@@ -17,7 +17,17 @@ export default defineConfig({
     },
   },
   server: {
+    // IPv4 صراحةً لأن Tailscale يمرّر الطلبات إلى 127.0.0.1
+    host: '127.0.0.1',
     port: 3000,
     open: true,
+    // السماح بالوصول عبر عنوان Tailscale (*.ts.net)
+    allowedHosts: ['.ts.net'],
+    // تمرير طلبات الـ API والصور و SignalR إلى الباك، ليعمل الموقع كله من منفذ واحد
+    proxy: {
+      '/api': 'http://localhost:5010',
+      '/uploads': 'http://localhost:5010',
+      '/hubs': { target: 'http://localhost:5010', ws: true },
+    },
   },
 })

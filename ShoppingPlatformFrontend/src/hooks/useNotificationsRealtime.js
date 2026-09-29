@@ -4,7 +4,7 @@ import * as signalR from '@microsoft/signalr'
 import { useAuthStore } from '../stores/authStore'
 import { useNotificationsStore, formatNotification } from '../stores/notificationsStore'
 
-const HUB_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5010'}/hubs/notifications`
+const HUB_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/notifications`
 
 /**
  * يتصل بـ NotificationHub ليصل الإشعار لحظيًا (بلا تحديث للصفحة)

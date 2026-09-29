@@ -18,7 +18,7 @@ export const useOpsNotifications = () => {
     isMounted.current = true
 
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${import.meta.env.VITE_API_URL || 'http://localhost:5010'}/hubs/ops`, {
+      .withUrl(`${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/ops`, {
         accessTokenFactory: () => token,
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000])
