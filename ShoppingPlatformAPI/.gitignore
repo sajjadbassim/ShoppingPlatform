@@ -1,0 +1,23 @@
+# Visual Studio files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+
+# Rider IDE
+.idea/
+
+# Node/NuGet packages
+node_modules/
+*.nupkg
+
+# Logs
+*.log
+
+# Others
+*.DS_Store
