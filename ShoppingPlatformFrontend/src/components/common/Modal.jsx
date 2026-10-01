@@ -77,7 +77,7 @@ const Modal = ({
 
   const modalContent = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
       onClick={handleOverlayClick}
     >
       {/* Overlay */}
@@ -91,15 +91,15 @@ const Modal = ({
         aria-labelledby={title ? 'modal-title' : undefined}
         tabIndex={-1}
         className={`
-          relative bg-white rounded-lg shadow-modal w-full
-          animate-scale-in overflow-hidden
+          relative bg-white rounded-t-2xl sm:rounded-lg shadow-modal w-full
+          animate-slide-up sm:animate-scale-in overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-none
           ${sizes[size]}
           ${className}
         `}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex-shrink-0">
             {title && (
               <h2 id="modal-title" className="text-lg font-semibold text-gray-900">
                 {title}
@@ -118,13 +118,13 @@ const Modal = ({
         )}
 
         {/* Content */}
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-4 sm:px-6 py-4 flex-1 min-h-0 sm:max-h-[70vh] overflow-y-auto">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-3 flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-4">
             {footer}
           </div>
         )}

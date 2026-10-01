@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Auth;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
@@ -20,6 +20,7 @@ namespace ecommerce.Services.AuthService
         private readonly IPasswordResetOtpRepository _passwordResetOtpRepository;
         private readonly ISmsSender _smsSender;
         private readonly INotificationService _notificationService;
+        private readonly IAuthThrottle _throttle;
 
         public AuthService(
             IUserRepository userRepository,
@@ -27,8 +28,10 @@ namespace ecommerce.Services.AuthService
             IVendorRepository vendorRepository,
             IPasswordResetOtpRepository passwordResetOtpRepository,
             ISmsSender smsSender,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IAuthThrottle throttle)
         {
+            _throttle = throttle;
             _userRepository = userRepository;
             _jwtSettings = jwtSettings.Value;
             _vendorRepository = vendorRepository;
@@ -37,31 +40,109 @@ namespace ecommerce.Services.AuthService
             _notificationService = notificationService;
         }
 
+        public const string PhoneUnavailable =
+            "لا يمكن إكمال التسجيل بهذا الرقم — إذا كان لديك حساب به فادخل بكلمة المرور";
+
+        // الإيميل مستخدم لحساب آخر؟ (بلا فرق بين الأحرف الكبيرة والصغيرة)
+        private async Task<bool> EmailTakenAsync(string email, Guid? exceptUserId = null) =>
+            email.Length > 0 && (await _userRepository.GetByEmailAsync(email)) is { } u && u.Id != exceptUserId;
+
+        private async Task<User?> FindByEmailAsync(string email) =>
+            email.Length == 0 ? null : await _userRepository.GetByEmailAsync(email);
+
+        // إضافة رقم الهاتف لحساب بلا هاتف (شرط إتمام الطلب) — يُعيد جلسة جديدة فيها الرقم
+        public async Task<LoginResponseDto> AddPhoneAsync(Guid userId, string phone)
+        {
+            var user = await _userRepository.GetByIdAsync(userId) ?? throw new Exception("المستخدم غير موجود");
+            var normalized = PhoneNumber.Require(phone);
+            if (user.Phone == normalized) return await SignInAsync(user);
+            if (!string.IsNullOrEmpty(user.Phone))
+                throw new Exception("لحسابك رقم هاتف مسبقاً");
+
+            var owner = await _userRepository.GetByPhoneAsync(normalized);
+            if (owner != null && owner.Id != userId)
+                throw new Exception("لا يمكن استخدام هذا الرقم — إذا كان لديك حساب به فادخل إليه بكلمة المرور");
+
+            user.Phone = normalized;
+            try { await _userRepository.UpdateAsync(user); }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+            {
+                throw new Exception("لا يمكن استخدام هذا الرقم — إذا كان لديك حساب به فادخل إليه بكلمة المرور");
+            }
+            return await SignInAsync(user);
+        }
+
+        // جلسة دخول لمستخدم تحقّقنا منه بطريقة أخرى (Google)
+        public async Task<LoginResponseDto> SignInAsync(User user)
+        {
+            user.LastLogin = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+
+            Guid? vendorId = null;
+            if (user.Role == UserRoles.Vendor)
+                vendorId = (await _vendorRepository.GetByOwnerIdAsync(user.Id))?.Id;
+
+            return new LoginResponseDto
+            {
+                UserId = user.Id,
+                Phone = user.Phone,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = user.Role,
+                Token = GenerateJwtToken(user),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
+                VendorId = vendorId,
+            };
+        }
+
         // ─────────────────────────────────────────────────────────────────────
         // REGISTER
         // ─────────────────────────────────────────────────────────────────────
         public async Task<LoginResponseDto> RegisterAsync(RegisterDto dto)
         {
-            var existingUser = await _userRepository.GetByPhoneAsync(dto.Phone);
-            if (existingUser != null)
-                throw new Exception("رقم الهاتف مسجل مسبقاً");
+            // الرقم بصيغة واحدة 07XXXXXXXXX حتى لا يتكرر نفس الرقم بصيغتين
+            var phone = PhoneNumber.Require(dto.Phone);
+            var fullName = (dto.FullName ?? "").Trim();
+            if (fullName.Length < 3)
+                throw new Exception("الاسم يجب أن يكون 3 أحرف على الأقل");
+
+            // رسالة محايدة: لا تؤكد أن الرقم مسجّل (تُستبدل لاحقاً برمز SMS)
+            var email = EmailAddress.Normalize(dto.Email);
+            if (!EmailAddress.IsValid(email))
+                throw new Exception("البريد الإلكتروني غير صحيح");
+
+            // نفس الرسالة للهاتف والإيميل المستخدَمين: لا تكشف أيهما مسجّل
+            if (await _userRepository.GetByPhoneAsync(phone) != null || await EmailTakenAsync(email))
+                throw new Exception(PhoneUnavailable);
 
             var user = new User
             {
-                Phone = dto.Phone,
+                Phone = phone,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                FullName = dto.FullName,
-                Email = dto.Email,
+                FullName = fullName,
+                Email = email,
                 Role = UserRoles.Customer,
                 IsActive = true
             };
 
-            user = await _userRepository.CreateAsync(user);
+            try
+            {
+                user = await _userRepository.CreateAsync(user);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException)
+            {
+                // تسجيلان بنفس الرقم في نفس اللحظة — يمنعهما الفهرس الفريد
+                throw new Exception(PhoneUnavailable);
+            }
 
-            await _notificationService.NotifyAdminsAsync(
-                NotificationCategory.NewUsers, NotificationType.NEW_USER,
-                $"مستخدم جديد: {user.FullName} ({user.Phone})",
-                new { userId = user.Id });
+            try
+            {
+                await _notificationService.NotifyAdminsAsync(
+                    NotificationCategory.NewUsers, NotificationType.NEW_USER,
+                    $"مستخدم جديد: {user.FullName} ({user.Phone})",
+                    new { userId = user.Id });
+            }
+            catch { /* الإشعار لا يُفشل التسجيل */ }
 
             var token = GenerateJwtToken(user);
 
@@ -83,12 +164,22 @@ namespace ecommerce.Services.AuthService
         // ─────────────────────────────────────────────────────────────────────
         public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
         {
-            var user = await _userRepository.GetByPhoneAsync(dto.Phone);
-            if (user == null)
-                throw new Exception("رقم الهاتف أو كلمة المرور غير صحيحة");
+            var identifier = (dto.Identifier ?? dto.Phone ?? "").Trim();
+            if (identifier.Length == 0)
+                throw new Exception("أدخل رقم الهاتف أو البريد الإلكتروني");
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-                throw new Exception("رقم الهاتف أو كلمة المرور غير صحيحة");
+            // إيميل أو هاتف — والمحاولات تُحسب لكل واحد منهما
+            var byEmail = EmailAddress.LooksLikeEmail(identifier);
+            var key = byEmail ? EmailAddress.Normalize(identifier) : PhoneNumber.ForLookup(identifier);
+            _throttle.EnsureLoginAllowed(key);
+
+            var user = byEmail ? await FindByEmailAsync(key) : await _userRepository.GetByPhoneAsync(key);
+            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            {
+                _throttle.LoginFailed(key);
+                throw new Exception("بيانات الدخول أو كلمة المرور غير صحيحة");
+            }
+            _throttle.LoginSucceeded(key);
 
             if (!user.IsActive)
                 throw new Exception("الحساب معطل. يرجى التواصل مع الدعم الفني");
@@ -177,9 +268,13 @@ namespace ecommerce.Services.AuthService
         // ─────────────────────────────────────────────────────────────────────
         public async Task ForgotPasswordAsync(ForgotPasswordDto dto)
         {
-            var user = await _userRepository.GetByPhoneAsync(dto.Phone);
-            if (user == null)
-                throw new Exception("لا يوجد حساب مرتبط بهذا الرقم");
+            var phone = PhoneNumber.ForLookup(dto.Phone);
+            _throttle.EnsureOtpRequestAllowed(phone);
+
+            // نفس الرد سواء كان الرقم مسجلاً أم لا — حتى لا تُعرف الأرقام المسجلة
+            var user = await _userRepository.GetByPhoneAsync(phone);
+            if (user == null || !user.IsActive || string.IsNullOrEmpty(user.Phone))
+                return;
 
             // إبطال أي رموز سابقة لم تُستخدم بعد
             await _passwordResetOtpRepository.InvalidatePendingForUserAsync(user.Id);
@@ -202,7 +297,7 @@ namespace ecommerce.Services.AuthService
         // ─────────────────────────────────────────────────────────────────────
         public async Task<string> VerifyResetOtpAsync(VerifyResetOtpDto dto)
         {
-            var user = await _userRepository.GetByPhoneAsync(dto.Phone);
+            var user = await _userRepository.GetByPhoneAsync(PhoneNumber.ForLookup(dto.Phone));
             if (user == null)
                 throw new Exception("رمز التحقق غير صحيح أو منتهي الصلاحية");
 
@@ -242,6 +337,7 @@ namespace ecommerce.Services.AuthService
                 throw new Exception("المستخدم غير موجود");
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.HasPassword = true;
             await _userRepository.UpdateAsync(user);
 
             otp.IsUsed = true;
@@ -259,12 +355,12 @@ namespace ecommerce.Services.AuthService
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.MobilePhone,    user.Phone),
+                new Claim(ClaimTypes.MobilePhone,    user.Phone ?? ""),
                 new Claim(ClaimTypes.Name,           user.FullName ?? ""),
                 new Claim(ClaimTypes.Email,          user.Email    ?? ""),
                 new Claim(ClaimTypes.Role,           user.Role),
                 new Claim("userId", user.Id.ToString()),
-                new Claim("phone",  user.Phone)
+                new Claim("phone",  user.Phone ?? "")
             };
 
             var tokenDescriptor = new SecurityTokenDescriptor

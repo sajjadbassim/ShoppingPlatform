@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Return;
 using ecommerce.Core.Models;
 using ecommerce.Data;
@@ -16,12 +16,16 @@ namespace ecommerce.Services
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
 
+        private readonly ecommerce.Services.FinanceService.IFinanceService? _finance;
+
         public ReturnService(
             IReturnRepository returnRepository,
             IFileService fileService,
             AppDbContext context,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            ecommerce.Services.FinanceService.IFinanceService? finance = null)
         {
+            _finance = finance;
             _returnRepository = returnRepository;
             _fileService = fileService;
             _context = context;
@@ -225,6 +229,9 @@ namespace ecommerce.Services
             returnRequest.RejectionReason = dto.RejectionReason;
 
             await _returnRepository.UpdateAsync(returnRequest);
+            // الموافقة على إرجاع بعد الاستلام = تُخصم قيمته من المتجر
+            if (returnRequest.Status == ReturnStatus.APPROVED && _finance != null)
+                await _finance.EnsureReturnEntriesAsync(returnRequest.Id);
             return await GetByIdAsync(returnId);
         }
 

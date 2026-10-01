@@ -1,186 +1,238 @@
-import { Settings, Globe, Sun, Moon, Bell, Shield, CreditCard, HelpCircle, FileText, MessageCircle, ChevronLeft, Save, CheckCircle } from 'lucide-react'
-import Button from '../../components/common/Button'
+import { useState } from 'react'
+import GoogleLinkRow from '../../components/auth/GoogleLinkRow'
+import { PushDeviceRow } from '../../components/common/PushPrompt'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  User, MapPin, Lock, Bell, Download, Share2, RefreshCw, Globe, Moon, HelpCircle, MessageCircle,
+  RotateCcw, Truck, FileText, Shield, Info, LogOut, ChevronLeft, CheckCircle2, Star,
+} from 'lucide-react'
 import Breadcrumb from '../../components/common/Breadcrumb'
 import { Toggle } from '../../components/common/FormControls'
-import Select from '../../components/common/Select'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
-import { useUIStore } from '../../stores/uiStore'
-import { usePreferencesDraft } from '../../hooks/usePreferences'
+import { useAuthStore } from '../../stores/authStore'
+import { useMyPreferences, useUpdateMyPreferences, useThemePreference } from '../../hooks/usePreferences'
+import { useInstallPrompt } from '../../hooks/useInstallPrompt'
 
-// المكونات على مستوى الملف — تعريفها داخل الصفحة يعيد إنشاءها مع كل تغيير فتُغلق القوائم وتفقد الحقول التركيز
-const SettingSection = ({ title, icon: Icon, children }) => (
-  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-    <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center gap-3">
-      <Icon size={20} className="text-primary" />
-      <h2 className="font-bold text-gray-900">{title}</h2>
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
+
+// ===========================
+// عناصر القائمة (خارج الصفحة حتى لا يُعاد إنشاؤها مع كل تغيير)
+// ===========================
+const Group = ({ title, children }) => (
+  <section>
+    {title && <h2 className="px-1 mb-2 text-xs font-bold text-gray-500">{title}</h2>}
+    <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100 overflow-hidden">
+      {children}
     </div>
-    <div className="p-6">{children}</div>
-  </div>
+  </section>
 )
 
-const SettingRow = ({ title, description, children }) => (
-  <div className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0">
-    <div>
-      <p className="font-medium text-gray-900">{title}</p>
-      {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
-    </div>
-    {children}
-  </div>
+const IconBox = ({ icon: Icon, color }) => (
+  <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+    <Icon size={18} />
+  </span>
 )
 
-const LinkRow = ({ title, description, icon: Icon, href }) => (
-  <a href={href} className="flex items-center justify-between py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 -mx-6 px-6 transition-colors">
-    <div className="flex items-center gap-3">
-      <Icon size={20} className="text-gray-400" />
-      <div>
-        <p className="font-medium text-gray-900">{title}</p>
-        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
-      </div>
-    </div>
-    <ChevronLeft size={20} className="text-gray-400" />
-  </a>
+// صف قابل للضغط (رابط أو زر)
+const Row = ({ icon, color = 'bg-gray-100 text-gray-600', title, subtitle, to, onClick, trailing, danger }) => {
+  const content = (
+    <>
+      <IconBox icon={icon} color={danger ? 'bg-red-50 text-red-500' : color} />
+      <span className="flex-1 min-w-0 text-right">
+        <span className={`block text-sm font-medium ${danger ? 'text-red-600' : 'text-gray-900'}`}>{title}</span>
+        {subtitle && <span className="block text-xs text-gray-500 mt-0.5 truncate">{subtitle}</span>}
+      </span>
+      {trailing ?? (!danger && <ChevronLeft size={18} className="text-gray-300 flex-shrink-0" />)}
+    </>
+  )
+  const className = 'w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 active:bg-gray-100 transition-colors'
+  return to
+    ? <Link to={to} className={className}>{content}</Link>
+    : <button type="button" onClick={onClick} className={className}>{content}</button>
+}
+
+// صف بمفتاح تشغيل
+const ToggleRow = ({ icon, color, title, subtitle, checked, onChange, disabled }) => (
+  <label className={`flex items-center gap-3 px-4 py-3 ${disabled ? 'opacity-60' : 'cursor-pointer'}`}>
+    <IconBox icon={icon} color={color} />
+    <span className="flex-1 min-w-0">
+      <span className="block text-sm font-medium text-gray-900">{title}</span>
+      {subtitle && <span className="block text-xs text-gray-500 mt-0.5">{subtitle}</span>}
+    </span>
+    <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+  </label>
 )
 
-const PREFERENCE_KEYS = ['language', 'currency', 'theme', 'notifyOrderUpdates']
-
+// ===========================
+// الصفحة
+// ===========================
 const SettingsPage = () => {
+  const navigate = useNavigate()
   const { success, error: showError } = useToast()
-  const { setTheme, setLanguage } = useUIStore()
-  const { draft, set, save, isDirty, isLoading, isError, isSaving } = usePreferencesDraft()
+  const { user, logout } = useAuthStore()
+  const { data: prefs, isLoading: prefsLoading } = useMyPreferences()
+  const { mutateAsync: updatePrefs, isPending: savingPrefs } = useUpdateMyPreferences()
+  const { theme, changeTheme, isSaving: savingTheme } = useThemePreference()
+  const { installed, canPrompt, ios, promptInstall } = useInstallPrompt()
+  const [clearing, setClearing] = useState(false)
 
-  const hasChanges = isDirty(PREFERENCE_KEYS)
-
-  const handleSave = async () => {
+  // الحفظ فوري عند تبديل المفتاح — لا حاجة لزر "حفظ"
+  const toggleOrderUpdates = async (e) => {
+    const value = e.target.checked
     try {
-      const saved = await save(PREFERENCE_KEYS)
-      // تطبيق المظهر واللغة بعد نجاح الحفظ حتى تبقى الواجهة مطابقة لما في الخادم
-      setTheme(saved.theme)
-      setLanguage(saved.language)
-      success('تم حفظ الإعدادات بنجاح')
+      await updatePrefs({ notifyOrderUpdates: value })
+      success(value ? 'سنُعلمك بكل تحديث على طلباتك' : 'تم إيقاف إشعارات الطلبات')
     } catch (err) {
-      showError(err.message || 'فشل حفظ الإعدادات')
+      showError(err.message || 'تعذّر حفظ الإعداد')
     }
   }
 
-  const breadcrumbItems = [{ label: 'حسابي', path: '/profile' }, { label: 'الإعدادات' }]
+  // المظهر يتغير فوراً ثم يُحفظ في الحساب
+  const toggleDarkMode = async (e) => {
+    const dark = e.target.checked
+    try {
+      await changeTheme(dark ? 'dark' : 'light')
+    } catch (err) {
+      showError(err.message || 'تعذّر حفظ المظهر')
+    }
+  }
 
-  const languages = [
-    { value: 'ar', label: 'العربية' },
-    { value: 'en', label: 'English' },
-    { value: 'ku', label: 'کوردی' },
-  ]
+  const handleInstall = async () => {
+    if (canPrompt) {
+      if (await promptInstall()) success('تم تثبيت التطبيق 🎉')
+    } else if (ios) {
+      success('من Safari: اضغط زر المشاركة ثم «إضافة إلى الشاشة الرئيسية»')
+    }
+  }
 
-  const currencies = [
-    { value: 'IQD', label: 'دينار عراقي (IQD)' },
-    { value: 'USD', label: 'دولار أمريكي (USD)' },
-  ]
+  const handleShare = async () => {
+    const data = { title: 'منصة واسط التجارية', text: 'تسوّق من متاجر واسط المحلية بتوصيل سريع', url: window.location.origin }
+    if (navigator.share) {
+      try { await navigator.share(data) } catch { /* ألغى المستخدم */ }
+    } else {
+      await navigator.clipboard?.writeText(data.url)
+      success('تم نسخ رابط التطبيق')
+    }
+  }
+
+  // يحذف ملفات التطبيق المخزّنة ويعيد التحميل — يحل مشكلة ظهور نسخة قديمة
+  const handleClearCache = async () => {
+    setClearing(true)
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map(k => caches.delete(k)))
+      }
+      const reg = await navigator.serviceWorker?.getRegistration()
+      await reg?.update()
+      success('تم مسح البيانات المؤقتة، جاري إعادة التحميل...')
+      setTimeout(() => window.location.reload(), 800)
+    } catch {
+      showError('تعذّر مسح البيانات المؤقتة')
+      setClearing(false)
+    }
+  }
+
+  const handleLogout = () => {
+    if (!confirm('هل تريد تسجيل الخروج؟')) return
+    logout()
+    success('تم تسجيل الخروج بنجاح')
+    navigate('/')
+  }
+
+  const installRow = installed
+    ? <Row icon={Download} color="bg-green-50 text-green-600" title="التطبيق مثبّت على جهازك"
+        trailing={<CheckCircle2 size={18} className="text-green-500 flex-shrink-0" />} onClick={() => {}} />
+    : (canPrompt || ios)
+      ? <Row icon={Download} color="bg-primary/10 text-primary" title="تثبيت التطبيق" subtitle="وصول أسرع من الشاشة الرئيسية" onClick={handleInstall} />
+      : null
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container-main py-6">
-        <Breadcrumb items={breadcrumbItems} className="mb-6" />
+      <div className="container-main py-4 lg:py-6">
+        <Breadcrumb items={[{ label: 'حسابي', path: '/profile' }, { label: 'الإعدادات' }]} className="mb-6 hidden lg:block" />
 
-        <div className="max-w-3xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Settings size={24} className="text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">الإعدادات</h1>
-                <p className="text-gray-500">إدارة تفضيلات حسابك</p>
-              </div>
-            </div>
-            {hasChanges && (
-              <Button variant="primary" onClick={handleSave} loading={isSaving}>
-                <Save size={18} className="ml-1" />
-                حفظ التغييرات
-              </Button>
+        <div className="max-w-2xl mx-auto space-y-5">
+          <h1 className="text-xl lg:text-2xl font-bold text-gray-900">الإعدادات</h1>
+
+          {/* بطاقة المستخدم */}
+          <Link to="/profile"
+            className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-l from-primary to-indigo-700 text-white shadow-sm">
+            <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold flex-shrink-0">
+              {user?.fullName?.charAt(0) || 'م'}
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-bold text-lg truncate">{user?.fullName || 'المستخدم'}</span>
+              <span className="block text-sm text-white/80 truncate text-right" dir="ltr">{user?.phone || user?.email}</span>
+            </span>
+            <span className="h-9 px-3 rounded-full bg-white/15 text-sm font-medium flex items-center gap-1 flex-shrink-0">
+              تعديل <ChevronLeft size={15} />
+            </span>
+          </Link>
+
+          <Group title="الحساب">
+            <Row icon={User} color="bg-blue-50 text-blue-600" title="الملف الشخصي" subtitle="الاسم والبريد الإلكتروني" to="/profile" />
+            <Row icon={MapPin} color="bg-emerald-50 text-emerald-600" title="عناوين التوصيل" subtitle="إضافة وتعديل عناوينك" to="/profile?tab=addresses" />
+            <Row icon={Lock} color="bg-amber-50 text-amber-600" title="كلمة المرور والأمان" subtitle="تغيير كلمة المرور" to="/profile?tab=security" />
+            <GoogleLinkRow />
+            <Row icon={Star} color="bg-yellow-50 text-yellow-600" title="النقاط التشجيعية" subtitle="رصيدك ومستواك وسجل النقاط" to="/loyalty" />
+          </Group>
+
+          <Group title="الإشعارات">
+            <PushDeviceRow />
+            {prefsLoading ? (
+              <div className="p-4"><Skeleton className="h-10 rounded-xl" /></div>
+            ) : (
+              <ToggleRow icon={Bell} color="bg-rose-50 text-rose-500"
+                title="تحديثات الطلبات"
+                subtitle="عند تأكيد طلبك وتحضيره وخروجه للتوصيل"
+                checked={prefs?.notifyOrderUpdates ?? true}
+                onChange={toggleOrderUpdates}
+                disabled={savingPrefs} />
             )}
-          </div>
+          </Group>
 
-          {isLoading ? (
-            <div className="space-y-4">{[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}</div>
-          ) : isError || !draft ? (
-            <p className="text-center text-red-500 py-8">تعذّر تحميل الإعدادات من الخادم</p>
-          ) : (
-            <>
-              {/* Language & Region */}
-              <SettingSection title="اللغة والمنطقة" icon={Globe}>
-                <SettingRow title="اللغة" description="اختر لغة العرض">
-                  <Select
-                    options={languages}
-                    value={draft.language}
-                    onChange={v => set('language', v)}
-                    className="w-40"
-                  />
-                </SettingRow>
-                <SettingRow title="العملة" description="العملة الافتراضية للأسعار">
-                  <Select
-                    options={currencies}
-                    value={draft.currency}
-                    onChange={v => set('currency', v)}
-                    className="w-48"
-                  />
-                </SettingRow>
-              </SettingSection>
+          <Group title="التطبيق">
+            {installRow}
+            <Row icon={Share2} color="bg-indigo-50 text-indigo-600" title="مشاركة التطبيق" subtitle="أرسل واسط لأصدقائك" onClick={handleShare} />
+            <Row icon={RefreshCw} color="bg-gray-100 text-gray-600" title="مسح البيانات المؤقتة"
+              subtitle="إذا ظهرت نسخة قديمة أو لم تتحدث الصفحات"
+              onClick={handleClearCache}
+              trailing={clearing ? <RefreshCw size={16} className="animate-spin text-gray-400" /> : undefined} />
+          </Group>
 
-              {/* Appearance */}
-              <SettingSection title="المظهر" icon={Sun}>
-                <SettingRow title="الوضع" description="اختر مظهر التطبيق">
-                  <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => set('theme', 'light')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                        draft.theme === 'light' ? 'bg-white shadow text-primary' : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <Sun size={18} />فاتح
-                    </button>
-                    <button
-                      onClick={() => set('theme', 'dark')}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
-                        draft.theme === 'dark' ? 'bg-white shadow text-primary' : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      <Moon size={18} />داكن
-                    </button>
-                  </div>
-                </SettingRow>
-              </SettingSection>
+          <Group title="اللغة والمظهر">
+            <ToggleRow icon={Moon} color="bg-slate-100 text-slate-600" title="الوضع الداكن" subtitle="مظهر مريح للعين ليلاً"
+              checked={theme === 'dark'} onChange={toggleDarkMode} disabled={savingTheme} />
+            <div className="flex items-center gap-3 px-4 py-3">
+              <IconBox icon={Globe} color="bg-sky-50 text-sky-600" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-gray-900">اللغة والعملة</span>
+                <span className="block text-xs text-gray-500 mt-0.5">العربية • دينار عراقي</span>
+              </span>
+            </div>
+          </Group>
 
-              {/* Notifications */}
-              <SettingSection title="الإشعارات" icon={Bell}>
-                <SettingRow title="تحديثات الطلبات" description="إشعارات عند إنشاء طلبك أو تأكيده أو تغيير حالته">
-                  <Toggle checked={draft.notifyOrderUpdates} onChange={(e) => set('notifyOrderUpdates', e.target.checked)} />
-                </SettingRow>
-              </SettingSection>
-            </>
-          )}
+          <Group title="المساعدة والمعلومات">
+            <Row icon={HelpCircle} color="bg-violet-50 text-violet-600" title="مركز المساعدة" subtitle="الأسئلة الشائعة والأدلة" to="/help" />
+            <Row icon={MessageCircle} color="bg-green-50 text-green-600" title="تواصل معنا" subtitle="فريق الدعم جاهز لمساعدتك" to="/contact" />
+            <Row icon={RotateCcw} color="bg-orange-50 text-orange-600" title="سياسة الإرجاع" to="/return-policy" />
+            <Row icon={Truck} color="bg-teal-50 text-teal-600" title="الشحن والتوصيل" to="/shipping" />
+            <Row icon={FileText} color="bg-gray-100 text-gray-600" title="شروط الاستخدام" to="/terms" />
+            <Row icon={Shield} color="bg-gray-100 text-gray-600" title="سياسة الخصوصية" to="/privacy" />
+            <Row icon={Info} color="bg-gray-100 text-gray-600" title="من نحن" to="/about" />
+          </Group>
 
-          {/* Payment Methods */}
-          <SettingSection title="طرق الدفع" icon={CreditCard}>
-            <LinkRow title="إدارة طرق الدفع" description="إضافة أو إزالة بطاقات الدفع" icon={CreditCard} href="/profile?tab=payment" />
-          </SettingSection>
+          <Group>
+            <Row icon={LogOut} title="تسجيل الخروج" onClick={handleLogout} danger />
+          </Group>
 
-          {/* Help & Support */}
-          <SettingSection title="المساعدة والدعم" icon={HelpCircle}>
-            <LinkRow title="مركز المساعدة" description="الأسئلة الشائعة والأدلة" icon={HelpCircle} href="/help" />
-            <LinkRow title="تواصل معنا" description="تحدث مع فريق الدعم" icon={MessageCircle} href="/contact" />
-            <LinkRow title="شروط الاستخدام" description="الشروط والأحكام" icon={FileText} href="/terms" />
-            <LinkRow title="سياسة الخصوصية" description="كيف نحمي بياناتك" icon={Shield} href="/privacy" />
-          </SettingSection>
-
-          {/* App Info */}
-          <div className="text-center text-gray-500 text-sm py-4 space-y-1">
-            <p className="font-medium">منصة واسط التجارية</p>
-            <p>الإصدار 1.0.0</p>
-            <p className="flex items-center justify-center gap-1">
-              <CheckCircle size={14} className="text-green-500" />
-              <span>جميع الخدمات تعمل بشكل طبيعي</span>
-            </p>
+          {/* معلومات التطبيق */}
+          <div className="text-center py-2 space-y-1">
+            <img src="/pwa-64x64.png" alt="" className="w-10 h-10 mx-auto rounded-xl" />
+            <p className="text-sm font-bold text-gray-700">منصة واسط التجارية</p>
+            <p className="text-xs text-gray-400">الإصدار {APP_VERSION}</p>
           </div>
         </div>
       </div>

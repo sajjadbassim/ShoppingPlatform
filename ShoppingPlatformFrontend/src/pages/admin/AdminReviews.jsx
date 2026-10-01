@@ -779,12 +779,12 @@ const AdminReviews = () => {
 
       {/* Tabs */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="flex border-b border-gray-200">
+        <div className="flex border-b border-gray-200 overflow-x-auto hide-scrollbar">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.key
                   ? 'border-b-2 border-primary text-primary bg-primary/5'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'

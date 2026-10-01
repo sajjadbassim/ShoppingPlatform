@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -38,6 +38,10 @@ namespace ecommerce.Core.Models
         [Required]
         [Column("quantity")]
         public int Quantity { get; set; }
+
+        // قطع رفضها الزبون عند الاستلام (رجعت مع السائق للمتجر)
+        [Column("refused_quantity")]
+        public int RefusedQuantity { get; set; } = 0;
 
         [Required]
         [Column("subtotal", TypeName = "decimal(10,2)")]

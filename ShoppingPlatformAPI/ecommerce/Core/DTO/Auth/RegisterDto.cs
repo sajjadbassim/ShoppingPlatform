@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Auth
 {
@@ -19,9 +19,11 @@ namespace ecommerce.Core.DTO.Auth
         [MaxLength(255)]
         public string FullName { get; set; }
 
+        // إلزامي وفريد — يُستخدم للدخول أيضاً
+        [Required(ErrorMessage = "البريد الإلكتروني مطلوب")]
         [EmailAddress(ErrorMessage = "البريد الإلكتروني غير صحيح")]
         [MaxLength(255)]
-        public string Email { get; set; }
+        public string Email { get; set; } = "";
 
 
 

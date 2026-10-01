@@ -120,6 +120,9 @@ namespace ecommerce.Core.DTO.Loyalty
         public decimal? GoldMultiplier { get; set; }
         public decimal? PlatinumMultiplier { get; set; }
 
+        [Range(0, 10000)]
+        public int? ReviewPoints { get; set; }
+
         public bool? IsActive { get; set; }
     }
 
@@ -136,6 +139,7 @@ namespace ecommerce.Core.DTO.Loyalty
         public decimal SilverMultiplier { get; set; }
         public decimal GoldMultiplier { get; set; }
         public decimal PlatinumMultiplier { get; set; }
+        public int ReviewPoints { get; set; }
         public bool IsActive { get; set; }
     }
 }

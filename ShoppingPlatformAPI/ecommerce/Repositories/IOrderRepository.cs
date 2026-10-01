@@ -18,5 +18,7 @@ namespace ecommerce.Repositories
         string status,
         int pageNumber,
         int pageSize);
+
+        Task<Dictionary<string, int>> GetStatusCountsAsync();
         }
 }

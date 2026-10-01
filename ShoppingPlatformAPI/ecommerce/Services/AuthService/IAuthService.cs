@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Auth;
+using ecommerce.Core.DTO.Auth;
 
 namespace ecommerce.Services.AuthService
 {
@@ -6,6 +6,8 @@ namespace ecommerce.Services.AuthService
     {
         Task<LoginResponseDto> RegisterAsync(RegisterDto dto);
         Task<LoginResponseDto> LoginAsync(LoginDto dto);
+        Task<LoginResponseDto> SignInAsync(ecommerce.Core.Models.User user);
+        Task<LoginResponseDto> AddPhoneAsync(Guid userId, string phone);
         Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordDto dto);
         Task<LoginResponseDto> RefreshTokenAsync(Guid userId);
         Task ForgotPasswordAsync(ForgotPasswordDto dto);

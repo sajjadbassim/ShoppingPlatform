@@ -1,11 +1,12 @@
-﻿using ecommerce.Core.DTO.Common;
+using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Vendor;
 
 namespace ecommerce.Services.VendorService.VendorService
 {
     public interface IVendorService
     {
-        Task<VendorResponseDto> CreateAsync(VendorCreateDto dto, Guid? ownerId = null);
+        Task<VendorResponseDto> CreateAsync(VendorCreateDto dto, Guid? ownerId = null, bool byAdmin = false);
+        Task<bool> ApproveOwnerAsync(Guid vendorId);
         Task<VendorResponseDto> GetByIdAsync(Guid id);
         Task<IEnumerable<VendorResponseDto>> GetAllAsync(bool onlyActive = true);
         Task<VendorResponseDto> GetByPhoneAsync(string phone);

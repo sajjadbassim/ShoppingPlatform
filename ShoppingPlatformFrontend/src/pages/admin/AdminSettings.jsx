@@ -1,12 +1,15 @@
 // src/pages/admin/AdminSettings.jsx
-import { Bell, Shield, Globe, Info } from 'lucide-react'
+import { Bell, Shield, Info } from 'lucide-react'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
 import { usePreferencesDraft } from '../../hooks/usePreferences'
 import {
-  SettingsSection, SettingsToggle, ThemePicker, LANGUAGE_OPTIONS,
+  SettingsSection, SettingsToggle, AppearanceSection,
 } from '../../components/settings/SettingsSection'
+import DeliveryFeePolicy from '../../components/settings/DeliveryFeePolicy'
+import ConfirmationTimeoutSetting from '../../components/settings/ConfirmationTimeoutSetting'
+import DeliverySpeedThresholds from '../../components/settings/DeliverySpeedThresholds'
 
 const ROLE_LABELS = {
   ADMIN: 'مدير النظام',
@@ -18,7 +21,6 @@ const ROLE_LABELS = {
 const NOTIFICATION_KEYS = [
   'notifyNewOrders', 'notifyReturns', 'notifyNewUsers', 'notifyLowStock', 'notifyNewVendors',
 ]
-const DISPLAY_KEYS = ['language', 'theme']
 
 const AdminSettings = () => {
   const { success, error: showError } = useToast()
@@ -81,28 +83,16 @@ const AdminSettings = () => {
         )}
       </SettingsSection>
 
-      {/* إعدادات العرض */}
-      <SettingsSection icon={Globe} title="إعدادات العرض"
-        onSave={handleSave(DISPLAY_KEYS, 'تم حفظ إعدادات العرض')}
-        saving={isSaving} saveDisabled={!isDirty(DISPLAY_KEYS)}>
-        {isLoading ? loadingBlock : isError || !draft ? errorBlock : (
-          <div className="space-y-4">
-            <div className="max-w-xs">
-              <label className="text-sm font-medium text-gray-700 block mb-1">اللغة</label>
-              <select value={draft.language} onChange={e => set('language', e.target.value)}
-                className="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white">
-                {LANGUAGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 block mb-2">المظهر</label>
-              <ThemePicker value={draft.theme} onChange={v => set('theme', v)} />
-            </div>
-          </div>
-        )}
-      </SettingsSection>
+      {/* المظهر */}
+      <AppearanceSection />
 
       {/* معلومات النظام */}
+      <ConfirmationTimeoutSetting editable />
+
+      <DeliverySpeedThresholds editable />
+
+      <DeliveryFeePolicy />
+
       <SettingsSection icon={Info} title="معلومات النظام">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[

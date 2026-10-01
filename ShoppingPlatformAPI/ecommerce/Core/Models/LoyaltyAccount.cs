@@ -79,6 +79,11 @@ namespace ecommerce.Core.Models
         [Column("order_id")]
         public Guid? OrderId { get; set; }         // مرتبط بطلب
 
+        // مفتاح يمنع تكرار منح نقاط لنفس الحدث، مثل "review:{productId}" لنقاط التقييم
+        [MaxLength(100)]
+        [Column("reference_key")]
+        public string? ReferenceKey { get; set; }
+
         [Column("expires_at")]
         public DateTime? ExpiresAt { get; set; }   // صلاحية النقاط المكتسبة
 
@@ -150,6 +155,10 @@ namespace ecommerce.Core.Models
         [Precision(18, 4)]
         [Column("platinum_multiplier")]
         public decimal PlatinumMultiplier { get; set; } = 2.0m;
+
+        // نقاط كتابة تقييم لمنتج (0 = لا نقاط)
+        [Column("review_points")]
+        public int ReviewPoints { get; set; } = 10;
 
         [Column("is_active")]
         public bool IsActive { get; set; } = true;

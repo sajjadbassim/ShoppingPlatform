@@ -177,7 +177,7 @@ export const Toggle = forwardRef(({
           ${checked ? 'bg-primary' : 'bg-gray-300'}
         `}>
           <div className={`
-            ${currentSize.thumb} bg-white rounded-full shadow-sm
+            ${currentSize.thumb} bg-white keep-white rounded-full shadow-sm
             transition-transform duration-200 absolute top-1 right-1
             ${checked ? `-${currentSize.translate}` : ''}
           `} 

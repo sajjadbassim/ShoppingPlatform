@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.OrderRating;
+using ecommerce.Core.DTO.OrderRating;
 using ecommerce.Services;
 using ecommerce.Services.OrderRatingService;
 using Microsoft.AspNetCore.Authorization;
@@ -70,13 +70,32 @@ namespace ecommerce.Controllers
         // GET: api/orders/{orderId}/rating/status
         // هل قيّم الزبون هذا الطلب؟
         // ===================================
+        // POST: api/orders/{orderId}/rating/stores — تقييم المتاجر وحدها (مستقل عن تقييم التجربة)
+        [HttpPost("stores")]
+        public async Task<IActionResult> RateStores(Guid orderId, [FromBody] CreateStoreRatingsDto dto)
+        {
+            try
+            {
+                var rating = await _ratingService.AddStoreRatingsAsync(orderId, GetCurrentUserId(), dto.SubOrderRatings, dto.DriverRatings);
+                return Ok(new { success = true, data = rating, message = "شكراً على تقييم المتاجر" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpGet("status")]
         public async Task<IActionResult> GetRatingStatus(Guid orderId)
         {
             try
             {
-                var hasRated = await _ratingService.HasRatedAsync(orderId, GetCurrentUserId());
-                return Ok(new { success = true, data = new { hasRated } });
+                var status = await _ratingService.GetRatingStatusAsync(orderId, GetCurrentUserId());
+                return Ok(new { success = true, data = status });
             }
             catch (Exception ex)
             {

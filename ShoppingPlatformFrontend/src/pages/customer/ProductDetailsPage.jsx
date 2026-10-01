@@ -4,17 +4,16 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   Star, Heart, Share2, Truck, Shield, RotateCcw,
   Minus, Plus, ShoppingCart, Store, AlertCircle, Check,
-  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent
+  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent, ChevronDown, ChevronLeft
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Breadcrumb from '../../components/common/Breadcrumb'
-import ProductCard from '../../components/common/ProductCard'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/common/Tabs'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useProduct, useProductsByCategory } from '../../hooks/useProducts'
 import { useProductVariants } from '../../hooks/useVariants'
-import { getAllProductImages } from '../../utils/imageHelper'
+import { getAllProductImages, getImageUrl } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -147,6 +146,79 @@ const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful }) => {
 }
 
 // ===========================
+// Mobile — التقييمات والمنتجات المشابهة بتمرير أفقي (الهاتف فقط)
+// ===========================
+const timeAgo = (date) => {
+  const days = Math.floor((Date.now() - new Date(date)) / 86400000)
+  if (days < 1) return 'اليوم'
+  if (days < 30) return `منذ ${days} يوم`
+  if (days < 365) return `منذ ${Math.floor(days / 30)} شهر`
+  return `منذ ${Math.floor(days / 365)} سنة`
+}
+
+const MobileReviewCard = ({ review, onMarkHelpful }) => {
+  const name = review.userName || review.userFullName || 'مستخدم'
+  const voted = review.isCurrentUserVotedHelpful ?? review.isHelpful
+  return (
+    <div className="w-[85%] sm:w-[360px] flex-shrink-0 snap-start bg-white border border-gray-200 rounded-2xl p-4 flex flex-col">
+      <div className="flex items-start gap-3 mb-3">
+        <div className="w-11 h-11 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold flex-shrink-0">
+          {name.charAt(0)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-gray-900 truncate">{name}</p>
+          <StarRating value={review.rating} size={16} />
+        </div>
+        <span className="text-xs text-gray-400 flex-shrink-0">{timeAgo(review.createdAt)}</span>
+      </div>
+      <div className="flex-1 border border-gray-200 rounded-xl p-3 min-h-[80px]">
+        {review.title && <p className="font-semibold text-gray-800 text-sm mb-1">{review.title}</p>}
+        {(review.body || !review.title) && (
+          <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">{review.body || '—'}</p>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2 mt-3">
+        <button onClick={() => onMarkHelpful(review.id, voted)}
+          className={`flex items-center gap-1.5 px-3 h-9 rounded-full border text-xs font-medium ${voted ? 'border-primary text-primary bg-primary/5' : 'border-gray-200 text-gray-800'}`}>
+          <ThumbsUp size={14} fill={voted ? 'currentColor' : 'none'} />
+          مراجعة مفيدة
+        </button>
+        {review.helpfulCount > 0 && (
+          <span className="text-xs text-gray-500">{review.helpfulCount} شخص وجدوه مفيد</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) => {
+  const img = p.images?.[0]?.url || p.images?.[0]?.imageUrl || p.primaryImageUrl
+  const src = img ? getImageUrl(img) : ''
+  const inStock = p.isAvailable && p.stockQuantity > 0
+  return (
+    <Link to={`/products/${p.id}`} className="block w-[44%] min-w-[150px] sm:w-[200px] flex-shrink-0 snap-start text-gray-900">
+      <div className="relative aspect-square bg-gray-50 rounded-2xl overflow-hidden border border-gray-100">
+        {src
+          ? <img src={src} alt="" loading="lazy" className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center text-gray-300"><ShoppingCart size={32} /></div>}
+        <button onClick={e => { e.preventDefault(); e.stopPropagation(); onToggleWishlist(p.id) }}
+          className="absolute top-2 left-2 w-9 h-9 rounded-full bg-white/90 shadow-sm flex items-center justify-center" aria-label="المفضلة">
+          <Heart size={18} className={isWishlisted ? 'text-error fill-error' : 'text-gray-700'} />
+        </button>
+        {inStock && (
+          <button onClick={e => { e.preventDefault(); e.stopPropagation(); onQuickAdd(p.id) }}
+            className="absolute bottom-2 left-2 w-9 h-9 rounded-full bg-white/90 shadow-sm flex items-center justify-center" aria-label="إضافة للسلة">
+            <Plus size={18} className="text-gray-800" />
+          </button>
+        )}
+      </div>
+      <p className="mt-2 text-[13px] leading-snug line-clamp-2 min-h-[2lh]">{p.nameAr || p.name}</p>
+      <p className="mt-1 font-bold">{p.price?.toLocaleString()} د.ع</p>
+    </Link>
+  )
+}
+
+// ===========================
 // WriteReviewForm — نموذج كتابة تقييم
 // ===========================
 const WriteReviewForm = ({ productId, onSuccess }) => {
@@ -179,8 +251,10 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
 
     try {
       const fd = reviewsService.buildFormData({ productId, orderId, rating, title, body })
-      await createReview(fd)
-      showSuccess('تم إضافة تقييمك بنجاح')
+      const created = await createReview(fd)
+      showSuccess(created?.pointsEarned > 0
+        ? `تم إضافة تقييمك وحصلت على ${created.pointsEarned} نقطة 🎉`
+        : 'تم إضافة تقييمك بنجاح')
       setRating(0); setTitle(''); setBody(''); setOrderId('')
       setShowForm(false)
       onSuccess?.()
@@ -421,6 +495,10 @@ const ProductDetailsPage = () => {
   const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
 
+  // الهاتف: عرض التقييمات كاملة أو كشريط أفقي، وتوزيع النجوم
+  const [showAllReviews, setShowAllReviews] = useState(false)
+  const [showRatingBreakdown, setShowRatingBreakdown] = useState(false)
+
   // الـ variant المختار حالياً
   const selectedVariant = useMemo(() => {
     if (!hasVariants) return null
@@ -511,6 +589,25 @@ const ProductDetailsPage = () => {
     }
   }
 
+  // المنتجات المشابهة: المفضلة والإضافة السريعة
+  const handleRelatedWishlist = async (productId) => {
+    if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
+    try { await toggleWishlist(productId) } catch { showError('فشلت العملية') }
+  }
+
+  const handleRelatedQuickAdd = async (productId) => {
+    if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
+    try {
+      // المنتج ذو الخيارات يُفتح لاختيارها
+      const relatedVariants = await variantsService.getVariants(productId)
+      if (variantsService.hasVariants(relatedVariants)) { navigate(`/products/${productId}`); return }
+      await addToCart(productId, 1, null)
+      success('تمت الإضافة للسلة')
+    } catch (err) {
+      showError(err.message || 'فشل إضافة المنتج للسلة')
+    }
+  }
+
   const handleShare = async () => {
     const url = window.location.href
     if (navigator.share) {
@@ -573,9 +670,11 @@ const ProductDetailsPage = () => {
     ? Math.round((1 - product.price / product.originalPrice) * 100)
     : 0
 
-  const filteredRelatedProducts = (relatedProducts || [])
-    .filter(p => p.id !== product.id)
-    .slice(0, 4)
+  const otherRelatedProducts = (relatedProducts || []).filter(p => p.id !== product.id)
+  const mobileRelatedProducts = otherRelatedProducts.slice(0, 10)
+
+  const avgRating = reviewSummary?.averageRating ?? reviewSummary?.average ?? 0
+  const totalReviews = reviewSummary?.totalReviews ?? reviewSummary?.total ?? 0
 
   const breadcrumbItems = [
     { label: 'المنتجات', path: '/products' },
@@ -752,8 +851,8 @@ const ProductDetailsPage = () => {
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="flex gap-3 mb-6">
+              {/* Actions — على الهاتف في الشريط السفلي الثابت */}
+              <div className="hidden lg:flex gap-3 mb-6">
                 <Button
                   variant="primary"
                   size="lg"
@@ -894,102 +993,126 @@ const ProductDetailsPage = () => {
           </Tabs>
         </div>
 
-        {/* ===== Reviews Section ===== */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Star size={20} className="text-yellow-400 fill-yellow-400" />
-              التقييمات
-              {reviewSummary?.totalReviews > 0 && (
-                <span className="text-sm font-normal text-gray-500">({reviewSummary.totalReviews})</span>
-              )}
-            </h2>
-            <select
-              value={reviewsSort}
-              onChange={e => { setReviewsSort(e.target.value); setReviewsPage(1) }}
-              className="h-9 px-3 border border-gray-200 rounded-lg text-sm bg-white"
-            >
-              <option value="newest">الأحدث</option>
-              <option value="highest">الأعلى تقييماً</option>
-              <option value="lowest">الأقل تقييماً</option>
-              <option value="helpful">الأكثر إفادة</option>
-            </select>
-          </div>
+        {/* ===== التقييمات والمراجعات ===== */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 lg:p-6 mb-5 lg:mb-6">
+          <h2 className="text-base lg:text-lg font-bold text-gray-900 flex items-center gap-2 mb-3">
+            <Star size={20} className="text-gray-800" />
+            التقييمات والمراجعات
+          </h2>
 
-          <ReviewSummary summary={reviewSummary} isLoading={summaryLoading} />
+          {/* الملخص — يفتح توزيع النجوم والترتيب */}
+          <button onClick={() => setShowRatingBreakdown(o => !o)}
+            className="w-full lg:w-auto lg:min-w-[320px] h-12 px-4 mb-3 border border-gray-200 rounded-xl flex items-center gap-2">
+            <Star size={22} className="text-warning fill-warning" />
+            <span className="text-lg font-bold text-gray-900">{Number(avgRating).toFixed(1)}</span>
+            <span className="text-sm text-gray-500">({totalReviews})</span>
+            <ChevronDown size={20} className={`mr-auto text-gray-600 transition-transform ${showRatingBreakdown ? 'rotate-180' : ''}`} />
+          </button>
+          {showRatingBreakdown && (
+            <>
+              <ReviewSummary summary={reviewSummary} isLoading={summaryLoading} />
+              <select value={reviewsSort}
+                onChange={e => { setReviewsSort(e.target.value); setReviewsPage(1) }}
+                className="w-full h-10 px-3 mb-3 border border-gray-200 rounded-xl text-sm bg-white">
+                <option value="newest">الأحدث</option>
+                <option value="highest">الأعلى تقييماً</option>
+                <option value="lowest">الأقل تقييماً</option>
+                <option value="helpful">الأكثر إفادة</option>
+              </select>
+            </>
+          )}
 
-          {/* Write Review */}
-          <div className="mb-6">
-            <WriteReviewForm productId={id} onSuccess={refetchReviews} />
-          </div>
-
-          {/* Reviews List */}
           {reviewsLoading ? (
-            <div className="space-y-4">
-              {[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}
+            <div className="flex gap-3 overflow-hidden">
+              {[1, 2].map(i => <Skeleton key={i} className="w-[85%] flex-shrink-0 h-48 rounded-2xl" />)}
             </div>
           ) : reviews.length === 0 ? (
-            <div className="text-center py-10 text-gray-400">
-              <Star size={40} className="mx-auto mb-3 opacity-30" />
+            <div className="text-center py-6 text-gray-400">
               <p>لا توجد تقييمات بعد</p>
               <p className="text-xs mt-1">كن أول من يقيّم هذا المنتج</p>
             </div>
+          ) : showAllReviews ? (
+            <>
+              <div className="space-y-5">
+                {reviews.map(review => (
+                  <ReviewCard key={review.id} review={review}
+                    currentUserId={user?.userId || user?.id}
+                    onDelete={handleDeleteReview} onMarkHelpful={handleMarkHelpful} />
+                ))}
+              </div>
+              {reviewsTotalPages > 1 && (
+                <div className="flex justify-center gap-2 mt-4">
+                  {Array.from({ length: reviewsTotalPages }, (_, i) => i + 1).map(page => (
+                    <button key={page} onClick={() => setReviewsPage(page)}
+                      className={`w-8 h-8 rounded-lg text-sm ${page === reviewsPage ? 'bg-primary text-white' : 'border border-gray-300 text-gray-600'}`}>
+                      {page}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="space-y-5">
+            <div className="flex gap-3 overflow-x-auto snap-x scroll-px-4 lg:scroll-px-6 hide-scrollbar -mx-4 px-4 lg:-mx-6 lg:px-6 pb-1">
               {reviews.map(review => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  currentUserId={user?.userId || user?.id}
-                  onDelete={handleDeleteReview}
-                  onMarkHelpful={handleMarkHelpful}
-                />
+                <MobileReviewCard key={review.id} review={review} onMarkHelpful={handleMarkHelpful} />
               ))}
             </div>
           )}
 
-          {/* Pagination */}
-          {reviewsTotalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-6">
-              {Array.from({ length: reviewsTotalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setReviewsPage(page)}
-                  className={`w-8 h-8 rounded-lg text-sm ${
-                    page === reviewsPage ? 'bg-primary text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
+          {reviews.length > 0 && (
+            <button onClick={() => setShowAllReviews(o => !o)}
+              className="w-full h-12 mt-4 border border-gray-200 rounded-full flex items-center justify-center gap-2 text-primary font-medium">
+              {showAllReviews ? 'عرض أقل' : 'عرض جميع المراجعات'}
+              {!showAllReviews && totalReviews > 0 && (
+                <span className="min-w-[26px] h-[26px] px-1.5 rounded-full bg-primary/10 text-primary text-sm flex items-center justify-center">{totalReviews}</span>
+              )}
+              <ChevronLeft size={18} className={showAllReviews ? 'rotate-90' : ''} />
+            </button>
           )}
+
+          <div className="mt-4">
+            <WriteReviewForm productId={id} onSuccess={refetchReviews} />
+          </div>
         </div>
 
-        {/* Related Products */}
-        {filteredRelatedProducts.length > 0 && (
-          <div>
-            <h2 className="text-xl font-bold mb-4">منتجات مشابهة</h2>
-            <div className="product-grid">
-              {filteredRelatedProducts.map(p => (
-                <ProductCard
-                  key={p.id}
-                  product={{
-                    id: p.id,
-                    name: p.nameAr || p.name,
-                    image: p.images?.[0]?.url || p.primaryImageUrl || '',
-                    price: p.price,
-                    originalPrice: p.originalPrice,
-                    rating: p.rating || 0,
-                    reviewsCount: p.reviewsCount || 0,
-                    storeName: p.vendor?.name || p.vendorName,
-                    inStock: p.isAvailable && p.stockQuantity > 0,
-                  }}
-                />
+        {/* ===== منتجات من نفس القسم ===== */}
+        {mobileRelatedProducts.length > 0 && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base lg:text-lg font-bold text-gray-900">منتجات من نفس القسم</h2>
+              <Link to={`/products?category=${product.categoryId}`}
+                className="px-4 h-9 flex items-center rounded-full border border-gray-200 bg-white text-primary text-sm font-medium">
+                مشاهدة المزيد
+              </Link>
+            </div>
+            <div className="flex gap-3 lg:gap-4 overflow-x-auto snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-1">
+              {mobileRelatedProducts.map(p => (
+                <MobileRelatedCard key={p.id} p={p}
+                  isWishlisted={isInWishlist(p.id)}
+                  onToggleWishlist={handleRelatedWishlist}
+                  onQuickAdd={handleRelatedQuickAdd} />
               ))}
             </div>
           </div>
         )}
+
+      </div>
+
+      {/* شريط الإضافة للسلة — الهاتف (مكان شريط التنقل السفلي) */}
+      <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+        <div className="h-16 px-4 flex items-center gap-2">
+          <button onClick={handleAddToCart} disabled={!isAvailable || cartLoading}
+            className="flex-1 h-12 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:bg-gray-300 active:scale-[0.99] transition">
+            <ShoppingCart size={20} />
+            {isAvailable ? 'إضافة للسلة' : 'غير متوفر'}
+          </button>
+          {isAvailable && (
+            <button onClick={handleBuyNow}
+              className="h-12 px-5 rounded-full border border-gray-300 text-gray-800 font-bold">
+              شراء الآن
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

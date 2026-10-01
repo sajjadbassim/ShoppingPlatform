@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Heart, Trash2, ShoppingCart, Share2 } from 'lucide-react'
-import ProductCard from '../../components/common/ProductCard'
+import { useNavigate, Link } from 'react-router-dom'
+import { Heart, Trash2, ShoppingCart, Share2, Store } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Breadcrumb from '../../components/common/Breadcrumb'
 import EmptyState from '../../components/common/EmptyState'
@@ -12,6 +11,54 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { getPrimaryImage } from '../../utils/imageHelper'
+
+// صف منتج مضغوط (الهاتف): كل التفاصيل ظاهرة دون تمرير
+const WishlistRow = ({ item, onAddToCart, onRemove }) => {
+  const p = item.product || {}
+  const img = getPrimaryImage(p)
+  const inStock = p.isAvailable && p.stockQuantity > 0
+  const hasDiscount = p.originalPrice && p.originalPrice > p.price
+  return (
+    <div className="flex gap-3 bg-white rounded-2xl border border-gray-200 p-3">
+      <Link to={`/products/${item.productId}`} className="relative w-24 h-24 lg:w-32 lg:h-32 flex-shrink-0 rounded-xl bg-gray-50 overflow-hidden">
+        {img
+          ? <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center text-gray-300"><ShoppingCart size={28} /></div>}
+        {!inStock && (
+          <span className="absolute inset-x-0 bottom-0 bg-black/60 text-white text-[10px] text-center py-0.5">غير متوفر</span>
+        )}
+      </Link>
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        {p.vendorName && (
+          <p className="flex items-center gap-1 text-[11px] text-gray-400 truncate">
+            <Store size={11} className="flex-shrink-0" />{p.vendorName}
+          </p>
+        )}
+        <Link to={`/products/${item.productId}`} className="text-sm font-medium text-gray-900 leading-snug line-clamp-2 mt-0.5">
+          {p.nameAr || p.name}
+        </Link>
+        <div className="flex items-baseline gap-2 mt-1">
+          <span className="font-bold text-primary">{(p.price || 0).toLocaleString()} د.ع</span>
+          {hasDiscount && <span className="text-xs text-gray-400 line-through">{p.originalPrice.toLocaleString()}</span>}
+        </div>
+
+        <div className="flex items-center gap-2 mt-auto pt-2">
+          <button onClick={() => onAddToCart(item)} disabled={!inStock}
+            className="flex-1 h-9 rounded-full bg-primary text-white text-xs font-bold flex items-center justify-center gap-1.5 disabled:bg-gray-200 disabled:text-gray-400">
+            <ShoppingCart size={14} />
+            {inStock ? 'أضف للسلة' : 'غير متوفر'}
+          </button>
+          <button onClick={() => onRemove(item.productId)}
+            className="w-9 h-9 rounded-full border border-gray-200 text-gray-500 flex items-center justify-center active:bg-red-50 active:text-red-500"
+            aria-label="إزالة من المفضلة">
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const WishlistPage = () => {
   const navigate = useNavigate()
@@ -161,101 +208,49 @@ const WishlistPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container-main py-6">
-        <Breadcrumb items={breadcrumbItems} className="mb-6" />
+      <div className="container-main py-4 lg:py-6">
+        <Breadcrumb items={breadcrumbItems} className="mb-6 hidden lg:block" />
 
         {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Heart className="text-red-500" fill="currentColor" />
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 lg:p-6 mb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Heart size={22} className="text-red-500" fill="currentColor" />
                 المفضلة
               </h1>
-              <p className="text-gray-500 mt-1">
-                {wishlistItems.length} منتج • {inStockCount} متوفر
+              <p className="text-sm text-gray-500 mt-1">
+                {wishlistItems.length} منتج • <span className="font-bold text-primary">{totalPrice.toLocaleString()} د.ع</span>
+                {outOfStockCount > 0 && <span className="text-red-500"> • {outOfStockCount} غير متوفر</span>}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={handleShare}>
-                <Share2 size={18} className="ml-1" />
-                مشاركة
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setShowClearModal(true)}
-                className="text-red-500 border-red-200 hover:bg-red-50"
-              >
-                <Trash2 size={18} className="ml-1" />
-                مسح الكل
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleAddAllToCart}>
-                <ShoppingCart size={18} className="ml-1" />
-                إضافة الكل للسلة
-              </Button>
-            </div>
-          </div>
-
-          {/* Summary */}
-          <div className="flex items-center gap-6 mt-4 pt-4 border-t border-gray-200">
-            <div>
-              <p className="text-sm text-gray-500">إجمالي القيمة</p>
-              <p className="text-xl font-bold text-primary">{totalPrice.toLocaleString()} د.ع</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">متوفر</p>
-              <p className="text-xl font-bold text-green-600">{inStockCount}</p>
-            </div>
-            {outOfStockCount > 0 && (
-              <div>
-                <p className="text-sm text-gray-500">غير متوفر</p>
-                <p className="text-xl font-bold text-red-500">{outOfStockCount}</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {wishlistItems.map(item => (
-            <div key={item.id} className="relative group">
-              <ProductCard
-                product={{
-                  id: item.productId,
-                  name: item.product?.nameAr || item.product?.name,
-image: item.product?.primaryImageUrl,
-                  price: item.product?.price,
-                  originalPrice: item.product?.originalPrice,
-                  rating: item.product?.rating || 0,
-                  reviewsCount: item.product?.reviewsCount || 0,
-                  storeName: item.product?.vendorName,
-                  inStock: item.product?.isAvailable && item.product?.stockQuantity > 0,
-                }}
-                onAddToCart={() => handleAddToCart(item)}
-              />
-              
-              {/* Remove Button Overlay */}
-              <button
-                onClick={() => handleRemoveItem(item.productId)}
-                className="absolute top-2 left-2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
-                title="إزالة من المفضلة"
-              >
-                <Trash2 size={16} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={handleShare} aria-label="مشاركة"
+                className="w-10 h-10 rounded-full border border-gray-200 text-gray-600 flex items-center justify-center">
+                <Share2 size={18} />
+              </button>
+              <button onClick={() => setShowClearModal(true)} aria-label="مسح الكل"
+                className="w-10 h-10 rounded-full border border-red-200 text-red-500 flex items-center justify-center">
+                <Trash2 size={18} />
               </button>
             </div>
+          </div>
+          {inStockCount > 0 && (
+            <button onClick={handleAddAllToCart}
+              className="w-full lg:w-auto lg:px-8 h-11 mt-4 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2">
+              <ShoppingCart size={18} />
+              إضافة الكل للسلة ({inStockCount})
+            </button>
+          )}
+        </div>
+
+        {/* المنتجات: صف لكل منتج — عمودان على الشاشات الكبيرة */}
+        <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+          {wishlistItems.map(item => (
+            <WishlistRow key={item.id} item={item} onAddToCart={handleAddToCart} onRemove={handleRemoveItem} />
           ))}
         </div>
 
-        {/* Out of Stock Notice */}
-        {outOfStockCount > 0 && (
-          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-            <p className="text-yellow-700 flex items-center gap-2">
-              <span className="text-xl">⚠️</span>
-              بعض المنتجات في قائمتك غير متوفرة حالياً. سنُعلمك عند توفرها.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Clear Confirmation Modal */}

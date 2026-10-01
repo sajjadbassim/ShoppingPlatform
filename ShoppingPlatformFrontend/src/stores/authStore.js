@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService } from '../services';
+import { detachPush } from '../utils/push';
 
 /**
  * Auth Store - إدارة حالة المصادقة
@@ -77,8 +78,25 @@ login: async (credentials) => {
         }
       },
 
+      // جلسة جاهزة من الخادم (الدخول بـ Google) — نفس شكل login
+      setSession: (data) => {
+        localStorage.setItem('accessToken', data.token);
+        const user = {
+          id: data.userId,
+          userId: data.userId,
+          vendorId: data.vendorId || null,
+          phone: data.phone,
+          fullName: data.fullName,
+          email: data.email,
+          role: data.role,
+        };
+        set({ user, token: data.token, isAuthenticated: true, isLoading: false, error: null });
+        return user;
+      },
+
       // تسجيل الخروج
       logout: () => {
+        detachPush(localStorage.getItem('accessToken'));
         localStorage.removeItem('accessToken');
         set({
           user: null,
@@ -137,5 +155,30 @@ login: async (credentials) => {
     }
   )
 );
+
+// ===== مزامنة الحساب بين التبويبات =====
+// التوكن في localStorage مشترك بين كل تبويبات الموقع، لكن المستخدم المعروض محفوظ في ذاكرة كل تبويب.
+// إن دخل حساب آخر (أو خرج) من تبويب ثانٍ، يصير هذا التبويب يرسل طلباته بحساب غير الذي يعرضه
+// (مثلاً: عنوان الحساب الأول مع توكن الحساب الثاني ← «هذا العنوان غير مسجل باسمك»).
+// لذلك نعيد تحميل التبويب ليأخذ الحساب الصحيح. تجديد التوكن لنفس الحساب لا يسبب إعادة تحميل.
+const tokenUserId = (token) => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const id = payload.userId || payload.nameid
+      || payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
+    return String(id || '').toLowerCase() || null;
+  } catch {
+    return null;
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'accessToken' || e.oldValue === e.newValue) return;
+    const current = String(useAuthStore.getState().user?.id || '').toLowerCase() || null;
+    const next = e.newValue ? tokenUserId(e.newValue) : null;
+    if (current !== next) window.location.reload();
+  });
+}
 
 export default useAuthStore;

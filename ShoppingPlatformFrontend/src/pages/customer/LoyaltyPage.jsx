@@ -131,7 +131,7 @@ const LoyaltyPage = () => {
 
   const breadcrumbItems = [
     { label: 'حسابي', path: '/profile' },
-    { label: 'نقاط الولاء' },
+    { label: 'النقاط التشجيعية' },
   ]
 
   return (
@@ -140,7 +140,7 @@ const LoyaltyPage = () => {
         <Breadcrumb items={breadcrumbItems} className="mb-6" />
 
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">نقاط الولاء</h1>
+          <h1 className="text-2xl font-bold text-gray-900">النقاط التشجيعية</h1>
           <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg">
             <RefreshCw size={16} className="text-gray-400" />
           </button>
@@ -262,7 +262,7 @@ const LoyaltyPage = () => {
                 <div className="text-center py-8 text-gray-400">
                   <Star size={32} className="mx-auto mb-2 opacity-30" />
                   <p>لا توجد معاملات بعد</p>
-                  <p className="text-xs mt-1">ابدأ التسوق لكسب نقاط الولاء</p>
+                  <p className="text-xs mt-1">ابدأ التسوق لكسب النقاط التشجيعية</p>
                 </div>
               ) : (
                 <div>

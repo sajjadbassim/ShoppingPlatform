@@ -151,6 +151,51 @@ namespace ecommerce.Services.LoyaltyService
         }
 
         // ===================================
+        // EarnReviewPointsAsync — يُستدعى من ReviewService
+        // عند كتابة تقييم لمنتج (مرة واحدة لكل منتج حتى لو حُذف التقييم وأعيدت كتابته)
+        // ===================================
+        public async Task<int> EarnReviewPointsAsync(Guid userId, Guid productId)
+        {
+            var settings = await GetSettingsEntityAsync();
+            if (!settings.IsActive || settings.ReviewPoints <= 0) return 0;
+
+            var account = await EnsureAccountAsync(userId);
+
+            var referenceKey = $"review:{productId}";
+            var alreadyEarned = await _context.LoyaltyTransactions
+                .AnyAsync(t => t.AccountId == account.Id && t.ReferenceKey == referenceKey);
+            if (alreadyEarned) return 0;
+
+            var points = settings.ReviewPoints;
+
+            account.Balance += points;
+            account.TotalEarned += points;
+            account.UpdatedAt = DateTime.UtcNow;
+            account.Tier = CalculateTier(account.TotalEarned, settings);
+
+            var expiresAt = settings.PointsExpiryDays > 0
+                ? DateTime.UtcNow.AddDays(settings.PointsExpiryDays)
+                : (DateTime?)null;
+
+            var transaction = new LoyaltyTransaction
+            {
+                AccountId = account.Id,
+                Type = LoyaltyTransactionType.Earned,
+                Points = points,
+                BalanceAfter = account.Balance,
+                Description = "Points earned for writing a review",
+                DescriptionAr = "نقاط مكتسبة من كتابة تقييم",
+                ReferenceKey = referenceKey,
+                ExpiresAt = expiresAt
+            };
+
+            await _context.LoyaltyTransactions.AddAsync(transaction);
+            await _context.SaveChangesAsync();
+
+            return points;
+        }
+
+        // ===================================
         // GetEstimateAsync — تقدير قبل الطلب
         // ===================================
         public async Task<LoyaltyEstimateDto> GetEstimateAsync(Guid userId, decimal orderAmount)
@@ -363,6 +408,7 @@ namespace ecommerce.Services.LoyaltyService
             if (dto.SilverMultiplier != null) settings.SilverMultiplier = dto.SilverMultiplier.Value;
             if (dto.GoldMultiplier != null) settings.GoldMultiplier = dto.GoldMultiplier.Value;
             if (dto.PlatinumMultiplier != null) settings.PlatinumMultiplier = dto.PlatinumMultiplier.Value;
+            if (dto.ReviewPoints != null) settings.ReviewPoints = dto.ReviewPoints.Value;
             if (dto.IsActive != null) settings.IsActive = dto.IsActive.Value;
 
             settings.UpdatedAt = DateTime.UtcNow;
@@ -498,6 +544,7 @@ namespace ecommerce.Services.LoyaltyService
             SilverMultiplier = s.SilverMultiplier,
             GoldMultiplier = s.GoldMultiplier,
             PlatinumMultiplier = s.PlatinumMultiplier,
+            ReviewPoints = s.ReviewPoints,
             IsActive = s.IsActive
         };
     }

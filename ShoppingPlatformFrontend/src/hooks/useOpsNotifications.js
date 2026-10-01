@@ -1,58 +1,58 @@
 // src/hooks/useOpsNotifications.js
+// اتصال لحظي بشاشات العمليات/الإدارة (OpsHub): أي تغيير في الطلبات أو السائقين يحدّث
+// الشاشات المفتوحة فوراً بدل انتظار التحديث اليدوي. يُشغَّل مرة واحدة من DashboardLayout.
 import { useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '../components/common/Toast'
 import { useAuthStore } from '../stores/authStore'
 
-export const useOpsNotifications = () => {
+// كل ما تعرضه شاشات العمليات من طلبات وسائقين وتتبع
+const LIVE_KEYS = [['ops'], ['orders'], ['orders-status-counts'], ['drivers'], ['ops-tracking'], ['admin']]
+
+export const useOpsNotifications = (enabled = true) => {
   const queryClient = useQueryClient()
   const { success } = useToast()
   const { token } = useAuthStore()
   const connectionRef = useRef(null)
-  const isMounted = useRef(false)
+  const refreshTimer = useRef(null)
 
   useEffect(() => {
-    if (!token) return
-    if (isMounted.current) return  // ← منع التشغيل مرتين
-    isMounted.current = true
+    if (!enabled || !token || connectionRef.current) return
+
+    // عدة أحداث متتالية (تسليم ← حالة الطلب ← حالة السائق) = تحديث واحد
+    const refresh = () => {
+      clearTimeout(refreshTimer.current)
+      refreshTimer.current = setTimeout(() => {
+        LIVE_KEYS.forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
+      }, 300)
+    }
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/ops`, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: () => useAuthStore.getState().token || token,
       })
-      .withAutomaticReconnect([0, 2000, 5000, 10000])
-      .configureLogging(signalR.LogLevel.None) // ← أوقف الـ logs
+      .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
+      .configureLogging(signalR.LogLevel.None)
       .build()
-
     connectionRef.current = connection
 
     connection.on('NewSubOrder', (order) => {
       success(`🛍️ طلب جديد #${order.subOrderNumber} يحتاج تأكيد`)
-      queryClient.invalidateQueries({ queryKey: ['ops'] })
+      refresh()
     })
+    ;['NewOrder', 'SubOrderConfirmed', 'SubOrderCancelled', 'OrderStatusChanged', 'DriverUpdated']
+      .forEach(event => connection.on(event, refresh))
 
-    connection.on('OrderStatusUpdated', () => {
-      queryClient.invalidateQueries({ queryKey: ['ops'] })
-    })
+    // بعد انقطاع الاتصال قد تكون فاتتنا أحداث
+    connection.onreconnected(refresh)
 
-    connection.onclose(() => {
-      isMounted.current = false
-      connectionRef.current = null
-    })
-
-    connection.start()
-      .then(() => console.log('✅ OpsHub connected'))
-      .catch((err) => {
-        console.error('❌ OpsHub error:', err)
-        isMounted.current = false
-        connectionRef.current = null
-      })
+    connection.start().catch(() => { connectionRef.current = null })
 
     return () => {
+      clearTimeout(refreshTimer.current)
       connection.stop()
-      isMounted.current = false
       connectionRef.current = null
     }
-  }, [token])
+  }, [enabled, token, queryClient, success])
 }

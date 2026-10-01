@@ -1,4 +1,4 @@
-﻿namespace ecommerce.Core.DTO.Order
+namespace ecommerce.Core.DTO.Order
 {
     public class SubOrderDto
     {
@@ -26,6 +26,10 @@
 
         // الإلغاء
         public string CancellationReason { get; set; }
+        public string? FailureReason { get; set; }
+        public string? FailureReasonAr { get; set; }
+        public string? FailureNote { get; set; }
+        public DateTime? PickedUpAt { get; set; }
         public Guid? CancelledBy { get; set; }
         public string CancelledByName { get; set; }
         public DateTime? CancelledAt { get; set; }

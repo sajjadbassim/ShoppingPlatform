@@ -55,7 +55,8 @@ export const TabsList = ({ children, className = '' }) => {
   }
 
   return (
-    <div className={`flex gap-1 ${variants[variant]} ${className}`}>
+    // تمرير أفقي بدل أن تدفع التبويبات الكثيرة الصفحة خارج الشاشة على الهاتف
+    <div className={`flex gap-1 overflow-x-auto hide-scrollbar ${variants[variant]} ${className}`}>
       {children}
     </div>
   )
@@ -78,21 +79,21 @@ export const TabsTrigger = ({
 
   const variants = {
     line: `
-      px-4 py-2.5 -mb-px border-b-2 transition-colors
+      px-4 py-2.5 -mb-px border-b-2 transition-colors whitespace-nowrap flex-shrink-0
       ${isSelected 
         ? 'border-primary text-primary font-medium' 
         : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
       }
     `,
     pills: `
-      px-4 py-2 rounded-md transition-all
+      px-4 py-2 rounded-md transition-all whitespace-nowrap flex-shrink-0
       ${isSelected 
         ? 'bg-white text-primary font-medium shadow-sm' 
         : 'text-gray-600 hover:text-gray-800'
       }
     `,
     enclosed: `
-      px-4 py-2.5 border border-transparent rounded-t-md -mb-px transition-colors
+      px-4 py-2.5 border border-transparent rounded-t-md -mb-px transition-colors whitespace-nowrap flex-shrink-0
       ${isSelected 
         ? 'bg-white border-gray-200 border-b-white text-primary font-medium' 
         : 'text-gray-600 hover:text-gray-800'

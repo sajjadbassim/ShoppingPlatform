@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Models;
+using ecommerce.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using static Azure.Core.HttpHeader;
@@ -42,6 +42,10 @@ namespace ecommerce.Data
         public DbSet<Promotion> Promotions { get; set; }
 
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<PushSubscription> PushSubscriptions { get; set; }
+        public DbSet<DeliverySettings> DeliverySettings { get; set; }
+        public DbSet<OrderDriverRating> OrderDriverRatings { get; set; }
+        public DbSet<VendorLedgerEntry> VendorLedgerEntries { get; set; }
 
         public DbSet<PasswordResetOtp> PasswordResetOtps { get; set; }
 
@@ -87,12 +91,20 @@ namespace ecommerce.Data
                 entity.HasIndex(e => e.Role)
                     .HasDatabaseName("idx_users_role");
 
+                // حساب Google يُربط بحساب واحد فقط
+                entity.HasIndex(e => e.GoogleId)
+                    .IsUnique()
+                    .HasFilter("[google_id] IS NOT NULL")
+                    .HasDatabaseName("idx_users_google_id");
+                entity.Property(e => e.GoogleId).HasColumnName("google_id");
+                entity.Property(e => e.GoogleEmail).HasColumnName("google_email");
+                entity.Property(e => e.HasPassword).HasColumnName("has_password").HasDefaultValue(true);
+
                 entity.HasIndex(e => e.Email)
                     .HasDatabaseName("idx_users_email");
 
                 // القيود
                 entity.Property(e => e.Phone)
-                    .IsRequired()
                     .HasMaxLength(20);
 
                 entity.Property(e => e.Role)
@@ -436,6 +448,50 @@ namespace ecommerce.Data
             // ===================================
             // تكوين جدول SubOrders
             // ===================================
+            modelBuilder.Entity<VendorLedgerEntry>(entity =>
+            {
+                entity.HasIndex(e => new { e.VendorId, e.CreatedAt }).HasDatabaseName("idx_ledger_vendor_date");
+                // كل حركة تلقائية مرة واحدة: لكل طلب فرعي، ولكل إرجاع ومتجر
+                entity.HasIndex(e => new { e.SubOrderId, e.Type }).IsUnique()
+                    .HasFilter("[sub_order_id] IS NOT NULL AND [return_id] IS NULL").HasDatabaseName("idx_ledger_suborder_type");
+                entity.HasIndex(e => new { e.ReturnId, e.VendorId, e.Type }).IsUnique()
+                    .HasFilter("[return_id] IS NOT NULL").HasDatabaseName("idx_ledger_return_type");
+                entity.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<OrderDriverRating>(entity =>
+            {
+                entity.HasIndex(r => new { r.OrderRatingId, r.DriverId }).IsUnique().HasDatabaseName("idx_order_driver_ratings_unique");
+                entity.HasIndex(r => r.DriverId).HasDatabaseName("idx_order_driver_ratings_driver");
+                entity.HasOne(r => r.OrderRating).WithMany(o => o.DriverRatings).HasForeignKey(r => r.OrderRatingId).OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(r => r.Driver).WithMany().HasForeignKey(r => r.DriverId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<PushSubscription>(entity =>
+            {
+                entity.HasIndex(s => s.Endpoint).IsUnique().HasDatabaseName("idx_push_subscriptions_endpoint");
+                entity.HasIndex(s => s.UserId).HasDatabaseName("idx_push_subscriptions_user");
+                entity.HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Driver>(entity =>
+            {
+                // حساب واحد لكل سائق
+                entity.HasIndex(d => d.UserId)
+                    .IsUnique()
+                    .HasFilter("[user_id] IS NOT NULL")
+                    .HasDatabaseName("idx_drivers_user_id");
+
+                entity.HasOne(d => d.User)
+                    .WithMany()
+                    .HasForeignKey(d => d.UserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<Order>()
+                .HasIndex(o => new { o.CashCollectedByDriverId, o.CashSettledAt })
+                .HasDatabaseName("idx_orders_driver_cash");
+
             modelBuilder.Entity<SubOrder>(entity =>
             {
                 entity.ToTable("sub_orders");

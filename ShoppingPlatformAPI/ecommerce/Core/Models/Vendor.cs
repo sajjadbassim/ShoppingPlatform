@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -55,6 +55,14 @@ namespace ecommerce.Core.Models
 
         [Column("owner_id")]
         public Guid? OwnerId { get; set; }
+
+        // عمولة المنصة الخاصة بهذا المتجر — فارغة = الإعداد العام (PERCENTAGE نسبة | FIXED مبلغ لكل طلب)
+        [MaxLength(20)]
+        [Column("commission_type")]
+        public string? CommissionType { get; set; }
+
+        [Column("commission_value", TypeName = "decimal(12,2)")]
+        public decimal? CommissionValue { get; set; }
 
         // Navigation Properties
         public virtual ICollection<Product> Products { get; set; }

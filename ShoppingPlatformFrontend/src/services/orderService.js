@@ -127,6 +127,7 @@ export const orderService = {
     { value: 'PREPARING',            label: 'قيد التحضير',   color: 'indigo' },
     { value: 'OUT_FOR_DELIVERY',     label: 'قيد التوصيل',   color: 'purple' },
     { value: 'DELIVERED',            label: 'تم التوصيل',    color: 'green'  },
+    { value: 'DELIVERY_FAILED',      label: 'تعذّر التسليم',  color: 'orange' },
     { value: 'CANCELLED',            label: 'ملغي',           color: 'red'    },
   ],
 
@@ -143,6 +144,7 @@ export const orderService = {
       OUT_FOR_DELIVERY:     'purple',
       DELIVERED:            'green',
       CANCELLED:            'red',
+      DELIVERY_FAILED:      'orange',
     };
     return colors[status] || 'gray';
   },
@@ -160,6 +162,7 @@ export const orderService = {
       OUT_FOR_DELIVERY:     'قيد التوصيل',
       DELIVERED:            'تم التوصيل',
       CANCELLED:            'ملغي',
+      DELIVERY_FAILED:      'تعذّر التسليم',
     };
     return labels[status] || status;
   },

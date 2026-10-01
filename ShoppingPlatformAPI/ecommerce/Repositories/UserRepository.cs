@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Models;
+using ecommerce.Core.Models;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Data;
 using ecommerce.Extensions;
@@ -155,5 +155,13 @@ namespace ecommerce.Repositories
             predicate == null
                 ? _context.Users.CountAsync(ct)
                 : _context.Users.CountAsync(predicate, ct);
+    
+        // الإيميل بلا فرق بين الأحرف الكبيرة والصغيرة والمسافات
+        public async Task<User?> GetByEmailAsync(string email)
+        {
+            var e = (email ?? "").Trim().ToLower();
+            if (e.Length == 0) return null;
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.Trim().ToLower() == e);
+        }
     }
 }

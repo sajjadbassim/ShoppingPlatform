@@ -37,7 +37,7 @@ namespace ecommerce.Core.DTO.Product
 
         public bool IsActive { get; set; } = true;
 
-        public List<IFormFile> Images { get; set; }
+        public List<IFormFile>? Images { get; set; }
 
 
     }

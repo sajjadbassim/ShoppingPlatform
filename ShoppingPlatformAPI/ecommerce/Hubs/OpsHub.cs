@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Text.RegularExpressions;
 
 namespace ecommerce.Hubs
 {
-    //[Authorize(Roles = "OPS,ADMIN")] // فقط Ops و Admin
+    [Authorize(Roles = "OPS,ADMIN")] // فقط Ops و Admin — يحمل إشعارات الطلبات ومواقع السائقين
     public class OpsHub : Hub
     {
         // الانضمام لمجموعة Ops

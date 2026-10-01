@@ -113,6 +113,14 @@ export const StatusBadge = ({ status }) => {
           icon: '🚚'
         };
       
+      case 'DELIVERY_FAILED':
+        return {
+          label: 'تعذّر التسليم',
+          bg: 'bg-orange-100',
+          text: 'text-orange-800',
+          icon: '⚠️'
+        };
+
       case 'DELIVERED':
         return {
           label: 'تم التوصيل',

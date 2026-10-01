@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.DTO.Vendor;
+using ecommerce.Filters;
+using ecommerce.Core.DTO.Vendor;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ namespace ecommerce.Controllers
     [ApiController]
     [Route("api/vendors/{vendorId}/dashboard")]
     [Authorize(Policy = "OpsOrAdminOrVENDOR")]
+    [TypeFilter(typeof(VendorRouteAccessFilter))]
     public class VendorDashboardController : Controller
     {
         private readonly IVendorDashboardService _dashboardService;

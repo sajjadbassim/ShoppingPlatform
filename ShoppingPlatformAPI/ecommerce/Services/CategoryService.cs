@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Category;
+using ecommerce.Core.DTO.Category;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
@@ -73,7 +73,13 @@ namespace ecommerce.Services
         public async Task<IEnumerable<CategoryResponseDto>> GetAllAsync(bool onlyActive = true)
         {
             var categories = await _categoryRepository.GetAllAsync(onlyActive);
-            return categories.Select(MapToDto);
+            var counts = await _categoryRepository.GetProductCountsAsync();
+            return categories.Select(c =>
+            {
+                var dto = MapToDto(c);
+                dto.ProductsCount = counts.GetValueOrDefault(c.Id);
+                return dto;
+            });
         }
 
         public async Task<IEnumerable<CategoryResponseDto>> GetByParentIdAsync(Guid? parentId, bool onlyActive = true)

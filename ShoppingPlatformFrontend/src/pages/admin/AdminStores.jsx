@@ -67,28 +67,6 @@ const useToggleStoreStatus = () => {
   })
 }
 
-// ✅ رفع صلاحية مالك المتجر (ownerId يصل مباشرة عبر الـ FK ضمن استجابة المتجر)
-const activateVendorWithRole = async (store) => {
-  try {
-    const userId = store.ownerId
-    if (!userId) return { upgraded: false }
-
-    // 1. جلب المستخدم للتأكد من دوره الحالي
-    const userRes = await apiGet(`/api/Users/${userId}`)
-    const role = userRes.data?.data?.role || userRes.data?.role
-
-    // 2. رفع الصلاحية فقط إذا كان CUSTOMER
-    if (role === 'CUSTOMER') {
-      await apiPut(`/api/Admin/users/${userId}/change-role`, { newRole: 'VENDOR' })
-      return { upgraded: true }
-    }
-    return { upgraded: false }
-  } catch {
-    // إذا فشل الرفع — نكمل بدون رفع الصلاحية (متجر بلا مالك مربوط مثلاً)
-    return { upgraded: false }
-  }
-}
-
 // ===========================
 // Store Detail Modal
 // ===========================
@@ -108,9 +86,9 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
   const avgRating = ratingData?.averageRating ?? ratingData?.overallAverage ?? null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg">تفاصيل المتجر</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
@@ -293,32 +271,44 @@ const AdminStores = () => {
     searchTerm: search || undefined,
   })
 
+  // كل المتاجر (بلا صفحات) — للأعداد ولتبويبي "النشطة" و"قيد المراجعة" حتى لا تقتصر على الصفحة المعروضة
+  const { data: allStores = [] } = useQuery({
+    queryKey: ['admin-stores', 'all'],
+    queryFn: async () => {
+      const r = await apiGet(API_ENDPOINTS.VENDORS.BASE, { onlyActive: false })
+      const d = r.data?.data ?? r.data
+      return Array.isArray(d) ? d : []
+    },
+    staleTime: 2 * 60 * 1000,
+  })
+
   const { data: topVendors, isLoading: topLoading } = useTopVendors()
   const { mutateAsync: toggleStatus, isPending: toggling } = useToggleStoreStatus()
 
   const stores      = data?.items ?? []
   const totalPages  = data?.totalPages ?? 1
-  const total       = data?.totalCount ?? stores.length
-  const activeCount = stores.filter(s => s.isActive).length
-  const pendingList = stores.filter(s => !s.isActive)
+  const total       = allStores.length || (data?.totalCount ?? stores.length)
+  const activeCount = allStores.filter(s => s.isActive).length
+  const pendingList = allStores.filter(s => !s.isActive)
   const pendingCount = pendingList.length
 
+  // "الكل" بصفحات من الخادم؛ "النشطة" و"قيد المراجعة" من القائمة الكاملة مع نفس البحث
+  const q = search.trim().toLowerCase()
+  const matchesSearch = (s) => !q || [s.name, s.nameAr, s.phone].some(v => (v || '').toLowerCase().includes(q))
   const displayStores = activeFilter === 'active'
-    ? stores.filter(s => s.isActive)
+    ? allStores.filter(s => s.isActive && matchesSearch(s))
     : activeFilter === 'pending'
-    ? pendingList
+    ? pendingList.filter(matchesSearch)
     : stores
 
   const handleToggle = async (store) => {
     try {
-      // 1. تفعيل/تعطيل المتجر
-      await toggleStatus(store.id)
-
-      // 2. إذا كان التفعيل (وليس التعطيل) — ارفع صلاحية المستخدم
+      // الخادم يفعّل المتجر ويحوّل صاحبه إلى بائع في نفس العملية
+      const res = await toggleStatus(store.id)
       if (!store.isActive) {
-        const { upgraded } = await activateVendorWithRole(store)
+        const upgraded = res?.data?.ownerUpgraded
         success(upgraded
-          ? `✅ تم تفعيل ${store.nameAr || store.name} ورفع صلاحية البائع`
+          ? `✅ تم تفعيل ${store.nameAr || store.name} وتحويل صاحبه إلى بائع`
           : `✅ تم تفعيل ${store.nameAr || store.name}`)
       } else {
         success(`تم تعطيل ${store.nameAr || store.name}`)
@@ -483,7 +473,7 @@ const AdminStores = () => {
           </div>
         )}
 
-        {totalPages > 1 && (
+        {activeFilter === 'all' && totalPages > 1 && (
           <div className="flex justify-center gap-2 p-4 border-t border-gray-200">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
               <button key={p} onClick={() => setPage(p)}

@@ -49,6 +49,9 @@ const AdminUsers = () => {
   // ✅ Tab values تطابق ما يمرره adminService.getUsers
   const roleFilter = activeTab !== 'all' ? activeTab : null
   const { data: usersData, isLoading, refetch } = useAdminUsers(roleFilter)
+  // الأعداد (البطاقات والتبويبات) من كل المستخدمين دائماً — لا تتغير حسب التبويب المختار.
+  // في تبويب "الكل" هو نفس الطلب السابق (مخزّن)
+  const { data: allUsersData, refetch: refetchAll } = useAdminUsers(null)
 
   const { mutateAsync: toggleStatus, isPending: toggling } = useToggleUserStatus()
   const { mutateAsync: deleteUser,   isPending: deleting  } = useDeleteUser()
@@ -69,12 +72,14 @@ const AdminUsers = () => {
   })
 
   // ✅ counts تقارن بـ uppercase لأن الـ API يرجع uppercase
+  const allUsers = Array.isArray(allUsersData) ? allUsersData : (allUsersData?.items ?? [])
+  const countRole = (r) => allUsers.filter(u => u.role?.toUpperCase() === r).length
   const counts = {
-    all:      totalCount,
-    Customer: users.filter(u => u.role?.toUpperCase() === 'CUSTOMER').length,
-    Vendor:   users.filter(u => u.role?.toUpperCase() === 'VENDOR').length,
-    Admin:    users.filter(u => u.role?.toUpperCase() === 'ADMIN').length,
-    Ops:      users.filter(u => u.role?.toUpperCase() === 'OPS').length,
+    all:      allUsersData?.totalCount ?? allUsers.length,
+    Customer: countRole('CUSTOMER'),
+    Vendor:   countRole('VENDOR'),
+    Admin:    countRole('ADMIN'),
+    Ops:      countRole('OPS'),
   }
 
   const handleToggleStatus = async (user) => {
@@ -181,10 +186,10 @@ const AdminUsers = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">المستخدمين</h1>
-          <p className="text-gray-500 mt-1">{totalCount} مستخدم مسجل</p>
+          <p className="text-gray-500 mt-1">{counts.all} مستخدم مسجل</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
+          <Button variant="ghost" size="sm" onClick={() => { refetch(); refetchAll() }} disabled={isLoading}>
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </Button>
           <Button variant="primary" onClick={() => { setOpsForm({ fullName: '', phone: '', password: '', email: '' }); setShowCreateOpsModal(true) }}>

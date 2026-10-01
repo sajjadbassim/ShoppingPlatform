@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Exceptions;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Vendor;
 using ecommerce.Core.Models;
@@ -15,24 +16,49 @@ namespace ecommerce.Services.VendorService.VendorService
         private readonly IFileService _fileService;
         private readonly INotificationService _notificationService;
         private readonly IProductRepository _productRepository;
+        private readonly IUserRepository? _userRepository;
 
         public VendorService(
             IVendorRepository vendorRepository,
             IFileService fileService,
             INotificationService notificationService,
-            IProductRepository productRepository)
+            IProductRepository productRepository,
+            IUserRepository? userRepository = null)
         {
+            _userRepository = userRepository;
             _vendorRepository = vendorRepository;
             _fileService = fileService;
             _notificationService = notificationService;
             _productRepository = productRepository;
         }
         // ✅ CreateAsync المحدث - مع رفع اللوجو
-        public async Task<VendorResponseDto> CreateAsync(VendorCreateDto dto, Guid? ownerId = null)
+        public async Task<VendorResponseDto> CreateAsync(VendorCreateDto dto, Guid? ownerId = null, bool byAdmin = false)
         {
-            // تحقق من تكرار الاسم
-            if (await _vendorRepository.ExistsByNameAsync(dto.Name))
-                throw new Exception("اسم التاجر مسجل مسبقاً");
+            dto.Name = (dto.Name ?? "").Trim();
+            dto.NameAr = dto.NameAr?.Trim();
+            if (dto.Name.Length < 2)
+                throw new Exception("اسم المتجر مطلوب");
+
+            if (await _vendorRepository.NameTakenAsync(dto.Name, dto.NameAr))
+                throw new Exception("اسم المتجر مستخدم لمتجر آخر");
+
+            if (byAdmin)
+            {
+                // الإدارة تنشئ متجراً بلا مالك وتحدد تفعيله بنفسها
+                ownerId = null;
+            }
+            else
+            {
+                // طلب فتح متجر من حساب زبون: متجر واحد، ويبقى غير مفعّل حتى توافق الإدارة
+                if (ownerId == null || _userRepository == null)
+                    throw new Exception("سجّل الدخول أولاً");
+                var owner = await _userRepository.GetByIdAsync(ownerId.Value);
+                if (owner == null || owner.Role != UserRoles.Customer)
+                    throw new ForbiddenException("فتح متجر متاح لحسابات الزبائن فقط");
+                if (await _vendorRepository.GetByOwnerIdAsync(ownerId.Value) != null)
+                    throw new Exception("لديك متجر أو طلب متجر مسبقاً");
+                dto.IsActive = false;
+            }
 
             string logoUrl = "";
 
@@ -177,6 +203,7 @@ namespace ecommerce.Services.VendorService.VendorService
             if (dto.Address != null)
                 vendor.Address = dto.Address;
 
+            var activating = dto.IsActive == true && !vendor.IsActive;
             if (dto.IsActive.HasValue)
                 vendor.IsActive = dto.IsActive.Value;
 
@@ -190,6 +217,8 @@ namespace ecommerce.Services.VendorService.VendorService
                 vendor.EstimatedPrepTime = dto.EstimatedPrepTime.Value;
 
             var updatedVendor = await _vendorRepository.UpdateAsync(vendor);
+
+            if (activating) await ApproveOwnerAsync(vendor.Id);
             return await MapToDtoAsync(updatedVendor);
         }
 
@@ -284,9 +313,31 @@ namespace ecommerce.Services.VendorService.VendorService
             );
         }
 
+        // تفعيل متجر لأول مرة: صاحبه الزبون يصبح بائعاً ويُبلَّغ — في الخادم وفي نفس العملية
+        public async Task<bool> ApproveOwnerAsync(Guid vendorId)
+        {
+            var vendor = await _vendorRepository.GetByIdAsync(vendorId);
+            if (vendor?.OwnerId == null || _userRepository == null) return false;
+
+            var owner = await _userRepository.GetByIdAsync(vendor.OwnerId.Value);
+            if (owner == null || owner.Role != UserRoles.Customer) return false;
+
+            owner.Role = UserRoles.Vendor;
+            await _userRepository.UpdateAsync(owner);
+            try
+            {
+                await _notificationService.NotifyCustomerAsync(owner.Id,
+                    $"تمت الموافقة على متجرك «{vendor.NameAr ?? vendor.Name}» 🎉 سجّل الدخول من جديد لتفتح لوحة البائع",
+                    new { vendorId = vendor.Id });
+            }
+            catch { /* الإشعار لا يُفشل التفعيل */ }
+            return true;
+        }
+
         private async Task<VendorResponseDto> MapToDtoAsync(Vendor vendor)
         {
             var productsCount = await _productRepository.GetCountAsync(vendorId: vendor.Id);
+            var (rating, ratingsCount) = await _vendorRepository.GetRatingSummaryAsync(vendor.Id);
 
             return new VendorResponseDto
             {
@@ -304,6 +355,8 @@ namespace ecommerce.Services.VendorService.VendorService
                 DeliveryFee = vendor.DeliveryFee,
                 EstimatedPrepTime = vendor.EstimatedPrepTime,
                 ProductsCount = productsCount,
+                Rating = rating,
+                RatingsCount = ratingsCount,
                 CreatedAt = vendor.CreatedAt
             };
         }

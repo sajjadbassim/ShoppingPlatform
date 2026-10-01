@@ -23,11 +23,12 @@ export const useVendors = (onlyActive = true) => {
 /**
  * جلب المتاجر مع التصفح
  */
-export const useVendorsPaged = (params = {}) => {
+export const useVendorsPaged = (params = {}, options = {}) => {
   return useQuery({
     queryKey: vendorKeys.list(params),
     queryFn: () => vendorService.getPaged(params),
     keepPreviousData: true,
+    ...options,
   });
 };
 

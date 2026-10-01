@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.OrderRating;
 using ecommerce.Core.Models;
 using ecommerce.Data;
@@ -21,59 +21,137 @@ namespace ecommerce.Services.OrderRatingService
         // ===================================
         public async Task<OrderRatingDto> CreateRatingAsync(Guid orderId, Guid customerId, CreateOrderRatingDto dto)
         {
-            // التحقق من الطلب
+            var order = await LoadRateableOrderAsync(orderId, customerId);
+            var rating = await _context.OrderRatings.Include(r => r.SubOrderRatings).Include(r => r.DriverRatings)
+                .FirstOrDefaultAsync(r => r.OrderId == orderId && r.CustomerId == customerId);
+
+            // تقييم التجربة مرة واحدة — لكن قد يسبقه تقييم المتاجر وحدها
+            if (rating?.DeliveryRating != null)
+                throw new Exception("لقد قيّمت تجربة هذا الطلب مسبقاً");
+
+            if (rating == null)
+            {
+                rating = new OrderRating { OrderId = orderId, CustomerId = customerId };
+                await _context.OrderRatings.AddAsync(rating);
+            }
+            rating.DeliveryRating = dto.DeliveryRating;
+            rating.DeliveryComment = dto.DeliveryComment;
+            rating.SpeedRating = dto.SpeedRating;
+            rating.PackagingRating = dto.PackagingRating;
+            rating.WouldRecommend = dto.WouldRecommend;
+
+            // تقييمات المتاجر المرسلة معها اختيارية (المتاجر المقيّمة مسبقاً تُتجاهل)
+            AddStoreRatings(order, rating, dto.SubOrderRatings, skipRated: true);
+            var drivers = AddDriverRatings(order, rating, dto.DriverRatings, skipRated: true);
+
+            await _context.SaveChangesAsync();
+            await RecalculateDriversAsync(drivers);
+            return await GetRatingDtoAsync(rating.Id);
+        }
+
+        // تقييم المتاجر وحدها — قبل تقييم التجربة أو بعده
+        public async Task<OrderRatingDto> AddStoreRatingsAsync(Guid orderId, Guid customerId, List<CreateSubOrderRatingDto> ratings, List<DriverRatingInputDto>? driverRatings = null)
+        {
+            ratings ??= new();
+            driverRatings ??= new();
+            if (ratings.Count == 0 && driverRatings.Count == 0)
+                throw new Exception("قيّم متجراً أو السائق على الأقل");
+
+            var order = await LoadRateableOrderAsync(orderId, customerId);
+            var rating = await _context.OrderRatings.Include(r => r.SubOrderRatings).Include(r => r.DriverRatings)
+                .FirstOrDefaultAsync(r => r.OrderId == orderId && r.CustomerId == customerId);
+
+            if (rating == null)
+            {
+                rating = new OrderRating { OrderId = orderId, CustomerId = customerId };
+                await _context.OrderRatings.AddAsync(rating);
+            }
+
+            var added = AddStoreRatings(order, rating, ratings, skipRated: false);
+            var drivers = AddDriverRatings(order, rating, driverRatings, skipRated: false);
+            if (added == 0 && drivers.Count == 0) throw new Exception("لم يُرسل أي تقييم");
+
+            await _context.SaveChangesAsync();
+            await RecalculateDriversAsync(drivers);
+            return await GetRatingDtoAsync(rating.Id);
+        }
+
+        // تقييم السائق: مرة لكل سائق، والسائق يجب أن يكون أوصل جزءاً من هذا الطلب
+        private List<Guid> AddDriverRatings(Order order, OrderRating rating, IEnumerable<DriverRatingInputDto>? dtos, bool skipRated)
+        {
+            var added = new List<Guid>();
+            var orderDrivers = order.SubOrders.Where(s => s.DriverId.HasValue).Select(s => s.DriverId!.Value).ToHashSet();
+            foreach (var d in (dtos ?? Enumerable.Empty<DriverRatingInputDto>()).GroupBy(x => x.DriverId).Select(g => g.Last()))
+            {
+                if (!orderDrivers.Contains(d.DriverId))
+                    throw new Exception("السائق لم يوصل هذا الطلب");
+                if (d.Rating is < 1 or > 5)
+                    throw new Exception("تقييم السائق يجب أن يكون بين 1 و 5");
+                if (rating.DriverRatings.Any(r => r.DriverId == d.DriverId))
+                {
+                    if (skipRated) continue;
+                    throw new Exception("لقد قيّمت السائق مسبقاً");
+                }
+                // يُضاف صراحةً: المعرّف مولَّد مسبقاً
+                var entity = new OrderDriverRating { OrderRatingId = rating.Id, DriverId = d.DriverId, Rating = d.Rating };
+                _context.OrderDriverRatings.Add(entity);
+                added.Add(d.DriverId);
+            }
+            return added;
+        }
+
+        // متوسط السائق (يظهر له وللعمليات): التقييمات الجديدة + القديمة المسجلة مع المتاجر
+        private async Task RecalculateDriversAsync(IEnumerable<Guid> driverIds)
+        {
+            foreach (var id in driverIds.Distinct())
+            {
+                var (sum, count) = await DriverScoreAsync(id);
+                var driver = await _context.Drivers.FirstOrDefaultAsync(x => x.Id == id);
+                if (driver == null) continue;
+                driver.Rating = count == 0 ? 0 : Math.Round((decimal)sum / count, 2);
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        private async Task<(int Sum, int Count)> DriverScoreAsync(Guid driverId)
+        {
+            var current = await _context.OrderDriverRatings.Where(r => r.DriverId == driverId).Select(r => r.Rating).ToListAsync();
+            var legacy = await _context.SubOrderRatings.Where(r => r.DriverId == driverId && r.DriverRating.HasValue).Select(r => r.DriverRating!.Value).ToListAsync();
+            return (current.Sum() + legacy.Sum(), current.Count + legacy.Count);
+        }
+
+        private async Task<Order> LoadRateableOrderAsync(Guid orderId, Guid customerId)
+        {
             var order = await _context.Orders
                 .Include(o => o.SubOrders)
-                    .ThenInclude(so => so.Vendor)
-                .Include(o => o.SubOrders)
-                    .ThenInclude(so => so.Driver)
-                .FirstOrDefaultAsync(o => o.Id == orderId);
-
-            if (order == null)
-                throw new Exception("الطلب غير موجود");
+                .FirstOrDefaultAsync(o => o.Id == orderId)
+                ?? throw new Exception("الطلب غير موجود");
 
             if (order.CustomerId != customerId)
                 throw new UnauthorizedAccessException("ليس لديك صلاحية لتقييم هذا الطلب");
 
-            // الطلب يجب أن يكون مسلّماً
             if (order.Status != OrderStatus.DELIVERED)
                 throw new Exception("يمكن تقييم الطلب فقط بعد الاستلام");
 
-            // منع التقييم المتكرر
-            var alreadyRated = await _context.OrderRatings
-                .AnyAsync(r => r.OrderId == orderId && r.CustomerId == customerId);
+            return order;
+        }
 
-            if (alreadyRated)
-                throw new Exception("لقد قيّمت هذا الطلب مسبقاً");
-
-            // التحقق من SubOrders المرسلة
-            var subOrderIds = order.SubOrders.Select(so => so.Id).ToHashSet();
-            foreach (var sub in dto.SubOrderRatings)
+        // يضيف تقييمات المتاجر؛ skipRated=false يرفض تقييم متجر مقيّم مسبقاً بدل تجاهله
+        private int AddStoreRatings(Order order, OrderRating rating, IEnumerable<CreateSubOrderRatingDto>? dtos, bool skipRated)
+        {
+            var added = 0;
+            foreach (var subDto in dtos ?? Enumerable.Empty<CreateSubOrderRatingDto>())
             {
-                if (!subOrderIds.Contains(sub.SubOrderId))
-                    throw new Exception($"الطلب الفرعي {sub.SubOrderId} لا ينتمي لهذا الطلب");
-            }
+                var subOrder = order.SubOrders.FirstOrDefault(so => so.Id == subDto.SubOrderId)
+                    ?? throw new Exception("المتجر المُقيَّم لا ينتمي لهذا الطلب");
 
-            // إنشاء التقييم الرئيسي
-            var rating = new OrderRating
-            {
-                OrderId = orderId,
-                CustomerId = customerId,
-                DeliveryRating = dto.DeliveryRating,
-                DeliveryComment = dto.DeliveryComment,
-                SpeedRating = dto.SpeedRating,
-                PackagingRating = dto.PackagingRating,
-                WouldRecommend = dto.WouldRecommend
-            };
+                if (rating.SubOrderRatings.Any(sr => sr.SubOrderId == subDto.SubOrderId))
+                {
+                    if (skipRated) continue;
+                    throw new Exception("لقد قيّمت هذا المتجر مسبقاً");
+                }
 
-            await _context.OrderRatings.AddAsync(rating);
-            await _context.SaveChangesAsync();
-
-            // إنشاء تقييمات المتاجر
-            foreach (var subDto in dto.SubOrderRatings)
-            {
-                var subOrder = order.SubOrders.First(so => so.Id == subDto.SubOrderId);
-
+                // يُضاف صراحةً كسجل جديد: المعرّف مولَّد مسبقاً فيعدّه EF تعديلاً لو أُضيف عبر المجموعة
                 var subRating = new SubOrderRating
                 {
                     OrderRatingId = rating.Id,
@@ -81,17 +159,14 @@ namespace ecommerce.Services.OrderRatingService
                     VendorId = subOrder.VendorId,
                     VendorRating = subDto.VendorRating,
                     VendorComment = subDto.VendorComment,
-                    DriverRating = subDto.DriverRating,
+                    // 0 = لم يقيّم السائق
+                    DriverRating = subDto.DriverRating is >= 1 and <= 5 ? subDto.DriverRating : null,
                     DriverId = subOrder.DriverId
                 };
-
-                await _context.SubOrderRatings.AddAsync(subRating);
+                _context.SubOrderRatings.Add(subRating); // يربطه EF بمجموعة التقييم تلقائياً
+                added++;
             }
-
-            await _context.SaveChangesAsync();
-
-            // جلب النتيجة كاملة
-            return await GetRatingDtoAsync(rating.Id);
+            return added;
         }
 
         // ===================================
@@ -114,7 +189,22 @@ namespace ecommerce.Services.OrderRatingService
         public async Task<bool> HasRatedAsync(Guid orderId, Guid customerId)
         {
             return await _context.OrderRatings
-                .AnyAsync(r => r.OrderId == orderId && r.CustomerId == customerId);
+                .AnyAsync(r => r.OrderId == orderId && r.CustomerId == customerId && r.DeliveryRating != null);
+        }
+
+        public async Task<OrderRatingStatusDto> GetRatingStatusAsync(Guid orderId, Guid customerId)
+        {
+            var rating = await _context.OrderRatings
+                .AsNoTracking()
+                .Where(r => r.OrderId == orderId && r.CustomerId == customerId)
+                .Select(r => new { r.DeliveryRating, Subs = r.SubOrderRatings.Select(x => x.SubOrderId).ToList(), Drivers = r.DriverRatings.Select(x => x.DriverId).ToList() })
+                .FirstOrDefaultAsync();
+            return new OrderRatingStatusDto
+            {
+                HasRated = rating?.DeliveryRating != null,
+                RatedSubOrderIds = rating?.Subs ?? new List<Guid>(),
+                RatedDriverIds = rating?.Drivers ?? new List<Guid>(),
+            };
         }
 
         // ===================================
@@ -144,7 +234,7 @@ namespace ecommerce.Services.OrderRatingService
             return new RatingStatsDto
             {
                 TotalRatings = ratings.Count,
-                AverageDeliveryRating = ratings.Average(r => r.DeliveryRating),
+                AverageDeliveryRating = ratings.Where(r => r.DeliveryRating.HasValue).Select(r => (double)r.DeliveryRating!.Value).DefaultIfEmpty(0).Average(),
                 AverageSpeedRating = ratings.Where(r => r.SpeedRating.HasValue).Any()
                                             ? ratings.Where(r => r.SpeedRating.HasValue).Average(r => r.SpeedRating!.Value)
                                             : 0,
@@ -210,17 +300,14 @@ namespace ecommerce.Services.OrderRatingService
             if (driver == null)
                 throw new Exception("السائق غير موجود");
 
-            var ratings = await _context.SubOrderRatings
-                .Where(sr => sr.DriverId == driverId && sr.DriverRating.HasValue)
-                .AsNoTracking()
-                .ToListAsync();
+            var (sum, count) = await DriverScoreAsync(driverId);
 
             return new DriverRatingStatsDto
             {
                 DriverId = driverId,
                 DriverName = driver.FullName,
-                AverageRating = ratings.Any() ? Math.Round(ratings.Average(sr => sr.DriverRating!.Value), 2) : 0,
-                TotalRatings = ratings.Count
+                AverageRating = count == 0 ? 0 : Math.Round((double)sum / count, 2),
+                TotalRatings = count
             };
         }
 
@@ -261,7 +348,8 @@ namespace ecommerce.Services.OrderRatingService
                 .FirstOrDefaultAsync(r => r.Id == ratingId);
 
             // حساب المتوسط الكلي
-            var scores = new List<double> { rating.DeliveryRating };
+            var scores = new List<double>();
+            if (rating.DeliveryRating.HasValue) scores.Add(rating.DeliveryRating.Value);
             if (rating.SpeedRating.HasValue) scores.Add(rating.SpeedRating.Value);
             if (rating.PackagingRating.HasValue) scores.Add(rating.PackagingRating.Value);
 
@@ -276,7 +364,8 @@ namespace ecommerce.Services.OrderRatingService
                 SpeedRating = rating.SpeedRating,
                 PackagingRating = rating.PackagingRating,
                 WouldRecommend = rating.WouldRecommend,
-                OverallAverage = Math.Round(scores.Average(), 2),
+                OverallAverage = scores.Count > 0 ? Math.Round(scores.Average(), 2)
+                    : rating.SubOrderRatings.Count > 0 ? Math.Round(rating.SubOrderRatings.Average(sr => sr.VendorRating), 2) : 0,
                 CreatedAt = rating.CreatedAt,
                 SubOrderRatings = rating.SubOrderRatings.Select(sr => new SubOrderRatingDto
                 {

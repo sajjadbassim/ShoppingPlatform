@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo } from '../../utils/imageHelper'
+import OverdueConfirmationsAlert from '../../components/common/OverdueConfirmationsAlert'
 
 const AdminDashboard = () => {
   const [dateRange, setDateRange] = useState('month')
@@ -72,7 +73,7 @@ const AdminDashboard = () => {
   const activeCoupons = coupons.filter(c => c.isActive && !c.isExpired).length
   const expiredCoupons = coupons.filter(c => c.isExpired).length
 
-  // ✅ إحصائيات الولاء
+  // ✅ إحصائيات النقاط التشجيعية
   const { data: loyaltySettings } = useQuery({
     queryKey: ['loyalty-settings'],
     queryFn: async () => {
@@ -141,9 +142,9 @@ const AdminDashboard = () => {
   const StoreModal = ({ store }) => {
     if (!store) return null
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200">
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+        <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
             <h3 className="font-bold text-lg">تفاصيل المتجر</h3>
             <button onClick={() => setReviewingStore(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
           </div>
@@ -218,13 +219,16 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* تجاوزت مهلة تأكيد المتجر */}
+      <OverdueConfirmationsAlert orderLink={(o) => `/admin/orders/${o.orderId}`} allLink="/admin/orders" />
+
       {/* Main Stats */}
       {statsLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-lg border border-gray-200 p-6"><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-8 w-32 mb-2" /><Skeleton className="h-3 w-20" /></div>)}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {mainStats.map((stat, i) => <StatCard key={i} {...stat} />)}
         </div>
       )}
@@ -490,7 +494,7 @@ const AdminDashboard = () => {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-gray-900 flex items-center gap-2">
             <Zap size={18} className="text-primary" />
-            نظام الولاء
+            النقاط التشجيعية
           </h2>
           <Link to="/admin/loyalty">
             <Button variant="ghost" size="sm">الإعدادات <ArrowLeft size={16} className="mr-1" /></Button>
@@ -559,31 +563,31 @@ const AdminDashboard = () => {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Link to="/admin/users/new" className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/users/new" className="bg-blue-50 p-4 rounded-lg text-gray-800 hover:bg-blue-100 transition-colors flex items-center gap-3">
           <UserPlus size={24} className="text-blue-600" />
           <span className="font-medium">إضافة مستخدم</span>
         </Link>
-        <Link to="/admin/stores" className="bg-yellow-50 p-4 rounded-lg hover:bg-yellow-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/stores" className="bg-yellow-50 p-4 rounded-lg text-gray-800 hover:bg-yellow-100 transition-colors flex items-center gap-3">
           <Store size={24} className="text-yellow-600" />
           <span className="font-medium">إدارة المتاجر</span>
         </Link>
-        <Link to="/admin/categories" className="bg-purple-50 p-4 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/categories" className="bg-purple-50 p-4 rounded-lg text-gray-800 hover:bg-purple-100 transition-colors flex items-center gap-3">
           <Package size={24} className="text-purple-600" />
           <span className="font-medium">إدارة الفئات</span>
         </Link>
-        <Link to="/admin/reviews" className="bg-orange-50 p-4 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/reviews" className="bg-orange-50 p-4 rounded-lg text-gray-800 hover:bg-orange-100 transition-colors flex items-center gap-3">
           <Star size={24} className="text-orange-500" />
           <span className="font-medium">التقييمات</span>
         </Link>
-        <Link to="/admin/coupons" className="bg-pink-50 p-4 rounded-lg hover:bg-pink-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/coupons" className="bg-pink-50 p-4 rounded-lg text-gray-800 hover:bg-pink-100 transition-colors flex items-center gap-3">
           <Tag size={24} className="text-pink-600" />
           <span className="font-medium">الكوبونات</span>
         </Link>
-        <Link to="/admin/loyalty" className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-3">
+        <Link to="/admin/loyalty" className="bg-blue-50 p-4 rounded-lg text-gray-800 hover:bg-blue-100 transition-colors flex items-center gap-3">
           <Zap size={24} className="text-blue-600" />
-          <span className="font-medium">نقاط الولاء</span>
+          <span className="font-medium">النقاط التشجيعية</span>
         </Link>
-        <Link to="/admin/returns" className="bg-red-50 p-4 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-3 relative">
+        <Link to="/admin/returns" className="bg-red-50 p-4 rounded-lg text-gray-800 hover:bg-red-100 transition-colors flex items-center gap-3 relative">
           <RotateCcw size={24} className="text-red-500" />
           <span className="font-medium">طلبات الإرجاع</span>
           {pendingReturns > 0 && (

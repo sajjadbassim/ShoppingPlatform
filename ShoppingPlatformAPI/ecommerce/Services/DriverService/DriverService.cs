@@ -1,4 +1,4 @@
-﻿// Services/DriverService.cs
+// Services/DriverService.cs
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Drivers;
 using ecommerce.Core.DTO.Ops;
@@ -11,11 +11,13 @@ namespace ecommerce.Services
     {
         private readonly IDriverRepository _driverRepository;
         private readonly ISubOrderRepository _subOrderRepository;
+        private readonly IUserRepository _userRepository;
 
-        public DriverService(IDriverRepository driverRepository, ISubOrderRepository subOrderRepository)
+        public DriverService(IDriverRepository driverRepository, ISubOrderRepository subOrderRepository, IUserRepository userRepository)
         {
             _driverRepository = driverRepository;
             _subOrderRepository = subOrderRepository;
+            _userRepository = userRepository;
         }
 
         public async Task<DriversPagedResultDto> GetDriversPagedAsync(
@@ -50,6 +52,9 @@ namespace ecommerce.Services
 
         public async Task<DriverDto> CreateDriverAsync(CreateDriverDto dto)
         {
+            // الرقم بصيغة واحدة — هو أيضاً رقم دخول السائق إن أُنشئ له حساب
+            dto.Phone = PhoneNumber.Require(dto.Phone);
+
             // التحقق من عدم تكرار رقم الهاتف
             var existing = await _driverRepository.GetByPhoneAsync(dto.Phone);
             if (existing != null)
@@ -82,9 +87,20 @@ namespace ecommerce.Services
 
             if (!string.IsNullOrEmpty(dto.Phone))
             {
+                dto.Phone = PhoneNumber.Require(dto.Phone);
                 var existing = await _driverRepository.GetByPhoneAsync(dto.Phone);
                 if (existing != null && existing.Id != id)
                     throw new Exception("رقم الهاتف مسجل مسبقاً");
+
+                // رقم الدخول يتبع رقم السائق
+                if (driver.UserId.HasValue && dto.Phone != driver.Phone)
+                {
+                    var owner = await _userRepository.GetByPhoneAsync(dto.Phone);
+                    if (owner != null && owner.Id != driver.UserId)
+                        throw new Exception("رقم الهاتف مسجل بحساب آخر");
+                    var user = await _userRepository.GetByIdAsync(driver.UserId.Value);
+                    if (user != null) { user.Phone = dto.Phone; await _userRepository.UpdateAsync(user); }
+                }
                 driver.Phone = dto.Phone;
             }
 
@@ -114,6 +130,13 @@ namespace ecommerce.Services
             // لو تم إيقافه، غير workStatus لـ offline
             if (driver.Status == DriverStatus.Suspended)
                 driver.WorkStatus = DriverWorkStatus.Offline;
+
+            // السائق الموقوف لا يستطيع الدخول للوحته
+            if (driver.UserId.HasValue)
+            {
+                var user = await _userRepository.GetByIdAsync(driver.UserId.Value);
+                if (user != null) { user.IsActive = driver.Status == DriverStatus.Active; await _userRepository.UpdateAsync(user); }
+            }
 
             driver = await _driverRepository.UpdateAsync(driver);
             return MapToDto(driver);
@@ -156,7 +179,8 @@ namespace ecommerce.Services
             WorkStatus = driver.WorkStatus,
             Rating = driver.Rating,
             TotalDeliveries = driver.TotalDeliveries,
-            CreatedAt = driver.CreatedAt
+            CreatedAt = driver.CreatedAt,
+            HasAccount = driver.UserId.HasValue
         };
 
         public async Task<DriverOrdersResultDto> GetDriverOrdersAsync(

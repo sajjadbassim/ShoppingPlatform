@@ -1,4 +1,4 @@
-﻿// Controllers/DriversController.cs
+// Controllers/DriversController.cs
 using ecommerce.Core.DTO.Drivers;
 using ecommerce.Core.DTO.Ops;
 using ecommerce.Services;
@@ -13,10 +13,12 @@ namespace ecommerce.Controllers
     public class DriversController : ControllerBase
     {
         private readonly IDriverService _driverService;
+        private readonly ecommerce.Services.DriverAppService.IDriverAppService _driverApp;
 
-        public DriversController(IDriverService driverService)
+        public DriversController(IDriverService driverService, ecommerce.Services.DriverAppService.IDriverAppService driverApp)
         {
             _driverService = driverService;
+            _driverApp = driverApp;
         }
 
         // GET: api/drivers/paged
@@ -76,6 +78,8 @@ namespace ecommerce.Controllers
             try
             {
                 var driver = await _driverService.CreateDriverAsync(dto);
+                if (!string.IsNullOrWhiteSpace(dto.Password))
+                    driver = await _driverApp.SetAccountAsync(driver.Id, dto.Password);
                 return Ok(new { success = true, data = driver, message = "تم إضافة السائق بنجاح" });
             }
             catch (Exception ex)

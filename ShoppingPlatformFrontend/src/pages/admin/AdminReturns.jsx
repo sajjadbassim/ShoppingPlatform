@@ -66,9 +66,9 @@ const ReviewModal = ({ ret, onClose, onSaved }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-md w-full max-h-[92dvh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg">مراجعة طلب الإرجاع</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
@@ -213,9 +213,9 @@ const RestockModal = ({ ret, onClose, onSaved }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-md w-full">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-md w-full max-h-[92dvh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg flex items-center gap-2">
             <PackagePlus size={20} className="text-primary" />
             تحديث المخزون
@@ -340,15 +340,34 @@ const AdminReturns = () => {
         pageNumber: page,
         pageSize: 15,
       })
-      return r.data.data || r.data
+      // الخادم يعيد { data: [...], pagination: { total, totalPages } }
+      return { items: r.data?.data ?? [], totalPages: r.data?.pagination?.totalPages ?? 1 }
     },
     staleTime: 2 * 60 * 1000,
   })
 
-  const returns    = data?.items ?? (Array.isArray(data) ? data : [])
+  // التنبيهات من كل الإرجاعات — لا تتأثر بالفلتر أو الصفحة المعروضة
+  const { data: alerts } = useQuery({
+    queryKey: ['admin-returns', 'alerts'],
+    queryFn: async () => {
+      const [pendingRes, approvedRes, completedRes] = await Promise.all([
+        apiGet(API_ENDPOINTS.RETURNS.PAGED, { status: 'PENDING', pageNumber: 1, pageSize: 1 }),
+        apiGet(API_ENDPOINTS.RETURNS.PAGED, { status: 'APPROVED', pageNumber: 1, pageSize: 200 }),
+        apiGet(API_ENDPOINTS.RETURNS.PAGED, { status: 'COMPLETED', pageNumber: 1, pageSize: 200 }),
+      ])
+      const done = [...(approvedRes.data?.data ?? []), ...(completedRes.data?.data ?? [])]
+      return {
+        pending: pendingRes.data?.pagination?.total ?? 0,
+        awaitingRestock: done.filter(canRestock).length,
+      }
+    },
+    staleTime: 60 * 1000,
+  })
+
+  const returns    = data?.items ?? []
   const totalPages = data?.totalPages ?? 1
-  const pending    = returns.filter(r => r.status?.toUpperCase() === 'PENDING').length
-  const awaitingRestock = returns.filter(canRestock).length
+  const pending    = alerts?.pending ?? 0
+  const awaitingRestock = alerts?.awaitingRestock ?? 0
 
   const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-returns'] })
@@ -394,12 +413,12 @@ const AdminReturns = () => {
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* Filters */}
-        <div className="p-4 border-b border-gray-200 flex items-center gap-3">
+        <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center gap-2 sm:gap-3 overflow-x-auto hide-scrollbar">
           {['', 'PENDING', 'APPROVED', 'REJECTED', 'COMPLETED'].map(s => (
             <button
               key={s}
               onClick={() => { setStatusFilter(s); setPage(1) }}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
                 statusFilter === s
                   ? 'bg-primary text-white'
                   : 'border border-gray-200 text-gray-600 hover:border-primary'

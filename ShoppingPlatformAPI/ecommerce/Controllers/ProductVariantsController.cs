@@ -1,6 +1,7 @@
-﻿using ecommerce.Core.DTO.Product;
+using ecommerce.Core.DTO.Product;
 using ecommerce.Services;
 using ecommerce.Services.ProductService;
+using ecommerce.Services.VendorAccessService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,10 +14,12 @@ namespace ecommerce.Controllers
     public class ProductVariantsController : Controller
     {
         private readonly IVariantService _variantService;
+        private readonly IVendorAccessService _access;
 
-        public ProductVariantsController(IVariantService variantService)
+        public ProductVariantsController(IVariantService variantService, IVendorAccessService access)
         {
             _variantService = variantService;
+            _access = access;
         }
 
         // ===================================
@@ -45,6 +48,9 @@ namespace ecommerce.Controllers
         [HttpPost("attributes")]
         public async Task<IActionResult> CreateAttribute(Guid productId, [FromBody] CreateProductAttributeDto dto)
         {
+            await _access.EnsureCanManageProductAsync(productId);
+
+
             try
             {
                 var attribute = await _variantService.CreateAttributeAsync(productId, dto);
@@ -63,6 +69,9 @@ namespace ecommerce.Controllers
         [HttpPut("attributes/{attributeId}")]
         public async Task<IActionResult> UpdateAttribute(Guid productId, Guid attributeId, [FromBody] UpdateProductAttributeDto dto)
         {
+            await _access.EnsureCanManageAttributeAsync(productId, attributeId);
+
+
             try
             {
                 var attribute = await _variantService.UpdateAttributeAsync(attributeId, dto);
@@ -81,6 +90,9 @@ namespace ecommerce.Controllers
         [HttpDelete("attributes/{attributeId}")]
         public async Task<IActionResult> DeleteAttribute(Guid productId, Guid attributeId)
         {
+            await _access.EnsureCanManageAttributeAsync(productId, attributeId);
+
+
             try
             {
                 var result = await _variantService.DeleteAttributeAsync(attributeId);
@@ -102,6 +114,9 @@ namespace ecommerce.Controllers
         [HttpPost("attributes/{attributeId}/values")]
         public async Task<IActionResult> AddAttributeValue(Guid productId, Guid attributeId, [FromBody] CreateAttributeValueDto dto)
         {
+            await _access.EnsureCanManageAttributeAsync(productId, attributeId);
+
+
             try
             {
                 var value = await _variantService.AddAttributeValueAsync(attributeId, dto);
@@ -120,6 +135,9 @@ namespace ecommerce.Controllers
         [HttpDelete("attributes/{attributeId}/values/{valueId}")]
         public async Task<IActionResult> DeleteAttributeValue(Guid productId, Guid attributeId, Guid valueId)
         {
+            await _access.EnsureCanManageAttributeValueAsync(productId, attributeId, valueId);
+
+
             try
             {
                 var result = await _variantService.DeleteAttributeValueAsync(valueId);
@@ -179,6 +197,9 @@ namespace ecommerce.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateVariant(Guid productId, [FromBody] CreateProductVariantDto dto)
         {
+            await _access.EnsureCanManageProductAsync(productId);
+
+
             try
             {
                 var variant = await _variantService.CreateVariantAsync(productId, dto);
@@ -197,6 +218,9 @@ namespace ecommerce.Controllers
         [HttpPut("{variantId}")]
         public async Task<IActionResult> UpdateVariant(Guid productId, Guid variantId, [FromBody] UpdateProductVariantDto dto)
         {
+            await _access.EnsureCanManageVariantAsync(productId, variantId);
+
+
             try
             {
                 var variant = await _variantService.UpdateVariantAsync(variantId, dto);
@@ -215,6 +239,9 @@ namespace ecommerce.Controllers
         [HttpDelete("{variantId}")]
         public async Task<IActionResult> DeleteVariant(Guid productId, Guid variantId)
         {
+            await _access.EnsureCanManageVariantAsync(productId, variantId);
+
+
             try
             {
                 var result = await _variantService.DeleteVariantAsync(variantId);

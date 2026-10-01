@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -23,12 +23,11 @@ namespace ecommerce.Core.Models
         public Guid CustomerId { get; set; }
 
         // ===================================
-        // تقييم التوصيل العام (1-5)
+        // تقييم التوصيل العام (1-5) — فارغ إن قيّم الزبون المتاجر فقط
         // ===================================
-        [Required]
         [Range(1, 5)]
         [Column("delivery_rating")]
-        public int DeliveryRating { get; set; }
+        public int? DeliveryRating { get; set; }
 
         [MaxLength(1000)]
         [Column("delivery_comment")]
@@ -68,11 +67,40 @@ namespace ecommerce.Core.Models
         public virtual User Customer { get; set; }
 
         public virtual ICollection<SubOrderRating> SubOrderRatings { get; set; } = new List<SubOrderRating>();
+        public virtual ICollection<OrderDriverRating> DriverRatings { get; set; } = new List<OrderDriverRating>();
     }
 
     // ===================================
     // SubOrderRating — تقييم كل متجر على حدة
     // ===================================
+    // تقييم السائق: مرة واحدة لكل سائق في الطلب (مهما كان عدد المتاجر التي أوصل منها)
+    [Table("order_driver_ratings")]
+    public class OrderDriverRating
+    {
+        [Key]
+        [Column("id")]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Column("order_rating_id")]
+        public Guid OrderRatingId { get; set; }
+
+        [Column("driver_id")]
+        public Guid DriverId { get; set; }
+
+        [Range(1, 5)]
+        [Column("rating")]
+        public int Rating { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [ForeignKey("OrderRatingId")]
+        public virtual OrderRating OrderRating { get; set; }
+
+        [ForeignKey("DriverId")]
+        public virtual Driver Driver { get; set; }
+    }
+
     [Table("sub_order_ratings")]
     public class SubOrderRating
     {

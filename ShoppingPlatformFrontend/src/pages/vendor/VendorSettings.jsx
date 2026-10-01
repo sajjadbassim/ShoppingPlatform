@@ -1,7 +1,7 @@
 // src/pages/vendor/VendorSettings.jsx
 import { useState, useEffect } from 'react'
 import {
-  Store, Bell, Globe,
+  Store, Bell,
   Upload, Phone, MapPin, Clock, DollarSign, Info,
 } from 'lucide-react'
 import { Skeleton } from '../../components/common/Loading'
@@ -13,11 +13,10 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 import { usePreferencesDraft } from '../../hooks/usePreferences'
 import {
-  SettingsSection as Section, SettingsToggle as Toggle, ThemePicker, LANGUAGE_OPTIONS,
+  SettingsSection as Section, SettingsToggle as Toggle, AppearanceSection,
 } from '../../components/settings/SettingsSection'
 
 const NOTIFICATION_KEYS = ['notifyNewOrders', 'notifyOrderConfirmations', 'notifyLowStock', 'notifyReviews']
-const DISPLAY_KEYS = ['language', 'theme']
 
 const VendorSettings = () => {
   const { success, error: showError } = useToast()
@@ -227,26 +226,8 @@ const VendorSettings = () => {
         )}
       </Section>
 
-      {/* إعدادات العرض */}
-      <Section icon={Globe} title="إعدادات العرض"
-        onSave={savePreferences(DISPLAY_KEYS, 'تم حفظ إعدادات العرض')}
-        saving={prefs.isSaving} saveDisabled={!prefs.isDirty(DISPLAY_KEYS)}>
-        {prefs.isLoading ? prefsLoading : prefs.isError || !prefs.draft ? prefsError : (
-          <div className="space-y-4">
-            <div className="max-w-xs">
-              <p className="text-sm font-medium text-gray-700 mb-1">اللغة</p>
-              <select value={prefs.draft.language} onChange={e => prefs.set('language', e.target.value)}
-                className={inputCls}>
-                {LANGUAGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-2">المظهر</p>
-              <ThemePicker value={prefs.draft.theme} onChange={v => prefs.set('theme', v)} />
-            </div>
-          </div>
-        )}
-      </Section>
+      {/* المظهر */}
+      <AppearanceSection />
 
       {/* معلومات الحساب */}
       <Section icon={Info} title="معلومات الحساب">

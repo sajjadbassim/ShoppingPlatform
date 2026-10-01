@@ -146,9 +146,9 @@ const CategoryModal = ({ category, parentId, categories, onClose, onSaved }) => 
   const inputCls = "w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white"
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-lg w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg">{isEdit ? 'تعديل الفئة' : 'إضافة فئة جديدة'}</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>

@@ -100,21 +100,24 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
-      <div className="container-main pt-20">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl mx-auto overflow-hidden">
+    // على الهاتف: شاشة كاملة، وعلى الشاشات الأكبر: نافذة في المنتصف
+    <div className="fixed inset-0 z-[60] bg-white sm:bg-black/50 sm:backdrop-blur-sm" onClick={onClose}>
+      <div className="h-full sm:h-auto sm:container-main sm:pt-20">
+        <div className="bg-white h-full sm:h-auto flex flex-col sm:rounded-2xl sm:shadow-2xl max-w-2xl mx-auto overflow-hidden"
+          onClick={e => e.stopPropagation()}>
           {/* Search Input */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="relative">
+          <div className="p-3 sm:p-4 border-b border-gray-200 flex items-center gap-2">
+            <div className="relative flex-1">
               <Search size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 ref={inputRef}
                 type="text"
+                enterKeyHint="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
                 placeholder="ابحث عن منتجات، متاجر، فئات..."
-                className="w-full h-12 pr-12 pl-12 bg-gray-100 rounded-xl text-lg focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
+                className="w-full h-12 pr-12 pl-12 bg-gray-100 rounded-xl text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
               />
               {query && (
                 <button
@@ -125,10 +128,13 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                 </button>
               )}
             </div>
+            <button onClick={onClose} className="sm:hidden px-2 py-2 text-sm text-gray-600 font-medium">
+              إلغاء
+            </button>
           </div>
 
           {/* Results */}
-          <div className="max-h-[60vh] overflow-y-auto">
+          <div className="flex-1 sm:flex-none sm:max-h-[60vh] overflow-y-auto">
             {/* Loading */}
             {isLoading && query.length >= 2 && (
               <div className="p-8 text-center text-gray-500">
@@ -288,7 +294,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+          <div className="hidden sm:flex p-4 border-t border-gray-200 bg-gray-50 items-center justify-between">
             <span className="text-sm text-gray-500">اضغط Enter للبحث</span>
             <button onClick={onClose} className="text-sm text-gray-600 hover:text-primary">
               إغلاق (Esc)

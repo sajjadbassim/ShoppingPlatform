@@ -3,19 +3,63 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#4F46E5" />
+    <!-- تطبيق الوضع الداكن قبل ظهور الصفحة حتى لا تومض باللون الأبيض -->
+    <script>
+      try {
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#151B27');
+        }
+      } catch (e) {}
+    </script>
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="واسط" />
     <meta name="description" content="منصة واسط التجارية - تسوق إلكتروني متكامل" />
     
     <!-- Google Fonts - Tajawal & Cairo -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <!-- الخطوط لا تعطّل ظهور الصفحة: تُحمَّل بعد العرض الأول -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"></noscript>
+
+    <!-- شاشة البداية: تظهر فوراً قبل تنزيل ملفات التطبيق، ويستبدلها React عند جاهزيته -->
+    <style>
+      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #fff; font-family: Tajawal, Cairo, system-ui, sans-serif; }
+      .boot img { width: 88px; height: 88px; border-radius: 22px; box-shadow: 0 10px 30px rgba(79,70,229,.25); animation: boot-pulse 1.6s ease-in-out infinite; }
+      .boot-name { font-size: 20px; font-weight: 700; color: #111827; }
+      .boot-track { width: 140px; height: 4px; border-radius: 4px; background: #EEF2FF; overflow: hidden; }
+      .boot-track span { display: block; width: 40%; height: 100%; border-radius: 4px; background: #4F46E5; animation: boot-slide 1.2s ease-in-out infinite; }
+      .boot-slow { font-size: 13px; color: #6B7280; opacity: 0; animation: boot-show .4s ease 6s forwards; }
+      @keyframes boot-pulse { 50% { transform: scale(.94); } }
+      @keyframes boot-slide { 0% { transform: translateX(260%); } 100% { transform: translateX(-160%); } }
+      @keyframes boot-show { to { opacity: 1; } }
+      .dark .boot { background: #0B0F19; }
+      .dark .boot-name { color: #F1F3F6; }
+      .dark .boot-track { background: #252A4A; }
+      @media (prefers-reduced-motion: reduce) { .boot img, .boot-track span { animation: none; } }
+    </style>
     
     <title>منصة واسط التجارية</title>
-    <script type="module" crossorigin src="/assets/index-hZzdc0bK.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CG1moxJF.css">
-  </head>
+    <script type="module" crossorigin src="/assets/index-BwT5ZCMQ.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/query-BRZwYufj.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-Bu8uO6_j.js">
+    <link rel="modulepreload" crossorigin href="/assets/signalr-B-Iw09YV.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-2UZWrRyz.css">
+  <link rel="manifest" href="/manifest.webmanifest"></head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status" aria-label="جاري تحميل التطبيق">
+        <img src="/pwa-192x192.png" alt="" />
+        <div class="boot-name">منصة واسط التجارية</div>
+        <div class="boot-track"><span></span></div>
+        <div class="boot-slow">الاتصال بطيء قليلاً، جاري تحميل التطبيق...</div>
+      </div>
+    </div>
   </body>
 </html>

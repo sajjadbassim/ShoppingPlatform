@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Users;
 using ecommerce.Core.Models;
@@ -18,10 +18,14 @@ namespace ecommerce.Services
         public async Task<UserResponseDto> RegisterAsync(RegisterDto dto)
         {
             // تحقق من وجود المستخدم
+            dto.Phone = PhoneNumber.Require(dto.Phone);
             if (await _userRepository.ExistsAsync(dto.Phone))
             {
                 throw new Exception("رقم الهاتف مسجل مسبقاً");
             }
+            dto.Email = EmailAddress.Normalize(dto.Email);
+            if (dto.Email.Length > 0 && await _userRepository.GetByEmailAsync(dto.Email) != null)
+                throw new Exception("البريد الإلكتروني مستخدم لحساب آخر");
 
             // تحقق من صحة Role
             var validRoles = new[] { UserRoles.Customer, UserRoles.Ops, UserRoles.Admin };
@@ -85,7 +89,14 @@ namespace ecommerce.Services
                 user.FullName = dto.FullName;
 
             if (!string.IsNullOrEmpty(dto.Email))
-                user.Email = dto.Email;
+            {
+                var email = EmailAddress.Normalize(dto.Email);
+                if (!EmailAddress.IsValid(email))
+                    throw new Exception("البريد الإلكتروني غير صحيح");
+                if ((await _userRepository.GetByEmailAsync(email)) is { } other && other.Id != user.Id)
+                    throw new Exception("البريد الإلكتروني مستخدم لحساب آخر");
+                user.Email = email;
+            }
 
             var updatedUser = await _userRepository.UpdateAsync(user);
             return MapToDto(updatedUser);

@@ -1,6 +1,7 @@
-﻿using ecommerce.Core.DTO.Notification;
+using ecommerce.Core.DTO.Notification;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Services.NotificationService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -14,9 +15,11 @@ namespace ecommerce.Controllers
     public class NotificationsController : Controller
     {
         private readonly INotificationRepository _notificationRepository;
+        private readonly INotificationLinkService _linkService;
 
-        public NotificationsController(INotificationRepository notificationRepository)
+        public NotificationsController(INotificationRepository notificationRepository, INotificationLinkService linkService)
         {
+            _linkService = linkService;
             _notificationRepository = notificationRepository;
         }
 
@@ -121,6 +124,14 @@ namespace ecommerce.Controllers
         // DELETE: api/notifications/{id}
         // حذف إشعار محدد
         // ===================================
+        // GET: api/notifications/{id}/link — الصفحة التي يفتحها الإشعار حسب دور المستخدم (أو null)
+        [HttpGet("{id}/link")]
+        public async Task<IActionResult> GetLink(Guid id, CancellationToken ct)
+        {
+            var path = await _linkService.GetLinkAsync(id, GetCurrentUserId(), User.FindFirstValue(ClaimTypes.Role) ?? "", ct);
+            return Ok(new { success = true, data = new { path } });
+        }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {

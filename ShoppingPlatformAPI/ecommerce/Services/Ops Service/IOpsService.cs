@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Ops;
+using ecommerce.Core.DTO.Ops;
 using ecommerce.Core.DTO.Order;
 
 namespace ecommerce.Services
@@ -17,6 +17,8 @@ namespace ecommerce.Services
 
         Task<SubOrderDto> AssignDriverAsync(Guid subOrderId, AssignDriverDto dto);
         Task<IEnumerable<SubOrderDto>> AssignDriverToOrderAsync(Guid orderId, AssignDriverToOrderDto dto);
+        Task<IReadOnlyList<ecommerce.Core.Models.SubOrder>> MarkDeliveredByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId);
+        Task<IReadOnlyList<ecommerce.Core.Models.SubOrder>> MarkFailedByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId, string reason, string? note);
     }
 
 }

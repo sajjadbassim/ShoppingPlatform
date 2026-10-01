@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { friendlyStatusNotification } from '../utils/orderStatusText';
 import { persist } from 'zustand/middleware';
 import { notificationsService } from '../services';
 
@@ -142,13 +143,19 @@ const TYPE_META = {
  */
 export const formatNotification = (raw) => {
   const meta = TYPE_META[raw.type] || TYPE_META[NotificationTypes.GENERAL];
+  // الحالة الجديدة: من البيانات المحفوظة (نص JSON) أو من الرسالة اللحظية مباشرة
+  let data = raw.data;
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch { /* نص عادي */ } }
+  const knownStatus = raw.newStatus || data?.newStatus || data?.status || null;
+  const { message, status } = friendlyStatusNotification(raw.message, knownStatus);
   return {
     id: raw.id,
     type: raw.type,
     title: meta.title,
     icon: meta.icon,
-    message: raw.message,
-    data: raw.data,
+    message,
+    status,
+    data,
     isRead: raw.isRead ?? false,
     createdAt: raw.createdAt || raw.timestamp || new Date().toISOString(),
   };

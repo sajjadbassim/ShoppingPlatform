@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using Microsoft.EntityFrameworkCore;
@@ -417,11 +417,6 @@ namespace ecommerce.Services.InvoiceService
             _ => method
         };
 
-        private static string GetStatusAr(string status) => status switch
-        {
-            OrderStatus.DELIVERED => "مسلّم",
-            OrderStatus.CANCELLED => "ملغي",
-            _ => status
-        };
+        private static string GetStatusAr(string status) => OrderStatusText.Ar(status);
     }
 }

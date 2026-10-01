@@ -1,6 +1,12 @@
-import { useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { MapPin, Phone, Clock, Share2, Heart, Package, ChevronLeft, AlertCircle, DollarSign } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiGet, apiPost } from '../../api/axios'
+import { API_ENDPOINTS } from '../../api/endpoints'
+import { onPullRefresh } from '../../utils/pullRefresh'
+import TikTokLogo from '../../components/tiktok/TikTokLogo'
+import TikTokVideosTab from '../../components/tiktok/TikTokVideosTab'
+import { MapPin, Phone, Clock, Share2, Heart, Package, ChevronLeft, AlertCircle, DollarSign, Star } from 'lucide-react'
 import ProductCard from '../../components/common/ProductCard'
 import { Skeleton } from '../../components/common/Loading'
 import Breadcrumb from '../../components/common/Breadcrumb'
@@ -27,6 +33,37 @@ const StoreDetailsPage = () => {
   const { data: store, isLoading, isError, error } = useVendor(id)
   const { data: productsData, isLoading: productsLoading } = useProductsByVendor(id)
   const products = productsData || []
+
+  // فيديوهات تيك توك للمتجر — التبويب يظهر فقط إن كان المتجر مربوطاً ومفعّلاً العرض
+  const { data: tiktokFeed } = useQuery({
+    queryKey: ['tiktok-store-feed', id],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.TIKTOK.STORE_FEED(id)); return r.data?.data ?? r.data },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  })
+  const tiktokVideos = tiktokFeed?.enabled ? tiktokFeed.videos || [] : []
+
+  // عند فتح المتجر أو سحبه للتحديث: جلب آخر الفيديوهات من تيك توك (الخادم يحدّ ذلك بمرة كل 30 ثانية لكل متجر)
+  const queryClient = useQueryClient()
+  const [refreshingVideos, setRefreshingVideos] = useState(false)
+  const refreshVideos = useCallback(() => {
+    if (!id) return Promise.resolve()
+    setRefreshingVideos(true)
+    return apiPost(API_ENDPOINTS.TIKTOK.STORE_FEED_REFRESH(id))
+      .then(r => queryClient.setQueryData(['tiktok-store-feed', id], r.data?.data ?? r.data))
+      .catch(() => { /* تبقى آخر نسخة محفوظة */ })
+      .finally(() => setRefreshingVideos(false))
+  }, [id, queryClient])
+  const refreshedFor = useRef(null)
+  useEffect(() => {
+    if (!id || refreshedFor.current === id) return
+    refreshedFor.current = id
+    refreshVideos()
+  }, [id, refreshVideos])
+  useEffect(() => onPullRefresh(refreshVideos), [refreshVideos])
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') === 'videos' && tiktokVideos.length > 0 ? 'videos' : searchParams.get('tab') === 'about' ? 'about' : 'products'
+  const setTab = (value) => setSearchParams(value === 'products' ? {} : { tab: value }, { replace: true })
 
   const handleAddToCart = async ({ id: productId, quantity = 1 }) => {
     if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
@@ -109,6 +146,19 @@ const StoreDetailsPage = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{store.nameAr || store.name}</h1>
+                  {store.ratingsCount > 0 ? (
+                    <div className="flex items-center gap-1.5 mt-1.5" aria-label={`تقييم المتجر ${store.rating} من 5`}>
+                      <span className="flex">
+                        {[1, 2, 3, 4, 5].map(i => (
+                          <Star key={i} size={16} className={i <= Math.round(store.rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+                        ))}
+                      </span>
+                      <b className="text-sm text-gray-900">{Number(store.rating).toFixed(1)}</b>
+                      <span className="text-sm text-gray-500">({store.ratingsCount} {store.ratingsCount === 1 ? 'تقييم' : 'تقييمات'})</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 mt-1.5 flex items-center gap-1"><Star size={14} /> لا توجد تقييمات بعد</p>
+                  )}
                   <p className="text-gray-500 mt-1 text-sm" dir="ltr">{store.phone}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -163,11 +213,16 @@ const StoreDetailsPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl border border-gray-200 mb-6">
-          <Tabs defaultValue="products">
+        <div className="bg-white rounded-xl border border-gray-200 mb-6 overflow-hidden">
+          <Tabs value={tab} onValueChange={setTab}>
             <div className="px-6 border-b border-gray-200">
               <TabsList>
                 <TabsTrigger value="products">المنتجات ({products.length})</TabsTrigger>
+                {tiktokVideos.length > 0 && (
+                  <TabsTrigger value="videos">
+                    <span className="inline-flex items-center gap-1.5"><TikTokLogo className="w-4 h-4" />الفيديوهات ({tiktokVideos.length})</span>
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="about">عن المتجر</TabsTrigger>
               </TabsList>
             </div>
@@ -200,6 +255,12 @@ const StoreDetailsPage = () => {
                 </>
               )}
             </TabsContent>
+
+            {tiktokVideos.length > 0 && (
+              <TabsContent value="videos" className="p-0 sm:p-6">
+                <TikTokVideosTab account={tiktokFeed.account} videos={tiktokVideos} refreshing={refreshingVideos} />
+              </TabsContent>
+            )}
 
             <TabsContent value="about" className="p-6">
               <div className="space-y-5">

@@ -1,19 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { 
   Search, 
   ShoppingCart, 
   User, 
   ChevronDown, 
-  Menu, 
-  X,
   Heart,
   Package,
   Settings,
   LogOut,
   LayoutDashboard,
   Store,
-  Star
+  Star,
+  Clapperboard
 } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
@@ -21,8 +20,9 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useToast } from '../../components/common/Toast'
 import { NotificationBell } from './Notifications'
 import GlobalSearch from './GlobalSearch'
+import { getDashboardLink } from '../../utils/dashboardLink'
 import { useCategories } from '../../hooks/useCategories'
-import { getImageUrl } from '../../utils/imageHelper'
+import CategoryIcon from './CategoryIcon'
 
 const Header = () => {
   const navigate = useNavigate()
@@ -36,11 +36,16 @@ const Header = () => {
   const { data: categoriesData } = useCategories(true)
   const categories = categoriesData?.slice(0, 5) || []  // أول 5 تصنيفات فقط
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+
+  // فتح البحث من أي مكان في الصفحة (مثل شريط البحث في الصفحة الرئيسية)
+  useEffect(() => {
+    const open = () => setGlobalSearchOpen(true)
+    window.addEventListener('open-global-search', open)
+    return () => window.removeEventListener('open-global-search', open)
+  }, [])
 
   const cartItemsCount = getItemsCount()
   const wishlistCount = wishlistItems.length
@@ -53,31 +58,8 @@ const Header = () => {
     navigate('/')
   }
 
-  // البحث
-  const handleSearch = (e) => {
-    e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`)
-      setSearchQuery('')
-      setMobileMenuOpen(false)
-    }
-  }
-
   // الحصول على رابط لوحة التحكم حسب الدور
-  const getDashboardLink = () => {
-    switch (user?.role) {
-      case 'Admin':
-        return { path: '/admin', label: 'لوحة الإدارة', icon: LayoutDashboard }
-      case 'Vendor':
-        return { path: '/vendor', label: 'لوحة البائع', icon: Store }
-      case 'Ops':
-        return { path: '/operations', label: 'لوحة العمليات', icon: LayoutDashboard }
-      default:
-        return null
-    }
-  }
-
-  const dashboardLink = getDashboardLink()
+  const dashboardLink = getDashboardLink(user?.role)
 
   // الحصول على الحرف الأول من الاسم
   const getInitial = () => {
@@ -127,17 +109,15 @@ const Header = () => {
                     to={`/products?category=${category.id}`}
                     className="dropdown-item"
                   >
-                    {category.iconUrl ? (
-                      <img src={getImageUrl(category.iconUrl)} alt="" className="w-5 h-5 object-contain" />
-                    ) : (
-                      <Package size={16} className="text-gray-400" />
-                    )}
+                    <span className="w-5 h-5 flex items-center justify-center">
+                      <CategoryIcon category={category} className="w-5 h-5" emojiClassName="text-base" />
+                    </span>
                     <span>{category.nameAr}</span>
                   </Link>
                 ))}
                 <div className="border-t border-gray-200 my-1"></div>
                 <Link to="/categories" className="dropdown-item text-primary">
-                  <span>عرض جميع الفئات</span>
+                  <span>جميع الفئات</span>
                 </Link>
               </div>
             )}
@@ -172,6 +152,15 @@ const Header = () => {
           >
             العروض
           </NavLink>
+
+          {/* ريلز — على الهاتف في منتصف الشريط السفلي */}
+          <NavLink
+            to="/reels"
+            className="px-3 py-1.5 rounded-full transition-transform font-bold text-white text-sm bg-gradient-to-tr from-fuchsia-600 via-rose-500 to-amber-400 shadow-sm shadow-rose-500/30 hover:scale-105 flex items-center gap-1.5"
+          >
+            <Clapperboard size={16} />
+            ريلز
+          </NavLink>
         </nav>
 
         {/* Search Bar - Opens Global Search */}
@@ -201,7 +190,7 @@ const Header = () => {
           {/* Wishlist */}
           <Link 
             to="/wishlist" 
-            className="hidden sm:flex p-2 hover:bg-gray-100 rounded-full transition-colors relative"
+            className="hidden lg:flex p-2 hover:bg-gray-100 rounded-full transition-colors relative"
           >
             <Heart size={22} className="text-gray-600" />
             {wishlistCount > 0 && (
@@ -214,7 +203,7 @@ const Header = () => {
           {/* Cart */}
           <Link 
             to="/cart" 
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
+            className="hidden lg:flex p-2 hover:bg-gray-100 rounded-full transition-colors relative"
           >
             <ShoppingCart size={22} className="text-gray-600" />
             {cartItemsCount > 0 && (
@@ -224,9 +213,18 @@ const Header = () => {
             )}
           </Link>
 
+          {/* الإدارة: لكل الأدوار عدا الزبون، تفتح لوحة الدور (على الهاتف في قائمة "حسابي") */}
+          {isAuthenticated && dashboardLink && (
+            <Link to={dashboardLink.path} title={dashboardLink.label}
+              className="hidden lg:inline-flex h-10 px-4 rounded-full bg-primary !text-white hover:!text-white hover:bg-primary-hover text-sm font-bold items-center gap-1.5 shadow-sm shadow-primary/25 transition-colors">
+              <dashboardLink.icon size={17} />
+              الإدارة
+            </Link>
+          )}
+
           {/* User Menu */}
           {isAuthenticated ? (
-            <div className="relative">
+            <div className="relative hidden lg:block">
               <button
                 className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-full transition-colors"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -246,7 +244,7 @@ const Header = () => {
                   {/* معلومات المستخدم */}
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="font-medium text-gray-900 truncate">{user?.fullName || 'المستخدم'}</p>
-                    <p className="text-sm text-gray-500 truncate" dir="ltr">{user?.phone}</p>
+                    <p className="text-sm text-gray-500 truncate" dir="ltr">{user?.phone || user?.email}</p>
                   </div>
 
                   {/* رابط لوحة التحكم (إذا كان له صلاحية) */}
@@ -254,7 +252,8 @@ const Header = () => {
                     <>
                       <Link to={dashboardLink.path} className="dropdown-item text-primary">
                         <dashboardLink.icon size={18} />
-                        <span>{dashboardLink.label}</span>
+                        <span className="flex-1">الإدارة</span>
+                        <span className="text-[11px] text-gray-400">{dashboardLink.label}</span>
                       </Link>
                       <div className="border-t border-gray-100 my-1"></div>
                     </>
@@ -303,145 +302,15 @@ const Header = () => {
             <div className="flex items-center gap-2">
               <Link 
                 to="/login" 
-                className="hidden sm:inline-flex btn-primary btn-md"
+                className="hidden lg:inline-flex btn-primary btn-md"
               >
                 تسجيل الدخول
-              </Link>
-              <Link 
-                to="/login" 
-                className="sm:hidden p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <User size={22} className="text-gray-600" />
               </Link>
             </div>
           )}
 
-          {/* Mobile Menu Toggle */}
-          <button 
-            className="lg:hidden p-2 hover:bg-gray-100 rounded-full transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <>
-          <div 
-            className="lg:hidden fixed inset-0 bg-black/50 z-40"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          <div className="lg:hidden fixed top-[70px] right-0 bottom-0 w-[280px] bg-white z-50 shadow-dropdown animate-slide-down overflow-y-auto">
-            {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="p-4 border-b border-gray-200">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="ابحث عن منتج..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-11 pr-11 pl-4 bg-gray-50 border border-gray-200 rounded-lg"
-                />
-                <button type="submit" className="absolute right-4 top-1/2 -translate-y-1/2">
-                  <Search className="text-gray-400" size={20} />
-                </button>
-              </div>
-            </form>
-
-            {/* Mobile User Info */}
-            {isAuthenticated && (
-              <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <span className="text-primary font-semibold">{getInitial()}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{user?.fullName || 'المستخدم'}</p>
-                    <p className="text-sm text-gray-500 truncate" dir="ltr">{user?.phone}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Mobile Nav */}
-            <nav className="p-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase mb-2">الفئات</p>
-              {categories.map((category) => (
-                <Link
-                  key={category.id}
-                  to={`/products?category=${category.id}`}
-                  className="flex items-center gap-3 px-3 py-3 text-gray-700 hover:bg-gray-50 rounded-md"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {category.iconUrl ? (
-                    <img src={getImageUrl(category.iconUrl)} alt="" className="w-6 h-6 object-contain" />
-                  ) : (
-                    <Package size={20} className="text-gray-400" />
-                  )}
-                  <span>{category.nameAr}</span>
-                </Link>
-              ))}
-
-              <div className="border-t border-gray-200 my-4"></div>
-
-              <Link
-                to="/stores"
-                className="flex items-center gap-3 px-3 py-3 text-gray-700 hover:bg-gray-50 rounded-md"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                المتاجر
-              </Link>
-              <Link
-                to="/products"
-                className="flex items-center gap-3 px-3 py-3 text-gray-700 hover:bg-gray-50 rounded-md"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                جميع المنتجات
-              </Link>
-
-              {/* Auth Links for Mobile */}
-              {!isAuthenticated && (
-                <>
-                  <div className="border-t border-gray-200 my-4"></div>
-                  <Link
-                    to="/login"
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-primary text-white rounded-lg font-medium"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    تسجيل الدخول
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="flex items-center justify-center gap-2 px-4 py-3 mt-2 border border-gray-300 text-gray-700 rounded-lg font-medium"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    إنشاء حساب
-                  </Link>
-                </>
-              )}
-
-              {/* Logout for Mobile */}
-              {isAuthenticated && (
-                <>
-                  <div className="border-t border-gray-200 my-4"></div>
-                  <button
-                    onClick={() => {
-                      handleLogout()
-                      setMobileMenuOpen(false)
-                    }}
-                    className="flex items-center gap-3 px-3 py-3 text-red-600 hover:bg-red-50 rounded-md w-full"
-                  >
-                    <LogOut size={20} />
-                    <span>تسجيل الخروج</span>
-                  </button>
-                </>
-              )}
-            </nav>
-          </div>
-        </>
-      )}
 
       {/* Global Search Modal */}
       <GlobalSearch isOpen={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />

@@ -1,4 +1,5 @@
-﻿using ecommerce.Common;
+using Serilog;
+using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Data;
@@ -32,6 +33,28 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ===================================
+// السجلات: الشاشة + ملف يومي دائم (logs/api-YYYYMMDD.log، آخر 30 يوماً)
+// الملف يحفظ التحذيرات والأخطاء فقط حتى يبقى صغيراً وسهل القراءة
+// ===================================
+builder.Host.UseSerilog((ctx, cfg) => cfg
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        Path.Combine(ctx.HostingEnvironment.ContentRootPath, "logs", "api-.log"),
+        restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning,
+        rollingInterval: Serilog.RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        encoding: System.Text.Encoding.UTF8,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"));
+
+// فحص الحالة: الخادم + قاعدة البيانات — /health
+builder.Services.AddHealthChecks().AddCheck<ecommerce.Common.DatabaseHealthCheck>("database");
+
 // Add services to the container.
 
 builder.Services.AddControllers(options =>
@@ -48,9 +71,18 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
     {
+        // رسائل الإطار الافتراضية بالإنجليزية ← عربية مفهومة (رسائلنا العربية تبقى كما هي)
+        static string Arabic(string m) =>
+            System.Text.RegularExpressions.Regex.IsMatch(m, "[؀-ۿ]") ? m
+            : m.Contains("is required") ? "يرجى تعبئة كل الحقول المطلوبة"
+            : m.Contains("not a valid e-mail") || m.Contains("valid email") ? "البريد الإلكتروني غير صحيح"
+            : m.Contains("maximum length") || m.Contains("minimum length") ? "طول أحد الحقول غير مسموح"
+            : "بيانات غير صالحة — تحقق من الحقول وأعد المحاولة";
+
         var message = string.Join(" | ", context.ModelState.Values
             .SelectMany(v => v.Errors)
-            .Select(e => e.ErrorMessage));
+            .Select(e => Arabic(string.IsNullOrEmpty(e.ErrorMessage) ? e.Exception?.Message ?? "" : e.ErrorMessage))
+            .Distinct());
 
         return new BadRequestObjectResult(
             ApiResponse<object>.Fail(message, context.HttpContext.TraceIdentifier));
@@ -164,10 +196,37 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole("OPS", "ADMIN", "VENDOR"));
     options.AddPolicy(PolicyNames.VendorOnly, policy =>
     policy.RequireRole("VENDOR"));
+    options.AddPolicy(PolicyNames.DriverOnly, policy =>
+        policy.RequireRole("DRIVER"));
 });
 
 
 builder.Services.AddSignalR();
+
+// ===================================
+// حدود الطلبات لكل عنوان: إنشاء الحسابات وطلب رموز الاستعادة
+// (حدود كل رقم هاتف في AuthThrottle). العنوان الحقيقي من X-Forwarded-For عبر الوكيل المحلي.
+// ===================================
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (ctx, ct) =>
+    {
+        ctx.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+        await ctx.HttpContext.Response.WriteAsync(
+            "{\"success\":false,\"message\":\"طلبات كثيرة من هذا الجهاز — حاول بعد قليل\"}", ct);
+    };
+    options.AddPolicy("auth-ip", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromMinutes(10),
+            QueueLimit = 0,
+        }));
+});
 
 // ===================================
 // إضافة CORS (مهم للـ SignalR)
@@ -187,6 +246,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddAppPersistence(builder.Configuration);
 builder.Services.AddAppServices();
+builder.Services.AddTikTokIntegration(builder.Configuration);
 
 //builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
@@ -216,6 +276,7 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+app.UseForwardedHeaders();
 app.UseAppExceptionHandling();
 
 app.UseStaticFiles();
@@ -237,8 +298,24 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
+
+// GET /health — يُستخدم للمراقبة: Healthy / Unhealthy مع حالة قاعدة البيانات
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json; charset=utf-8";
+        await ctx.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.ToDictionary(e => e.Key, e => e.Value.Status.ToString()),
+            time = DateTime.UtcNow,
+        }));
+    }
+}).AllowAnonymous();
 
 app.MapHub<NotificationHub>("/hubs/notifications");
 app.MapHub<OpsHub>("/hubs/ops");

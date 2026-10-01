@@ -20,6 +20,7 @@ import Button from './Button'
  * @param {string} description - الوصف
  * @param {string} actionText - نص الزر
  * @param {function} onAction - دالة الزر
+ * @param {ReactNode} action - عنصر مخصص بدل الزر الافتراضي (مثل زر بأيقونة)
  */
 const EmptyState = ({
   type = 'generic',
@@ -28,6 +29,7 @@ const EmptyState = ({
   description,
   actionText,
   onAction,
+  action,
   className = '',
 }) => {
   // الأنواع المحددة مسبقاً
@@ -115,7 +117,9 @@ const EmptyState = ({
       </p>
 
       {/* Action Button */}
-      {displayActionText && onAction && (
+      {action ? (
+        <div className="flex flex-wrap items-center justify-center gap-2">{action}</div>
+      ) : displayActionText && onAction && (
         <Button variant="primary" onClick={onAction}>
           {displayActionText}
         </Button>

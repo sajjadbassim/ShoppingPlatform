@@ -1,17 +1,30 @@
-import { useState } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { NotificationBell } from '../common/Notifications'
+import { PageLoader } from '../common/PageLoader'
+import { useMobileTableLabels } from '../../hooks/useMobileTableLabels'
+import PushPrompt from '../common/PushPrompt'
+import { useOpsNotifications } from '../../hooks/useOpsNotifications'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Store,
-  BarChart3, Settings, LogOut, Menu, X, ChevronLeft,
+  BarChart3, Settings, LogOut, Menu, X, ChevronLeft, Wallet,
   Star, Tag, Zap, RotateCcw, Image,
+  Link2, Home,
 } from 'lucide-react'
 
 const DashboardLayout = ({ type = 'vendor' }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // تحديث لحظي لشاشات العمليات والإدارة (الطلبات والسائقون) — اتصال واحد لكل اللوحة
+  useOpsNotifications(type === 'operations' || type === 'admin')
+  // القائمة مفتوحة افتراضياً على الشاشات الكبيرة فقط — على الهاتف كانت تغطي المحتوى عند فتح أي صفحة
+  const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches
+  const [sidebarOpen, setSidebarOpen] = useState(isDesktop)
+  const { pathname } = useLocation()
+  useEffect(() => { if (!isDesktop()) setSidebarOpen(false) }, [pathname])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const navigate = useNavigate()
+  const mainRef = useRef(null)
+  useMobileTableLabels(mainRef)
   const { logout, user } = useAuthStore()
 
   const getMenuItems = () => {
@@ -23,6 +36,8 @@ const DashboardLayout = ({ type = 'vendor' }) => {
       
         { icon: Star, label: 'التقييمات', path: '/vendor/reviews' },
         { icon: BarChart3,       label: 'التقارير',  path: '/vendor/reports' },
+        { icon: Wallet,          label: 'أرباحي',    path: '/vendor/earnings' },
+        { icon: Link2,           label: 'ربط الحسابات', path: '/vendor/social' },
         { icon: Settings,        label: 'الإعدادات', path: '/vendor/settings' },
         ]
     } else if (type === 'admin') {
@@ -35,9 +50,10 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         { icon: ShoppingCart,    label: 'الطلبات',     path: '/admin/orders'     },
         { icon: Star,            label: 'التقييمات',   path: '/admin/reviews'    },
         { icon: Tag,             label: 'الكوبونات',   path: '/admin/coupons'    },
-        { icon: Zap,             label: 'نقاط الولاء', path: '/admin/loyalty'    },
+        { icon: Zap,             label: 'النقاط التشجيعية', path: '/admin/loyalty'    },
         { icon: RotateCcw,       label: 'الإرجاع',     path: '/admin/returns'    },
         { icon: BarChart3,       label: 'التقارير',    path: '/admin/reports'    },
+        { icon: Wallet,          label: 'المستحقات',   path: '/admin/finance'    },
         { icon: Settings,        label: 'الإعدادات',   path: '/admin/settings'   },
       ]
     } else if (type === 'operations') {
@@ -47,6 +63,7 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         { icon: Users,           label: 'عمال التوصيل',   path: '/operations/drivers' },
         { icon: Store,           label: 'التتبع المباشر', path: '/operations/tracking' },
         { icon: BarChart3,       label: 'التقارير',       path: '/operations/reports' },
+        { icon: Settings,        label: 'الإعدادات',      path: '/operations/settings' },
       ]
     }
     return []
@@ -78,9 +95,9 @@ const DashboardLayout = ({ type = 'vendor' }) => {
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <Link to="/" title="الصفحة الرئيسية للتسوق" className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-xl">و</span>
-            </div>
+            </Link>
             <div className="hidden sm:block">
               <h1 className="font-display font-bold text-lg text-gray-900">{getTitle()}</h1>
             </div>
@@ -116,7 +133,7 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         </button>
 
         {/* Nav items - scrollable */}
-        <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100%-64px)]">
+        <nav className="p-3 space-y-0.5 overflow-y-auto h-[calc(100%-112px)]">
           {menuItems.map((item) => (
             <NavLink
               key={item.path}
@@ -137,8 +154,17 @@ const DashboardLayout = ({ type = 'vendor' }) => {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="absolute bottom-0 right-0 left-0 p-3 border-t border-gray-100">
+        {/* العودة للمتجر + تسجيل الخروج */}
+        <div className="absolute bottom-0 right-0 left-0 p-3 border-t border-gray-100 space-y-0.5 bg-white">
+          <Link to="/" title="الصفحة الرئيسية للتسوق"
+            className={`
+              flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium
+              !text-primary hover:bg-primary/10 transition-colors duration-200
+              ${sidebarCollapsed ? 'justify-center px-2' : ''}
+            `}>
+            <Home size={19} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>الصفحة الرئيسية للتسوق</span>}
+          </Link>
           <button
             onClick={handleLogout}
             className={`
@@ -159,12 +185,15 @@ const DashboardLayout = ({ type = 'vendor' }) => {
       )}
 
       {/* Main Content */}
-      <main className={`
-        pt-[70px] min-h-screen transition-all duration-300
+      <main ref={mainRef} className={`
+        dashboard-main pt-[70px] min-h-screen transition-all duration-300
         ${sidebarCollapsed ? 'lg:pr-[70px]' : 'lg:pr-[240px]'}
       `}>
         <div className="p-4 lg:p-6">
-          <Outlet />
+          <PushPrompt className="mb-4" text="فعّل الإشعارات لتصلك الطلبات الجديدة فوراً حتى والتطبيق مغلق" />
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

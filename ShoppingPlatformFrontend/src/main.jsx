@@ -21,7 +21,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      {/* أداة المطوّرين: في وضع التطوير وعلى الحاسوب فقط، حتى لا تغطي الشريط السفلي على الهاتف */}
+      {import.meta.env.DEV && window.matchMedia('(min-width: 1024px)').matches && (
+        <ReactQueryDevtools initialIsOpen={false} />
+      )}
     </QueryClientProvider>
   </React.StrictMode>,
 )

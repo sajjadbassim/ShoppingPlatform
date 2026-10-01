@@ -1,4 +1,4 @@
-﻿using ecommerce.Common;
+using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Admin;
 using ecommerce.Core.DTO.Common;
@@ -146,9 +146,11 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var isActive = await _adminService.ToggleVendorStatusAsync(id);
-                var message = isActive ? "تم تفعيل المتجر" : "تم إيقاف المتجر";
-                return Ok(new { success = true, isActive, message });
+                var (isActive, ownerUpgraded) = await _adminService.ToggleVendorStatusAsync(id);
+                var message = isActive
+                    ? (ownerUpgraded ? "تم تفعيل المتجر وتحويل صاحبه إلى بائع" : "تم تفعيل المتجر")
+                    : "تم إيقاف المتجر";
+                return Ok(new { success = true, isActive, ownerUpgraded, message });
             }
             catch (Exception ex)
             {

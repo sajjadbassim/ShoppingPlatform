@@ -1,18 +1,19 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Product
 {
+    // تحديث جزئي: الحقول غير المُرسلة تبقى كما هي
     public class UpdateProductDto
     {
         public Guid? CategoryId { get; set; }
 
         [MaxLength(255)]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [MaxLength(255)]
-        public string NameAr { get; set; }
+        public string? NameAr { get; set; }
 
-        public string Description { get; set; }
+        public string? Description { get; set; }
 
         //public string? ImageUrl { get; set; }
 
@@ -23,7 +24,7 @@ namespace ecommerce.Core.DTO.Product
         public decimal? OriginalPrice { get; set; }
 
         [MaxLength(100)]
-        public string Sku { get; set; }
+        public string? Sku { get; set; }
 
         [Range(0, int.MaxValue, ErrorMessage = "الكمية يجب أن تكون أكبر من أو تساوي 0")]
         public int? StockQuantity { get; set; }
@@ -32,7 +33,7 @@ namespace ecommerce.Core.DTO.Product
 
         public bool? IsActive { get; set; }
 
-        public List<IFormFile> NewImages { get; set; }
+        public List<IFormFile>? NewImages { get; set; }
 
 
     }

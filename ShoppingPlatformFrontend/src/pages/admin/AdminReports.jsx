@@ -90,7 +90,7 @@ const AdminReports = () => {
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-gray-500">{c.label}</p>
-                <p className="font-bold text-gray-900 truncate">{c.value}</p>
+                <p className="font-bold text-gray-900 truncate" dir="auto">{c.value}</p>
               </div>
             </div>
           ))}

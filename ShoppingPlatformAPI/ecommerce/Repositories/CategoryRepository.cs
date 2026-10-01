@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Models;
+using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Extensions;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +30,33 @@ namespace ecommerce.Repositories
             return await _context.Categories
                 .FirstOrDefaultAsync(c => c.NameAr == name);
         }
+        public async Task<Dictionary<Guid, int>> GetProductCountsAsync()
+        {
+            var direct = await _context.Products
+                .Where(p => p.CategoryId != null)
+                .GroupBy(p => p.CategoryId!.Value)
+                .Select(g => new { CategoryId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
+
+            var parentOf = await _context.Categories
+                .Select(c => new { c.Id, c.ParentId })
+                .ToDictionaryAsync(x => x.Id, x => x.ParentId);
+
+            // كل منتج يُحسب لفئته ولكل أسلافها
+            var totals = parentOf.Keys.ToDictionary(id => id, _ => 0);
+            foreach (var (categoryId, count) in direct)
+            {
+                var current = (Guid?)categoryId;
+                var guard = 0;
+                while (current.HasValue && totals.ContainsKey(current.Value) && guard++ < 20)
+                {
+                    totals[current.Value] += count;
+                    current = parentOf[current.Value];
+                }
+            }
+            return totals;
+        }
+
         public async Task<IEnumerable<Category>> GetAllAsync(bool onlyActive = true)
         {
             var query = _context.Categories.AsQueryable();

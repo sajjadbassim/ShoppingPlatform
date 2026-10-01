@@ -52,9 +52,14 @@ export const useCreateReview = () => {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (formData) => reviewsService.createReview(formData),
-    onSuccess: (_, formData) => {
+    onSuccess: (review, formData) => {
       const productId = formData.get?.('ProductId')
       queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+      // التقييم يمنح نقاط ولاء — تحديث الرصيد والسجل
+      if (review?.pointsEarned > 0) {
+        queryClient.invalidateQueries({ queryKey: ['loyalty-account'] })
+        queryClient.invalidateQueries({ queryKey: ['loyalty-transactions'] })
+      }
       if (productId) {
         queryClient.invalidateQueries({ queryKey: reviewKeys.summary(productId) })
       }

@@ -124,12 +124,17 @@ const SettingsTab = () => {
               onChange={e => setForm({...form, pointsExpiryDays: Number(e.target.value)})}
               className={inputCls} />
           </F>
+          <F label="نقاط كتابة تقييم" hint="تُمنح مرة واحدة لكل منتج — 0 = بدون نقاط">
+            <input type="number" min="0" value={form.reviewPoints ?? ''}
+              onChange={e => setForm({...form, reviewPoints: Number(e.target.value)})}
+              className={inputCls} />
+          </F>
           <F label="حالة النظام">
             <label className="flex items-center gap-2 cursor-pointer mt-2">
               <input type="checkbox" checked={form.isActive ?? true}
                 onChange={e => setForm({...form, isActive: e.target.checked})}
                 className="w-4 h-4 accent-primary" />
-              <span className="text-sm text-gray-700">نظام الولاء نشط</span>
+              <span className="text-sm text-gray-700">نظام النقاط التشجيعية نشط</span>
             </label>
           </F>
         </div>
@@ -382,8 +387,8 @@ const AdminLoyalty = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">نظام الولاء</h1>
-        <p className="text-gray-500 mt-1">إدارة إعدادات نقاط الولاء وتعديل أرصدة المستخدمين</p>
+        <h1 className="text-2xl font-bold text-gray-900">النقاط التشجيعية</h1>
+        <p className="text-gray-500 mt-1">إدارة إعدادات النقاط التشجيعية وتعديل أرصدة المستخدمين</p>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

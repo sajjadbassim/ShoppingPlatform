@@ -1,63 +1,18 @@
+import plugin from 'tailwindcss/plugin'
+import { themeColors, themeVars } from './theme.palette.js'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // الوضع الداكن يُفعَّل بإضافة الصنف "dark" إلى <html>
+  darkMode: 'class',
   theme: {
     extend: {
-      colors: {
-        // Primary Colors
-        primary: {
-          DEFAULT: '#4F46E5',
-          hover: '#4338CA',
-          light: '#EEF2FF',
-          50: '#EEF2FF',
-          100: '#E0E7FF',
-          200: '#C7D2FE',
-          300: '#A5B4FC',
-          400: '#818CF8',
-          500: '#4F46E5',
-          600: '#4338CA',
-          700: '#3730A3',
-          800: '#312E81',
-          900: '#1E1B4B',
-        },
-        // Secondary/Status Colors
-        success: {
-          DEFAULT: '#10B981',
-          light: '#D1FAE5',
-          dark: '#059669',
-        },
-        warning: {
-          DEFAULT: '#F59E0B',
-          light: '#FEF3C7',
-          dark: '#D97706',
-        },
-        error: {
-          DEFAULT: '#EF4444',
-          light: '#FEE2E2',
-          dark: '#DC2626',
-        },
-        info: {
-          DEFAULT: '#3B82F6',
-          light: '#DBEAFE',
-          dark: '#2563EB',
-        },
-        // Neutral Colors
-        gray: {
-          50: '#F9FAFB',
-          100: '#F3F4F6',
-          200: '#E5E7EB',
-          300: '#D1D5DB',
-          400: '#9CA3AF',
-          500: '#6B7280',
-          600: '#4B5563',
-          700: '#374151',
-          800: '#1F2937',
-          900: '#111827',
-        },
-      },
+      // الألوان معرّفة كمتغيرات CSS في theme.palette.js (فاتح/داكن)
+      colors: themeColors,
       fontFamily: {
         sans: ['Tajawal', 'system-ui', 'sans-serif'],
         display: ['Cairo', 'system-ui', 'sans-serif'],
@@ -91,8 +46,35 @@ export default {
         'slide-down': 'slideDown 0.3s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'spin-slow': 'spin 2s linear infinite',
+        // زر العروض في الشريط السفلي
+        'wiggle': 'wiggle 2.5s ease-in-out infinite',
+        'soft-ping': 'softPing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+        // زر الريلز في الهيدر
+        'gradient-x': 'gradientX 4s ease infinite',
+        // شريط التحميل العلوي
+        'loading-bar': 'loadingBar 8s cubic-bezier(0.1, 0.6, 0.3, 1) forwards',
       },
       keyframes: {
+        wiggle: {
+          '0%, 60%, 100%': { transform: 'rotate(0deg) scale(1)' },
+          '10%': { transform: 'rotate(-14deg) scale(1.1)' },
+          '20%': { transform: 'rotate(12deg) scale(1.1)' },
+          '30%': { transform: 'rotate(-8deg) scale(1.05)' },
+          '40%': { transform: 'rotate(6deg) scale(1.05)' },
+          '50%': { transform: 'rotate(0deg) scale(1)' },
+        },
+        loadingBar: {
+          '0%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(0)' },
+        },
+        gradientX: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        softPing: {
+          '0%': { transform: 'scale(1)', opacity: '0.55' },
+          '80%, 100%': { transform: 'scale(1.45)', opacity: '0' },
+        },
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
@@ -119,5 +101,15 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // متغيرات الألوان: الوضع الفاتح على :root والداكن على .dark
+    // .theme-static يعيد ألوان الوضع الفاتح لعناصر داكنة أصلاً (مثل الفوتر) حتى لا تنقلب
+    plugin(({ addBase }) => {
+      addBase({
+        ':root': { ...themeVars.light, colorScheme: 'light' },
+        '.dark': { ...themeVars.dark, colorScheme: 'dark' },
+        '.theme-static': themeVars.light,
+      })
+    }),
+  ],
 }

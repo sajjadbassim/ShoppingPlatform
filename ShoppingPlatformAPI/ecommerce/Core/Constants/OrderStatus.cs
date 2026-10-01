@@ -1,4 +1,4 @@
-﻿namespace ecommerce.Core.Constants
+namespace ecommerce.Core.Constants
 {
     public static class OrderStatus
     {
@@ -9,5 +9,6 @@
         public const string OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY";         // في الطريق
         public const string DELIVERED = "DELIVERED";                        // تم التوصيل
         public const string CANCELLED = "CANCELLED";                        // ملغي
+        public const string DELIVERY_FAILED = "DELIVERY_FAILED";            // تعذّر التسليم (رفض/لا يرد/عنوان خاطئ)
     }
 }

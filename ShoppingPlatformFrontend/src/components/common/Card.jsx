@@ -134,9 +134,9 @@ export const StatCard = ({
     <Card className={className}>
       <div className="flex items-start justify-between">
         {/* Content */}
-        <div className="flex-1">
-          <p className="text-sm text-gray-500 mb-1">{title}</p>
-          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm text-gray-500 mb-1 truncate">{title}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{value}</p>
           
           {subtitle && (
             <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
@@ -157,8 +157,8 @@ export const StatCard = ({
 
         {/* Icon */}
         {Icon && (
-          <div className={`w-12 h-12 ${iconBg} rounded-lg flex items-center justify-center`}>
-            <Icon size={24} className={iconColor} />
+          <div className={`w-9 h-9 sm:w-12 sm:h-12 ${iconBg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+            <Icon className={`w-[18px] h-[18px] sm:w-6 sm:h-6 ${iconColor}`} />
           </div>
         )}
       </div>

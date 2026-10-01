@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Admin;
+using ecommerce.Core.DTO.Admin;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Product;
 using ecommerce.Core.Models;
@@ -21,7 +21,7 @@ namespace ecommerce.Services.AdminService
 
         // Vendor Management
         Task<IEnumerable<VendorResponseDto>> GetAllVendorsAsync(bool? isActive = null);
-        Task<bool> ToggleVendorStatusAsync(Guid vendorId);
+        Task<(bool IsActive, bool OwnerUpgraded)> ToggleVendorStatusAsync(Guid vendorId);
 
         // Product Management
         Task<IEnumerable<ProductDto>> GetAllProductsAsync(bool? isActive = null);

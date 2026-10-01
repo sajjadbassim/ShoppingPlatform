@@ -1,706 +1,571 @@
 // src/pages/operations/OperationsOrders.jsx
-import { useState } from 'react'
+// إدارة الطلبات للعمليات: قائمة مختصرة تُظهر «الخطوة التالية» لكل طلب + لوحة تفاصيل فيها كل الإجراءات
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Search, ChevronDown, ChevronUp, Truck, Package, Clock,
-  CheckCircle, XCircle, MapPin, User, RefreshCw,
-  AlertCircle, Store, Calendar, Phone, FileText,
-  Loader2
+  Search, Truck, Package, Clock, CheckCircle, XCircle, MapPin, RefreshCw, AlertCircle, Store,
+  Phone, FileText, X, ChevronLeft, MessageCircle, Bike, Car, Timer, User,
 } from 'lucide-react'
-import Button from '../../components/common/Button'
-import { StatusBadge } from '../../components/common/Badge'
-import { Tabs, TabsList, TabsTrigger } from '../../components/common/Tabs'
+import { useQuery } from '@tanstack/react-query'
 import Pagination from '../../components/common/Pagination'
-import Modal from '../../components/common/Modal'
-import Select from '../../components/common/Select'
-import EmptyState from '../../components/common/EmptyState'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
+import { apiGet } from '../../api/axios'
+import { API_ENDPOINTS } from '../../api/endpoints'
+import { getImageUrl } from '../../utils/imageHelper'
 import {
-  useOrdersPaged,
-  useOrder,
-  useConfirmSubOrder,
-  useCancelSubOrder,
-  useUpdateSubOrderStatus,
-  useAssignDriverToOrder,
-  useAvailableDrivers,
+  useOrdersPaged, useOrder, useConfirmSubOrder, useCancelSubOrder, useUpdateSubOrderStatus,
+  useAssignDriverToOrder, useAvailableDrivers,
 } from '../../hooks/useOrders'
+import { DurationChip, OrderTimingCard } from '../../components/common/OrderTiming'
+import { useOrderTimings } from '../../hooks/useOrderTiming'
 
 // ===========================
-// Helpers
+// الحالات
 // ===========================
-
-const STATUS_CONFIG = {
-  PENDING_CONFIRMATION: { label: 'قيد الانتظار',  bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-700', badgeBg: 'bg-yellow-100', dot: 'bg-yellow-500', icon: Clock       },
-  CONFIRMED:            { label: 'مؤكد',           bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700',   badgeBg: 'bg-blue-100',   dot: 'bg-blue-500',   icon: CheckCircle },
-  PARTIALLY_CONFIRMED:  { label: 'مؤكد جزئياً',    bg: 'bg-cyan-50',   border: 'border-cyan-200',   text: 'text-cyan-700',   badgeBg: 'bg-cyan-100',   dot: 'bg-cyan-500',   icon: Package     },
-  PREPARING:            { label: 'قيد التحضير',    bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', badgeBg: 'bg-indigo-100', dot: 'bg-indigo-500', icon: Package     },
-  OUT_FOR_DELIVERY:     { label: 'قيد التوصيل',    bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', badgeBg: 'bg-purple-100', dot: 'bg-purple-500', icon: Truck       },
-  DELIVERED:            { label: 'تم التوصيل',     bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-700',  badgeBg: 'bg-green-100',  dot: 'bg-green-500',  icon: CheckCircle },
-  CANCELLED:            { label: 'ملغي',           bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-600',    badgeBg: 'bg-red-100',    dot: 'bg-red-500',    icon: XCircle     },
+const STATUS = {
+  PENDING_CONFIRMATION: { label: 'بانتظار التأكيد', chip: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500', icon: Clock },
+  CONFIRMED: { label: 'مؤكد', chip: 'bg-blue-100 text-blue-800', dot: 'bg-blue-500', icon: CheckCircle },
+  PARTIALLY_CONFIRMED: { label: 'مؤكد جزئياً', chip: 'bg-cyan-100 text-cyan-800', dot: 'bg-cyan-500', icon: CheckCircle },
+  PREPARING: { label: 'قيد التحضير', chip: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500', icon: Package },
+  OUT_FOR_DELIVERY: { label: 'مع السائق', chip: 'bg-purple-100 text-purple-800', dot: 'bg-purple-500', icon: Truck },
+  DELIVERED: { label: 'تم التوصيل', chip: 'bg-green-100 text-green-800', dot: 'bg-green-500', icon: CheckCircle },
+  CANCELLED: { label: 'ملغي', chip: 'bg-red-100 text-red-700', dot: 'bg-red-500', icon: XCircle },
+  DELIVERY_FAILED: { label: 'تعذّر التسليم', chip: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500', icon: XCircle },
 }
+const st = (s) => STATUS[s] || { label: s || '—', chip: 'bg-gray-100 text-gray-600', dot: 'bg-gray-400', icon: Package }
 
-const sc = (status) => STATUS_CONFIG[status] || { label: status, bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-600', badgeBg: 'bg-gray-100', dot: 'bg-gray-400', icon: Package }
-
-const TAB_STATUSES = [
-  { value: 'all',                    label: 'الكل'           },
-  { value: 'PENDING_CONFIRMATION',   label: 'قيد الانتظار'   },
-  { value: 'CONFIRMED',              label: 'مؤكد'           },
-  { value: 'PARTIALLY_CONFIRMED',    label: 'مؤكد جزئياً'    },
-  { value: 'PREPARING',              label: 'قيد التحضير'    },
-  { value: 'OUT_FOR_DELIVERY',       label: 'قيد التوصيل'    },
-  { value: 'DELIVERED',              label: 'تم التوصيل'     },
-  { value: 'CANCELLED',              label: 'ملغي'           },
+const FILTERS = [
+  { value: 'all', label: 'الكل' },
+  { value: 'PENDING_CONFIRMATION', label: 'بانتظار التأكيد' },
+  { value: 'CONFIRMED', label: 'مؤكد' },
+  { value: 'PARTIALLY_CONFIRMED', label: 'مؤكد جزئياً' },
+  { value: 'PREPARING', label: 'قيد التحضير' },
+  { value: 'OUT_FOR_DELIVERY', label: 'مع السائق' },
+  { value: 'DELIVERED', label: 'تم التوصيل' },
+  { value: 'DELIVERY_FAILED', label: 'تعذّر التسليم' },
+  { value: 'CANCELLED', label: 'ملغي' },
 ]
 
-const fmt = {
-  date: (d) => d ? new Date(d).toLocaleDateString('ar-IQ') : '-',
-  time: (d) => d ? new Date(d).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' }) : '',
-  price: (p) => (p || 0).toLocaleString() + ' د.ع',
-}
+const CANCEL_REASONS = ['المتجر لم يرد', 'المنتج غير متوفر', 'طلب الزبون الإلغاء', 'تعذّر الوصول للزبون']
 
-// ✅ هل كل الطلبات الفرعية الفعالة جاهزة (PREPARING) لتعيين سائق موحّد لكامل الطلب؟
-const isOrderReadyForDriver = (subs) => {
-  const active = (subs || []).filter(s => s.status !== 'CANCELLED')
-  if (active.length === 0) return false
-  return active.every(s => s.status === 'PREPARING')
+const money = (n) => `${(n || 0).toLocaleString()} د.ع`
+const timeAgo = (d) => {
+  const min = Math.round((Date.now() - new Date(d).getTime()) / 60000)
+  if (min < 1) return 'الآن'
+  if (min < 60) return `منذ ${min} د`
+  const h = Math.round(min / 60)
+  if (h < 24) return `منذ ${h} س`
+  return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' })
 }
+const waLink = (phone) => {
+  const d = (phone || '').replace(/\D/g, '')
+  return d ? `https://wa.me/${d.startsWith('0') ? '964' + d.slice(1) : d}` : null
+}
+const cleanAddress = (a) => (a || '').split(',').map(x => x.trim()).filter(Boolean).join('، ')
 
 // ===========================
-// SubOrder Card (داخل الطلب الرئيسي)
+// «الخطوة التالية» — ما يجب فعله بالطلب الآن
 // ===========================
+const nextStep = (order) => {
+  const subs = (order.subOrders || []).filter(s => s.status !== 'CANCELLED')
+  if (!subs.length) return order.status === 'CANCELLED' ? { text: 'ملغي', tone: 'text-red-600' } : { text: '—', tone: 'text-gray-400' }
+  const count = (s) => subs.filter(x => x.status === s).length
+  const pending = count('PENDING_CONFIRMATION')
+  if (pending) {
+    const mins = Math.min(...subs.filter(x => x.status === 'PENDING_CONFIRMATION').map(x => x.minutesRemaining ?? 99))
+    return { text: `بانتظار تأكيد ${pending === 1 ? 'متجر' : pending + ' متاجر'}${mins < 99 ? ` · ${mins > 0 ? `باقي ${mins} د` : 'انتهت المهلة'}` : ''}`, tone: mins <= 0 ? 'text-red-600' : 'text-amber-700', urgent: true }
+  }
+  if (count('DELIVERY_FAILED')) return { text: 'تعذّر التسليم — أعد المحاولة أو ألغِ', tone: 'text-orange-700', urgent: true }
+  if (count('CONFIRMED')) return { text: 'ابدأ التحضير', tone: 'text-blue-700', urgent: true }
+  if (subs.every(x => x.status === 'PREPARING')) return { text: 'جاهز — عيّن سائقاً', tone: 'text-primary', urgent: true }
+  if (count('PREPARING')) return { text: 'قيد التحضير', tone: 'text-indigo-700' }
+  if (count('OUT_FOR_DELIVERY')) {
+    const d = subs.find(x => x.driverName)?.driverName
+    return { text: d ? `مع ${d}` : 'في الطريق', tone: 'text-purple-700' }
+  }
+  if (subs.every(x => x.status === 'DELIVERED')) return { text: 'اكتمل', tone: 'text-green-700' }
+  return { text: st(order.status).label, tone: 'text-gray-600' }
+}
 
-const SubOrderCard = ({ sub, onConfirm, onCancel, onUpdateStatus }) => {
-  const s = sc(sub.status)
-  const Icon = s.icon
-
+const StatusChip = ({ status, small }) => {
+  const s = st(status)
   return (
-    <div className={`rounded-xl border-2 ${s.border} ${s.bg} p-4 transition-all hover:shadow-sm`}>
-      {/* Header: Store + Status */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <div className={`w-9 h-9 rounded-lg ${s.badgeBg} flex items-center justify-center`}>
-            <Store size={16} className={s.text} />
-          </div>
-          <div>
-            <h4 className="font-bold text-gray-900 text-sm leading-tight">
-              {sub.vendorNameAr || sub.vendorName || 'متجر'}
-            </h4>
-            <span className="text-xs text-gray-400">#{sub.subOrderNumber}</span>
-          </div>
-        </div>
-        <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 ${s.badgeBg} ${s.text}`}>
-          <Icon size={12} />
-          {s.label}
+    <span className={`inline-flex items-center gap-1 rounded-full font-bold whitespace-nowrap ${s.chip} ${small ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
+    </span>
+  )
+}
+
+// ===========================
+// صف الطلب في القائمة
+// ===========================
+const OrderRow = ({ order, active, onOpen, timing }) => {
+  const step = nextStep(order)
+  const subs = order.subOrders || []
+  const area = cleanAddress(order.deliveryAddress).split('، ').slice(-2).join('، ')
+  return (
+    <button onClick={onOpen}
+      className={`w-full text-right p-3.5 sm:p-4 transition-colors border-r-4 ${active ? 'bg-primary/5 border-primary' : step.urgent ? 'border-amber-400 hover:bg-gray-50' : 'border-transparent hover:bg-gray-50'}`}>
+      <div className="flex items-center gap-2">
+        <span className="font-bold text-gray-900 text-sm" dir="ltr">{order.orderNumber?.replace(/^ORD-\d{4}(\d{4})-(\d+)$/, '$1-$2')}</span>
+        <span className="text-xs text-gray-400">{timeAgo(order.createdAt)}</span>
+        <span className="mr-auto flex items-center gap-1">
+          {order.status === 'DELIVERED' && <DurationChip timing={timing} small />}
+          <StatusChip status={order.status} small />
         </span>
       </div>
+      <div className="flex items-center gap-2 mt-2">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium text-gray-900 truncate">{order.customerName || 'زبون'}</span>
+          <span className="block text-xs text-gray-500 truncate">{area || '—'} · {subs.length} {subs.length === 1 ? 'متجر' : 'متاجر'}</span>
+        </span>
+        <span className="font-bold text-gray-900 text-sm flex-shrink-0">{money(order.totalAmount)}</span>
+      </div>
+      <p className={`mt-2 text-xs font-bold flex items-center gap-1 ${step.tone}`}>
+        {step.urgent && <span className="w-1.5 h-1.5 rounded-full bg-current motion-safe:animate-pulse" />}{step.text}
+      </p>
+    </button>
+  )
+}
 
-      {/* Items */}
-      <div className="bg-white/60 rounded-lg p-3 mb-3 space-y-2">
-        {(sub.items || []).map((item, i) => (
-          <div key={i} className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="w-6 h-6 rounded-md bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
-                {item.quantity}
-              </span>
-              <span className="text-gray-800 truncate">{item.productNameAr || item.productName}</span>
+// ===========================
+// طلب فرعي (متجر) داخل لوحة التفاصيل
+// ===========================
+const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
+  const pending = sub.status === 'PENDING_CONFIRMATION'
+  const late = pending && (sub.minutesRemaining ?? 1) <= 0
+  return (
+    <div className={`rounded-2xl border ${pending ? (late ? 'border-red-300' : 'border-amber-300') : 'border-gray-200'} bg-white overflow-hidden`}>
+      <div className="flex items-center gap-2.5 p-3 border-b border-gray-100">
+        <span className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0"><Store size={17} className="text-gray-500" /></span>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-gray-900 text-sm truncate">{sub.vendorNameAr || sub.vendorName}</p>
+          {sub.vendorPhone && <a href={`tel:${sub.vendorPhone}`} className="text-xs text-primary" dir="ltr">{sub.vendorPhone}</a>}
+        </div>
+        <StatusChip status={sub.status} />
+      </div>
 
-              {/* ✅ الـ variant المختار */}
-              {item.variantAttributes?.map((attr, i) => (
-                <span key={i} className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded mr-1">
-                  {attr.attributeNameAr}: {attr.valueAr}
-                </span>
-              ))}
-            </div>
-            <span className="text-gray-500 text-xs font-medium mr-2">{fmt.price(item.subtotal)}</span>
+      {pending && (
+        <p className={`px-3 pt-2.5 text-xs font-bold flex items-center gap-1 ${late ? 'text-red-600' : 'text-amber-700'}`}>
+          <Timer size={13} />{late ? 'انتهت مهلة تأكيد المتجر — اتصل به أو ألغِ طلبه' : `مهلة تأكيد المتجر: باقي ${sub.minutesRemaining} دقيقة`}
+        </p>
+      )}
+
+      <div className="p-3 space-y-2">
+        {(sub.items || []).map((it, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            <span className="relative w-10 h-10 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0">
+              {it.productImageUrl && <img src={getImageUrl(it.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
+              <span className="absolute -top-1 -left-1 min-w-5 h-5 px-1 rounded-full bg-gray-900 text-white text-[10px] font-bold flex items-center justify-center">{it.quantity}</span>
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-sm text-gray-800 truncate">{it.productNameAr || it.productName}</span>
+              {it.variantAttributes?.length > 0 && (
+                <span className="block text-[11px] text-gray-500 truncate">{it.variantAttributes.map(a => `${a.attributeNameAr}: ${a.valueAr}`).join(' · ')}</span>
+              )}
+            </span>
+            <span className="text-xs text-gray-600 flex-shrink-0">{money(it.subtotal)}</span>
           </div>
         ))}
-        {(!sub.items || sub.items.length === 0) && (
-          <p className="text-xs text-gray-400 text-center py-1">لا توجد منتجات</p>
-        )}
       </div>
 
-      {/* Driver */}
       {sub.driverName && (
-        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 bg-white/60 rounded-lg p-2">
-          <Truck size={13} className="text-purple-400" />
-          <span>{sub.driverName}</span>
-          {sub.driverPhone && <span className="text-gray-400">({sub.driverPhone})</span>}
-        </div>
+        <p className="mx-3 mb-3 flex items-center gap-2 text-xs text-purple-800 bg-purple-50 rounded-lg p-2">
+          <Truck size={14} /><span className="font-bold">{sub.driverName}</span>
+          {sub.driverPhone && <a href={`tel:${sub.driverPhone}`} className="mr-auto" dir="ltr">{sub.driverPhone}</a>}
+        </p>
+      )}
+      {sub.cancellationReason && <p className="mx-3 mb-3 text-xs text-red-700 bg-red-50 rounded-lg p-2">سبب الإلغاء: {sub.cancellationReason}</p>}
+      {sub.status === 'DELIVERY_FAILED' && (
+        <p className="mx-3 mb-3 text-xs text-orange-800 bg-orange-50 rounded-lg p-2">
+          تعذّر التسليم: <b>{sub.failureReasonAr || '—'}</b>{sub.failureNote ? ` — ${sub.failureNote}` : ''}
+          <span className="block mt-0.5 text-orange-700">البضاعة رجعت مع السائق. إعادة المحاولة تعيده للتحضير لتعيين سائق، والإلغاء يعيد القطع للمخزون.</span>
+        </p>
       )}
 
-      {/* Footer: Total + Actions */}
-      <div className="flex items-center justify-between">
-        <span className="font-bold text-gray-900">{fmt.price(sub.total)}</span>
-
-        <div className="flex items-center gap-1.5">
-          {sub.status === 'PENDING_CONFIRMATION' && (
-            <>
-              <Button variant="primary" size="sm" onClick={() => onConfirm(sub.id)}>
-                <CheckCircle size={13} className="ml-1" />تأكيد
-              </Button>
-              <Button variant="danger" size="sm" onClick={() => onCancel(sub)}>
-                إلغاء
-              </Button>
-            </>
-          )}
-          {sub.status === 'CONFIRMED' && (
-            <Button variant="primary" size="sm" onClick={() => onUpdateStatus(sub.id, 'PREPARING')}>
-              <Package size={13} className="ml-1" />بدء التحضير
-            </Button>
-          )}
-          {/* ✅ زر "تعيين سائق" اتحذف من هنا — التعيين صار على مستوى الطلب الرئيسي */}
-          {sub.status === 'OUT_FOR_DELIVERY' && (
-            <Button variant="primary" size="sm" onClick={() => onUpdateStatus(sub.id, 'DELIVERED')}>
-              <CheckCircle size={13} className="ml-1" />تم التوصيل
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ===========================
-// Order Card (الطلب الرئيسي) - Expandable
-// ===========================
-
-const OrderCard = ({ order, isExpanded, onToggle, subOrders, subOrdersLoading, onConfirm, onCancel, onUpdateStatus, onAssignDriver }) => {
-  const s = sc(order.status)
-  const Icon = s.icon
-  const subs = subOrders || order.subOrders || []
-  const readyForDriver = isOrderReadyForDriver(subs) // ✅ جديد
-
-  return (
-    <div className={`rounded-2xl border overflow-hidden transition-all ${
-      isExpanded ? 'border-gray-300 shadow-md' : 'border-gray-200 shadow-sm hover:shadow-md'
-    }`}>
-
-      {/* ===== Card Header (always visible) ===== */}
-      <div
-        className="bg-white p-5 cursor-pointer"
-        onClick={onToggle}
-      >
-        {/* Row 1: Order Number + Status + Date */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-xl ${s.badgeBg} flex items-center justify-center`}>
-              <Icon size={20} className={s.text} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-lg text-gray-900">#{order.orderNumber}</h3>
-                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${s.badgeBg} ${s.text}`}>
-                  {s.label}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                <Calendar size={12} />
-                <span>{fmt.date(order.createdAt)}</span>
-                <span>•</span>
-                <span>{fmt.time(order.createdAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Total + Assign Driver + Expand */}
-          <div className="flex items-center gap-3">
-            <div className="text-left">
-              <p className="text-xs text-gray-400">الإجمالي</p>
-              <p className="font-bold text-lg text-gray-900">{fmt.price(order.totalAmount || order.total)}</p>
-            </div>
-
-            {/* ✅ زر جديد: يظهر فقط لما كل الطلبات الفرعية الفعالة تكون PREPARING */}
-            {readyForDriver && (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); onAssignDriver(order) }}
-              >
-                <Truck size={14} className="ml-1" />تعيين سائق
-              </Button>
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border-t border-gray-100">
+        <span className="text-sm font-bold text-gray-900 flex-1">{money(sub.total)}</span>
+        {pending && (
+          <>
+            <button onClick={() => onCancel(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm font-bold disabled:opacity-50">إلغاء</button>
+            <button onClick={() => onConfirm(sub)} disabled={busy} className="h-9 px-4 rounded-lg bg-green-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />تأكيد</button>
+          </>
+        )}
+        {sub.status === 'CONFIRMED' && (
+          <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Package size={15} />بدء التحضير</button>
+        )}
+        {sub.status === 'DELIVERY_FAILED' && (
+          <>
+            <button onClick={() => onCancel(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm font-bold disabled:opacity-50">إلغاء</button>
+            {sub.failureReason !== 'customer_refused' && (
+              <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-4 rounded-lg bg-orange-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Truck size={15} />إعادة المحاولة</button>
             )}
-
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              isExpanded ? 'bg-primary/10' : 'bg-gray-100'
-            }`}>
-              {isExpanded
-                ? <ChevronUp size={16} className="text-primary" />
-                : <ChevronDown size={16} className="text-gray-400" />
-              }
-            </div>
-          </div>
-        </div>
-
-        {/* Row 2: Customer Info */}
-        <div className="flex items-center gap-5 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center">
-              <User size={14} className="text-gray-500" />
-            </div>
-            <span className="font-medium">{order.customerName || 'عميل'}</span>
-          </div>
-
-          {order.customerPhone && (
-            <div className="flex items-center gap-1.5 text-sm text-gray-500">
-              <Phone size={13} className="text-gray-400" />
-              <span>{order.customerPhone}</span>
-            </div>
-          )}
-
-          {(order.deliveryAddress || order.address) && (
-            <div className="flex items-center gap-1.5 text-sm text-gray-500 truncate max-w-xs">
-              <MapPin size={13} className="text-gray-400 shrink-0" />
-              <span className="truncate">{order.deliveryAddress || order.address}</span>
-            </div>
-          )}
-
-          {/* SubOrders count badge */}
-          <div className="flex items-center gap-1.5 mr-auto">
-            <Store size={13} className="text-gray-400" />
-            <span className="text-sm text-gray-500">
-              {(order.subOrders || []).length || '—'} متجر
-            </span>
-          </div>
-        </div>
-
-        {/* Customer Notes */}
-        {order.customerNotes && (
-          <div className="mt-3 flex items-start gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg p-2.5">
-            <FileText size={14} className="shrink-0 mt-0.5" />
-            <span>{order.customerNotes}</span>
-          </div>
+          </>
+        )}
+        {sub.status === 'OUT_FOR_DELIVERY' && (
+          <button onClick={() => onStatus(sub, 'DELIVERED')} disabled={busy} className="h-9 px-4 rounded-lg bg-green-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />تم التوصيل</button>
         )}
       </div>
-
-      {/* ===== Expanded Content: SubOrders ===== */}
-      {isExpanded && (
-        <div className="border-t border-gray-100 bg-gray-50 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Store size={16} className="text-gray-500" />
-            <h4 className="font-bold text-gray-700 text-sm">الطلبات الفرعية</h4>
-            {subs.length > 0 && (
-              <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{subs.length}</span>
-            )}
-          </div>
-
-          {subOrdersLoading ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {[1, 2].map(i => (
-                <div key={i} className="bg-white rounded-xl border border-gray-200 p-4">
-                  <Skeleton className="h-5 w-32 mb-3" />
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-8 w-24 mt-3" />
-                </div>
-              ))}
-            </div>
-          ) : subs.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {subs.map(sub => (
-                <SubOrderCard
-                  key={sub.id}
-                  sub={sub}
-                  onConfirm={onConfirm}
-                  onCancel={onCancel}
-                  onUpdateStatus={onUpdateStatus}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-400">
-              <Package size={32} className="mx-auto mb-2 opacity-50" />
-              <p className="text-sm">لا توجد طلبات فرعية</p>
-              <p className="text-xs mt-1">قد تحتاج لجلب التفاصيل من السيرفر</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
 
 // ===========================
-// Main Component
+// لوحة تفاصيل الطلب
 // ===========================
+const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
+  const { data: detail, isLoading } = useOrder(orderId)
+  const order = detail ? { ...fallback, ...detail } : fallback
+  const subs = order?.subOrders || []
+  const active = subs.filter(s => s.status !== 'CANCELLED')
+  const readyForDriver = active.length > 0 && active.every(s => s.status === 'PREPARING')
+  const wa = waLink(order?.customerPhone || order?.deliveryPhone)
+  const phone = order?.deliveryPhone || order?.customerPhone
 
-const OperationsOrders = () => {
-  const { success, error: toastError } = useToast()
-  const { user } = useAuthStore()
-  const opsUserId = user?.userId || user?.id
-
-  const [searchParams, setSearchParams] = useSearchParams()
-  const currentPage = parseInt(searchParams.get('page')) || 1
-  const statusFilter = searchParams.get('status') || 'all'
-
-  // States
-  const [searchQuery, setSearchQuery] = useState('')
-  const [expandedOrderId, setExpandedOrderId] = useState(null)
-
-  // Modals
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [showCancelModal, setShowCancelModal] = useState(false)
-  const [showAssignModal, setShowAssignModal] = useState(false)
-
-  // Form
-  const [confirmOrderId, setConfirmOrderId] = useState(null)
-  const [confirmNotes, setConfirmNotes] = useState('')
-  const [selectedSubOrder, setSelectedSubOrder] = useState(null) // ✅ الآن يخزن الـ Order كامل عند فتح مودال تعيين السائق
-  const [selectedDriver, setSelectedDriver] = useState('')
-  const [cancellationReason, setCancellationReason] = useState('')
-
-  // ===== Queries =====
-  const { data, isLoading, isError, error, refetch } = useOrdersPaged({
-    PageNumber: currentPage,
-    PageSize: 10,
-    status: statusFilter !== 'all' ? statusFilter : undefined,
-    orderNumber: searchQuery || undefined,
-  })
-
-  // جلب تفاصيل الطلب المفتوح (يحتوي على subOrders)
-  const { data: expandedOrderData, isLoading: expandedLoading } = useOrder(expandedOrderId)
-
-  const { data: availableDriversData } = useAvailableDrivers()
-  const availableDrivers = availableDriversData || []
-
-  // استخراج الطلبات - نحاول عدة بنى ممكنة للـ response
-  const rawData = data?.data || data
-  const orders = rawData?.items || (Array.isArray(rawData) ? rawData : [])
-  const totalPages = rawData?.totalPages || 1
-  const totalCount = rawData?.totalCount || orders.length
-
-  // ===== Mutations =====
-  const { mutateAsync: confirmSubOrder, isPending: confirming } = useConfirmSubOrder()
-  const { mutateAsync: cancelSubOrder, isPending: cancelling } = useCancelSubOrder()
-  const { mutateAsync: updateStatus, isPending: updatingStatus } = useUpdateSubOrderStatus()
-  const { mutateAsync: assignDriverToOrder, isPending: assigning } = useAssignDriverToOrder() // ✅ تعديل
-
-  // ===== Toggle Expand =====
-  const handleToggle = (orderId) => {
-    setExpandedOrderId(prev => prev === orderId ? null : orderId)
-  }
-
-  // ===== Navigation =====
-  const handleStatusChange = (status) => {
-    const params = new URLSearchParams(searchParams)
-    status === 'all' ? params.delete('status') : params.set('status', status)
-    params.set('page', '1')
-    setSearchParams(params)
-    setExpandedOrderId(null)
-  }
-
-  const handlePageChange = (page) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', page.toString())
-    setSearchParams(params)
-    setExpandedOrderId(null)
-  }
-
-  const handleSearchSubmit = (e) => {
-    if (e.key === 'Enter') {
-      const params = new URLSearchParams(searchParams)
-      params.set('page', '1')
-      setSearchParams(params)
-      refetch()
-    }
-  }
-
-  // ===== SubOrder Actions =====
-  const handleOpenConfirm = (subOrderId) => {
-    setConfirmOrderId(subOrderId)
-    setConfirmNotes('')
-    setShowConfirmModal(true)
-  }
-
-  const handleConfirm = async () => {
-    try {
-      await confirmSubOrder({ id: confirmOrderId, data: { opsUserId, notes: confirmNotes } })
-      success('تم تأكيد الطلب الفرعي بنجاح')
-      setShowConfirmModal(false)
-      refetch()
-    } catch (err) { toastError(err.message || 'فشل تأكيد الطلب') }
-  }
-
-  const handleUpdateStatus = async (subOrderId, newStatus) => {
-    try {
-      await updateStatus({ id: subOrderId, data: { opsUserId, newStatus } })
-      success('تم تحديث الحالة')
-      refetch()
-    } catch (err) { toastError(err.message || 'فشل تحديث الحالة') }
-  }
-
-  const handleOpenCancel = (subOrder) => {
-    setSelectedSubOrder(subOrder)
-    setCancellationReason('')
-    setShowCancelModal(true)
-  }
-
-  const handleCancel = async () => {
-    if (!cancellationReason.trim()) { toastError('يجب إدخال سبب الإلغاء'); return }
-    try {
-      await cancelSubOrder({ id: selectedSubOrder.id, data: { opsUserId, cancellationReason } })
-      success('تم إلغاء الطلب الفرعي')
-      setShowCancelModal(false)
-      refetch()
-    } catch (err) { toastError(err.message || 'فشل إلغاء الطلب') }
-  }
-
-  // ✅ تعديل: تستقبل الآن الطلب الرئيسي (order) كامل، مو الـ SubOrder
-  const handleOpenAssign = (order) => {
-    setSelectedSubOrder(order)
-    setSelectedDriver('')
-    setShowAssignModal(true)
-  }
-
-  // ✅ تعديل: تستدعي endpoint تعيين السائق لكامل الطلب
-  const handleAssignDriver = async () => {
-    if (!selectedDriver) { toastError('يجب اختيار سائق'); return }
-    try {
-      await assignDriverToOrder({
-        orderId: selectedSubOrder.id,
-        data: { driverId: selectedDriver, opsUserId }
-      })
-      success('تم تعيين السائق لكامل الطلب بنجاح')
-      setShowAssignModal(false)
-      refetch()
-    } catch (err) { toastError(err.message || 'فشل تعيين السائق') }
-  }
-
-  // ===== Error State =====
-  if (isError) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-gray-900">إدارة الطلبات</h1>
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <p className="text-red-700 font-medium">{error?.message || 'فشل في تحميل الطلبات'}</p>
-          <Button variant="outline" className="mt-4" onClick={() => refetch()}>إعادة المحاولة</Button>
-        </div>
-      </div>
-    )
-  }
-
+  // فُتح من رابط (إشعار) ولم تصل التفاصيل بعد
+  if (!order?.orderNumber) return (
+    <div className="p-5 space-y-3">
+      <Skeleton className="h-6 w-48" /><Skeleton className="h-28 rounded-2xl" /><Skeleton className="h-40 rounded-2xl" />
+    </div>
+  )
   return (
-    <div className="space-y-6">
-
-      {/* ===== Header ===== */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">إدارة الطلبات</h1>
-          <p className="text-gray-500 mt-1">{totalCount} طلب</p>
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-white">
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-gray-900" dir="ltr">{order.orderNumber}</p>
+          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
-          <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          <span className="mr-1">تحديث</span>
-        </Button>
+        <StatusChip status={order.status} />
+        <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center" aria-label="إغلاق"><X size={18} /></button>
       </div>
 
-      {/* ===== Status Cards ===== */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
-          const Icon = cfg.icon
-          const isActive = statusFilter === key
-          return (
-            <button
-              key={key}
-              onClick={() => handleStatusChange(key)}
-              className={`rounded-xl border-2 p-3 text-center transition-all ${
-                isActive
-                  ? `${cfg.border} ${cfg.bg} shadow-sm`
-                  : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-              }`}
-            >
-              <Icon size={18} className={`mx-auto mb-1 ${isActive ? cfg.text : 'text-gray-400'}`} />
-              <p className={`text-xs font-medium ${isActive ? cfg.text : 'text-gray-500'}`}>{cfg.label}</p>
-            </button>
-          )
-        })}
-      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        {readyForDriver && (
+          <button onClick={() => actions.assign(order)}
+            className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-primary text-white text-right shadow-md shadow-primary/30">
+            <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><Truck size={20} /></span>
+            <span className="flex-1"><span className="block font-bold">الطلب جاهز — عيّن سائقاً</span><span className="block text-xs text-white/80">كل المتاجر أنهت التحضير</span></span>
+            <ChevronLeft size={20} />
+          </button>
+        )}
 
-      {/* ===== Search + Tabs ===== */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        {/* Search */}
-        <div className="p-4 border-b border-gray-100">
-          <div className="relative max-w-md">
-            <input
-              type="text"
-              placeholder="البحث برقم الطلب..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchSubmit}
-              className="w-full h-10 pr-10 pl-4 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50"
-            />
-            <Search size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-        </div>
+        <OrderTimingCard orderId={order.id} />
 
-        {/* Tabs */}
-        <Tabs value={statusFilter} onValueChange={handleStatusChange}>
-          <div className="px-4 border-b border-gray-100 overflow-x-auto">
-            <TabsList>
-              {TAB_STATUSES.map(s => (
-                <TabsTrigger key={s.value} value={s.value}>{s.label}</TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </Tabs>
-      </div>
-
-      {/* ===== Orders List (Cards) ===== */}
-      {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <Skeleton className="w-11 h-11 rounded-xl" />
-                <div>
-                  <Skeleton className="h-5 w-32 mb-2" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <div className="mr-auto">
-                  <Skeleton className="h-6 w-28" />
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-4 w-40" />
-              </div>
+        {/* الزبون والتوصيل */}
+        <div className="rounded-2xl bg-white border border-gray-200 p-4">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center"><User size={17} className="text-gray-500" /></span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-gray-900 truncate">{order.customerName || 'زبون'}</p>
+              {phone && <p className="text-xs text-gray-500" dir="ltr">{phone}</p>}
             </div>
-          ))}
+            <span className="text-xs font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-700">{order.paymentMethod === 'COD' ? 'دفع عند الاستلام' : order.paymentMethod || '—'}</span>
+          </div>
+          {order.deliveryAddress && (
+            <p className="mt-3 text-sm text-gray-700 flex items-start gap-1.5"><MapPin size={15} className="mt-0.5 flex-shrink-0 text-gray-400" />{cleanAddress(order.deliveryAddress)}</p>
+          )}
+          {order.customerNotes && (
+            <p className="mt-2 text-sm text-amber-800 bg-amber-50 rounded-lg p-2 flex items-start gap-1.5"><FileText size={14} className="mt-0.5 flex-shrink-0" />{order.customerNotes}</p>
+          )}
+          {phone && (
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <a href={`tel:${phone}`} className="h-10 rounded-xl border border-gray-200 text-sm font-medium inline-flex items-center justify-center gap-1.5"><Phone size={15} />اتصال</a>
+              {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="h-10 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-medium inline-flex items-center justify-center gap-1.5"><MessageCircle size={15} />واتساب</a>}
+            </div>
+          )}
         </div>
-      ) : orders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-8">
-          <EmptyState
-            title="لا توجد طلبات"
-            description={
-              searchQuery ? 'لم يتم العثور على طلبات تطابق البحث'
-              : statusFilter !== 'all' ? 'لا توجد طلبات في هذه الفئة'
-              : 'لا توجد طلبات حالياً'
-            }
-          />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {orders.map(order => {
-            const isExpanded = expandedOrderId === order.id
-            // عند التوسع: استخدم البيانات المجلوبة من getById (تحتوي subOrders)
-            // أو استخدم subOrders الموجودة في order نفسه إن وُجدت
-            const detailedSubOrders = isExpanded && expandedOrderData?.subOrders
-              ? expandedOrderData.subOrders
-              : order.subOrders || []
 
+        {/* المتاجر */}
+        <div>
+          <p className="text-sm font-bold text-gray-700 mb-2">المتاجر ({subs.length})</p>
+          {isLoading && !subs.length ? <Skeleton className="h-40 rounded-2xl" /> : (
+            <div className="space-y-3">
+              {subs.map(sub => (
+                <SubOrderBlock key={sub.id} sub={sub} busy={actions.busy}
+                  onConfirm={actions.confirm} onCancel={actions.cancel} onStatus={actions.status} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* المجموع */}
+        <div className="rounded-2xl bg-white border border-gray-200 p-4 space-y-1.5 text-sm">
+          <div className="flex justify-between text-gray-600"><span>المنتجات</span><span>{money(order.subtotal)}</span></div>
+          <div className="flex justify-between text-gray-600"><span>التوصيل</span><span>{money(order.deliveryFees)}</span></div>
+          {order.discountAmount > 0 && <div className="flex justify-between text-green-700"><span>الخصم{order.couponCode ? ` (${order.couponCode})` : ''}</span><span>-{money(order.discountAmount)}</span></div>}
+          <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-100"><span>المطلوب من الزبون</span><span className="text-primary">{money(order.totalAmount)}</span></div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ===========================
+// نوافذ الإجراءات
+// ===========================
+const Sheet = ({ children, onClose, busy }) => (
+  <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+    <div className="absolute inset-0 bg-black/50" onClick={busy ? undefined : onClose} />
+    <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 animate-slide-up pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[85dvh] overflow-y-auto">{children}</div>
+  </div>
+)
+
+const CancelSheet = ({ sub, onClose, onSubmit, busy }) => {
+  const [reason, setReason] = useState('')
+  const [custom, setCustom] = useState('')
+  const final = reason === 'other' ? custom.trim() : reason
+  return (
+    <Sheet onClose={onClose} busy={busy}>
+      <h3 className="font-bold text-gray-900">إلغاء طلب {sub.vendorNameAr || sub.vendorName}</h3>
+      <p className="text-sm text-gray-500 mt-1">بقية متاجر الطلب لا تتأثر. السبب يظهر للزبون.</p>
+      <div className="flex flex-wrap gap-2 mt-4">
+        {[...CANCEL_REASONS, 'other'].map(r => (
+          <button key={r} onClick={() => setReason(r)}
+            className={`h-9 px-3.5 rounded-full text-sm border ${reason === r ? 'bg-red-50 border-red-300 text-red-700 font-bold' : 'border-gray-200 text-gray-700'}`}>{r === 'other' ? 'سبب آخر' : r}</button>
+        ))}
+      </div>
+      {reason === 'other' && <textarea value={custom} onChange={e => setCustom(e.target.value)} rows={2} autoFocus placeholder="اكتب السبب..." className="mt-3 w-full p-3 border border-gray-200 rounded-xl text-sm" />}
+      <div className="grid grid-cols-2 gap-2 mt-5">
+        <button onClick={onClose} disabled={busy} className="h-11 rounded-xl border border-gray-200 font-bold text-gray-700">تراجع</button>
+        <button onClick={() => onSubmit(final)} disabled={!final || busy} className="h-11 rounded-xl bg-red-600 text-white font-bold disabled:opacity-40">تأكيد الإلغاء</button>
+      </div>
+    </Sheet>
+  )
+}
+
+const vehicle = (t) => t === 'car' ? { Icon: Car, label: 'سيارة' } : t === 'motorcycle' ? { Icon: Bike, label: 'دراجة نارية' } : { Icon: Bike, label: 'دراجة' }
+
+const AssignSheet = ({ order, drivers, onClose, onSubmit, busy }) => {
+  const [driverId, setDriverId] = useState('')
+  return (
+    <Sheet onClose={onClose} busy={busy}>
+      <h3 className="font-bold text-gray-900">تعيين سائق للطلب <span dir="ltr">{order.orderNumber}</span></h3>
+      <p className="text-sm text-gray-500 mt-1">السائق يستلم من كل متاجر الطلب ويوصل للزبون</p>
+      {drivers.length === 0 ? (
+        <p className="mt-4 p-4 rounded-2xl bg-amber-50 text-amber-800 text-sm text-center">لا يوجد سائق متاح الآن</p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {drivers.map(d => {
+            const v = vehicle(d.vehicleType)
             return (
-              <OrderCard
-                key={order.id}
-                order={isExpanded && expandedOrderData ? { ...order, ...expandedOrderData } : order}
-                isExpanded={isExpanded}
-                onToggle={() => handleToggle(order.id)}
-                subOrders={detailedSubOrders}
-                subOrdersLoading={isExpanded && expandedLoading}
-                onConfirm={handleOpenConfirm}
-                onCancel={handleOpenCancel}
-                onUpdateStatus={handleUpdateStatus}
-                onAssignDriver={handleOpenAssign}
-              />
+              <button key={d.id} onClick={() => setDriverId(d.id)}
+                className={`w-full flex items-center gap-3 p-3 rounded-2xl border text-right ${driverId === d.id ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <span className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><v.Icon size={18} className="text-gray-600" /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-bold text-gray-900 text-sm truncate">{d.fullName}</span>
+                  <span className="block text-xs text-gray-500">{v.label}{d.phone && <> · <span dir="ltr">{d.phone}</span></>}</span>
+                </span>
+                {driverId === d.id && <CheckCircle size={20} className="text-primary" />}
+              </button>
             )
           })}
         </div>
       )}
+      <div className="grid grid-cols-2 gap-2 mt-5">
+        <button onClick={onClose} disabled={busy} className="h-11 rounded-xl border border-gray-200 font-bold text-gray-700">إلغاء</button>
+        <button onClick={() => onSubmit(driverId)} disabled={!driverId || busy} className="h-11 rounded-xl bg-primary text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-40">
+          {busy && <RefreshCw size={16} className="animate-spin" />}تعيين
+        </button>
+      </div>
+    </Sheet>
+  )
+}
 
-      {/* ===== Pagination ===== */}
-      {!isLoading && totalPages > 1 && (
-        <div className="flex justify-center">
-          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+// ===========================
+// الصفحة
+// ===========================
+const OperationsOrders = () => {
+  const { success, error: toastError } = useToast()
+  const { user } = useAuthStore()
+  const opsUserId = user?.userId || user?.id
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentPage = parseInt(searchParams.get('page')) || 1
+  const statusFilter = searchParams.get('status') || 'all'
+
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  useEffect(() => { const t = setTimeout(() => setSearch(searchInput.trim()), 400); return () => clearTimeout(t) }, [searchInput])
+
+  const [opened, setOpened] = useState(null) // يبقى مفتوحاً حتى لو خرج الطلب من الفلتر بعد إجراء
+  // ?order=<id> (من الإشعارات): فتح الطلب مباشرة حتى لو لم يكن في الصفحة المعروضة
+  const orderParam = searchParams.get('order')
+  useEffect(() => { if (orderParam) setOpened(o => o?.id === orderParam ? o : { id: orderParam }) }, [orderParam])
+  const closeOrder = () => {
+    setOpened(null)
+    if (orderParam) { const p = new URLSearchParams(searchParams); p.delete('order'); setSearchParams(p, { replace: true }) }
+  }
+  const openId = opened?.id
+  const [cancelSub, setCancelSub] = useState(null)
+  const [assignOrder, setAssignOrder] = useState(null)
+
+  const { data, isLoading, isError, error, refetch, isFetching, dataUpdatedAt } = useOrdersPaged({
+    PageNumber: currentPage, PageSize: 20,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    orderNumber: search || undefined,
+  })
+  const { data: counts = {}, refetch: refetchCounts } = useQuery({
+    queryKey: ['orders-status-counts'],
+    queryFn: async () => (await apiGet(API_ENDPOINTS.ORDERS.STATUS_COUNTS)).data.data || {},
+    refetchInterval: 30000,
+  })
+  // الطلبات الجديدة تظهر وحدها
+  useEffect(() => { const t = setInterval(() => refetch(), 30000); return () => clearInterval(t) }, [refetch])
+
+  const { data: drivers = [] } = useAvailableDrivers()
+  const orders = data?.items || []
+  // مدة الوصول للطلبات المُسلَّمة في هذه الصفحة
+  const { data: timings } = useOrderTimings((orders || []).filter(o => o.status === 'DELIVERED').map(o => o.id))
+  const totalPages = data?.totalPages || 1
+  const allCount = Object.values(counts).reduce((a, b) => a + b, 0)
+  const openOrder = opened && (orders.find(o => o.id === openId) || opened)
+
+  const { mutateAsync: confirmSub, isPending: confirming } = useConfirmSubOrder()
+  const { mutateAsync: cancelSubOrder, isPending: cancelling } = useCancelSubOrder()
+  const { mutateAsync: updateStatus, isPending: updating } = useUpdateSubOrderStatus()
+  const { mutateAsync: assignDriver, isPending: assigning } = useAssignDriverToOrder()
+  const busy = confirming || cancelling || updating || assigning
+
+  const after = (msg) => { success(msg); refetch(); refetchCounts() }
+  const actions = {
+    busy,
+    confirm: async (sub) => {
+      try { await confirmSub({ id: sub.id, data: { opsUserId, notes: '' } }); after(`تم تأكيد ${sub.vendorNameAr || sub.vendorName}`) }
+      catch (e) { toastError(e.message || 'فشل التأكيد') }
+    },
+    cancel: (sub) => setCancelSub(sub),
+    status: async (sub, newStatus) => {
+      try { await updateStatus({ id: sub.id, data: { opsUserId, newStatus } }); after(newStatus === 'DELIVERED' ? 'تم تسجيل التوصيل' : 'بدأ التحضير') }
+      catch (e) { toastError(e.message || 'فشل تحديث الحالة') }
+    },
+    assign: (order) => setAssignOrder(order),
+  }
+
+  const setStatus = (v) => {
+    const p = new URLSearchParams(searchParams)
+    v === 'all' ? p.delete('status') : p.set('status', v)
+    p.delete('page')
+    setSearchParams(p)
+  }
+
+  if (isError) return (
+    <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center">
+      <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+      <p className="text-red-700">{error?.message || 'فشل تحميل الطلبات'}</p>
+      <button onClick={() => refetch()} className="mt-4 h-10 px-5 rounded-xl border border-gray-300 font-medium">إعادة المحاولة</button>
+    </div>
+  )
+
+  const urgentCount = (counts.PENDING_CONFIRMATION || 0) + (counts.CONFIRMED || 0)
+
+  return (
+    <div className="space-y-4">
+      {/* العنوان */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-gray-900">الطلبات</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {allCount} طلب · تحديث تلقائي كل 30 ثانية
+            {dataUpdatedAt ? ` · آخر تحديث ${new Date(dataUpdatedAt).toLocaleTimeString('ar-IQ', { hour: 'numeric', minute: '2-digit' })}` : ''}
+          </p>
+        </div>
+        <button onClick={() => { refetch(); refetchCounts() }} disabled={isFetching} aria-label="تحديث"
+          className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center">
+          <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {/* ما يحتاج تدخلاً */}
+      {urgentCount > 0 && statusFilter === 'all' && (
+        <div className="grid sm:grid-cols-2 gap-2">
+          {counts.PENDING_CONFIRMATION > 0 && (
+            <button onClick={() => setStatus('PENDING_CONFIRMATION')} className="flex items-center gap-3 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-right">
+              <Clock size={20} className="text-amber-600" />
+              <span className="flex-1 text-sm"><b className="text-amber-900">{counts.PENDING_CONFIRMATION}</b> <span className="text-amber-800">بانتظار تأكيد المتاجر</span></span>
+              <ChevronLeft size={18} className="text-amber-600" />
+            </button>
+          )}
+          {counts.CONFIRMED > 0 && (
+            <button onClick={() => setStatus('CONFIRMED')} className="flex items-center gap-3 p-3 rounded-2xl bg-blue-50 border border-blue-200 text-right">
+              <Package size={20} className="text-blue-600" />
+              <span className="flex-1 text-sm"><b className="text-blue-900">{counts.CONFIRMED}</b> <span className="text-blue-800">مؤكدة تنتظر بدء التحضير</span></span>
+              <ChevronLeft size={18} className="text-blue-600" />
+            </button>
+          )}
         </div>
       )}
 
-      {/* ===== Confirm Modal ===== */}
-      <Modal isOpen={showConfirmModal} onClose={() => setShowConfirmModal(false)} title="تأكيد الطلب الفرعي" size="sm">
-        <div className="space-y-4">
-          <p className="text-gray-600 text-sm">هل تريد تأكيد هذا الطلب الفرعي؟</p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              ملاحظات <span className="text-gray-400 text-xs">(اختياري)</span>
-            </label>
-            <textarea
-              value={confirmNotes}
-              onChange={(e) => setConfirmNotes(e.target.value)}
-              placeholder="أدخل أي ملاحظات..."
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button variant="ghost" fullWidth onClick={() => setShowConfirmModal(false)}>تراجع</Button>
-            <Button variant="primary" fullWidth loading={confirming} onClick={handleConfirm}>تأكيد الطلب</Button>
-          </div>
-        </div>
-      </Modal>
+      {/* التصفية والبحث */}
+      <div className="flex gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1">
+        {FILTERS.map(f => {
+          const n = f.value === 'all' ? allCount : counts[f.value] || 0
+          const on = statusFilter === f.value
+          if (f.value === 'PARTIALLY_CONFIRMED' && !n && !on) return null
+          return (
+            <button key={f.value} onClick={() => setStatus(f.value)}
+              className={`h-9 px-3.5 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-1.5 border ${on ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
+              {f.value !== 'all' && <span className={`w-2 h-2 rounded-full ${st(f.value).dot}`} />}
+              {f.label}
+              <span className={`text-[11px] min-w-5 px-1.5 rounded-full ${on ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{n}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="relative">
+        <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
+          placeholder="ابحث برقم الطلب أو اسم الزبون أو هاتفه..."
+          className="w-full h-10 pr-9 pl-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/25 focus:border-primary" />
+      </div>
 
-      {/* ===== Cancel Modal ===== */}
-      <Modal isOpen={showCancelModal} onClose={() => setShowCancelModal(false)} title="إلغاء الطلب الفرعي" size="sm">
-        <div className="space-y-4">
-          <p className="text-gray-600 text-sm">
-            إلغاء الطلب من <span className="font-bold">{selectedSubOrder?.vendorNameAr || selectedSubOrder?.vendorName}</span>
-          </p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              سبب الإلغاء <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={cancellationReason}
-              onChange={(e) => setCancellationReason(e.target.value)}
-              placeholder="أدخل سبب الإلغاء..."
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-100 focus:border-red-400 bg-gray-50"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button variant="ghost" fullWidth onClick={() => setShowCancelModal(false)}>تراجع</Button>
-            <Button variant="danger" fullWidth loading={cancelling} onClick={handleCancel}>تأكيد الإلغاء</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ===== Assign Driver Modal ===== */}
-      {/* ✅ ملاحظة: selectedSubOrder هنا يحمل الطلب الرئيسي (Order) كامل عند فتح هذا المودال تحديداً */}
-      <Modal isOpen={showAssignModal} onClose={() => setShowAssignModal(false)} title="تعيين سائق" size="sm">
-        <div className="space-y-4">
-          <p className="text-gray-600 text-sm">
-            تعيين سائق لكامل الطلب <span className="font-bold">#{selectedSubOrder?.orderNumber}</span>
-          </p>
-          {availableDrivers.length === 0 ? (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-sm text-yellow-700 text-center">
-              <Truck size={24} className="mx-auto mb-2 text-yellow-400" />
-              لا يوجد سائقين متاحين حالياً
-            </div>
+      {/* القائمة + التفاصيل */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,26rem)_1fr] lg:gap-4 lg:items-start">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          {isLoading ? (
+            <div className="divide-y divide-gray-100">{[1, 2, 3, 4].map(i => <div key={i} className="p-4"><Skeleton className="h-4 w-32 mb-2" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-3 w-40" /></div>)}</div>
+          ) : orders.length === 0 ? (
+            <div className="py-14 text-center text-gray-400"><Package size={34} className="mx-auto mb-2 opacity-40" /><p className="text-sm">{search ? 'لا توجد نتائج' : 'لا توجد طلبات هنا'}</p></div>
           ) : (
-            <Select
-              label="اختر السائق"
-              options={availableDrivers.map(d => ({
-                value: d.id,
-                label: `${d.fullName} — ${d.vehicleType === 'motorcycle' ? 'دراجة نارية' : d.vehicleType === 'car' ? 'سيارة' : 'دراجة'}`,
-              }))}
-              value={selectedDriver}
-              onChange={setSelectedDriver}
-              placeholder="اختر السائق المتاح"
-            />
+            <div className="divide-y divide-gray-100">
+              {orders.map(o => <OrderRow key={o.id} order={o} active={o.id === openId} onOpen={() => setOpened(o)} timing={timings?.[o.id]} />)}
+            </div>
           )}
-          <div className="flex gap-2 pt-4">
-            <Button variant="ghost" fullWidth onClick={() => setShowAssignModal(false)}>إلغاء</Button>
-            <Button
-              variant="primary" fullWidth
-              disabled={!selectedDriver || availableDrivers.length === 0}
-              loading={assigning}
-              onClick={handleAssignDriver}
-            >
-              تعيين السائق
-            </Button>
-          </div>
+          {!isLoading && totalPages > 1 && (
+            <div className="p-3 border-t border-gray-100 flex justify-center">
+              <Pagination currentPage={currentPage} totalPages={totalPages}
+                onPageChange={p => { const ps = new URLSearchParams(searchParams); ps.set('page', String(p)); setSearchParams(ps) }} />
+            </div>
+          )}
         </div>
-      </Modal>
+
+        {/* لوحة التفاصيل: جانبية على الكمبيوتر، ملء الشاشة على الهاتف */}
+        <div className="hidden lg:block sticky top-24 h-[calc(100dvh-7.5rem)] rounded-2xl border border-gray-200 overflow-hidden bg-white">
+          {openOrder
+            ? <OrderPanel orderId={openId} fallback={openOrder} onClose={closeOrder} actions={actions} />
+            : <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-2"><Package size={36} className="opacity-40" /><p className="text-sm">اختر طلباً لعرض تفاصيله وإجراءاته</p></div>}
+        </div>
+      </div>
+      {openOrder && (
+        <div className="lg:hidden fixed inset-0 z-50 bg-white animate-slide-up">
+          <OrderPanel orderId={openId} fallback={openOrder} onClose={closeOrder} actions={actions} />
+        </div>
+      )}
+
+      {cancelSub && (
+        <CancelSheet sub={cancelSub} busy={cancelling} onClose={() => setCancelSub(null)}
+          onSubmit={async (reason) => {
+            try { await cancelSubOrder({ id: cancelSub.id, data: { opsUserId, cancellationReason: reason } }); setCancelSub(null); after('تم إلغاء طلب المتجر') }
+            catch (e) { toastError(e.message || 'فشل الإلغاء') }
+          }} />
+      )}
+      {assignOrder && (
+        <AssignSheet order={assignOrder} drivers={drivers} busy={assigning} onClose={() => setAssignOrder(null)}
+          onSubmit={async (driverId) => {
+            try { await assignDriver({ orderId: assignOrder.id, data: { driverId, opsUserId } }); setAssignOrder(null); after('تم تعيين السائق') }
+            catch (e) { toastError(e.message || 'فشل تعيين السائق') }
+          }} />
+      )}
     </div>
   )
 }

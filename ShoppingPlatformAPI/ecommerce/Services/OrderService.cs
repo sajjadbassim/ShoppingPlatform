@@ -1,4 +1,4 @@
-﻿using ecommerce.Core;
+using ecommerce.Core;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.CouponDto;
@@ -63,6 +63,13 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null) throw new Exception("المستخدم غير موجود");
+            // الشراء يتطلب رقم هاتف في الحساب (حسابات Google تُنشأ بلا هاتف)
+            if (string.IsNullOrWhiteSpace(user.Phone))
+                throw new Exception("أضف رقم هاتفك لإكمال الطلب");
+
+            // مهلة تأكيد المتجر من الإعدادات (الافتراضي 5 دقائق)
+            var confirmationMinutes = await _context.DeliverySettings.AsNoTracking()
+                .Select(x => (int?)x.ConfirmationTimeoutMinutes).FirstOrDefaultAsync() is int m and >= 1 and <= 240 ? m : 5;
 
             var address = await _addressRepository.GetByIdAsync(dto.AddressId);
             if (address == null) throw new Exception("العنوان غير موجود");
@@ -165,7 +172,9 @@ namespace ecommerce.Services
                     CouponCode = dto.CouponCode?.ToUpper(),
                     PaymentMethod = PaymentMethods.COD,
                     PaymentStatus = PaymentStatus.Pending,
-                    CustomerNotes = dto.CustomerNotes
+                    CustomerNotes = dto.CustomerNotes,
+                    DeliveryLatitude = address.Latitude,
+                    DeliveryLongitude = address.Longitude
                 };
 
                 order = await _orderRepository.CreateAsync(order);
@@ -194,7 +203,7 @@ namespace ecommerce.Services
                         Status = SubOrderStatus.PendingConfirmation,
                         Subtotal = vendorSubtotal,
                         DeliveryFee = vendor.DeliveryFee,
-                        ConfirmationDeadline = DateTime.UtcNow.AddMinutes(5)
+                        ConfirmationDeadline = DateTime.UtcNow.AddMinutes(confirmationMinutes)
                     };
 
                     subOrder = await _subOrderRepository.CreateAsync(subOrder);
@@ -268,17 +277,12 @@ namespace ecommerce.Services
             PaginationParams pagination, Guid? customerId = null, string orderNumber = null, string status = null)
         {
             var pagedOrders = await _orderRepository.GetPagedAsync(customerId, orderNumber, status, pagination.PageNumber, pagination.PageSize);
-            var dtoList = pagedOrders.Items.Select(o => new OrderResponseDto
-            {
-                Id = o.Id,
-                OrderNumber = o.OrderNumber,
-                CustomerId = o.CustomerId,
-                TotalAmount = o.TotalAmount,
-                Status = o.Status,
-                CreatedAt = o.CreatedAt
-            }).ToList();
+            // نفس تحويل صفحة التفاصيل: الزبون، العنوان، المتاجر، السائق والمنتجات
+            var dtoList = pagedOrders.Items.Select(MapToDto).ToList();
             return new PagedResponse<OrderResponseDto>(dtoList, pagedOrders.TotalCount, pagedOrders.PageNumber, pagedOrders.PageSize);
         }
+
+        public Task<Dictionary<string, int>> GetStatusCountsAsync() => _orderRepository.GetStatusCountsAsync();
 
         public async Task<OrderTrackingDto> GetOrderTrackingAsync(Guid orderId, Guid customerId, bool isAdmin = false)
         {
@@ -339,7 +343,7 @@ namespace ecommerce.Services
 
                 var cancellable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED };
                 if (!cancellable.Contains(order.Status))
-                    throw new Exception($"لا يمكن إلغاء الطلب في حالة \"{order.Status}\"، الإلغاء متاح فقط قبل بدء التحضير");
+                    throw new Exception($"لا يمكن إلغاء الطلب وهو «{OrderStatusText.Ar(order.Status)}»، الإلغاء متاح فقط قبل بدء التحضير");
 
                 var oldStatus = order.Status;
                 order.Status = OrderStatus.CANCELLED;
@@ -403,6 +407,10 @@ namespace ecommerce.Services
                 ConfirmationDeadline = so.ConfirmationDeadline,
                 MinutesRemaining = so.ConfirmationDeadline.HasValue ? (int)Math.Max(0, (so.ConfirmationDeadline.Value - DateTime.UtcNow).TotalMinutes) : null,
                 CancellationReason = so.CancellationReason,
+                FailureReason = so.FailureReason,
+                FailureReasonAr = so.FailureReason == null ? null : DeliveryFailureReason.Ar(so.FailureReason),
+                FailureNote = so.FailureNote,
+                PickedUpAt = so.PickedUpAt,
                 CancelledBy = so.CancelledBy,
                 CancelledByName = so.CancelledByUser?.FullName,
                 CancelledAt = so.CancelledAt,

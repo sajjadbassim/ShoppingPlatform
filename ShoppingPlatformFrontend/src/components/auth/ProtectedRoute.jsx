@@ -51,6 +51,7 @@ export const GuestRoute = ({ children, redirectTo = '/' }) => {
       ADMIN: '/admin',
       VENDOR: '/vendor',
       OPS: '/operations',
+      DRIVER: '/driver',
       CUSTOMER: '/',
     };
     

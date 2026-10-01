@@ -12,6 +12,8 @@ import { useQuery } from '@tanstack/react-query'
 import { getImageUrl } from '../../utils/imageHelper'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { DurationChip } from '../../components/common/OrderTiming'
+import { useOrderTimings } from '../../hooks/useOrderTiming'
 
 const STATUS_OPTIONS = [
   { value: '',                      label: 'الكل'           },
@@ -20,6 +22,7 @@ const STATUS_OPTIONS = [
   { value: 'PREPARING',             label: 'قيد التحضير'   },
   { value: 'OUT_FOR_DELIVERY',      label: 'قيد التوصيل'   },
   { value: 'DELIVERED',             label: 'تم التوصيل'    },
+  { value: 'DELIVERY_FAILED',       label: 'تعذّر التسليم' },
   { value: 'CANCELLED',             label: 'ملغي'           },
 ]
 
@@ -36,6 +39,7 @@ const statusLabels = {
   OUT_FOR_DELIVERY:     { label: 'قيد التوصيل',   color: 'bg-purple-100 text-purple-700'},
   DELIVERED:            { label: 'تم التوصيل',    color: 'bg-green-100 text-green-700'  },
   CANCELLED:            { label: 'ملغي',           color: 'bg-red-100 text-red-600'      },
+  DELIVERY_FAILED:      { label: 'تعذّر التسليم',  color: 'bg-orange-100 text-orange-800'},
 }
 
 const OrderDetailModal = ({ orderId, onClose }) => {
@@ -53,9 +57,9 @@ const OrderDetailModal = ({ orderId, onClose }) => {
   const s = statusLabels[order?.status] || { label: order?.status, color: 'bg-gray-100 text-gray-600' }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white">
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-2xl w-full max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg">
             {order ? `طلب #${order.orderNumber}` : 'تفاصيل الطلب'}
           </h3>
@@ -203,6 +207,8 @@ const AdminOrders = () => {
 
   const statusLabel = (s) => STATUS_OPTIONS.find(o => o.value === s)?.label || s
 
+  const { data: timings } = useOrderTimings((orders || []).filter(o => o.status === 'DELIVERED').map(o => o.id))
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -253,7 +259,7 @@ const AdminOrders = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['رقم الطلب','العميل','المبلغ','طريقة الدفع','التاريخ','الحالة',''].map(h => (
+                  {['رقم الطلب','العميل','المبلغ','طريقة الدفع','التاريخ','الحالة','مدة الوصول',''].map(h => (
                     <th key={h} className="px-4 py-3 text-right font-semibold text-gray-600">{h}</th>
                   ))}
                 </tr>
@@ -278,6 +284,9 @@ const AdminOrders = () => {
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      {order.status === 'DELIVERED' ? <DurationChip timing={timings?.[order.id]} /> : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <button onClick={() => navigate(`/admin/orders/${order.id}`)}

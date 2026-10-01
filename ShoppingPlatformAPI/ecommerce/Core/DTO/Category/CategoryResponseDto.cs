@@ -1,4 +1,4 @@
-﻿namespace ecommerce.Core.DTO.Category
+namespace ecommerce.Core.DTO.Category
 {
     public class CategoryResponseDto
     {
@@ -19,5 +19,8 @@
         public bool IsActive { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        // عدد المنتجات في الفئة وكل فئاتها الفرعية (الفئة الرئيسية لا منتجات مباشرة فيها غالباً)
+        public int ProductsCount { get; set; }
     }
 }

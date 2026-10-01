@@ -385,8 +385,8 @@ const ProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container-main py-6">
-        <Breadcrumb items={[{ label: 'المنتجات' }]} className="mb-6" />
+      <div className="container-main py-4 lg:py-6">
+        <Breadcrumb items={[{ label: 'المنتجات' }]} className="mb-6 hidden lg:block" />
 
         <div className="flex gap-6">
           {/* Desktop Sidebar */}
@@ -399,10 +399,10 @@ const ProductsPage = () => {
           {/* Main */}
           <div className="flex-1 min-w-0">
             {/* Header bar */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+            <div className="bg-white rounded-2xl sm:rounded-xl border border-gray-200 p-3 sm:p-4 mb-3 sm:mb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">
+                  <h1 className="text-base sm:text-lg font-bold text-gray-900">
                     {searchTerm ? `نتائج: "${searchTerm}"` : 'جميع المنتجات'}
                   </h1>
                   <p className="text-sm text-gray-400 mt-0.5">
@@ -412,7 +412,7 @@ const ProductsPage = () => {
                 <div className="flex items-center gap-2">
                   {/* Mobile filter btn */}
                   <button onClick={() => setShowMobileFilters(true)}
-                    className="lg:hidden flex items-center gap-1.5 h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-600 hover:border-primary hover:text-primary transition-colors">
+                    className="lg:hidden flex-1 sm:flex-none justify-center flex items-center gap-1.5 h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-600 hover:border-primary hover:text-primary transition-colors">
                     <SlidersHorizontal size={15} />
                     الفلاتر
                     {activeCount > 0 && (
@@ -422,7 +422,7 @@ const ProductsPage = () => {
 
                   {/* Sort */}
                   <select value={sortBy} onChange={e => { const p = new URLSearchParams(searchParams); p.set('sort', e.target.value); p.set('page','1'); setSearchParams(p) }}
-                    className="h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary">
+                    className="flex-1 sm:flex-none h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary">
                     <option value="newest">الأحدث</option>
                     <option value="price-low">السعر: الأقل</option>
                     <option value="price-high">السعر: الأعلى</option>

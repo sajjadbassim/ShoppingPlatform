@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Admin;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Product;
@@ -18,13 +18,16 @@ namespace ecommerce.Services.AdminService
         private readonly IUserRepository _userRepository;
         private readonly IVendorRepository _vendorRepository;
         private readonly IProductRepository _productRepository;
+        private readonly ecommerce.Services.VendorService.VendorService.IVendorService? _vendorService;
 
         public AdminService(
             AppDbContext context,
             IUserRepository userRepository,
             IVendorRepository vendorRepository,
-            IProductRepository productRepository)
+            IProductRepository productRepository,
+            ecommerce.Services.VendorService.VendorService.IVendorService? vendorService = null)
         {
+            _vendorService = vendorService;
             _context = context;
             _userRepository = userRepository;
             _vendorRepository = vendorRepository;
@@ -165,12 +168,17 @@ namespace ecommerce.Services.AdminService
         public async Task<UserResponseDto> CreateOpsUserAsync(CreateOpsUserDto dto)
         {
             // التحقق من عدم وجود المستخدم
-            if (await _userRepository.ExistsAsync(dto.Phone))
+            var phone = PhoneNumber.Require(dto.Phone);
+            if (await _userRepository.ExistsAsync(phone))
                 throw new Exception("رقم الهاتف مسجل مسبقاً");
+            var opsEmail = EmailAddress.Normalize(dto.Email);
+            if (opsEmail.Length > 0 && await _userRepository.GetByEmailAsync(opsEmail) != null)
+                throw new Exception("البريد الإلكتروني مستخدم لحساب آخر");
+            dto.Email = opsEmail;
 
             var user = new User
             {
-                Phone = dto.Phone,
+                Phone = phone,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 FullName = dto.FullName,
                 Email = dto.Email,
@@ -239,7 +247,7 @@ namespace ecommerce.Services.AdminService
             });
         }
 
-        public async Task<bool> ToggleVendorStatusAsync(Guid vendorId)
+        public async Task<(bool IsActive, bool OwnerUpgraded)> ToggleVendorStatusAsync(Guid vendorId)
         {
             var vendor = await _vendorRepository.GetByIdAsync(vendorId);
             if (vendor == null)
@@ -248,7 +256,9 @@ namespace ecommerce.Services.AdminService
             vendor.IsActive = !vendor.IsActive;
             await _vendorRepository.UpdateAsync(vendor);
 
-            return vendor.IsActive;
+            // التفعيل يحوّل صاحب المتجر لبائع في نفس العملية (كان يتم من المتصفح بطلب منفصل)
+            var upgraded = vendor.IsActive && _vendorService != null && await _vendorService.ApproveOwnerAsync(vendor.Id);
+            return (vendor.IsActive, upgraded);
         }
 
         public async Task<IEnumerable<ProductDto>> GetAllProductsAsync(bool? isActive = null)

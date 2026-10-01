@@ -47,6 +47,37 @@ namespace ecommerce.Core.Models
         [Column("payment_status")]
         public string PaymentStatus { get; set; } = "PENDING";
 
+        // ===== موقع التوصيل وقت الطلب (نسخة من دبوس العنوان) — تعديل العنوان لاحقاً لا يغيّر وجهة الطلب =====
+        [Column("delivery_latitude", TypeName = "decimal(10,8)")]
+        public decimal? DeliveryLatitude { get; set; }
+
+        [Column("delivery_longitude", TypeName = "decimal(11,8)")]
+        public decimal? DeliveryLongitude { get; set; }
+
+        // ===== الدفع عند الاستلام: ما استلمه السائق نقداً، ومتى سلّمه للعمليات =====
+        [Column("cash_collected_amount", TypeName = "decimal(10,2)")]
+        public decimal? CashCollectedAmount { get; set; }
+
+        [Column("cash_collected_at")]
+        public DateTime? CashCollectedAt { get; set; }
+
+        [Column("cash_collected_by_driver_id")]
+        public Guid? CashCollectedByDriverId { get; set; }
+
+        [Column("cash_settled_at")]
+        public DateTime? CashSettledAt { get; set; }
+
+        [Column("cash_settled_by")]
+        public Guid? CashSettledBy { get; set; }
+
+        // أجرة التوصيل عند الرفض: قيمتها ومن يتحمّلها (RefusalFeePayer) حسب الإعداد وقت الرفض
+        [Column("refusal_fee_amount", TypeName = "decimal(10,2)")]
+        public decimal? RefusalFeeAmount { get; set; }
+
+        [MaxLength(20)]
+        [Column("refusal_fee_payer")]
+        public string? RefusalFeePayer { get; set; }
+
         [Column("customer_notes")]
         public string CustomerNotes { get; set; }
 

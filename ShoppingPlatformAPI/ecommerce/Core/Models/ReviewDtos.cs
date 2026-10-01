@@ -105,6 +105,9 @@ namespace ecommerce.Core.DTO.Review
         public string? ProductName { get; set; }
         public string? ProductNameAr { get; set; }
         public List<ReviewImageDto> Images { get; set; } = new List<ReviewImageDto>();
+
+        // نقاط الولاء الممنوحة عند إنشاء التقييم (تُملأ في استجابة الإنشاء فقط)
+        public int PointsEarned { get; set; }
     }
 
     public class ReviewImageDto

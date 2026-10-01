@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Vendor
 {
@@ -33,6 +33,11 @@ namespace ecommerce.Core.DTO.Vendor
         public int? EstimatedPrepTime { get; set; }
 
         public int ProductsCount { get; set; }
+
+        // تقييم المتجر من الزبائن بعد استلام طلباتهم (نجوم المتجر في تقييم الطلب)
+        public double Rating { get; set; }
+
+        public int RatingsCount { get; set; }
 
         public DateTime CreatedAt { get; set; }
     }

@@ -11,6 +11,10 @@ export const API_ENDPOINTS = {
     FORGOT_PASSWORD: '/api/Auth/forgot-password',
     VERIFY_RESET_OTP: '/api/Auth/verify-reset-otp',
     RESET_PASSWORD: '/api/Auth/reset-password',
+    GOOGLE: '/api/auth/google',
+    ADD_PHONE: '/api/auth/phone',
+    GOOGLE_STATUS: '/api/auth/google/status',
+    GOOGLE_LINK: '/api/auth/google/link',
   },
 
   // ============ Users ============
@@ -65,6 +69,21 @@ export const API_ENDPOINTS = {
   },
 
   // ============ Vendors ============
+  // ============ TikTok ============
+  TIKTOK: {
+    STATUS: '/api/tiktok/status',
+    CONNECT_URL: '/api/tiktok/connect-url',
+    SYNC: '/api/tiktok/sync',
+    VIDEOS: '/api/tiktok/videos',
+    VIDEO: (id) => `/api/tiktok/videos/${id}`,
+    SETTINGS: '/api/tiktok/settings',
+    CONNECTION: '/api/tiktok/connection',
+    STORE_FEED: (vendorId) => `/api/tiktok/stores/${vendorId}/videos`,
+    STORE_FEED_REFRESH: (vendorId) => `/api/tiktok/stores/${vendorId}/videos/refresh`,
+    REELS: '/api/tiktok/reels',
+    REELS_REFRESH: '/api/tiktok/reels/refresh',
+  },
+
   VENDORS: {
     BASE: '/api/Vendors',
     BY_ID: (id) => `/api/Vendors/${id}`,
@@ -100,6 +119,7 @@ export const API_ENDPOINTS = {
     BY_NUMBER: (orderNumber) => `/api/Orders/number/${orderNumber}`,
     BY_CUSTOMER: (customerId) => `/api/Orders/customer/${customerId}`,
     PAGED: '/api/Orders/paged',
+    STATUS_COUNTS: '/api/Orders/status-counts',
     TRACKING: (id) => `/api/Orders/${id}/tracking`,         // ✅ جديد
     CANCEL: (id) => `/api/Orders/${id}/cancel`,             // ✅ جديد
   },
@@ -109,6 +129,7 @@ export const API_ENDPOINTS = {
     CREATE: (orderId) => `/api/orders/${orderId}/rating`,
     GET: (orderId) => `/api/orders/${orderId}/rating`,
     STATUS: (orderId) => `/api/orders/${orderId}/rating/status`,
+    STORES: (orderId) => `/api/orders/${orderId}/rating/stores`,
   },
 
   // ============ Wishlist ============
@@ -150,6 +171,7 @@ export const API_ENDPOINTS = {
     MARK_ALL_READ: '/api/Notifications/read-all',
     DELETE: (id) => `/api/Notifications/${id}`,
     DELETE_READ: '/api/Notifications/read',
+    LINK: (id) => `/api/Notifications/${id}/link`,
   },
 
   // ============ Coupons ============  ✅ جديد كلياً
@@ -249,6 +271,60 @@ export const API_ENDPOINTS = {
     ASSIGN_DRIVER: (id) => `/api/Ops/suborders/${id}/assign-driver`,
     ASSIGN_DRIVER_TO_ORDER: (orderId) => `/api/Ops/orders/${orderId}/assign-driver`, // ✅ جديد
     DASHBOARD_STATS: '/api/Ops/dashboard/stats',
+    TRACKING: '/api/ops/tracking',
+    TRACKING_LINK: (driverId) => `/api/ops/drivers/${driverId}/tracking-link`,
+    REPORTS: '/api/ops/reports',
+  },
+
+  // ============ صفحة السائق (رابط مشاركة الموقع — بلا تسجيل دخول) ============
+  // مستحقات المتاجر
+  FINANCE: {
+    BALANCES: '/api/finance/vendors',
+    STATEMENT: (vendorId) => `/api/finance/vendors/${vendorId}/statement`,
+    PAYOUT: (vendorId) => `/api/finance/vendors/${vendorId}/payouts`,
+    ADJUST: (vendorId) => `/api/finance/vendors/${vendorId}/adjustments`,
+    VENDOR_COMMISSION: (vendorId) => `/api/finance/vendors/${vendorId}/commission`,
+    COMMISSION: '/api/finance/commission',
+    BACKFILL: '/api/finance/backfill',
+    ME: '/api/vendor-finance/me',
+  },
+
+  // إعدادات الطلبات + المتأخرة عن مهلة التأكيد
+  ORDER_SETTINGS: {
+    GET: '/api/order-settings',
+    TIMEOUT: '/api/order-settings/confirmation-timeout',
+    OVERDUE: '/api/order-settings/overdue',
+    THRESHOLDS: '/api/order-settings/delivery-thresholds',
+  },
+
+  // كم استغرق الطلب للوصول
+  ORDER_TIMING: {
+    BY_ID: (orderId) => `/api/order-timing/${orderId}`,
+    LIST: '/api/order-timing',
+  },
+
+  // إشعارات الدفع (Web Push)
+  PUSH: {
+    PUBLIC_KEY: '/api/push/public-key',
+    SUBSCRIBE: '/api/push/subscribe',
+    UNSUBSCRIBE: '/api/push/unsubscribe',
+    TEST: '/api/push/test',
+  },
+
+  // لوحة السائق (حساب بدور DRIVER)
+  DRIVER_APP: {
+    ME: '/api/driver/me',
+    WORK_STATUS: '/api/driver/me/work-status',
+    LOCATION: '/api/driver/me/location',
+    ORDERS: '/api/driver/orders',
+    PICKED_UP: (subOrderId) => `/api/driver/stops/${subOrderId}/picked-up`,
+    DELIVERED: (orderId) => `/api/driver/orders/${orderId}/delivered`,
+    FAILED: (orderId) => `/api/driver/orders/${orderId}/failed`,
+  },
+
+  DRIVER_TRACKING: {
+    INFO: (token) => `/api/driver-tracking/${token}`,
+    LOCATION: (token) => `/api/driver-tracking/${token}/location`,
   },
 
   // ============ Drivers ============
@@ -262,6 +338,10 @@ export const API_ENDPOINTS = {
     UPDATE_WORK_STATUS: (id) => `/api/Drivers/${id}/work-status`,
     ORDERS: (id) => `/api/Drivers/${id}/orders`,
     STATS: (id) => `/api/Drivers/${id}/stats`,
+    ACCOUNT: (id) => `/api/ops/drivers/${id}/account`,
+    CASH: (id) => `/api/ops/drivers/${id}/cash`,
+    SETTLE_CASH: (id) => `/api/ops/drivers/${id}/cash/settle`,
+    DELIVERY_SETTINGS: '/api/ops/drivers/settings',
   },
 };
 

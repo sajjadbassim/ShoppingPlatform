@@ -130,13 +130,14 @@ const Pagination = ({
 
   // الشكل الافتراضي
   return (
-    <div className={`flex items-center justify-center gap-1 ${className}`}>
+    // على الهاتف: أزرار أصغر وبدون البداية/النهاية حتى لا تتجاوز عرض الشاشة
+    <div className={`flex items-center justify-center gap-0.5 sm:gap-1 max-w-full ${className}`}>
       {/* زر البداية */}
       {showFirstLast && (
         <button
           onClick={() => handlePageChange(1)}
           disabled={currentPage === 1}
-          className={`${buttonBaseClass} w-10 h-10 rounded-md text-gray-600 hover:bg-gray-100`}
+          className={`${buttonBaseClass} hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-md text-gray-600 hover:bg-gray-100`}
           title="الصفحة الأولى"
         >
           <ChevronsRight size={18} />
@@ -147,20 +148,20 @@ const Pagination = ({
       <button
         onClick={() => handlePageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className={`${buttonBaseClass} w-10 h-10 rounded-md text-gray-600 hover:bg-gray-100`}
+        className={`${buttonBaseClass} w-9 h-9 sm:w-10 sm:h-10 rounded-md text-gray-600 hover:bg-gray-100`}
         title="الصفحة السابقة"
       >
         <ChevronRight size={18} />
       </button>
 
       {/* أرقام الصفحات */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
         {paginationRange.map((page, index) => {
           if (page === '...') {
             return (
               <span 
                 key={`dots-${index}`} 
-                className="w-10 h-10 flex items-center justify-center text-gray-400"
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-gray-400"
               >
                 ...
               </span>
@@ -172,7 +173,7 @@ const Pagination = ({
               key={page}
               onClick={() => handlePageChange(page)}
               className={`
-                ${buttonBaseClass} w-10 h-10 rounded-md text-sm font-medium
+                ${buttonBaseClass} w-9 h-9 sm:w-10 sm:h-10 rounded-md text-sm font-medium
                 ${page === currentPage
                   ? 'bg-primary text-white'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -189,7 +190,7 @@ const Pagination = ({
       <button
         onClick={() => handlePageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className={`${buttonBaseClass} w-10 h-10 rounded-md text-gray-600 hover:bg-gray-100`}
+        className={`${buttonBaseClass} w-9 h-9 sm:w-10 sm:h-10 rounded-md text-gray-600 hover:bg-gray-100`}
         title="الصفحة التالية"
       >
         <ChevronLeft size={18} />
@@ -200,7 +201,7 @@ const Pagination = ({
         <button
           onClick={() => handlePageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className={`${buttonBaseClass} w-10 h-10 rounded-md text-gray-600 hover:bg-gray-100`}
+          className={`${buttonBaseClass} hidden sm:flex w-9 h-9 sm:w-10 sm:h-10 rounded-md text-gray-600 hover:bg-gray-100`}
           title="الصفحة الأخيرة"
         >
           <ChevronsLeft size={18} />

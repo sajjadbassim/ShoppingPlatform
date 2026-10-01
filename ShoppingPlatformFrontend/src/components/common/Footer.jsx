@@ -13,7 +13,7 @@ const Footer = () => {
     ],
     support: [
       { label: 'مركز المساعدة', path: '/help' },
-      { label: 'سياسة الإرجاع', path: '/returns' },
+      { label: 'سياسة الإرجاع', path: '/return-policy' },
       { label: 'الشحن والتوصيل', path: '/shipping' },
       { label: 'طرق الدفع', path: '/payment-methods' },
     ],
@@ -32,7 +32,7 @@ const Footer = () => {
   ]
 
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <footer className="theme-static bg-gray-900 text-gray-300">
       {/* Main Footer */}
       <div className="container-main py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
@@ -152,9 +152,8 @@ const Footer = () => {
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 ml-2">طرق الدفع:</span>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-6 bg-gray-800 rounded flex items-center justify-center text-xs font-medium">VISA</div>
-              <div className="w-10 h-6 bg-gray-800 rounded flex items-center justify-center text-xs font-medium">MC</div>
-              <div className="w-10 h-6 bg-gray-800 rounded flex items-center justify-center text-xs font-medium">مدى</div>
+              <Link to="/payment-methods" className="h-6 px-2 bg-gray-800 rounded flex items-center justify-center text-xs font-medium text-gray-300 hover:text-white">الدفع عند الاستلام</Link>
+              <Link to="/payment-methods" className="h-6 px-2 bg-gray-800 rounded flex items-center justify-center text-xs font-medium text-gray-300 hover:text-white">زين كاش</Link>
             </div>
           </div>
         </div>

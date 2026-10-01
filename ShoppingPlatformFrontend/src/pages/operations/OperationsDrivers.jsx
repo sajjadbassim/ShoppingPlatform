@@ -3,7 +3,7 @@ import { useState } from 'react'
 import {
   Search, MoreVertical, Phone, MapPin, Star,
   Package, Clock, CheckCircle, Eye, Edit, Ban,
-  Truck, UserPlus, RefreshCw
+  Truck, UserPlus, RefreshCw, KeyRound, Wallet
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
@@ -25,6 +25,7 @@ import {
   useDriverOrders,
   useDriverStats,
 } from '../../hooks/useOrders'
+import { useSetDriverAccount, useDriverCash, useSettleDriverCash } from '../../hooks/useDriverApp'
 
 // ===========================
 // Helpers (خارج الـ Component)
@@ -58,7 +59,7 @@ const getOrderStatusStyle = (status) => {
   return map[status] || { label: status, color: 'bg-gray-100 text-gray-600' }
 }
 
-const DriverForm = ({ formData, onSubmit, loading, updateFormField, onCancel }) => (
+const DriverForm = ({ formData, onSubmit, loading, updateFormField, onCancel, withAccount = false }) => (
   <form onSubmit={onSubmit} className="space-y-4">
     <Input label="الاسم الكامل" value={formData.fullName}
       onChange={(e) => updateFormField('fullName', e.target.value)}
@@ -81,6 +82,14 @@ const DriverForm = ({ formData, onSubmit, loading, updateFormField, onCancel }) 
     <Input label="منطقة العمل" value={formData.workArea}
       onChange={(e) => updateFormField('workArea', e.target.value)}
       placeholder="مثال: المنصور، الكرادة" />
+    {withAccount && (
+      <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 space-y-1">
+        <Input label="كلمة مرور لوحة السائق (اختياري)" type="password" value={formData.password || ''}
+          onChange={(e) => updateFormField('password', e.target.value)}
+          placeholder="6 أحرف على الأقل" minLength={6} autoComplete="new-password" />
+        <p className="text-xs text-gray-500">يدخل السائق برقم هاتفه وهذه الكلمة ليرى طلباته ويسلّمها. يمكن إضافتها لاحقاً.</p>
+      </div>
+    )}
     <div className="flex gap-2 pt-4">
       <Button variant="ghost" type="button" fullWidth
         onClick={onCancel}>
@@ -106,7 +115,7 @@ const DriverDetailsContent = ({ driver, onEdit, onViewOrders }) => {
       <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
         <Avatar name={driver.fullName} size="xl" />
         <div>
-          <h3 className="text-lg font-bold text-gray-900">{driver.fullName}</h3>
+          <h3 className="text-lg font-bold text-gray-900 truncate">{driver.fullName}</h3>
           <p className="text-gray-500">{getVehicleLabel(driver.vehicleType)}</p>
           {driver.workArea && <p className="text-sm text-gray-500 mt-1">{driver.workArea}</p>}
           <span className={`inline-block mt-2 text-xs px-2 py-1 rounded-full font-medium ${ws.badge}`}>
@@ -247,7 +256,16 @@ const OperationsDrivers = () => {
     email: '',
     vehicleType: '',
     workArea: '',
+    password: '',
   })
+
+  // حساب الدخول والنقد
+  const [accountDriver, setAccountDriver] = useState(null)
+  const [accountPassword, setAccountPassword] = useState('')
+  const [cashDriver, setCashDriver] = useState(null)
+  const { mutateAsync: setAccount, isPending: savingAccount } = useSetDriverAccount()
+  const { data: cash, isLoading: cashLoading } = useDriverCash(cashDriver?.id)
+  const { mutateAsync: settleCash, isPending: settling } = useSettleDriverCash()
 
   // ===== Queries =====
   const { data, isLoading, refetch } = useDriversPaged({
@@ -340,10 +358,11 @@ const OperationsDrivers = () => {
   const handleCreateDriver = async (e) => {
     e.preventDefault()
     try {
-      await createDriver(formData)
-      success('تم إضافة السائق بنجاح')
+      const { password, ...rest } = formData
+      await createDriver(password ? { ...rest, password } : rest)
+      success(password ? 'تم إضافة السائق وإنشاء حسابه' : 'تم إضافة السائق بنجاح')
       setShowAddModal(false)
-      setFormData({ fullName: '', phone: '', email: '', vehicleType: '', workArea: '' })
+      setFormData({ fullName: '', phone: '', email: '', vehicleType: '', workArea: '', password: '' })
       refetch()
     } catch (err) {
       toastError(err.message || 'فشل إضافة السائق')
@@ -373,6 +392,29 @@ const OperationsDrivers = () => {
     }
   }
 
+  const handleSaveAccount = async (e) => {
+    e.preventDefault()
+    try {
+      await setAccount({ driverId: accountDriver.id, password: accountPassword })
+      success(accountDriver.hasAccount ? 'تم تغيير كلمة المرور' : 'تم إنشاء حساب السائق')
+      setAccountDriver(null)
+      refetch()
+    } catch (err) {
+      toastError(err.message || 'تعذّر حفظ الحساب')
+    }
+  }
+
+  const handleSettleCash = async () => {
+    if (!window.confirm(`تأكيد استلام ${(cash?.total || 0).toLocaleString()} د.ع من ${cashDriver.fullName}؟`)) return
+    try {
+      await settleCash(cashDriver.id)
+      success('تم تسجيل استلام النقد')
+      setCashDriver(null)
+    } catch (err) {
+      toastError(err.message || 'تعذّر التسجيل')
+    }
+  }
+
   const getDriverActions = (driver) => [
     { label: 'عرض التفاصيل',    icon: Eye,        onClick: () => handleViewDriver(driver) },
     { label: 'طلبات السائق',     icon: Package,    onClick: () => handleViewOrders(driver) },
@@ -386,6 +428,9 @@ const OperationsDrivers = () => {
       }
     },
     { label: 'اتصال', icon: Phone, onClick: () => window.open(`tel:${driver.phone}`) },
+    { label: driver.hasAccount ? 'تغيير كلمة المرور' : 'إنشاء حساب دخول', icon: KeyRound,
+      onClick: () => { setAccountPassword(''); setAccountDriver(driver) } },
+    { label: 'النقد مع السائق', icon: Wallet, onClick: () => setCashDriver(driver) },
     { divider: true },
     driver.status === 'active'
       ? { label: 'إيقاف مؤقت', icon: Ban,          onClick: () => handleToggleStatus(driver), danger: true }
@@ -403,8 +448,8 @@ const OperationsDrivers = () => {
               <Avatar name={driver.fullName} size="lg" />
               <div className={`absolute -bottom-1 -left-1 w-4 h-4 rounded-full border-2 border-white ${ws.dot}`} />
             </div>
-            <div>
-              <h3 className="font-bold text-gray-900">{driver.fullName}</h3>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-gray-900 truncate">{driver.fullName}</h3>
               <p className="text-sm text-gray-500">{getVehicleLabel(driver.vehicleType)}</p>
             </div>
           </div>
@@ -435,10 +480,14 @@ const OperationsDrivers = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-200">
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${ws.badge}`}>
             {ws.label}
           </span>
+          {driver.hasAccount
+            ? <span className="text-xs px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 flex items-center gap-1"><KeyRound size={11} /> له حساب</span>
+            : <button type="button" onClick={() => { setAccountPassword(''); setAccountDriver(driver) }}
+                className="text-xs px-2 py-1 rounded-full border border-dashed border-gray-300 text-gray-500 hover:text-primary hover:border-primary">+ حساب</button>}
           <span className={`text-xs px-2 py-1 rounded-full ${
             driver.status === 'active'    ? 'bg-green-100 text-green-700' :
             driver.status === 'suspended' ? 'bg-red-100 text-red-600'    : 'bg-gray-100 text-gray-600'
@@ -650,6 +699,7 @@ const OperationsDrivers = () => {
           loading={creating}
           updateFormField={updateFormField}
           onCancel={() => setShowAddModal(false)}
+          withAccount
         />
       </Modal>
 
@@ -684,6 +734,53 @@ const OperationsDrivers = () => {
             <Button variant="primary" fullWidth loading={updatingWork} onClick={handleUpdateWorkStatus}>حفظ</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* حساب الدخول */}
+      <Modal isOpen={!!accountDriver} onClose={() => setAccountDriver(null)}
+        title={accountDriver?.hasAccount ? 'تغيير كلمة مرور السائق' : 'إنشاء حساب دخول للسائق'} size="sm">
+        {accountDriver && (
+          <form onSubmit={handleSaveAccount} className="space-y-4">
+            <div className="rounded-xl bg-gray-50 p-3 text-sm">
+              <p className="text-gray-500">يدخل من صفحة تسجيل الدخول برقم:</p>
+              <p className="font-bold text-gray-900" dir="ltr">{accountDriver.phone}</p>
+            </div>
+            <Input label="كلمة المرور" type="password" value={accountPassword} required minLength={6}
+              onChange={(e) => setAccountPassword(e.target.value)} placeholder="6 أحرف على الأقل" autoComplete="new-password" />
+            <div className="flex gap-2">
+              <Button variant="ghost" type="button" fullWidth onClick={() => setAccountDriver(null)}>إلغاء</Button>
+              <Button variant="primary" type="submit" fullWidth loading={savingAccount} disabled={accountPassword.length < 6}>حفظ</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* النقد مع السائق */}
+      <Modal isOpen={!!cashDriver} onClose={() => setCashDriver(null)} title={`النقد مع ${cashDriver?.fullName || ''}`} size="sm">
+        {cashLoading ? <Skeleton className="h-24" /> : (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
+              <p className="text-sm text-amber-800">مبالغ استلمها من الزبائن ولم يسلّمها بعد</p>
+              <p className="text-2xl font-extrabold text-gray-900 mt-1">{(cash?.total || 0).toLocaleString()} د.ع</p>
+            </div>
+            {cash?.items?.length > 0 ? (
+              <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-xl">
+                {cash.items.map(i => (
+                  <div key={i.orderId} className="flex items-center justify-between p-3 text-sm">
+                    <div>
+                      <p className="font-mono text-gray-900" dir="ltr">{i.orderNumber}</p>
+                      <p className="text-xs text-gray-500">{new Date(i.collectedAt).toLocaleString('ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                    </div>
+                    <span className="font-bold text-gray-900">{i.amount.toLocaleString()} د.ع</span>
+                  </div>
+                ))}
+              </div>
+            ) : <p className="text-center text-sm text-gray-500">لا يوجد نقد معلّق مع هذا السائق</p>}
+            <Button variant="primary" fullWidth loading={settling} disabled={!cash?.items?.length} onClick={handleSettleCash}>
+              استلمت المبلغ من السائق
+            </Button>
+          </div>
+        )}
       </Modal>
 
     </div>

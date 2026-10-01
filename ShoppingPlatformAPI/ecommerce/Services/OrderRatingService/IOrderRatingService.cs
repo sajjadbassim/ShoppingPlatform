@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.OrderRating;
+using ecommerce.Core.DTO.OrderRating;
 
 namespace ecommerce.Services.OrderRatingService
 {
@@ -16,6 +16,8 @@ namespace ecommerce.Services.OrderRatingService
 
             /// <summary>هل قيّم الزبون هذا الطلب؟</summary>
             Task<bool> HasRatedAsync(Guid orderId, Guid customerId);
+            Task<OrderRatingStatusDto> GetRatingStatusAsync(Guid orderId, Guid customerId);
+            Task<OrderRatingDto> AddStoreRatingsAsync(Guid orderId, Guid customerId, List<CreateSubOrderRatingDto> ratings, List<DriverRatingInputDto>? driverRatings = null);
 
             // ===================================
             // Admin

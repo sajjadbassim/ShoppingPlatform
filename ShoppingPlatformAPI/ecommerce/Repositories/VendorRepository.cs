@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Models;
+using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Extensions;
 using Microsoft.EntityFrameworkCore;
@@ -128,6 +128,26 @@ namespace ecommerce.Repositories
             query = query.OrderByDescending(v => v.CreatedAt);
 
             return await query.ToPagedListAsync(pageNumber, pageSize);
+        }
+    
+        // متوسط نجوم المتجر وعددها من تقييمات الطلبات
+        public async Task<(double Average, int Count)> GetRatingSummaryAsync(Guid vendorId)
+        {
+            var stats = await _context.SubOrderRatings.AsNoTracking()
+                .Where(r => r.VendorId == vendorId)
+                .GroupBy(r => 1)
+                .Select(g => new { Avg = g.Average(r => (double)r.VendorRating), Count = g.Count() })
+                .FirstOrDefaultAsync();
+            return stats == null ? (0, 0) : (Math.Round(stats.Avg, 1), stats.Count);
+        }
+    
+        // الاسم (إنجليزي أو عربي) مستخدم لمتجر آخر — بلا فرق بين الأحرف الكبيرة والصغيرة والمسافات الزائدة
+        public async Task<bool> NameTakenAsync(string name, string? nameAr, Guid? exceptId = null)
+        {
+            var n = (name ?? "").Trim().ToLower();
+            var ar = (nameAr ?? "").Trim();
+            return await _context.Vendors.AnyAsync(v => v.Id != exceptId &&
+                ((n != "" && v.Name.Trim().ToLower() == n) || (ar != "" && v.NameAr != null && v.NameAr.Trim() == ar)));
         }
     }
 }

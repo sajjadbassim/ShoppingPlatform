@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using ecommerce.Core.Models;
@@ -26,5 +26,7 @@ namespace ecommerce.Repositories
             int pageNumber = 1,
             int pageSize = 20
         );
+        Task<(double Average, int Count)> GetRatingSummaryAsync(Guid vendorId);
+        Task<bool> NameTakenAsync(string name, string? nameAr, Guid? exceptId = null);
     }
 }

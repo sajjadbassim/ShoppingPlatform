@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { GoogleSignInSection } from '../../components/auth/GoogleSignIn'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, Phone, Store, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import Button from '../../components/common/Button'
@@ -40,6 +41,10 @@ const RegisterPage = () => {
       e.phone = 'رقم الهاتف مطلوب'
     else if (!/^(07[3-9]\d{8})$/.test(formData.phone.replace(/\s/g, '')))
       e.phone = 'رقم الهاتف غير صحيح (مثال: 07701234567)'
+    if (!formData.email.trim())
+      e.email = 'البريد الإلكتروني مطلوب'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()))
+      e.email = 'البريد الإلكتروني غير صحيح'
     if (formData.accountType === 'vendor') {
       if (!formData.storeName.trim())    e.storeName    = 'اسم المتجر مطلوب'
       if (!formData.storeNameAr.trim())  e.storeNameAr  = 'اسم المتجر بالعربي مطلوب'
@@ -72,7 +77,7 @@ const RegisterPage = () => {
         phone: formData.phone.replace(/\s/g, ''),
         password: formData.password,
         fullName: formData.fullName.trim(),
-        ...(formData.email ? { email: formData.email } : {}),
+        email: formData.email.trim().toLowerCase(),
       })
       success('تم إنشاء الحساب بنجاح! 🎉')
       navigate('/', { replace: true })
@@ -90,7 +95,7 @@ const RegisterPage = () => {
         phone: formData.phone.replace(/\s/g, ''),
         password: formData.password,
         fullName: formData.fullName.trim(),
-        ...(formData.email ? { email: formData.email } : {}),
+        email: formData.email.trim().toLowerCase(),
       })
 
       // 2. إنشاء المتجر في try/catch منفصل
@@ -105,12 +110,7 @@ const RegisterPage = () => {
         fd.append('EstimatedPrepTime', formData.prepTime          || '30')
         fd.append('Address',           formData.storeAddress      || '-')
         fd.append('Description',       formData.storeDesc         || '-')
-        const base64Png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-        const byteChars = atob(base64Png)
-        const byteArr = new Uint8Array(byteChars.length)
-        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i)
-        const pngBlob = new Blob([byteArr], { type: 'image/png' })
-        fd.append('Logo', pngBlob, 'placeholder.png')
+        // بلا شعار: يضيفه صاحب المتجر من إعدادات متجره بعد الموافقة (حتى ذلك يظهر رمز افتراضي)
         await apiPostForm(API_ENDPOINTS.VENDORS.BASE, fd)
         setStep(3)
       } catch (vendorErr) {
@@ -130,7 +130,7 @@ const RegisterPage = () => {
   const progressPct = step === 3 ? 100 : (step / 2) * 100
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-primary/10 flex">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-primary/10 flex overflow-x-clip">
       {/* Left Panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary to-primary/80 items-center justify-center p-12">
         <div className="max-w-lg text-white text-center">
@@ -153,8 +153,8 @@ const RegisterPage = () => {
       </div>
 
       {/* Form */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-        <div className="w-full max-w-md">
+      <div className="flex-1 min-w-0 flex items-center justify-center p-6 overflow-y-auto">
+        <div className="w-full max-w-md min-w-0">
           <div className="text-center mb-6">
             <Link to="/">
               <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
@@ -188,6 +188,15 @@ const RegisterPage = () => {
             {/* ===== Step 1 ===== */}
             {step === 1 && (
               <div className="space-y-4">
+                {formData.accountType === 'customer' && (
+                  <div className="space-y-3">
+                    <GoogleSignInSection text="signup_with" />
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+                      <div className="relative flex justify-center text-xs"><span className="px-3 bg-white text-gray-400">أو أنشئ حساباً برقم هاتفك</span></div>
+                    </div>
+                  </div>
+                )}
                 <h2 className="font-bold text-gray-900">المعلومات الأساسية</h2>
 
                 {/* نوع الحساب */}
@@ -220,7 +229,7 @@ const RegisterPage = () => {
                   value={formData.phone} onChange={handleChange} error={errors.phone}
                   placeholder="07XX XXX XXXX" dir="ltr" required />
 
-                <Input label="البريد الإلكتروني (اختياري)" name="email" type="email"
+                <Input label="البريد الإلكتروني *" name="email" type="email"
                   value={formData.email} onChange={handleChange} error={errors.email}
                   placeholder="example@email.com" dir="ltr" />
 

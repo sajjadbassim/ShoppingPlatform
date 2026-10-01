@@ -1,28 +1,21 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Truck, Package, Clock, CheckCircle, Users, TrendingUp,
-  AlertTriangle, ArrowLeft, RefreshCw, MapPin
+  Truck, Package, Clock, CheckCircle, Users, AlertTriangle, ArrowLeft, RefreshCw, XCircle,
 } from 'lucide-react'
-import { StatCard } from '../../components/common/Card'
 import { StatusBadge, Avatar } from '../../components/common/Badge'
 import { Skeleton } from '../../components/common/Loading'
-import Button from '../../components/common/Button'
-import { useOpsNotifications } from '../../hooks/useOpsNotifications'
 import {
   useOpsDashboardStats,
   useSubOrdersPaged,
   useDriversPaged,
 } from '../../hooks/useOrders'
+import OverdueConfirmationsAlert from '../../components/common/OverdueConfirmationsAlert'
 
 const getVehicleLabel = (type) =>
   type === 'motorcycle' ? 'دراجة نارية' :
   type === 'car'        ? 'سيارة'        : 'دراجة هوائية'
 
 const OperationsDashboard = () => {
-  useOpsNotifications()
-  const [dateRange, setDateRange] = useState('today')
-
   // ===== Queries =====
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useOpsDashboardStats()
 
@@ -64,317 +57,134 @@ const OperationsDashboard = () => {
     ...shippedOrders,
   ].slice(0, 5)
 
-  // ===== Stats Cards =====
-  const statCards = [
-    {
-      title: 'طلبات جديدة',
-      value: (stats?.pendingConfirmation ?? pendingOrders.length).toString(),
-      icon: Package,
-      iconBg: 'bg-yellow-100',
-      iconColor: 'text-yellow-600',
-    },
-    {
-      title: 'قيد التحضير',
-      value: (stats?.preparing ?? preparingOrders.length).toString(),
-      icon: Clock,
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-    },
-    {
-      title: 'قيد التوصيل',
-      value: (stats?.outForDelivery ?? shippedOrders.length).toString(),
-      icon: Truck,
-      iconBg: 'bg-purple-100',
-      iconColor: 'text-purple-600',
-    },
-    {
-      title: 'تم التوصيل',
-      value: (stats?.delivered ?? deliveredOrders.length).toString(),
-      icon: CheckCircle,
-      iconBg: 'bg-green-100',
-      iconColor: 'text-green-600',
-    },
+  // أرقام اليوم — كل بطاقة تفتح الطلبات المطابقة
+  const todayCards = [
+    { label: 'بانتظار التأكيد', value: stats?.pendingConfirmation ?? pendingOrders.length, icon: Clock, tone: 'bg-amber-100 text-amber-700', to: 'PENDING_CONFIRMATION', urgent: true },
+    { label: 'قيد التحضير', value: (stats?.confirmed ?? confirmedOrders.length) + (stats?.preparing ?? preparingOrders.length), icon: Package, tone: 'bg-indigo-100 text-indigo-700', to: 'PREPARING' },
+    { label: 'مع السائق', value: stats?.outForDelivery ?? shippedOrders.length, icon: Truck, tone: 'bg-purple-100 text-purple-700', to: 'OUT_FOR_DELIVERY' },
+    { label: 'تم التوصيل', value: stats?.delivered ?? deliveredOrders.length, icon: CheckCircle, tone: 'bg-green-100 text-green-700', to: 'DELIVERED' },
   ]
-
-  const quickStats = [
-    {
-      label: 'بانتظار التأكيد',
-      value: stats?.pendingConfirmation ?? pendingOrders.length,
-      urgent: true,
-    },
-    {
-      label: 'سائقين متاحين',
-      value: availableDrivers,
-      urgent: false,
-    },
-    {
-      label: 'سائقين مشغولين',
-      value: busyDrivers,
-      urgent: false,
-    },
-    {
-      label: 'ملغاة اليوم',
-      value: stats?.cancelled ?? cancelledOrders.length,
-      urgent: (stats?.cancelled ?? cancelledOrders.length) > 5,
-    },
-  ]
+  const cancelledToday = stats?.cancelled ?? cancelledOrders.length
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+    <div className="space-y-5">
+      {/* العنوان */}
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">لوحة التشغيل</h1>
-          <p className="text-gray-500 mt-1">مراقبة وإدارة عمليات التوصيل</p>
+          <p className="text-sm text-gray-500 mt-0.5">{new Date().toLocaleDateString('ar-IQ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={refetch} disabled={isLoading}>
-            <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
-          </Button>
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="today">اليوم</option>
-            <option value="yesterday">أمس</option>
-            <option value="week">هذا الأسبوع</option>
-          </select>
-          <Link to="/operations/orders?status=PENDING_CONFIRMATION">
-            <Button variant="primary">
-              <Truck size={16} className="ml-1" />
-              تعيين طلبات
-            </Button>
-          </Link>
-        </div>
+        <button onClick={refetch} disabled={isLoading} aria-label="تحديث"
+          className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center">
+          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+        </button>
+        <Link to="/operations/orders" className="h-10 px-4 rounded-full bg-primary text-white text-sm font-bold inline-flex items-center gap-1.5">
+          <Package size={16} />الطلبات
+        </Link>
       </div>
 
-      {/* Stat Cards */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6">
-              <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-8 w-16" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {statCards.map((stat, i) => <StatCard key={i} {...stat} />)}
-        </div>
+      {/* تجاوزت مهلة تأكيد المتجر */}
+      <OverdueConfirmationsAlert
+        orderLink={(o) => `/operations/orders?order=${o.orderId}`}
+        allLink="/operations/orders?status=PENDING_CONFIRMATION" />
+
+      {/* ما يحتاج تدخلاً الآن */}
+      {pendingOrders.length > 0 && (
+        <Link to="/operations/orders?status=PENDING_CONFIRMATION"
+          className="flex items-center gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-200 hover:bg-amber-100/70">
+          <span className="w-11 h-11 rounded-full bg-amber-400 text-white flex items-center justify-center flex-shrink-0"><AlertTriangle size={20} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-bold text-amber-900">{pendingOrders.length} طلب ينتظر تأكيد المتاجر</span>
+            <span className="block text-xs text-amber-800/80 truncate">{pendingOrders.slice(0, 3).map(o => o.customerName || o.subOrderNumber).join('، ')}</span>
+          </span>
+          <ArrowLeft size={18} className="text-amber-700" />
+        </Link>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {quickStats.map((stat, i) => (
-          <div
-            key={i}
-            className={`bg-white rounded-lg border p-4 ${
-              stat.urgent && stat.value > 0 ? 'border-yellow-400' : 'border-gray-200'
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-600">{stat.label}</p>
-              {stat.urgent && stat.value > 0 && (
-                <AlertTriangle size={16} className="text-yellow-500" />
-              )}
-            </div>
-            <p className={`text-2xl font-bold mt-1 ${
-              stat.urgent && stat.value > 0 ? 'text-yellow-600' : 'text-gray-900'
-            }`}>
-              {stat.value}
-            </p>
+      {/* أرقام اليوم */}
+      <div>
+        <p className="text-sm font-bold text-gray-500 mb-2">اليوم</p>
+        {isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {todayCards.map(c => (
+              <Link key={c.label} to={`/operations/orders?status=${c.to}`}
+                className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${c.urgent && c.value > 0 ? 'border-amber-300' : 'border-gray-200'}`}>
+                <span className={`w-9 h-9 rounded-xl flex items-center justify-center ${c.tone}`}><c.icon size={18} /></span>
+                <p className="text-2xl font-bold text-gray-900 mt-3">{c.value}</p>
+                <p className="text-xs text-gray-500">{c.label}</p>
+              </Link>
+            ))}
           </div>
-        ))}
+        )}
+        <div className="flex flex-wrap gap-2 mt-3 text-xs">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 font-medium"><span className="w-2 h-2 rounded-full bg-green-500" />{availableDrivers} سائق متاح</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-50 text-yellow-700 font-medium"><Truck size={13} />{busyDrivers} يوصل الآن</span>
+          {cancelledToday > 0 && (
+            <Link to="/operations/orders?status=CANCELLED" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 text-red-600 font-medium"><XCircle size={13} />{cancelledToday} ملغاة اليوم</Link>
+          )}
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Active Orders */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
-              <Package size={20} className="text-primary" />
-              الطلبات الجارية
-            </h2>
-            <Link to="/operations/orders">
-              <Button variant="ghost" size="sm">
-                عرض الكل <ArrowLeft size={16} className="mr-1" />
-              </Button>
-            </Link>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* الطلبات الجارية */}
+        <section className="lg:col-span-2 bg-white rounded-2xl border border-gray-200">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-base font-bold text-gray-900 flex items-center gap-2"><Package size={18} className="text-primary" />الطلبات الجارية</p>
+            <Link to="/operations/orders" className="text-sm text-primary font-medium inline-flex items-center gap-1">الكل<ArrowLeft size={15} /></Link>
           </div>
-
           {ordersLoading ? (
-            <div className="p-4 space-y-4">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-20" />)}
-            </div>
+            <div className="p-4 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-16" />)}</div>
           ) : activeOrders.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <Package size={48} className="mx-auto mb-4 text-gray-300" />
-              <p>لا توجد طلبات جارية</p>
-            </div>
+            <div className="py-10 text-center text-gray-400"><CheckCircle size={32} className="mx-auto mb-2 text-green-300" /><p className="text-sm">لا توجد طلبات جارية</p></div>
           ) : (
             <div className="divide-y divide-gray-100">
               {activeOrders.map(order => (
-                <div key={order.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <span className="font-medium text-primary">#{order.subOrderNumber}</span>
-                      <span className="text-gray-500 text-sm mr-2">• {order.customerName || 'عميل'}</span>
-                    </div>
-                    <StatusBadge status={order.status} />
+                <Link key={order.id} to={`/operations/orders?status=${order.status}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{order.customerName || 'زبون'} <span className="text-xs text-gray-400" dir="ltr">{order.subOrderNumber}</span></p>
+                    <p className="text-xs text-gray-500 truncate">{order.vendorNameAr || order.vendorName} · {order.items?.length || 0} منتج · {(order.total || 0).toLocaleString()} د.ع</p>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                    <span className="flex items-center gap-1">
-                      <MapPin size={14} />
-                      {order.deliveryAddress || '-'}
-                    </span>
-                    <span>{order.items?.length || 0} منتج</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">
-                      {(order.total || 0).toLocaleString()} د.ع
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                      <Link to={`/operations/orders?status=${order.status}`}>
-                        <Button variant="ghost" size="sm">تفاصيل</Button>
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Drivers */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="font-bold text-gray-900 flex items-center gap-2">
-              <Users size={20} className="text-primary" />
-              عمال التوصيل
-            </h2>
-            <Link to="/operations/drivers">
-              <Button variant="ghost" size="sm">الكل</Button>
-            </Link>
-          </div>
-
-          {driversLoading ? (
-            <div className="p-4 space-y-3">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-14" />)}
-            </div>
-          ) : drivers.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              <Users size={48} className="mx-auto mb-4 text-gray-300" />
-              <p>لا يوجد سائقين</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
-              {drivers.map(driver => (
-                <div key={driver.id} className="p-3 hover:bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Avatar name={driver.fullName} size="md" />
-                      <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
-                        driver.workStatus === 'available'  ? 'bg-green-500'  :
-                        driver.workStatus === 'delivering' ? 'bg-yellow-500' : 'bg-gray-400'
-                      }`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-gray-900 truncate">{driver.fullName}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          driver.workStatus === 'available'  ? 'bg-green-100 text-green-700'   :
-                          driver.workStatus === 'delivering' ? 'bg-yellow-100 text-yellow-700' :
-                          driver.workStatus === 'break'      ? 'bg-gray-100 text-gray-600'     :
-                                                               'bg-gray-100 text-gray-500'
-                        }`}>
-                          {driver.workStatus === 'available'  ? 'متاح'       :
-                           driver.workStatus === 'delivering' ? 'يوصل'        :
-                           driver.workStatus === 'break'      ? 'استراحة'    : 'غير متصل'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-                        <span>{getVehicleLabel(driver.vehicleType)}</span>
-                        <span>•</span>
-                        <span>{driver.totalDeliveries} توصيل</span>
-                        <span>•</span>
-                        <span className="text-yellow-600">⭐ {driver.rating}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Pending Orders Alert */}
-      {pendingOrders.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle size={20} className="text-yellow-600" />
-            <h3 className="font-bold text-yellow-700">
-              طلبات بانتظار المعالجة ({pendingOrders.length})
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {pendingOrders.slice(0, 3).map(order => (
-              <div key={order.id} className="bg-white rounded-lg p-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">#{order.subOrderNumber}</p>
-                  <p className="text-sm text-gray-600">{order.customerName}</p>
-                  <p className="text-xs text-gray-500">{(order.total || 0).toLocaleString()} د.ع</p>
-                </div>
-                <Link to="/operations/orders?status=PENDING_CONFIRMATION">
-                  <Button variant="primary" size="sm">معالجة</Button>
+                  <StatusBadge status={order.status} />
                 </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          )}
+        </section>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Link to="/operations/orders?status=PENDING_CONFIRMATION"
-          className="bg-yellow-50 p-4 rounded-lg hover:bg-yellow-100 transition-colors flex items-center gap-3">
-          <Clock size={24} className="text-yellow-600" />
-          <div>
-            <p className="font-medium">طلبات جديدة</p>
-            <p className="text-sm text-gray-600">{stats?.pendingConfirmation ?? pendingOrders.length} طلب</p>
+        {/* السائقون */}
+        <section className="bg-white rounded-2xl border border-gray-200">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-base font-bold text-gray-900 flex items-center gap-2"><Users size={18} className="text-primary" />السائقون</p>
+            <Link to="/operations/drivers" className="text-sm text-primary font-medium inline-flex items-center gap-1">الكل<ArrowLeft size={15} /></Link>
           </div>
-        </Link>
-        <Link to="/operations/drivers"
-          className="bg-green-50 p-4 rounded-lg hover:bg-green-100 transition-colors flex items-center gap-3">
-          <Users size={24} className="text-green-600" />
-          <div>
-            <p className="font-medium">عمال متاحين</p>
-            <p className="text-sm text-gray-600">{availableDrivers} عامل</p>
-          </div>
-        </Link>
-        <Link to="/operations/orders?status=OUT_FOR_DELIVERY"
-          className="bg-purple-50 p-4 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-3">
-          <Truck size={24} className="text-purple-600" />
-          <div>
-            <p className="font-medium">قيد التوصيل</p>
-            <p className="text-sm text-gray-600">{stats?.outForDelivery ?? shippedOrders.length} طلب</p>
-          </div>
-        </Link>
-        <Link to="/operations/orders?status=DELIVERED"
-          className="bg-blue-50 p-4 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-3">
-          <TrendingUp size={24} className="text-blue-600" />
-          <div>
-            <p className="font-medium">تم التوصيل</p>
-            <p className="text-sm text-gray-600">{stats?.delivered ?? deliveredOrders.length} طلب</p>
-          </div>
-        </Link>
+          {driversLoading ? (
+            <div className="p-4 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12" />)}</div>
+          ) : drivers.length === 0 ? (
+            <div className="py-10 text-center text-gray-400"><Users size={32} className="mx-auto mb-2 opacity-40" /><p className="text-sm">لا يوجد سائقون</p></div>
+          ) : (
+            <div className="divide-y divide-gray-100 max-h-[360px] overflow-y-auto">
+              {drivers.map(driver => (
+                <div key={driver.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="relative">
+                    <Avatar name={driver.fullName} size="md" />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                      driver.workStatus === 'available' ? 'bg-green-500' : driver.workStatus === 'delivering' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{driver.fullName}</p>
+                    <p className="text-xs text-gray-500">{getVehicleLabel(driver.vehicleType)} · {driver.totalDeliveries} توصيل</p>
+                  </div>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                    driver.workStatus === 'available' ? 'bg-green-100 text-green-700' : driver.workStatus === 'delivering' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {driver.workStatus === 'available' ? 'متاح' : driver.workStatus === 'delivering' ? 'يوصل' : driver.workStatus === 'break' ? 'استراحة' : 'غير متصل'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

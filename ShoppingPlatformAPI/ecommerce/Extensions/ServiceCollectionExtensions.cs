@@ -1,3 +1,6 @@
+using ecommerce.Services.DriverTrackingService;
+using ecommerce.Services.OpsReportService;
+using ecommerce.Services.VendorAccessService;
 using ecommerce.Core.Interfaces;
 using ecommerce.Data;
 using ecommerce.Data.Interceptors;
@@ -16,9 +19,13 @@ using ecommerce.Services.OrderRatingService;
 using ecommerce.Services.ProductService;
 using ecommerce.Services.ProductService.ProductService;
 using ecommerce.Services.SmsService;
+using ecommerce.Services.TikTokService;
+using ecommerce.Core.Models;
 using ecommerce.Services.UserPreferencesService;
 using ecommerce.Services.VendorService.VendorService;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ecommerce.Extensions
 {
@@ -40,6 +47,25 @@ namespace ecommerce.Extensions
         {
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<IVendorAccessService, VendorAccessService>();
+            services.AddScoped<IDriverTrackingService, DriverTrackingService>();
+            services.AddScoped<ecommerce.Services.FinanceService.IFinanceService, ecommerce.Services.FinanceService.FinanceService>();
+            services.AddMemoryCache();
+            services.AddSingleton<ecommerce.Services.AuthService.IAuthThrottle, ecommerce.Services.AuthService.AuthThrottle>();
+            services.AddOptions<ecommerce.Services.AuthService.GoogleOptions>().BindConfiguration(ecommerce.Services.AuthService.GoogleOptions.Section);
+            services.AddSingleton<ecommerce.Services.AuthService.IGoogleTokenValidator, ecommerce.Services.AuthService.GoogleTokenValidator>();
+            services.AddScoped<ecommerce.Services.AuthService.IGoogleAuthService, ecommerce.Services.AuthService.GoogleAuthService>();
+            services.AddScoped<ecommerce.Services.OrderSettingsService.IOrderSettingsService, ecommerce.Services.OrderSettingsService.OrderSettingsService>();
+            services.AddScoped<ecommerce.Services.OrderTimingService.IOrderTimingService, ecommerce.Services.OrderTimingService.OrderTimingService>();
+
+            // إشعارات الدفع (Web Push): طابور + مرسل في الخلفية
+            services.AddOptions<ecommerce.Services.PushService.PushOptions>().BindConfiguration(ecommerce.Services.PushService.PushOptions.Section);
+            services.AddSingleton<ecommerce.Services.PushService.PushQueue>();
+            services.AddSingleton<ecommerce.Services.PushService.IPushQueue>(sp => sp.GetRequiredService<ecommerce.Services.PushService.PushQueue>());
+            services.AddHostedService<ecommerce.Services.PushService.PushSenderService>();
+            services.AddScoped<ecommerce.Services.DriverAppService.IDriverAppService, ecommerce.Services.DriverAppService.DriverAppService>();
+            services.AddScoped<INotificationLinkService, NotificationLinkService>();
+            services.AddScoped<IOpsReportService, OpsReportService>();
 
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IUserService, UserService>();
@@ -115,6 +141,34 @@ namespace ecommerce.Extensions
 
             services.AddScoped<IUserPreferencesRepository, UserPreferencesRepository>();
             services.AddScoped<IUserPreferencesService, UserPreferencesService>();
+
+            return services;
+        }
+
+        // ربط متاجر التجار بتيك توك — المفاتيح من القسم "TikTok" (السر في user-secrets / متغيرات البيئة)
+        public static IServiceCollection AddTikTokIntegration(this IServiceCollection services, IConfiguration config)
+        {
+            services.Configure<TikTokOptions>(config.GetSection(TikTokOptions.SectionName));
+
+            // مهلة اتصال قصيرة (الشبكة إلى TikTok غير مستقرة أحياناً) — TikTokApiClient يعيد المحاولة مرة
+            services.AddHttpClient(TikTokApiClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    ConnectTimeout = TimeSpan.FromSeconds(6),
+                    // تجربة كل عناوين الخادم معاً — أحد عناوين TikTok قد لا يكون قابلاً للوصول
+                    ConnectCallback = TikTokConnectionHelper.ConnectToFastestAsync,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+                });
+            services.TryAddSingleton(TimeProvider.System);
+
+            // تشفير توكنات تيك توك في قاعدة البيانات
+            services.AddDataProtection().SetApplicationName("WasitPlatform");
+            services.AddSingleton<ITikTokTokenProtector, TikTokTokenProtector>();
+
+            services.AddScoped<ITikTokApiClient, TikTokApiClient>();
+            services.AddScoped<ITikTokRepository, TikTokRepository>();
+            services.AddScoped<ITikTokService, TikTokService>();
+            services.AddHostedService<TikTokSyncBackgroundService>();
 
             return services;
         }

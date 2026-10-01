@@ -499,6 +499,58 @@ namespace ecommerce.Migrations
                     b.ToTable("coupon_usages", (string)null);
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.DeliverySettings", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ConfirmationTimeoutMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("confirmation_timeout_minutes");
+
+                    b.Property<string>("DefaultCommissionType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("default_commission_type");
+
+                    b.Property<decimal>("DefaultCommissionValue")
+                        .HasColumnType("decimal(12,2)")
+                        .HasColumnName("default_commission_value");
+
+                    b.Property<int>("DeliveryFastMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("delivery_fast_minutes");
+
+                    b.Property<int>("DeliverySlowMinutes")
+                        .HasColumnType("int")
+                        .HasColumnName("delivery_slow_minutes");
+
+                    b.Property<bool>("PartialRefusalCustomerPays")
+                        .HasColumnType("bit")
+                        .HasColumnName("partial_refusal_customer_pays");
+
+                    b.Property<string>("RefusalFeePayer")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("refusal_fee_payer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("delivery_settings");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.Driver", b =>
                 {
                     b.Property<Guid>("Id")
@@ -520,6 +572,27 @@ namespace ecommerce.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("full_name");
+
+                    b.Property<double?>("LastLatitude")
+                        .HasColumnType("float")
+                        .HasColumnName("last_latitude");
+
+                    b.Property<double?>("LastLocationAccuracy")
+                        .HasColumnType("float")
+                        .HasColumnName("last_location_accuracy");
+
+                    b.Property<DateTime?>("LastLocationAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_location_at");
+
+                    b.Property<double?>("LastLongitude")
+                        .HasColumnType("float")
+                        .HasColumnName("last_longitude");
+
+                    b.Property<string>("LocationTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("location_token_hash");
 
                     b.Property<string>("Phone")
                         .IsRequired()
@@ -545,6 +618,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("updated_at");
 
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
                     b.Property<string>("VehicleType")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -563,6 +640,15 @@ namespace ecommerce.Migrations
                         .HasColumnName("work_status");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LocationTokenHash")
+                        .IsUnique()
+                        .HasFilter("[location_token_hash] IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_drivers_user_id")
+                        .HasFilter("[user_id] IS NOT NULL");
 
                     b.ToTable("drivers");
                 });
@@ -763,6 +849,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("decimal(18,4)")
                         .HasColumnName("points_per_currency_unit");
 
+                    b.Property<int>("ReviewPoints")
+                        .HasColumnType("int")
+                        .HasColumnName("review_points");
+
                     b.Property<decimal>("SilverMultiplier")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)")
@@ -822,6 +912,11 @@ namespace ecommerce.Migrations
                     b.Property<int>("Points")
                         .HasColumnType("int")
                         .HasColumnName("points");
+
+                    b.Property<string>("ReferenceKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("reference_key");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -909,6 +1004,26 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("cancellation_reason");
 
+                    b.Property<decimal?>("CashCollectedAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("cash_collected_amount");
+
+                    b.Property<DateTime?>("CashCollectedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("cash_collected_at");
+
+                    b.Property<Guid?>("CashCollectedByDriverId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("cash_collected_by_driver_id");
+
+                    b.Property<DateTime?>("CashSettledAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("cash_settled_at");
+
+                    b.Property<Guid?>("CashSettledBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("cash_settled_by");
+
                     b.Property<string>("CouponCode")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
@@ -932,6 +1047,14 @@ namespace ecommerce.Migrations
                         .HasColumnType("decimal(10,2)")
                         .HasDefaultValue(0m)
                         .HasColumnName("delivery_fees");
+
+                    b.Property<decimal?>("DeliveryLatitude")
+                        .HasColumnType("decimal(10,8)")
+                        .HasColumnName("delivery_latitude");
+
+                    b.Property<decimal?>("DeliveryLongitude")
+                        .HasColumnType("decimal(11,8)")
+                        .HasColumnName("delivery_longitude");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("decimal(10,2)")
@@ -958,6 +1081,15 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasDefaultValue("PENDING")
                         .HasColumnName("payment_status");
+
+                    b.Property<decimal?>("RefusalFeeAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("refusal_fee_amount");
+
+                    b.Property<string>("RefusalFeePayer")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("refusal_fee_payer");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -996,7 +1128,45 @@ namespace ecommerce.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("idx_orders_status");
 
+                    b.HasIndex("CashCollectedByDriverId", "CashSettledAt")
+                        .HasDatabaseName("idx_orders_driver_cash");
+
                     b.ToTable("orders", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.OrderDriverRating", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("driver_id");
+
+                    b.Property<Guid>("OrderRatingId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("order_rating_id");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int")
+                        .HasColumnName("rating");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DriverId")
+                        .HasDatabaseName("idx_order_driver_ratings_driver");
+
+                    b.HasIndex("OrderRatingId", "DriverId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_order_driver_ratings_unique");
+
+                    b.ToTable("order_driver_ratings");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.OrderRating", b =>
@@ -1019,7 +1189,7 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(1000)")
                         .HasColumnName("delivery_comment");
 
-                    b.Property<int>("DeliveryRating")
+                    b.Property<int?>("DeliveryRating")
                         .HasColumnType("int")
                         .HasColumnName("delivery_rating");
 
@@ -1537,6 +1707,60 @@ namespace ecommerce.Migrations
                     b.ToTable("promotions", (string)null);
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.PushSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Auth")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("auth");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(700)
+                        .HasColumnType("nvarchar(700)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("P256dh")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("p256dh");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Endpoint")
+                        .IsUnique()
+                        .HasDatabaseName("idx_push_subscriptions_endpoint");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("idx_push_subscriptions_user");
+
+                    b.ToTable("push_subscriptions");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.Return", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1557,6 +1781,10 @@ namespace ecommerce.Migrations
                     b.Property<string>("Details")
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("details");
+
+                    b.Property<bool>("IsDoorRefusal")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_door_refusal");
 
                     b.Property<bool>("IsRestocked")
                         .HasColumnType("bit")
@@ -1971,9 +2199,27 @@ namespace ecommerce.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("driver_id");
 
+                    b.Property<DateTime?>("FailedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("failed_at");
+
+                    b.Property<string>("FailureNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("failure_note");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("failure_reason");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("order_id");
+
+                    b.Property<DateTime?>("PickedUpAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("picked_up_at");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2063,6 +2309,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("int")
                         .HasColumnName("quantity");
 
+                    b.Property<int>("RefusedQuantity")
+                        .HasColumnType("int")
+                        .HasColumnName("refused_quantity");
+
                     b.Property<Guid>("SubOrderId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("sub_order_id");
@@ -2145,6 +2395,235 @@ namespace ecommerce.Migrations
                     b.ToTable("sub_order_ratings");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AccessTokenExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("access_token_expires_at");
+
+                    b.Property<string>("AccessTokenProtected")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("access_token_protected");
+
+                    b.Property<bool>("AutoShowNewVideos")
+                        .HasColumnType("bit")
+                        .HasColumnName("auto_show_new_videos");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("avatar_url");
+
+                    b.Property<DateTime>("ConnectedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("connected_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<long?>("FollowerCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("follower_count");
+
+                    b.Property<string>("LastSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("last_sync_error");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<long?>("LikesCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("likes_count");
+
+                    b.Property<bool>("NeedsReconnect")
+                        .HasColumnType("bit")
+                        .HasColumnName("needs_reconnect");
+
+                    b.Property<string>("OpenId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)")
+                        .HasColumnName("open_id");
+
+                    b.Property<string>("ProfileUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("profile_url");
+
+                    b.Property<DateTime>("RefreshTokenExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("refresh_token_expires_at");
+
+                    b.Property<string>("RefreshTokenProtected")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("refresh_token_protected");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("scopes");
+
+                    b.Property<bool>("ShowOnStore")
+                        .HasColumnType("bit")
+                        .HasColumnName("show_on_store");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("username");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.Property<long?>("VideoCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("video_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VendorId")
+                        .IsUnique();
+
+                    b.ToTable("tiktok_connections", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokOAuthState", b =>
+                {
+                    b.Property<string>("State")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("NonceHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("nonce_hash");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("State");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("tiktok_oauth_states", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokVideo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("connection_id");
+
+                    b.Property<string>("CoverImageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("cover_image_url");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("DurationSeconds")
+                        .HasColumnType("int")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<string>("EmbedLink")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("embed_link");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("external_id");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_hidden");
+
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_removed");
+
+                    b.Property<long?>("LikeCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("like_count");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("ShareUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)")
+                        .HasColumnName("share_url");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<long?>("ViewCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("view_count");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ConnectionId", "ExternalId")
+                        .IsUnique();
+
+                    b.ToTable("tiktok_videos", (string)null);
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2170,6 +2649,22 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(255)")
                         .HasColumnName("full_name");
 
+                    b.Property<string>("GoogleEmail")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("google_email");
+
+                    b.Property<string>("GoogleId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("google_id");
+
+                    b.Property<bool>("HasPassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true)
+                        .HasColumnName("has_password");
+
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -2187,7 +2682,6 @@ namespace ecommerce.Migrations
                         .HasColumnName("password_hash");
 
                     b.Property<string>("Phone")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("phone");
@@ -2209,9 +2703,15 @@ namespace ecommerce.Migrations
                     b.HasIndex("Email")
                         .HasDatabaseName("idx_users_email");
 
+                    b.HasIndex("GoogleId")
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_google_id")
+                        .HasFilter("[google_id] IS NOT NULL");
+
                     b.HasIndex("Phone")
                         .IsUnique()
-                        .HasDatabaseName("idx_users_phone");
+                        .HasDatabaseName("idx_users_phone")
+                        .HasFilter("[phone] IS NOT NULL");
 
                     b.HasIndex("Role")
                         .HasDatabaseName("idx_users_role");
@@ -2301,6 +2801,15 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(500)")
                         .HasColumnName("address");
 
+                    b.Property<string>("CommissionType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("commission_type");
+
+                    b.Property<decimal?>("CommissionValue")
+                        .HasColumnType("decimal(12,2)")
+                        .HasColumnName("commission_value");
+
                     b.Property<string>("CoverImageUrl")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)")
@@ -2388,6 +2897,75 @@ namespace ecommerce.Migrations
                         .HasDatabaseName("idx_vendors_phone");
 
                     b.ToTable("vendors", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.VendorLedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<Guid?>("ReturnId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("return_id");
+
+                    b.Property<Guid?>("SubOrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("sub_order_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubOrderId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("idx_ledger_suborder_type")
+                        .HasFilter("[sub_order_id] IS NOT NULL AND [return_id] IS NULL");
+
+                    b.HasIndex("VendorId", "CreatedAt")
+                        .HasDatabaseName("idx_ledger_vendor_date");
+
+                    b.HasIndex("ReturnId", "VendorId", "Type")
+                        .IsUnique()
+                        .HasDatabaseName("idx_ledger_return_type")
+                        .HasFilter("[return_id] IS NOT NULL");
+
+                    b.ToTable("vendor_ledger_entries");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Wishlist", b =>
@@ -2526,6 +3104,16 @@ namespace ecommerce.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.Driver", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.HomeSectionItem", b =>
                 {
                     b.HasOne("ecommerce.Core.Models.HomeSection", "Section")
@@ -2593,6 +3181,25 @@ namespace ecommerce.Migrations
                     b.Navigation("Address");
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.OrderDriverRating", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Driver", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.OrderRating", "OrderRating")
+                        .WithMany("DriverRatings")
+                        .HasForeignKey("OrderRatingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Driver");
+
+                    b.Navigation("OrderRating");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.OrderRating", b =>
@@ -2728,6 +3335,17 @@ namespace ecommerce.Migrations
                     b.Navigation("AttributeValue");
 
                     b.Navigation("Variant");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.PushSubscription", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Return", b =>
@@ -2966,6 +3584,35 @@ namespace ecommerce.Migrations
                     b.Navigation("Vendor");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokConnection", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokVideo", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.TikTokConnection", "Connection")
+                        .WithMany("Videos")
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Connection");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.UserPreferences", b =>
                 {
                     b.HasOne("ecommerce.Core.Models.User", "User")
@@ -2985,6 +3632,17 @@ namespace ecommerce.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Owner");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.VendorLedgerEntry", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Vendor");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Wishlist", b =>
@@ -3047,6 +3705,8 @@ namespace ecommerce.Migrations
 
             modelBuilder.Entity("ecommerce.Core.Models.OrderRating", b =>
                 {
+                    b.Navigation("DriverRatings");
+
                     b.Navigation("SubOrderRatings");
                 });
 
@@ -3097,6 +3757,11 @@ namespace ecommerce.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("StatusLogs");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokConnection", b =>
+                {
+                    b.Navigation("Videos");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.User", b =>

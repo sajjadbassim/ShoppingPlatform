@@ -1,10 +1,14 @@
 // src/components/common/ProductCard.jsx
 import { useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { Heart, Star, ShoppingCart, Plus, Store } from 'lucide-react'
 import { getPrimaryImage } from '../../utils/imageHelper'
-import { useProductVariants } from '../../hooks/useVariants'
+import { useProductVariants, variantKeys } from '../../hooks/useVariants'
 import { variantsService } from '../../services/variantsService'
+
+// أجهزة اللمس لا تدعم hover — تغيير محتوى الكرت عند "hover" يجعل iOS يحتاج ضغطتين لفتح المنتج
+const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
 
 // ===========================
 // InlineVariantPicker
@@ -122,10 +126,27 @@ const ProductCard = ({
   )
   const hasVariants = variantsService.hasVariants(variantsList)
 
-  const handleAddToCart = useCallback((e) => {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const handleAddToCart = useCallback(async (e) => {
     e.preventDefault(); e.stopPropagation()
+    // على أجهزة اللمس لا يظهر منتقي الخيارات، فالمنتج ذو الخيارات يُفتح لاختيارها
+    if (!canHover && variant === 'default') {
+      try {
+        const variants = await queryClient.fetchQuery({
+          queryKey: variantKeys.list(id),
+          queryFn: () => variantsService.getVariants(id),
+          staleTime: 5 * 60 * 1000,
+        })
+        if (variantsService.hasVariants(variants)) {
+          navigate(`/products/${id}`)
+          return
+        }
+      } catch { /* نكمل الإضافة كالمعتاد */ }
+    }
     onAddToCart?.({ ...product, quantity })
-  }, [product, quantity, onAddToCart])
+  }, [product, quantity, onAddToCart, variant, id, queryClient, navigate])
 
   const handleToggleWishlist = useCallback((e) => {
     e.preventDefault(); e.stopPropagation()
@@ -162,8 +183,8 @@ const ProductCard = ({
     return (
       <div
         className={`card group flex flex-col h-full overflow-hidden ${className}`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={canHover ? () => setIsHovered(true) : undefined}
+        onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
       >
         <Link to={`/products/${id}`} className="flex flex-col flex-1">
           <div className="relative aspect-square bg-gray-100 overflow-hidden">
@@ -177,18 +198,18 @@ const ProductCard = ({
             )}
 
             {discountPercent > 0 && (
-              <span className="absolute top-3 right-3 bg-error text-white text-xs font-bold px-2 py-1 rounded">
+              <span className="absolute top-2 right-2 sm:top-3 sm:right-3 bg-error text-white text-[10px] sm:text-xs font-bold px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">
                 {discountPercent}% خصم
               </span>
             )}
 
             <button onClick={handleToggleWishlist}
-              className={`absolute top-3 left-3 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 ${
+              className={`absolute top-2 left-2 sm:top-3 sm:left-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 ${
                 isWishlisted
                   ? 'bg-error text-white'
                   : 'bg-white/80 text-gray-600 hover:bg-white hover:text-error'
               }`}>
-              <Heart size={18} fill={isWishlisted ? 'currentColor' : 'none'} />
+              <Heart size={16} fill={isWishlisted ? 'currentColor' : 'none'} />
             </button>
 
             {!inStock && (
@@ -198,17 +219,17 @@ const ProductCard = ({
             )}
           </div>
 
-          <div className="p-4 flex flex-col flex-1">
+          <div className="p-2.5 sm:p-4 flex flex-col flex-1">
             {/* ✅ اسم البائع */}
-            <StoreLabel extraClass="mb-1.5" />
+            <StoreLabel extraClass="mb-1 sm:mb-1.5" />
 
             {/* ✅ ارتفاع ثابت يكفي سطرين دائماً — يمنع اختلاف مكان السعر والزر بين الكروت */}
-            <h3 className="font-medium text-gray-800 line-clamp-2 mb-2 min-h-[3rem] group-hover:text-primary transition-colors">
+            <h3 className="text-[13px] sm:text-base font-medium text-gray-800 leading-snug line-clamp-2 mb-1.5 sm:mb-2 min-h-[2lh] group-hover:text-primary transition-colors">
               {name}
             </h3>
 
             {rating > 0 && (
-              <div className="flex items-center gap-1 mb-2">
+              <div className="flex items-center gap-1 mb-1.5 sm:mb-2">
                 <Star size={14} className="text-warning fill-warning" />
                 <span className="text-sm font-medium text-gray-700">{rating}</span>
                 {reviewsCount > 0 && (
@@ -219,16 +240,16 @@ const ProductCard = ({
 
             {/* ✅ السعر والزر مثبّتان دائماً في أسفل الكرت بغض النظر عن طول الاسم */}
             <div className="mt-auto">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg font-bold text-primary">{price?.toLocaleString()} د.ع</span>
+              <div className="flex flex-wrap items-baseline gap-x-2 mb-2 sm:mb-3">
+                <span className="text-sm sm:text-lg font-bold text-primary">{price?.toLocaleString()} د.ع</span>
                 {hasDiscount && (
-                  <span className="text-sm text-gray-400 line-through">{originalPrice?.toLocaleString()} د.ع</span>
+                  <span className="text-[11px] sm:text-sm text-gray-400 line-through">{originalPrice?.toLocaleString()} د.ع</span>
                 )}
               </div>
 
               {inStock && !hasVariants && (
-                <button onClick={handleAddToCart} className="w-full btn-primary btn-md">
-                  <Plus size={18} /><span>إضافة للسلة</span>
+                <button onClick={handleAddToCart} className="w-full btn-primary h-9 sm:h-11 px-2 text-xs sm:text-base rounded-lg gap-1">
+                  <Plus size={16} /><span>إضافة للسلة</span>
                 </button>
               )}
               {inStock && hasVariants && (

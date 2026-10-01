@@ -449,6 +449,24 @@ export const useOrderRating = (orderId) => {
 }
 
 /**
+ * تقييم المتاجر وحدها (مستقل عن تقييم التجربة)
+ * data: { subOrderRatings: [{ subOrderId, vendorRating, vendorComment?, driverRating? }] }
+ */
+export const useRateOrderStores = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ orderId, data }) => {
+      const response = await apiPost(API_ENDPOINTS.ORDER_RATING.STORES(orderId), data)
+      return response.data.data || response.data
+    },
+    onSuccess: (_, { orderId }) => {
+      queryClient.invalidateQueries({ queryKey: [...orderKeys.all, 'rating-status', orderId] })
+      queryClient.invalidateQueries({ queryKey: [...orderKeys.all, 'rating', orderId] })
+    },
+  })
+}
+
+/**
  * إنشاء تقييم للطلب
  * data: { deliveryRating, speedRating, packagingRating, wouldRecommend, deliveryComment?, subOrderRatings: [] }
  */

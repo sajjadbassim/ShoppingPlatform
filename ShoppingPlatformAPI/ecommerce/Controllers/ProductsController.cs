@@ -1,5 +1,7 @@
-﻿using ecommerce.Core.DTO.Product;
+using ecommerce.Core.DTO.Product;
+using ecommerce.Core.Constants;
 using ecommerce.Services.ProductService.ProductService;
+using ecommerce.Services.VendorAccessService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,10 +12,12 @@ namespace ecommerce.Controllers
     public class ProductsController : Controller
     {
         private readonly IProductService _productService;
+        private readonly IVendorAccessService _access;
 
-        public ProductsController(IProductService productService)
+        public ProductsController(IProductService productService, IVendorAccessService access)
         {
             _productService = productService;
+            _access = access;
         }
 
         // ===================================
@@ -225,8 +229,12 @@ namespace ecommerce.Controllers
         // POST: api/products — مع الصور
         // ===================================
         [HttpPost]
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         public async Task<IActionResult> Create([FromForm] CreateProductDto dto)
         {
+            // المنتج يُنشأ فقط في متجر يملكه المستخدم
+            await _access.EnsureCanManageVendorAsync(dto.VendorId);
+
             try
             {
                 var product = await _productService.CreateAsync(dto);
@@ -243,8 +251,11 @@ namespace ecommerce.Controllers
         // PUT: api/products/{id} — مع صور جديدة
         // ===================================
         [HttpPut("{id}")]
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         public async Task<IActionResult> Update(Guid id, [FromForm] UpdateProductDto dto)
         {
+            await _access.EnsureCanManageProductAsync(id);
+
             try
             {
                 var product = await _productService.UpdateAsync(id, dto);
@@ -259,11 +270,15 @@ namespace ecommerce.Controllers
         // ===================================
         // POST: api/products/{id}/images
         // ===================================
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         [HttpPost("{id}/images")]
         [Consumes("multipart/form-data")]
         [DisableRequestSizeLimit]
         public async Task<IActionResult> AddImage(Guid id, IFormFile image)
         {
+            await _access.EnsureCanManageProductAsync(id);
+
+
             try
             {
                 if (image == null)
@@ -281,9 +296,13 @@ namespace ecommerce.Controllers
         // ===================================
         // DELETE: api/products/images/{imageId}
         // ===================================
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         [HttpDelete("images/{imageId}")]
         public async Task<IActionResult> DeleteImage(Guid imageId)
         {
+            await _access.EnsureCanManageProductImageAsync(imageId);
+
+
             try
             {
                 var result = await _productService.DeleteImageAsync(imageId);
@@ -301,9 +320,14 @@ namespace ecommerce.Controllers
         // ===================================
         // PATCH: api/products/{productId}/images/{imageId}/set-primary
         // ===================================
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         [HttpPatch("{productId}/images/{imageId}/set-primary")]
         public async Task<IActionResult> SetPrimaryImage(Guid productId, Guid imageId)
         {
+            await _access.EnsureCanManageProductAsync(productId);
+            await _access.EnsureCanManageProductImageAsync(imageId);
+
+
             try
             {
                 var result = await _productService.SetPrimaryImageAsync(imageId, productId);
@@ -321,9 +345,13 @@ namespace ecommerce.Controllers
         // ===================================
         // PATCH: api/products/{id}/stock
         // ===================================
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         [HttpPatch("{id}/stock")]
         public async Task<IActionResult> UpdateStock(Guid id, [FromBody] int quantity)
         {
+            await _access.EnsureCanManageProductAsync(id);
+
+
             try
             {
                 var result = await _productService.UpdateStockAsync(id, quantity);
@@ -341,9 +369,13 @@ namespace ecommerce.Controllers
         // ===================================
         // DELETE: api/products/{id}
         // ===================================
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
+            await _access.EnsureCanManageProductAsync(id);
+
+
             try
             {
                 var result = await _productService.DeleteAsync(id);

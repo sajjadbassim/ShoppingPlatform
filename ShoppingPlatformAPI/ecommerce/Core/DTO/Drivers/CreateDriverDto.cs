@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Drivers
 {
@@ -19,5 +19,9 @@ namespace ecommerce.Core.DTO.Drivers
         public string VehicleType { get; set; }
 
         public string? WorkArea { get; set; }
+
+        // اختياري: إنشاء حساب دخول للوحة السائق برقم هاتفه
+        [MinLength(6, ErrorMessage = "كلمة المرور 6 أحرف على الأقل")]
+        public string? Password { get; set; }
     }
 }

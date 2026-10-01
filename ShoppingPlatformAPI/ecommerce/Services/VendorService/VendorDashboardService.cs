@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Vendor;
 using ecommerce.Core.Models;
@@ -322,7 +322,7 @@ namespace ecommerce.Services
                 throw new Exception("الطلب غير موجود");
 
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
-                throw new Exception($"لا يمكن تأكيد الطلب في حالة \"{subOrder.Status}\"");
+                throw new Exception($"لا يمكن تأكيد الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
             var oldStatus = subOrder.Status;
 
@@ -373,7 +373,7 @@ namespace ecommerce.Services
                 throw new Exception("الطلب غير موجود");
 
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
-                throw new Exception($"لا يمكن رفض الطلب في حالة \"{subOrder.Status}\"");
+                throw new Exception($"لا يمكن رفض الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
             var oldStatus = subOrder.Status;
 

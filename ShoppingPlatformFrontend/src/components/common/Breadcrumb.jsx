@@ -45,15 +45,23 @@ const Breadcrumb = ({
                   {item.label}
                 </span>
               ) : (
-                // العناصر القابلة للنقر
                 <>
-                  <Link
-                    to={item.path || '#'}
-                    className="flex items-center gap-1.5 text-gray-500 hover:text-primary transition-colors"
-                  >
-                    {Icon && <Icon size={16} />}
-                    {item.label}
-                  </Link>
+                  {item.path ? (
+                    // العناصر القابلة للنقر
+                    <Link
+                      to={item.path}
+                      className="flex items-center gap-1.5 text-gray-500 hover:text-primary transition-colors"
+                    >
+                      {Icon && <Icon size={16} />}
+                      {item.label}
+                    </Link>
+                  ) : (
+                    // عنصر بدون رابط يُعرض كنص عادي
+                    <span className="flex items-center gap-1.5 text-gray-500">
+                      {Icon && <Icon size={16} />}
+                      {item.label}
+                    </span>
+                  )}
                   {/* الفاصل */}
                   <span className="mx-1">{SeparatorIcon}</span>
                 </>

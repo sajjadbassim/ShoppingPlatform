@@ -21,6 +21,9 @@ namespace ecommerce.Services
         // ===================================
         Task EarnPointsAsync(Guid userId, Guid orderId, decimal orderAmount);
 
+        // كسب نقاط كتابة تقييم — مرة واحدة لكل منتج، ويعيد عدد النقاط الممنوحة (0 إن لم تُمنح)
+        Task<int> EarnReviewPointsAsync(Guid userId, Guid productId);
+
         // ===================================
         // استرداد النقاط
         // ===================================

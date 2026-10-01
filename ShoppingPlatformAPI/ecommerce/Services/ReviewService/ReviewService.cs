@@ -13,17 +13,23 @@ namespace ecommerce.Services
         private readonly IFileService _fileService;
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly ILoyaltyService _loyaltyService;
+        private readonly ILogger<ReviewService> _logger;
 
         public ReviewService(
             IReviewRepository reviewRepository,
             IFileService fileService,
             AppDbContext context,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            ILoyaltyService loyaltyService,
+            ILogger<ReviewService> logger)
         {
             _reviewRepository = reviewRepository;
             _fileService = fileService;
             _context = context;
             _notificationService = notificationService;
+            _loyaltyService = loyaltyService;
+            _logger = logger;
         }
 
         // ===================================
@@ -146,7 +152,20 @@ namespace ecommerce.Services
 
                 await _notificationService.NotifyNewReviewAsync(dto.ProductId, created.Id, dto.Rating);
 
-                return await GetByIdAsync(created.Id);
+                // 5️⃣ نقاط الولاء — فشلها لا يُلغي التقييم الذي حُفظ فعلاً
+                var pointsEarned = 0;
+                try
+                {
+                    pointsEarned = await _loyaltyService.EarnReviewPointsAsync(userId, dto.ProductId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "فشل منح نقاط التقييم للمستخدم {UserId} على المنتج {ProductId}", userId, dto.ProductId);
+                }
+
+                var result = await GetByIdAsync(created.Id);
+                result.PointsEarned = pointsEarned;
+                return result;
             }
             catch (Exception)
             {

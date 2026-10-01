@@ -2,6 +2,7 @@ using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Hubs;
 using ecommerce.Repositories;
+using ecommerce.Services.PushService;
 using Microsoft.AspNetCore.SignalR;
 using System.Text.Json;
 
@@ -17,6 +18,7 @@ namespace ecommerce.Services.NotificationService
         private readonly IProductRepository _productRepository;
         private readonly IUserPreferencesRepository _preferencesRepository;
         private readonly ILogger<NotificationService> _logger;
+        private readonly IPushQueue? _push;
 
         public NotificationService(
             IHubContext<NotificationHub> notificationHub,
@@ -26,8 +28,10 @@ namespace ecommerce.Services.NotificationService
             IVendorRepository vendorRepository,
             IProductRepository productRepository,
             IUserPreferencesRepository preferencesRepository,
-            ILogger<NotificationService> logger)
+            ILogger<NotificationService> logger,
+            IPushQueue? push = null)
         {
+            _push = push;
             _notificationHub = notificationHub;
             _opsHub = opsHub;
             _notificationRepository = notificationRepository;
@@ -48,6 +52,8 @@ namespace ecommerce.Services.NotificationService
                 message = $"طلب جديد: {orderNumber}",
                 timestamp = DateTime.UtcNow
             });
+            _push?.Enqueue(new PushMessage($"طلب جديد: {orderNumber}", Role: UserRoles.Ops,
+                Url: $"/operations/orders?order={orderId}", Tag: $"order-{orderId}"));
 
             await NotifyAdminsAsync(
                 NotificationCategory.NewOrders, NotificationType.NEW_ORDER,
@@ -112,14 +118,14 @@ namespace ecommerce.Services.NotificationService
             _logger.LogInformation("Sub-order cancelled notification sent. SubOrderNumber: {SubOrderNumber}", subOrderNumber);
         }
 
-        public async Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus)
+        public async Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus, string? orderNumber = null)
         {
             await _opsHub.Clients.Group("OpsTeam").SendAsync("OrderStatusChanged", new
             {
                 orderId,
                 oldStatus,
                 newStatus,
-                message = $"تغيرت حالة الطلب من {oldStatus} إلى {newStatus}",
+                message = OrderStatusText.StaffMessage(newStatus, orderNumber ?? ""),
                 timestamp = DateTime.UtcNow
             });
 
@@ -139,7 +145,7 @@ namespace ecommerce.Services.NotificationService
         {
             if (!await IsEnabledAsync(customerId, NotificationCategory.OrderUpdates)) return;
 
-            var message = $"طلبك {orderNumber} أصبح في حالة: {newStatus}";
+            var message = OrderStatusText.CustomerMessage(newStatus, orderNumber);
             var data = new { orderId, orderNumber, status = newStatus };
 
             var notification = new Notification
@@ -151,6 +157,7 @@ namespace ecommerce.Services.NotificationService
             };
 
             await _notificationRepository.CreateAsync(notification);
+            _push?.Enqueue(new PushMessage(message, UserId: customerId, NotificationId: notification.Id, Tag: $"order-{orderId}"));
 
             await _notificationHub.Clients.User(customerId.ToString()).SendAsync("OrderStatusChanged", new
             {
@@ -240,6 +247,24 @@ namespace ecommerce.Services.NotificationService
             }
         }
 
+        public async Task NotifyDriverUpdatedAsync(Guid driverId, string workStatus, string? reason = null)
+        {
+            try
+            {
+                await _opsHub.Clients.Group("OpsTeam").SendAsync("DriverUpdated", new
+                {
+                    driverId,
+                    workStatus,
+                    reason,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "DriverUpdated broadcast failed");
+            }
+        }
+
         // من لا يملك سجل تفضيلات تُطبَّق عليه القيم الافتراضية
         private async Task<bool> IsEnabledAsync(Guid userId, NotificationCategory category)
         {
@@ -266,6 +291,7 @@ namespace ecommerce.Services.NotificationService
             };
 
             await _notificationRepository.CreateAsync(notification);
+            _push?.Enqueue(new PushMessage(message, UserId: userId, NotificationId: notification.Id));
 
             await _notificationHub.Clients.User(userId.ToString()).SendAsync("Notification", new
             {

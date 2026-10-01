@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Addresses;
+using ecommerce.Core.DTO.Addresses;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
 
@@ -32,8 +32,18 @@ namespace ecommerce.Services
             return addresses.Select(MapToDto);
         }
 
+        // الدبوس: الإحداثيان معاً أو لا شيء، وضمن النطاق الصحيح
+        private static void ValidatePin(decimal? lat, decimal? lng)
+        {
+            if (lat.HasValue != lng.HasValue)
+                throw new Exception("موقع الخريطة غير مكتمل");
+            if (lat.HasValue && (lat is < -90 or > 90 || lng is < -180 or > 180 || (lat == 0 && lng == 0)))
+                throw new Exception("موقع الخريطة غير صالح");
+        }
+
         public async Task<AddressResponseDto> CreateAsync(AddressCreateDto dto)
         {
+            ValidatePin(dto.Latitude, dto.Longitude);
             var address = new Address
             {
                 UserId = dto.UserId,
@@ -47,8 +57,8 @@ namespace ecommerce.Services
                 Phone = dto.Phone,
                 Notes = dto.Notes,
                 IsDefault = dto.IsDefault,
-                Latitude = dto.Latitude,
-                Longitude = dto.Longitude
+                Latitude = dto.Latitude.HasValue ? Math.Round(dto.Latitude.Value, 7) : null,
+                Longitude = dto.Longitude.HasValue ? Math.Round(dto.Longitude.Value, 7) : null
             };
 
             var createdAddress = await _addressRepository.CreateAsync(address);
@@ -72,8 +82,13 @@ namespace ecommerce.Services
             address.Phone = dto.Phone ?? address.Phone;
             address.Notes = dto.Notes ?? address.Notes;
             address.IsDefault = dto.IsDefault;
-            address.Latitude = dto.Latitude;
-            address.Longitude = dto.Longitude;
+            // التعديل بلا دبوس يُبقي الدبوس المحفوظ (لا يمسحه)
+            if (dto.Latitude.HasValue || dto.Longitude.HasValue)
+            {
+                ValidatePin(dto.Latitude, dto.Longitude);
+                address.Latitude = Math.Round(dto.Latitude!.Value, 7);
+                address.Longitude = Math.Round(dto.Longitude!.Value, 7);
+            }
 
             var updatedAddress = await _addressRepository.UpdateAsync(address);
             return MapToDto(updatedAddress);

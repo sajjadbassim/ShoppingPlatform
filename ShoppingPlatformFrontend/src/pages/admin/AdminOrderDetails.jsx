@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
+import { OrderTimingCard } from '../../components/common/OrderTiming'
 
 // ===========================
 // Helpers
@@ -105,16 +106,16 @@ const AdminOrderDetails = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/admin/orders')}
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <button onClick={() => navigate('/admin/orders')} aria-label="العودة للطلبات"
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0">
             <ArrowRight size={18} />
-            <span className="text-sm">العودة للطلبات</span>
+            <span className="text-sm hidden sm:inline">العودة للطلبات</span>
           </button>
-          <div className="h-5 w-px bg-gray-300" />
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">#{order.orderNumber}</h1>
+          <div className="h-5 w-px bg-gray-300 hidden sm:block" />
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-gray-900 whitespace-nowrap truncate" dir="ltr">#{order.orderNumber}</h1>
             <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
               <Calendar size={12} />
               {new Date(order.createdAt).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -133,6 +134,8 @@ const AdminOrderDetails = () => {
 
         {/* ===== العمود الرئيسي ===== */}
         <div className="lg:col-span-2 space-y-5">
+
+          <OrderTimingCard orderId={order.id} />
 
           {/* الطلبات الفرعية */}
           {order.subOrders?.map(sub => (

@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Common;
+using ecommerce.Core.DTO.Common;
 using ecommerce.Core.Models;
 using System.Linq.Expressions;
 
@@ -8,6 +8,7 @@ namespace ecommerce.Repositories
     {
         Task<User> GetByIdAsync(Guid id);
         Task<User> GetByPhoneAsync(string phone);
+        Task<User?> GetByEmailAsync(string email);
         Task<IEnumerable<User>> GetAllAsync();
         Task<IEnumerable<User>> GetByRoleAsync(string role);
         Task<User> CreateAsync(User user);

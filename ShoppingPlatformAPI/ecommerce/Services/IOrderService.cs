@@ -7,6 +7,7 @@ namespace ecommerce.Services
     {
         Task<OrderResponseDto> CreateOrderFromCartAsync(Guid userId, CreateOrderDto dto);
         Task<OrderResponseDto> GetOrderByIdAsync(Guid orderId);
+        Task<Dictionary<string, int>> GetStatusCountsAsync();
         Task<OrderResponseDto> GetOrderByNumberAsync(string orderNumber);
         Task<IEnumerable<OrderResponseDto>> GetCustomerOrdersAsync(Guid customerId);
 

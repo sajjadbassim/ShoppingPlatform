@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -79,6 +79,22 @@ namespace ecommerce.Core.Models
 
         [Column("assigned_at")]
         public DateTime? AssignedAt { get; set; }
+
+        // السائق أكّد استلام الطلب من المتجر
+        [Column("picked_up_at")]
+        public DateTime? PickedUpAt { get; set; }
+
+        // تعذّر التسليم: السبب (DeliveryFailureReason) والوقت
+        [MaxLength(30)]
+        [Column("failure_reason")]
+        public string? FailureReason { get; set; }
+
+        [MaxLength(300)]
+        [Column("failure_note")]
+        public string? FailureNote { get; set; }
+
+        [Column("failed_at")]
+        public DateTime? FailedAt { get; set; }
 
         // Navigation Property
         [ForeignKey("DriverId")]

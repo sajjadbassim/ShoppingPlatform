@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.OrderRating
 {
@@ -24,6 +24,33 @@ namespace ecommerce.Core.DTO.OrderRating
 
         // تقييم كل متجر
         public List<CreateSubOrderRatingDto> SubOrderRatings { get; set; } = new();
+
+        // تقييم كل سائق (مرة واحدة لكل سائق)
+        public List<DriverRatingInputDto> DriverRatings { get; set; } = new();
+    }
+
+    public class DriverRatingInputDto
+    {
+        [Required]
+        public Guid DriverId { get; set; }
+
+        [Range(1, 5, ErrorMessage = "تقييم السائق يجب أن يكون بين 1 و 5")]
+        public int Rating { get; set; }
+    }
+
+    // تقييم المتاجر وحدها (مستقل عن تقييم التجربة)
+    public class CreateStoreRatingsDto
+    {
+        public List<CreateSubOrderRatingDto> SubOrderRatings { get; set; } = new();
+        public List<DriverRatingInputDto> DriverRatings { get; set; } = new();
+    }
+
+    // ما قيّمه الزبون حتى الآن في هذا الطلب
+    public class OrderRatingStatusDto
+    {
+        public bool HasRated { get; set; }                  // تقييم التجربة (التوصيل)
+        public List<Guid> RatedSubOrderIds { get; set; } = new();
+        public List<Guid> RatedDriverIds { get; set; } = new();
     }
 
     public class CreateSubOrderRatingDto
@@ -52,7 +79,7 @@ namespace ecommerce.Core.DTO.OrderRating
         public string OrderNumber { get; set; }
         public string CustomerName { get; set; }
 
-        public int DeliveryRating { get; set; }
+        public int? DeliveryRating { get; set; }
         public string? DeliveryComment { get; set; }
         public int? SpeedRating { get; set; }
         public int? PackagingRating { get; set; }

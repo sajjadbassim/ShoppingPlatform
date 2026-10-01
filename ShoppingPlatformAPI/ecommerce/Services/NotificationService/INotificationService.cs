@@ -12,7 +12,10 @@ namespace ecommerce.Services.NotificationService
         Task NotifyNewSubOrderAsync(Guid subOrderId, string subOrderNumber, Guid vendorId);
         Task NotifySubOrderConfirmedAsync(Guid subOrderId, string subOrderNumber, Guid vendorId);
         Task NotifySubOrderCancelledAsync(Guid subOrderId, string subOrderNumber, string reason, Guid vendorId);
-        Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus);
+        Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus, string? orderNumber = null);
+
+        // تحديث لحظي لشاشات العمليات: تغيّرت حالة سائق أو طلباته (استلام/تسليم)
+        Task NotifyDriverUpdatedAsync(Guid driverId, string workStatus, string? reason = null);
 
         // الزبون
         Task NotifyCustomerAsync(Guid customerId, string message, object? data = null);

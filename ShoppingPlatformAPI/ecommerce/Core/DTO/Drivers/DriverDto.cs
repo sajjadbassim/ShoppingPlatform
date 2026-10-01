@@ -1,4 +1,4 @@
-﻿namespace ecommerce.Core.DTO.Drivers
+namespace ecommerce.Core.DTO.Drivers
 {
     public class DriverDto
     {
@@ -13,5 +13,6 @@
         public decimal Rating { get; set; }
         public int TotalDeliveries { get; set; }
         public DateTime CreatedAt { get; set; }
+        public bool HasAccount { get; set; }          // يستطيع الدخول للوحة السائق
     }
 }

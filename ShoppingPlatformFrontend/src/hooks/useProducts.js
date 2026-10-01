@@ -35,11 +35,12 @@ export const useProducts = () => {
 /**
  * جلب المنتجات مع التصفية والصفحات
  */
-export const useProductsPaged = (params = {}) => {
+export const useProductsPaged = (params = {}, options = {}) => {
   return useQuery({
     queryKey: productKeys.list(params),
     queryFn: () => productService.getPaged(params),
     keepPreviousData: true,
+    ...options,
   });
 };
 

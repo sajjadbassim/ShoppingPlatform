@@ -1,5 +1,7 @@
-import { Save, Sun, Moon } from 'lucide-react'
+import { Save, Sun, Moon, Palette } from 'lucide-react'
 import Button from '../common/Button'
+import { useToast } from '../common/Toast'
+import { useThemePreference } from '../../hooks/usePreferences'
 
 // ملاحظة: هذه المكونات معرّفة على مستوى الملف عمداً — تعريفها داخل الصفحة
 // يجعل React يعيد إنشاءها مع كل تغيير في الحالة فتفقد الحقول التركيز
@@ -32,12 +34,6 @@ export const SettingsToggle = ({ label, desc, checked, onChange, disabled }) => 
   </label>
 )
 
-export const LANGUAGE_OPTIONS = [
-  { value: 'ar', label: 'العربية' },
-  { value: 'en', label: 'English' },
-  { value: 'ku', label: 'کوردی' },
-]
-
 export const ThemePicker = ({ value, onChange, disabled }) => (
   <div className="flex gap-3">
     {[
@@ -56,3 +52,26 @@ export const ThemePicker = ({ value, onChange, disabled }) => (
     ))}
   </div>
 )
+
+// قسم المظهر للوحات التحكم — التغيير يُطبَّق ويُحفظ فوراً دون زر حفظ
+export const AppearanceSection = () => {
+  const { success, error: showError } = useToast()
+  const { theme, changeTheme, isSaving } = useThemePreference()
+
+  const handleChange = async (value) => {
+    if (value === theme) return
+    try {
+      await changeTheme(value)
+      success(value === 'dark' ? 'تم تفعيل الوضع الداكن' : 'تم تفعيل الوضع الفاتح')
+    } catch (err) {
+      showError(err.message || 'تعذّر حفظ المظهر')
+    }
+  }
+
+  return (
+    <SettingsSection icon={Palette} title="المظهر">
+      <p className="text-sm text-gray-500 mb-3">اختر مظهر الواجهة، ويُحفظ اختيارك في حسابك على جميع أجهزتك.</p>
+      <ThemePicker value={theme} onChange={handleChange} disabled={isSaving} />
+    </SettingsSection>
+  )
+}

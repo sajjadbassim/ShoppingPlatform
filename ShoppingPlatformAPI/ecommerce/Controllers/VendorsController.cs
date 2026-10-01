@@ -1,5 +1,8 @@
-﻿using ecommerce.Core.DTO.Common;
+using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Vendor;
+using ecommerce.Core.Constants;
+using ecommerce.Core.Exceptions;
+using ecommerce.Services.VendorAccessService;
 using ecommerce.Services.VendorService.VendorService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,16 +15,30 @@ namespace ecommerce.Controllers
     public class VendorsController : Controller
     {
         private readonly IVendorService _vendorService;
+        private readonly IVendorAccessService _access;
 
-        public VendorsController(IVendorService vendorService)
+        public VendorsController(IVendorService vendorService, IVendorAccessService access)
         {
             _vendorService = vendorService;
+            _access = access;
         }
 
         private Guid? GetCurrentUserId()
         {
             var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return claim != null ? Guid.Parse(claim) : null;
+        }
+
+        // المتاجر غير المفعّلة (طلبات قيد المراجعة) ومعرّف المالك: للإدارة والعمليات فقط
+        private bool IsStaff => User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Ops);
+
+        private bool CanSee(VendorResponseDto v) =>
+            v.IsActive || IsStaff || (v.OwnerId != null && v.OwnerId == GetCurrentUserId());
+
+        private VendorResponseDto Public(VendorResponseDto v)
+        {
+            if (!IsStaff && v.OwnerId != GetCurrentUserId()) v.OwnerId = null;
+            return v;
         }
 
         // ✅ POST: api/vendors - مع رفع اللوجو
@@ -32,8 +49,12 @@ namespace ecommerce.Controllers
             try
             {
                 var ownerId = GetCurrentUserId();
-                var vendor = await _vendorService.CreateAsync(dto, ownerId);
+                var vendor = await _vendorService.CreateAsync(dto, ownerId, byAdmin: User.IsInRole(UserRoles.Admin));
                 return Ok(new { success = true, data = vendor });
+            }
+            catch (ForbiddenException ex)
+            {
+                return StatusCode(403, new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {
@@ -49,7 +70,9 @@ namespace ecommerce.Controllers
             try
             {
                 var vendor = await _vendorService.GetByIdAsync(id);
-                return Ok(new { success = true, data = vendor });
+                if (!CanSee(vendor))
+                    return NotFound(new { success = false, message = "المتجر غير موجود" });
+                return Ok(new { success = true, data = Public(vendor) });
             }
             catch (Exception ex)
             {
@@ -64,8 +87,8 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var vendors = await _vendorService.GetAllAsync(onlyActive);
-                return Ok(new { success = true, data = vendors });
+                var vendors = await _vendorService.GetAllAsync(IsStaff ? onlyActive : true);
+                return Ok(new { success = true, data = vendors.Select(Public) });
             }
             catch (Exception ex)
             {
@@ -78,6 +101,11 @@ namespace ecommerce.Controllers
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Update(Guid id, [FromForm] VendorUpdateDto dto)
         {
+            await _access.EnsureCanManageVendorAsync(id);
+            // تفعيل/تعطيل المتجر قرار إداري — صاحب المتجر لا يعيد تفعيل متجر أوقفته الإدارة
+            if (dto.IsActive.HasValue && !User.IsInRole("ADMIN") && !User.IsInRole("OPS"))
+                throw new ForbiddenException("تفعيل أو تعطيل المتجر من صلاحية الإدارة فقط");
+
             try
             {
                 var vendor = await _vendorService.UpdateAsync(id, dto);
@@ -94,6 +122,8 @@ namespace ecommerce.Controllers
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdateLogo(Guid id, IFormFile logo)
         {
+            await _access.EnsureCanManageVendorAsync(id);
+
             try
             {
                 if (logo == null)
@@ -112,6 +142,8 @@ namespace ecommerce.Controllers
         [HttpDelete("{id}/logo")]
         public async Task<IActionResult> DeleteLogo(Guid id)
         {
+            await _access.EnsureCanManageVendorAsync(id);
+
             try
             {
                 var result = await _vendorService.DeleteLogoAsync(id);
@@ -127,8 +159,9 @@ namespace ecommerce.Controllers
         }
 
 
-        // DELETE: api/vendors/{id}
+        // DELETE: api/vendors/{id} — حذف متجر قرار إداري فقط
         [HttpDelete("{id}")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<IActionResult> Delete(Guid id)
         {
             try
@@ -153,7 +186,9 @@ namespace ecommerce.Controllers
             try
             {
                 var vendor = await _vendorService.GetByPhoneAsync(phone);
-                return Ok(new { success = true, data = vendor });
+                if (!CanSee(vendor))
+                    return NotFound(new { success = false, message = "المتجر غير موجود" });
+                return Ok(new { success = true, data = Public(vendor) });
             }
             catch (Exception ex)
             {
@@ -179,7 +214,7 @@ namespace ecommerce.Controllers
 
                 var result = await _vendorService.GetVendorsPagedAsync(
                     searchTerm,
-                    onlyActive,
+                    IsStaff ? onlyActive : true,
                     pagination.PageNumber,
                     pagination.PageSize
                 );
@@ -187,7 +222,7 @@ namespace ecommerce.Controllers
                 return Ok(new
                 {
                     success = true,
-                    data = result.Data,
+                    data = result.Data.Select(Public),
                     pagination = result.Pagination
                 });
             }

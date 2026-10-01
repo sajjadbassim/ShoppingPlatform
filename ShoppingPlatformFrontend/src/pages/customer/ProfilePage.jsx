@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X } from 'lucide-react'
+import { lazy as lazyLoad, Suspense } from 'react'
+const LocationPicker = lazyLoad(() => import('../../components/common/LocationPicker'))
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
+import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { Avatar } from '../../components/common/Badge'
@@ -17,9 +19,14 @@ import { userService, authService } from '../../services'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import AddPhoneModal from '../../components/auth/AddPhoneModal'
 
 const ProfilePage = () => {
   const navigate = useNavigate()
+  // فتح تبويب محدد من رابط خارجي (مثل الإعدادات: ?tab=addresses أو ?tab=security)
+  const [searchParams] = useSearchParams()
+  const TABS = ['profile', 'addresses', 'returns', 'notifications', 'security']
+  const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'profile'
   const { success, error } = useToast()
 
   const { user, isAuthenticated, logout, updateUser } = useAuthStore()
@@ -70,6 +77,8 @@ const { items: wishlistItems, fetchWishlist } = useWishlistStore()
 useEffect(() => {
   fetchWishlist()
 }, [])
+  const [addPhoneOpen, setAddPhoneOpen] = useState(false)
+
   useEffect(() => {
     if (user) setFormData({ fullName: user.fullName || '', email: user.email || '', phone: user.phone || '' })
   }, [user])
@@ -104,10 +113,11 @@ useEffect(() => {
   const openAddressModal = (address = null) => {
     if (address) {
       setEditingAddress(address)
-      setAddressFormData({ title: address.label || '', phone: address.phone || '', city: address.city || '', area: address.area || '', street: address.streetAddress || '', building: address.buildingNumber || '', isDefault: address.isDefault || false })
+      setAddressFormData({ title: address.label || '', phone: address.phone || '', city: address.city || '', area: address.area || '', street: address.streetAddress || '', building: address.buildingNumber || '', isDefault: address.isDefault || false,
+        pin: address.latitude != null && address.longitude != null ? { latitude: address.latitude, longitude: address.longitude } : null })
     } else {
       setEditingAddress(null)
-      setAddressFormData({ title: '', phone: user?.phone || '', city: '', area: '', street: '', building: '', isDefault: addresses.length === 0 })
+      setAddressFormData({ title: '', phone: user?.phone || '', city: '', area: '', street: '', building: '', isDefault: addresses.length === 0, pin: null })
     }
     setShowAddressModal(true)
   }
@@ -115,7 +125,8 @@ useEffect(() => {
   const handleSaveAddress = async () => {
     const userId = user?.userId || user?.id
     if (!userId) { error('حدث خطأ في بيانات المستخدم'); return }
-    const apiData = { userId, label: addressFormData.title || '', streetAddress: addressFormData.street || '', city: addressFormData.city || '', area: addressFormData.area || '', buildingNumber: addressFormData.building || '', floorNumber: '', apartmentNumber: '', phone: addressFormData.phone || '', notes: '', isDefault: addressFormData.isDefault || false }
+    if (!addressFormData.pin) { error('حدّد موقع العنوان على الخريطة'); return }
+    const apiData = { latitude: addressFormData.pin.latitude, longitude: addressFormData.pin.longitude, userId, label: addressFormData.title || '', streetAddress: addressFormData.street || '', city: addressFormData.city || '', area: addressFormData.area || '', buildingNumber: addressFormData.building || '', floorNumber: '', apartmentNumber: '', phone: addressFormData.phone || '', notes: '', isDefault: addressFormData.isDefault || false }
     try {
       if (editingAddress) {
         await updateAddressMutation.mutateAsync({ id: editingAddress.id, addressData: apiData })
@@ -168,42 +179,54 @@ const stats = {
 }
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container-main py-6">
-        <Breadcrumb items={[{ label: 'حسابي' }]} className="mb-6" />
+      <div className="container-main py-4 lg:py-6">
+        <Breadcrumb items={[{ label: 'حسابي' }]} className="mb-6 hidden lg:block" />
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
           {/* Sidebar */}
           <div className="w-full lg:w-80">
-            <div className="bg-white rounded-xl border border-gray-200 p-6 sticky top-24">
-              <div className="text-center mb-6">
-                <div className="relative inline-block">
-                  <Avatar name={user?.fullName || 'مستخدم'} size="xl" className="w-24 h-24 text-3xl" />
-                  <button className="absolute bottom-0 left-0 w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90"><Camera size={16} /></button>
+            <div className="bg-white rounded-2xl lg:rounded-xl border border-gray-200 p-4 lg:p-6 lg:sticky lg:top-24">
+              <div className="flex items-center gap-4 mb-4 lg:flex-col lg:text-center lg:mb-6">
+                <div className="relative flex-shrink-0">
+                  <Avatar name={user?.fullName || 'مستخدم'} size="xl" className="w-16 h-16 text-2xl lg:w-24 lg:h-24 lg:text-3xl" />
+                  <button className="hidden lg:flex absolute bottom-0 left-0 w-8 h-8 bg-primary text-white rounded-full items-center justify-center hover:bg-primary/90"><Camera size={16} /></button>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 mt-4">{user?.fullName}</h2>
-                <p className="text-gray-500">{user?.email || user?.phone}</p>
+                <div className="min-w-0">
+                  <h2 className="text-lg lg:text-xl font-bold text-gray-900 truncate">{user?.fullName}</h2>
+                  <p className="text-sm lg:text-base text-gray-500 truncate">{user?.email || user?.phone}</p>
+                </div>
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 py-4 border-t border-b border-gray-200">
-                <div className="text-center">
-                  <p className="text-xl font-bold text-gray-900">{stats.ordersCount}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Link to="/orders" className="text-center py-3 rounded-xl bg-gray-50 active:bg-gray-100">
+                  <p className="text-lg lg:text-xl font-bold text-gray-900">{stats.ordersCount}</p>
                   <p className="text-xs text-gray-500">طلب</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-gray-900">{stats.wishlistCount}</p>
+                </Link>
+                <Link to="/wishlist" className="text-center py-3 rounded-xl bg-gray-50 active:bg-gray-100">
+                  <p className="text-lg lg:text-xl font-bold text-gray-900">{stats.wishlistCount}</p>
                   <p className="text-xs text-gray-500">مفضلة</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xl font-bold text-yellow-500 flex items-center justify-center gap-0.5">
-                    <Star size={14} className="fill-yellow-400" />
-                    {(loyaltyAccount?.balance ?? 0).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-gray-500">نقطة</p>
-                </div>
+                </Link>
               </div>
 
-              <nav className="mt-4 space-y-1">
+              {/* النقاط التشجيعية — مدخلها الوحيد على الهاتف (أُزيلت من قائمة "حسابي") */}
+              <Link to="/loyalty"
+                className="mt-2 flex items-center gap-3 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-yellow-100 border border-amber-200 active:from-amber-100">
+                <span className="w-10 h-10 rounded-full bg-amber-400 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Star size={20} className="fill-white" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-bold text-gray-900">النقاط التشجيعية</span>
+                  <span className="block text-xs text-amber-700 truncate">
+                    رصيدك <span className="font-bold">{(loyaltyAccount?.balance ?? 0).toLocaleString()}</span> نقطة
+                    {loyaltyAccount?.tierAr && <> • المستوى {loyaltyAccount.tierAr}</>}
+                  </span>
+                </span>
+                <ChevronLeft size={18} className="text-amber-600 flex-shrink-0" />
+              </Link>
+
+              {/* الروابط — على الهاتف موجودة في قائمة "حسابي" */}
+              <nav className="hidden lg:block mt-4 pt-4 border-t border-gray-200 space-y-1">
                 <Link to="/orders" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
                   <Package size={20} /><span>طلباتي</span>
                 </Link>
@@ -211,10 +234,10 @@ const stats = {
                   <Heart size={20} /><span>المفضلة</span>
                 </Link>
                 <Link to="/loyalty" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
-                  <Star size={20} className="text-yellow-400" /><span>نقاط الولاء</span>
-                  {(loyaltyAccount?.points ?? 0) > 0 && (
+                  <Star size={20} className="text-yellow-400" /><span>النقاط التشجيعية</span>
+                  {(loyaltyAccount?.balance ?? 0) > 0 && (
                     <span className="mr-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                      {loyaltyAccount.points.toLocaleString()}
+                      {loyaltyAccount.balance.toLocaleString()}
                     </span>
                   )}
                 </Link>
@@ -235,10 +258,10 @@ const stats = {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">
-            <div className="bg-white rounded-xl border border-gray-200">
-              <Tabs defaultValue="profile">
-                <div className="px-6 border-b border-gray-200">
+          <div className="flex-1 min-w-0">
+            <div className="bg-white rounded-2xl lg:rounded-xl border border-gray-200 overflow-hidden">
+              <Tabs key={initialTab} defaultValue={initialTab}>
+                <div className="px-2 lg:px-6">
                   <TabsList>
                     <TabsTrigger value="profile">الملف الشخصي</TabsTrigger>
                     <TabsTrigger value="addresses">العناوين</TabsTrigger>
@@ -251,10 +274,10 @@ const stats = {
                 </div>
 
                 {/* Profile Tab */}
-                <TabsContent value="profile" className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">المعلومات الشخصية</h3>
-                    {!isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}><Edit size={16} className="ml-1" />تعديل</Button>}
+                <TabsContent value="profile" className="p-4 lg:p-6">
+                  <div className="flex items-center justify-between gap-3 mb-4 lg:mb-6">
+                    <h3 className="text-base lg:text-lg font-bold text-gray-900">المعلومات الشخصية</h3>
+                    {!isEditing && <Button variant="outline" size="sm" icon={Edit} onClick={() => setIsEditing(true)}>تعديل</Button>}
                   </div>
                   {isEditing ? (
                     <div className="space-y-4">
@@ -267,15 +290,21 @@ const stats = {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {[
                         { icon: User,  label: 'الاسم الكامل',      value: user?.fullName },
                         { icon: Mail,  label: 'البريد الإلكتروني', value: user?.email },
                         { icon: Phone, label: 'رقم الهاتف',         value: user?.phone, dir: 'ltr' },
                       ].map(({ icon: Icon, label, value, dir }) => (
-                        <div key={label} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                          <Icon size={20} className="text-gray-400" />
-                          <div><p className="text-sm text-gray-500">{label}</p><p className="font-medium text-gray-900" dir={dir}>{value || 'غير محدد'}</p></div>
+                        <div key={label} className="flex items-center gap-3 p-3 lg:p-4 bg-gray-50 rounded-xl">
+                          <span className="w-10 h-10 rounded-xl bg-white text-gray-500 flex items-center justify-center flex-shrink-0"><Icon size={18} /></span>
+                          <div className="min-w-0">
+                            <p className="text-xs lg:text-sm text-gray-500">{label}</p>
+                            <p className="font-medium text-gray-900 truncate text-right" dir={dir}>{value || 'غير محدد'}</p>
+                          </div>
+                          {Icon === Phone && !value && (
+                            <Button variant="outline" size="sm" className="mr-auto" onClick={() => setAddPhoneOpen(true)}>إضافة</Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -283,10 +312,10 @@ const stats = {
                 </TabsContent>
 
                 {/* Addresses Tab */}
-                <TabsContent value="addresses" className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">عناويني</h3>
-                    <Button variant="primary" size="sm" onClick={() => openAddressModal()}><Plus size={16} className="ml-1" />إضافة عنوان</Button>
+                <TabsContent value="addresses" className="p-4 lg:p-6">
+                  <div className="flex items-center justify-between gap-3 mb-4 lg:mb-6">
+                    <h3 className="text-base lg:text-lg font-bold text-gray-900">عناويني</h3>
+                    <Button variant="primary" size="sm" icon={Plus} onClick={() => openAddressModal()}>إضافة عنوان</Button>
                   </div>
                   {addressesLoading ? (
                     <div className="space-y-4">{[1,2].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}</div>
@@ -297,22 +326,33 @@ const stats = {
                       <Button variant="outline" size="sm" className="mt-4" onClick={() => openAddressModal()}>إضافة عنوان جديد</Button>
                     </div>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {addresses.map(addr => (
-                        <div key={addr.id} className={`p-4 rounded-xl border-2 ${addr.isDefault ? 'border-primary bg-primary/5' : 'border-gray-200'}`}>
-                          <div className="flex items-start justify-between">
-                            <div>
+                        <div key={addr.id} className={`p-4 rounded-2xl border ${addr.isDefault ? 'border-primary bg-primary/5' : 'border-gray-200'}`}>
+                          <div className="flex items-start gap-3">
+                            <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${addr.isDefault ? 'bg-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
+                              <MapPin size={18} />
+                            </span>
+                            <div className="flex-1 min-w-0">
                               <p className="font-bold text-gray-900 flex items-center gap-2">
-                                {addr.title || 'عنوان'}
-                                {addr.isDefault && <span className="text-xs bg-primary text-white px-2 py-0.5 rounded-full">افتراضي</span>}
+                                <span className="truncate">{addr.label || addr.title || 'عنوان'}</span>
+                                {addr.isDefault && <span className="text-[11px] bg-primary text-white px-2 py-0.5 rounded-full flex-shrink-0">افتراضي</span>}
                               </p>
-                              <p className="text-gray-600 text-sm">{addr.city}، {addr.area}، {addr.street}</p>
-                              <p className="text-gray-500 text-sm mt-1" dir="ltr">{addr.phone}</p>
+                              <p className="text-gray-600 text-sm mt-0.5">
+                                {[addr.city, addr.area, addr.streetAddress || addr.street, addr.buildingNumber].filter(Boolean).join('، ')}
+                              </p>
+                              {addr.phone && <p className="text-gray-500 text-sm mt-1 text-right" dir="ltr">{addr.phone}</p>}
                             </div>
-                            <div className="flex gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => openAddressModal(addr)}>تعديل</Button>
+                            <div className="flex gap-1.5 flex-shrink-0">
+                              <button onClick={() => openAddressModal(addr)} aria-label="تعديل"
+                                className="w-9 h-9 rounded-full border border-gray-200 bg-white text-gray-600 flex items-center justify-center hover:bg-gray-50">
+                                <Edit size={16} />
+                              </button>
                               {!addr.isDefault && (
-                                <Button variant="ghost" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => { setAddressToDelete(addr); setShowDeleteConfirm(true) }}>حذف</Button>
+                                <button onClick={() => { setAddressToDelete(addr); setShowDeleteConfirm(true) }} aria-label="حذف"
+                                  className="w-9 h-9 rounded-full border border-red-200 bg-white text-red-500 flex items-center justify-center hover:bg-red-50">
+                                  <Trash2 size={16} />
+                                </button>
                               )}
                             </div>
                           </div>
@@ -323,11 +363,11 @@ const stats = {
                 </TabsContent>
 
                 {/* ✅ Returns Tab */}
-                <TabsContent value="returns" className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">طلبات الإرجاع</h3>
+                <TabsContent value="returns" className="p-4 lg:p-6">
+                  <div className="flex items-center justify-between gap-3 mb-4 lg:mb-6">
+                    <h3 className="text-base lg:text-lg font-bold text-gray-900">طلبات الإرجاع</h3>
                     <Link to="/returns">
-                      <Button variant="primary" size="sm"><Plus size={16} className="ml-1" />طلب جديد</Button>
+                      <Button variant="primary" size="sm" icon={Plus}>طلب جديد</Button>
                     </Link>
                   </div>
                   {returnsLoading ? (
@@ -366,7 +406,7 @@ const stats = {
                 </TabsContent>
 
                 {/* Notifications Tab */}
-                <TabsContent value="notifications" className="p-6">
+                <TabsContent value="notifications" className="p-4 lg:p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-6">إعدادات الإشعارات</h3>
                   <div className="space-y-4">
                     {[
@@ -387,7 +427,7 @@ const stats = {
                 </TabsContent>
 
                 {/* Security Tab */}
-                <TabsContent value="security" className="p-6">
+                <TabsContent value="security" className="p-4 lg:p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-6">الأمان وكلمة المرور</h3>
                   <div className="space-y-6">
                     <div className="p-4 bg-gray-50 rounded-lg">
@@ -420,6 +460,13 @@ const stats = {
             <div className="p-6">
               <h3 className="text-lg font-bold mb-4">{editingAddress ? 'تعديل العنوان' : 'إضافة عنوان جديد'}</h3>
               <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-1.5">الموقع على الخريطة <span className="text-red-500">*</span></p>
+                  <Suspense fallback={<div className="h-56 rounded-2xl bg-gray-100 animate-pulse" />}>
+                    <LocationPicker key={editingAddress?.id || 'new'} value={addressFormData.pin} height={220}
+                      onChange={(pin) => setAddressFormData(f => ({ ...f, pin }))} />
+                  </Suspense>
+                </div>
                 <Input label="عنوان مختصر" placeholder="مثال: المنزل، العمل" value={addressFormData.title} onChange={(e) => setAddressFormData({ ...addressFormData, title: e.target.value })} />
                 <Input label="رقم الهاتف" placeholder="07XX XXX XXXX" value={addressFormData.phone} onChange={(e) => setAddressFormData({ ...addressFormData, phone: e.target.value })} dir="ltr" />
                 <div className="grid grid-cols-2 gap-4">
@@ -454,6 +501,7 @@ const stats = {
         confirmText="حذف"
         loading={deleteAddressMutation.isPending}
       />
+      <AddPhoneModal isOpen={addPhoneOpen} onClose={() => setAddPhoneOpen(false)} onDone={() => setAddPhoneOpen(false)} />
     </div>
   )
 }

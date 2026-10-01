@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   Package, MapPin, CreditCard, Phone, CheckCircle,
   AlertCircle, ArrowRight, X, FileText, ExternalLink,
@@ -9,87 +9,111 @@ import { StatusBadge } from '../../components/common/Badge'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
-import { useOrderByNumber, useCancelOrder, useOrderTracking, useInvoice, useOrderRatingStatus, useCreateOrderRating } from '../../hooks/useOrders'
+import { useOrderByNumber, useCancelOrder, useOrderTracking, useInvoice, useOrderRatingStatus, useCreateOrderRating, useRateOrderStores } from '../../hooks/useOrders'
 import { getImageUrl } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { orderService } from '../../services'
+import { CustomerDeliveredIn } from '../../components/common/OrderTiming'
 
 
 // ===========================
 // StarPicker — اختيار النجوم
 // ===========================
-const StarPicker = ({ value, onChange, label }) => (
+const StarPicker = ({ value, onChange, label, size = 24 }) => (
   <div>
     {label && <p className="text-sm text-gray-600 mb-1">{label}</p>}
     <div className="flex gap-1">
       {[1,2,3,4,5].map(star => (
-        <button key={star} type="button" onClick={() => onChange(star)}>
-          <Star size={24} className={star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+        <button
+          key={star}
+          type="button"
+          aria-label={`${star} نجوم`}
+          onClick={() => onChange(star === value ? 0 : star)}
+          className="p-0.5 transition-transform active:scale-90"
+        >
+          <Star size={size} className={star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
         </button>
       ))}
     </div>
   </div>
 )
 
+const STAR_WORDS = ['', 'سيئ', 'مقبول', 'جيد', 'جيد جداً', 'ممتاز']
+
 // ===========================
-// OrderRatingForm — نموذج تقييم الطلب
+// OrderRatingForm — تقييم الطلب بزر واحد
+// كل شيء اختياري: يرسل ما اختاره الزبون فقط (التجربة، أو المتاجر، أو كليهما)
 // ===========================
 const OrderRatingForm = ({ order, onSuccess }) => {
   const { success: showSuccess, error: showError } = useToast()
-  const { mutateAsync: createRating, isPending } = useCreateOrderRating()
   const { data: ratingStatus } = useOrderRatingStatus(order?.id)
+  const { mutateAsync: createRating, isPending: savingExperience } = useCreateOrderRating()
+  const { mutateAsync: rateStores, isPending: savingStores } = useRateOrderStores()
 
   const [deliveryRating, setDeliveryRating] = useState(0)
   const [speedRating, setSpeedRating] = useState(0)
   const [packagingRating, setPackagingRating] = useState(0)
   const [wouldRecommend, setWouldRecommend] = useState(true)
   const [deliveryComment, setDeliveryComment] = useState('')
-  const [subRatings, setSubRatings] = useState(
-    (order?.subOrders || []).map(sub => ({
-      subOrderId: sub.id,
-      vendorName: sub.vendorNameAr || sub.vendorName,
-      vendorRating: 0,
-      vendorComment: '',
-      driverRating: 0,
-    }))
-  )
+  const [showDetails, setShowDetails] = useState(false)
+  const [storeStars, setStoreStars] = useState({}) // subOrderId → نجوم المتجر
+  const [driverStars, setDriverStars] = useState({}) // driverId → نجوم السائق
 
-  // إذا تم التقييم مسبقاً
-  if (ratingStatus?.hasRated || ratingStatus?.isRated) {
+  const experienceDone = !!(ratingStatus?.hasRated || ratingStatus?.isRated)
+  const ratedIds = ratingStatus?.ratedSubOrderIds || []
+  const subOrders = order?.subOrders || []
+  const pendingStores = subOrders.filter(s => !ratedIds.includes(s.id))
+  const ratedStores = subOrders.filter(s => ratedIds.includes(s.id))
+
+  // السائق يُقيَّم مرة واحدة حتى لو أوصل من أكثر من متجر
+  const ratedDriverIds = ratingStatus?.ratedDriverIds || []
+  const drivers = [...new Map(subOrders.filter(s => s.driverId).map(s => [s.driverId, { id: s.driverId, name: s.driverName }])).values()]
+  const pendingDrivers = drivers.filter(d => !ratedDriverIds.includes(d.id))
+
+  if (experienceDone && pendingStores.length === 0 && pendingDrivers.length === 0) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
         <CheckCircle className="text-green-500 w-5 h-5 flex-shrink-0" />
-        <p className="text-green-700 text-sm font-medium">شكراً! لقد قيّمت هذا الطلب مسبقاً</p>
+        <p className="text-green-700 text-sm font-medium">شكراً! لقد قيّمت هذا الطلب</p>
       </div>
     )
   }
 
-  const updateSubRating = (index, field, value) => {
-    setSubRatings(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r))
-  }
+  const readyStores = pendingStores
+    .filter(s => storeStars[s.id] > 0)
+    .map(s => ({ subOrderId: s.id, vendorRating: storeStars[s.id] }))
+  const readyDrivers = pendingDrivers
+    .filter(d => driverStars[d.id] > 0)
+    .map(d => ({ driverId: d.id, rating: driverStars[d.id] }))
+  const rateExperience = !experienceDone && deliveryRating > 0
+  const canSubmit = rateExperience || readyStores.length > 0 || readyDrivers.length > 0
+  const isPending = savingExperience || savingStores
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (deliveryRating === 0) { showError('يرجى تقييم التوصيل'); return }
-
+    if (!canSubmit) return
     try {
-      await createRating({
-        orderId: order.id,
-        data: {
-          deliveryRating,
-          speedRating: speedRating || deliveryRating,
-          packagingRating: packagingRating || deliveryRating,
-          wouldRecommend,
-          deliveryComment,
-          subOrderRatings: subRatings
-            .filter(r => r.vendorRating > 0)
-            .map(({ subOrderId, vendorRating, vendorComment, driverRating }) => ({
-              subOrderId, vendorRating, vendorComment, driverRating: driverRating || 0
-            }))
-        }
-      })
+      // طلب واحد في الحالتين: التجربة تحمل معها المتاجر المختارة إن وُجدت
+      if (rateExperience) {
+        await createRating({
+          orderId: order.id,
+          data: {
+            deliveryRating,
+            speedRating: speedRating || null,
+            packagingRating: packagingRating || null,
+            wouldRecommend,
+            deliveryComment,
+            subOrderRatings: readyStores,
+            driverRatings: readyDrivers,
+          }
+        })
+      } else {
+        await rateStores({ orderId: order.id, data: { subOrderRatings: readyStores, driverRatings: readyDrivers } })
+      }
       showSuccess('شكراً على تقييمك!')
+      setStoreStars({})
+      setDriverStars({})
       onSuccess?.()
     } catch (err) {
       showError(err.message || 'فشل إرسال التقييم')
@@ -97,73 +121,102 @@ const OrderRatingForm = ({ order, onSuccess }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h2 className="font-bold text-lg mb-5 flex items-center gap-2">
+    <form onSubmit={handleSubmit} className="bg-white rounded-lg border border-gray-200 p-5 sm:p-6 space-y-5">
+      <h2 className="font-bold text-lg flex items-center gap-2">
         <Star size={20} className="text-yellow-400 fill-yellow-400" />
-        قيّم تجربتك
+        كيف كانت تجربتك؟
       </h2>
-      <form onSubmit={handleSubmit} className="space-y-5">
 
-        {/* تقييم التوصيل */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-xl">
-          <StarPicker label="تقييم التوصيل *" value={deliveryRating} onChange={setDeliveryRating} />
-          <StarPicker label="سرعة التوصيل" value={speedRating} onChange={setSpeedRating} />
-          <StarPicker label="التغليف" value={packagingRating} onChange={setPackagingRating} />
-        </div>
-
-        {/* ملاحظات */}
-        <div>
-          <label className="text-sm text-gray-600 block mb-1">ملاحظات التوصيل</label>
-          <textarea
-            value={deliveryComment}
-            onChange={e => setDeliveryComment(e.target.value)}
-            placeholder="كيف كانت تجربة التوصيل؟"
-            rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
-
-        {/* هل توصي؟ */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={wouldRecommend}
-            onChange={e => setWouldRecommend(e.target.checked)}
-            className="w-4 h-4 accent-primary"
-          />
-          <span className="text-sm text-gray-700 flex items-center gap-1">
-            <ThumbsUp size={15} className="text-primary" />
-            أنصح بالشراء من هذه المتاجر
-          </span>
-        </label>
-
-        {/* تقييم كل متجر */}
-        {subRatings.length > 0 && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-gray-700">تقييم المتاجر</p>
-            {subRatings.map((sub, i) => (
-              <div key={sub.subOrderId} className="border border-gray-200 rounded-xl p-3 space-y-3">
-                <p className="text-sm font-medium text-gray-800">{sub.vendorName}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <StarPicker label="تقييم المتجر" value={sub.vendorRating} onChange={v => updateSubRating(i, 'vendorRating', v)} />
-                  {sub.driverRating !== undefined && (
-                    <StarPicker label="تقييم السائق" value={sub.driverRating} onChange={v => updateSubRating(i, 'driverRating', v)} />
-                  )}
-                </div>
-              </div>
-            ))}
+      {/* تجربة التوصيل: نجوم كبيرة، والتفاصيل مطوية */}
+      {experienceDone ? (
+        <p className="text-sm text-green-700 flex items-center gap-2">
+          <CheckCircle size={16} /> قيّمت تجربة التوصيل
+        </p>
+      ) : (
+        <div className="text-center space-y-2">
+          <p className="text-sm text-gray-600">التوصيل</p>
+          <div className="flex justify-center">
+            <StarPicker value={deliveryRating} onChange={setDeliveryRating} size={36} />
           </div>
-        )}
+          <p className="text-sm font-medium text-gray-700 h-5">{STAR_WORDS[deliveryRating]}</p>
 
-        <button
-          type="submit"
-          disabled={isPending || deliveryRating === 0}
-          className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          {isPending ? 'جاري الإرسال...' : 'إرسال التقييم'}
-        </button>
-      </form>
-    </div>
+          {deliveryRating > 0 && !showDetails && (
+            <button type="button" onClick={() => setShowDetails(true)} className="text-sm text-primary font-medium">
+              + أضف تفاصيل (اختياري)
+            </button>
+          )}
+          {deliveryRating > 0 && showDetails && (
+            <div className="text-right space-y-4 p-4 bg-gray-50 rounded-xl">
+              <div className="grid grid-cols-2 gap-3">
+                <StarPicker label="سرعة التوصيل" value={speedRating} onChange={setSpeedRating} size={20} />
+                <StarPicker label="التغليف" value={packagingRating} onChange={setPackagingRating} size={20} />
+              </div>
+              <textarea
+                value={deliveryComment}
+                onChange={e => setDeliveryComment(e.target.value)}
+                placeholder="ملاحظة عن التوصيل…"
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={wouldRecommend}
+                  onChange={e => setWouldRecommend(e.target.checked)}
+                  className="w-4 h-4 accent-primary"
+                />
+                <span className="text-sm text-gray-700 flex items-center gap-1">
+                  <ThumbsUp size={15} className="text-primary" />
+                  أنصح بالشراء من هذه المتاجر
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* المتاجر: صف واحد لكل متجر */}
+      {pendingStores.length > 0 && (
+        <div className="border-t border-gray-100 pt-4 space-y-3">
+          <p className="text-sm text-gray-600">{pendingStores.length > 1 ? 'المتاجر' : 'المتجر'}</p>
+          {pendingStores.map(sub => (
+            <div key={sub.id} className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-gray-800 truncate">{sub.vendorNameAr || sub.vendorName}</p>
+              <StarPicker value={storeStars[sub.id] || 0} onChange={v => setStoreStars(p => ({ ...p, [sub.id]: v }))} size={22} />
+            </div>
+          ))}
+          {ratedStores.length > 0 && (
+            <p className="text-xs text-green-700 flex items-center gap-1">
+              <CheckCircle size={12} /> تم تقييم: {ratedStores.map(s => s.vendorNameAr || s.vendorName).join('، ')}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* السائق: مرة واحدة لكل سائق */}
+      {pendingDrivers.length > 0 && (
+        <div className="border-t border-gray-100 pt-4 space-y-3">
+          <p className="text-sm text-gray-600">{pendingDrivers.length > 1 ? 'السائقون' : 'السائق'}</p>
+          {pendingDrivers.map(d => (
+            <div key={d.id} className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-gray-800 truncate">{d.name || 'السائق'}</p>
+              <StarPicker value={driverStars[d.id] || 0} onChange={v => setDriverStars(p => ({ ...p, [d.id]: v }))} size={22} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={isPending || !canSubmit}
+        className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+      >
+        {isPending ? 'جاري الإرسال...' : 'إرسال التقييم'}
+      </button>
+      {!canSubmit && (
+        <p className="text-xs text-gray-500 text-center -mt-2">اختر النجوم لما تريد تقييمه فقط</p>
+      )}
+    </form>
   )
 }
 
@@ -174,6 +227,7 @@ const OrderDetailsPage = () => {
   const { success, error } = useToast()
 
   const isSuccess = searchParams.get('success') === 'true'
+  const { hash } = useLocation()
 
   // جلب تفاصيل الطلب
   const { data: orderResponse, isLoading, isError, error: orderError, refetch } = useOrderByNumber(id)
@@ -196,15 +250,16 @@ const OrderDetailsPage = () => {
   const [cancellationReason, setCancellationReason] = useState('')
   const [cancellingOrder, setCancellingOrder] = useState(false)
 
+  // الانتقال لقسم التتبع عند القدوم من زر "تتبع الطلب" (#order-tracking) بعد تحميل الطلب
+  useEffect(() => {
+    if (hash !== '#order-tracking' || !order) return
+    const t = setTimeout(() => document.getElementById('order-tracking')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+    return () => clearTimeout(t)
+  }, [hash, order])
+
   // السلة (لإعادة الطلب)
   const { addItem: addToCart } = useCartStore()
 
-  // عرض رسالة النجاح
-  useEffect(() => {
-    if (isSuccess) {
-      success('🎉 تم إنشاء طلبك بنجاح!')
-    }
-  }, [isSuccess, success])
 
   // ✅ دالة إلغاء الطلب — تستخدم API مباشرة
   const handleCancelOrder = () => {
@@ -364,12 +419,42 @@ const OrderDetailsPage = () => {
         <Breadcrumb items={breadcrumbItems} className="mb-6" />
 
         {/* رسالة النجاح */}
+        {/* شاشة تأكيد الطلب — تظهر مرة واحدة بعد إتمام الشراء */}
         {isSuccess && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-            <CheckCircle className="w-6 h-6 text-green-500" />
-            <div>
-              <p className="font-medium text-green-800">تم إنشاء طلبك بنجاح!</p>
-              <p className="text-sm text-green-600">سيتم التواصل معك قريباً لتأكيد الطلب</p>
+          <div className="mb-6 bg-white rounded-2xl border border-green-200 overflow-hidden">
+            <div className="bg-gradient-to-b from-green-50 to-white px-5 pt-8 pb-5 text-center">
+              <div className="relative w-20 h-20 mx-auto mb-4">
+                <span className="absolute inset-0 rounded-full bg-green-400/30 motion-safe:animate-soft-ping" aria-hidden="true" />
+                <span className="relative w-20 h-20 rounded-full bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/30">
+                  <CheckCircle className="w-10 h-10" />
+                </span>
+              </div>
+              <h1 className="text-xl lg:text-2xl font-bold text-gray-900">تم استلام طلبك بنجاح! 🎉</h1>
+              <p className="text-sm text-gray-600 mt-2">شكراً لتسوقك من واسط. سنتواصل معك قريباً لتأكيد الطلب.</p>
+
+              <div className="mt-5 grid grid-cols-2 gap-2 max-w-sm mx-auto text-right">
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500">رقم الطلب</p>
+                  <p className="font-bold text-gray-900 mt-0.5" dir="ltr">#{order.orderNumber}</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3">
+                  <p className="text-xs text-gray-500">المبلغ عند الاستلام</p>
+                  <p className="font-bold text-primary mt-0.5">{total.toLocaleString()} د.ع</p>
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-500">💵 الدفع نقداً عند الاستلام • ⭐ تُضاف نقاطك التشجيعية بعد التوصيل</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 p-4 border-t border-gray-100">
+              <a href="#order-tracking"
+                className="h-11 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">
+                تتبع الطلب
+              </a>
+              <Link to="/products"
+                className="h-11 rounded-full border border-gray-300 text-gray-800 text-sm font-bold flex items-center justify-center">
+                متابعة التسوق
+              </Link>
             </div>
           </div>
         )}
@@ -394,14 +479,25 @@ const OrderDetailsPage = () => {
                       hour: '2-digit', minute: '2-digit',
                     })}
                   </p>
+                  {order.status === 'DELIVERED' && <CustomerDeliveredIn orderId={order.id} />}
                 </div>
                 <StatusBadge status={order.status} />
               </div>
             </div>
 
+            {order.status === 'DELIVERY_FAILED' && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 flex items-start gap-3">
+                <AlertCircle className="text-orange-500 w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-orange-900">تعذّر تسليم طلبك</p>
+                  <p className="text-sm text-orange-800 mt-0.5">لم يتمكن السائق من تسليم الطلب. سيتواصل معك فريقنا لإعادة المحاولة أو إلغاء الطلب.</p>
+                </div>
+              </div>
+            )}
+
             {/* ✅ Timeline — يعرض بيانات الـ API أو الـ fallback */}
-            {order.status !== 'CANCELLED' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
+            {order.status !== 'CANCELLED' && order.status !== 'DELIVERY_FAILED' && (
+              <div id="order-tracking" className="bg-white rounded-lg border border-gray-200 p-6 scroll-mt-24">
                 <h2 className="font-bold text-lg mb-4">تتبع الطلب</h2>
 
                 {/* معلومات السائق إذا توفرت من الـ API */}

@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -53,6 +53,10 @@ namespace ecommerce.Core.Models
         // إعادة البضاعة للمخزون — يدوية بعد استلامها وفحصها، ومرة واحدة فقط
         [Column("is_restocked")]
         public bool IsRestocked { get; set; } = false;
+
+        // رفض عند الباب (سجّله السائق) — مستثنى من المبيعات أصلاً فلا يُخصم من المتجر مرة ثانية
+        [Column("is_door_refusal")]
+        public bool IsDoorRefusal { get; set; } = false;
 
         [Column("restocked_at")]
         public DateTime? RestockedAt { get; set; }

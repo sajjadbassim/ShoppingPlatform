@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.DTO.Auth;
+using ecommerce.Core.DTO.Auth;
 using ecommerce.Services.AuthService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +20,7 @@ namespace ecommerce.Controllers
 
         // POST: api/auth/register
         [HttpPost("register")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
         [AllowAnonymous]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
@@ -61,6 +62,25 @@ namespace ecommerce.Controllers
             }
         }
 
+        // PUT: api/auth/phone — إضافة رقم الهاتف لحساب بلا هاتف (مطلوب قبل إتمام الطلب)
+        [HttpPut("phone")]
+        [Authorize]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
+        public async Task<IActionResult> AddPhone([FromBody] AddPhoneDto dto)
+        {
+            try
+            {
+                var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!Guid.TryParse(idClaim, out var userId)) return Unauthorized();
+                var result = await _authService.AddPhoneAsync(userId, dto.Phone);
+                return Ok(new { success = true, data = result, message = "تم حفظ رقم الهاتف" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         // POST: api/auth/change-password
         [AllowAnonymous]
         [HttpPost("change-password")]
@@ -86,12 +106,13 @@ namespace ecommerce.Controllers
         // POST: api/auth/forgot-password
         [AllowAnonymous]
         [HttpPost("forgot-password")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
             try
             {
                 await _authService.ForgotPasswordAsync(dto);
-                return Ok(new { success = true, message = "تم إرسال رمز التحقق إلى رقم هاتفك" });
+                return Ok(new { success = true, message = "إذا كان الرقم مسجلاً سيصلك رمز التحقق خلال لحظات" });
             }
             catch (Exception ex)
             {
@@ -102,6 +123,7 @@ namespace ecommerce.Controllers
         // POST: api/auth/verify-reset-otp
         [AllowAnonymous]
         [HttpPost("verify-reset-otp")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
         public async Task<IActionResult> VerifyResetOtp([FromBody] VerifyResetOtpDto dto)
         {
             try
@@ -118,6 +140,7 @@ namespace ecommerce.Controllers
         // POST: api/auth/reset-password
         [AllowAnonymous]
         [HttpPost("reset-password")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
         {
             try
@@ -197,5 +220,11 @@ namespace ecommerce.Controllers
 
             return Guid.Parse(userIdClaim);
         }
+    }
+
+    public class AddPhoneDto
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "رقم الهاتف مطلوب")]
+        public string Phone { get; set; } = "";
     }
 }

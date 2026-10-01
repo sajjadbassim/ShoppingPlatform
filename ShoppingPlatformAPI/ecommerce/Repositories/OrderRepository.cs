@@ -47,6 +47,8 @@ namespace ecommerce.Repositories
                     .ThenInclude(so => so.Vendor)
                 .Include(o => o.SubOrders)
                     .ThenInclude(so => so.Items)
+                .Include(o => o.SubOrders)
+                    .ThenInclude(so => so.Driver)   // اسم السائق في صفحة الطلب والتقييم
                 .FirstOrDefaultAsync(o => o.OrderNumber == orderNumber);
         }
 
@@ -114,17 +116,28 @@ namespace ecommerce.Repositories
         int pageNumber,
         int pageSize)
         {
+            // القائمة تعرض الزبون والعنوان والمتاجر والسائق وصور المنتجات — بدونها تظهر البطاقات فارغة
             var query = _context.Orders
                 .AsNoTracking()
+                .Include(o => o.Customer)
+                .Include(o => o.Address)
+                .Include(o => o.SubOrders).ThenInclude(so => so.Vendor)
+                .Include(o => o.SubOrders).ThenInclude(so => so.Driver)
+                .Include(o => o.SubOrders).ThenInclude(so => so.Items)
+                .AsSplitQuery()
                 .AsQueryable();
 
             // فلترة حسب العميل
             if (customerId.HasValue)
                 query = query.Where(o => o.CustomerId == customerId);
 
-            // فلترة حسب رقم الطلب
+            // البحث: رقم الطلب أو اسم الزبون أو هاتفه
             if (!string.IsNullOrWhiteSpace(orderNumber))
-                query = query.Where(o => o.OrderNumber.Contains(orderNumber));
+            {
+                var term = orderNumber.Trim();
+                query = query.Where(o => o.OrderNumber.Contains(term)
+                    || (o.Customer != null && (o.Customer.FullName.Contains(term) || o.Customer.Phone.Contains(term))));
+            }
 
             // فلترة حسب الحالة
             if (!string.IsNullOrWhiteSpace(status))
@@ -136,5 +149,13 @@ namespace ecommerce.Repositories
         }
 
 
+    
+        // عدد الطلبات لكل حالة — لأزرار التصفية في شاشة العمليات
+        public async Task<Dictionary<string, int>> GetStatusCountsAsync() =>
+            await _context.Orders
+                .AsNoTracking()
+                .GroupBy(o => o.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Status, x => x.Count);
     }
 }
