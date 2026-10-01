@@ -1,4 +1,4 @@
-using ecommerce.Core;
+﻿using ecommerce.Core;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.CouponDto;
@@ -120,18 +120,21 @@ namespace ecommerce.Services
             var vendorGroups = cart.Items.GroupBy(i => i.Product.VendorId);
             decimal totalSubtotal = 0;
             decimal totalDelivery = 0;
+            // رسوم التوصيل: سعر منطقة العنوان للمتاجر المشمولة بالمناطق، وإلا سعر المتجر الثابت
+            var feeRules = await DeliveryFeeRules.LoadAsync(_context, address.ZoneId);
 
             foreach (var group in vendorGroups)
             {
                 var vendor = group.First().Product.Vendor;
                 var vendorSubtotal = group.Sum(i => unitPrices[i.Id] * i.Quantity);
                 totalSubtotal += vendorSubtotal;
-                totalDelivery += vendor.DeliveryFee;
+                totalDelivery += feeRules.FeeFor(vendor);
                 if (vendorSubtotal < vendor.MinOrderAmount)
                     errors.Add($"الطلب من '{vendor.Name}' أقل من الحد الأدنى ({vendor.MinOrderAmount} دينار)");
             }
 
             if (errors.Any()) throw new Exception(string.Join(", ", errors));
+            var zoneUsed = vendorGroups.Any(g => feeRules.UsesZone(g.First().Product.Vendor));
 
             // إنشاء الطلب كاملاً في معاملة واحدة: إذا فشل أي جزء يُتراجع عن خصم المخزون أيضاً
             Order order;
@@ -174,7 +177,9 @@ namespace ecommerce.Services
                     PaymentStatus = PaymentStatus.Pending,
                     CustomerNotes = dto.CustomerNotes,
                     DeliveryLatitude = address.Latitude,
-                    DeliveryLongitude = address.Longitude
+                    DeliveryLongitude = address.Longitude,
+                    DeliveryZoneId = zoneUsed ? feeRules.Zone!.Id : null,
+                    DeliveryZoneName = zoneUsed ? feeRules.Zone!.Name : null
                 };
 
                 order = await _orderRepository.CreateAsync(order);
@@ -202,7 +207,7 @@ namespace ecommerce.Services
                         SubOrderNumber = $"{orderNumber}-V{vendorIndex}",
                         Status = SubOrderStatus.PendingConfirmation,
                         Subtotal = vendorSubtotal,
-                        DeliveryFee = vendor.DeliveryFee,
+                        DeliveryFee = feeRules.FeeFor(vendor),
                         ConfirmationDeadline = DateTime.UtcNow.AddMinutes(confirmationMinutes)
                     };
 

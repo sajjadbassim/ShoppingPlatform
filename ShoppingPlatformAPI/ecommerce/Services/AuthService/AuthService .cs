@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Auth;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
@@ -88,6 +88,7 @@ namespace ecommerce.Services.AuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 Email = user.Email,
+                AvatarUrl = user.AvatarUrl,
                 Role = user.Role,
                 Token = GenerateJwtToken(user),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
@@ -152,6 +153,7 @@ namespace ecommerce.Services.AuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 Email = user.Email,
+                AvatarUrl = user.AvatarUrl,
                 Role = user.Role,
                 Token = token,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
@@ -203,6 +205,7 @@ namespace ecommerce.Services.AuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 Email = user.Email,
+                AvatarUrl = user.AvatarUrl,
                 Role = user.Role,
                 Token = token,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),
@@ -256,6 +259,7 @@ namespace ecommerce.Services.AuthService
                 Phone = user.Phone,
                 FullName = user.FullName,
                 Email = user.Email,
+                AvatarUrl = user.AvatarUrl,
                 Role = user.Role,
                 Token = token,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpirationInMinutes),

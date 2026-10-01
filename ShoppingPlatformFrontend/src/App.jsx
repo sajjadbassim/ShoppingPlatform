@@ -68,6 +68,7 @@ const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'))
 const AdminOrderDetails = lazy(() => import('./pages/admin/AdminOrderDetails'))
 const AdminReports = lazy(() => import('./pages/admin/AdminReports'))
 const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'))
+const AdminDeliveryZones = lazy(() => import('./pages/admin/AdminDeliveryZones'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 const OperationsDashboard = lazy(() => import('./pages/operations/OperationsDashboard'))
 const OperationsDrivers = lazy(() => import('./pages/operations/OperationsDrivers'))
@@ -171,6 +172,7 @@ function App() {
               <Route path="orders/:id" element={<AdminOrderDetails />} />
               <Route path="reports" element={<AdminReports />} />
               <Route path="finance" element={<AdminFinance />} />
+              <Route path="delivery-zones" element={<AdminDeliveryZones />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
 

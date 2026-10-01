@@ -10,6 +10,7 @@
         public string Token { get; set; }
         public DateTime ExpiresAt { get; set; }
         public Guid? VendorId { get; set; }
+        public string? AvatarUrl { get; set; }
 
     }
 }

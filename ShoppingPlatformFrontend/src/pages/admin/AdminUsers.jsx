@@ -6,6 +6,7 @@ import {
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { Avatar } from '../../components/common/Badge'
+import { getImageUrl } from '../../utils/imageHelper'
 import { Tabs, TabsList, TabsTrigger } from '../../components/common/Tabs'
 import Pagination from '../../components/common/Pagination'
 import Modal, { ConfirmModal } from '../../components/common/Modal'
@@ -145,7 +146,7 @@ const AdminUsers = () => {
         </td>
         <td className="px-4 py-4">
           <div className="flex items-center gap-3">
-            <Avatar name={user.fullName || 'مستخدم'} size="md" />
+            <Avatar src={getImageUrl(user.avatarUrl)} name={user.fullName || 'مستخدم'} size="md" />
             <div>
               <p className="font-medium text-gray-900">{user.fullName}</p>
               <p className="text-sm text-gray-500">{user.email || '—'}</p>
@@ -307,7 +308,7 @@ const AdminUsers = () => {
           return (
             <div className="space-y-4">
               <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <Avatar name={selectedUser.fullName || 'مستخدم'} size="xl" />
+                <Avatar src={getImageUrl(selectedUser.avatarUrl)} name={selectedUser.fullName || 'مستخدم'} size="xl" />
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">{selectedUser.fullName}</h3>
                   <p className="text-gray-500 text-sm">{selectedUser.email || '—'}</p>

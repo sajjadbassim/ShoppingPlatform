@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.Exceptions;
 using ecommerce.Core.Models;
 using ecommerce.Data;
@@ -33,19 +33,30 @@ namespace ecommerce.Tests.Services
                     return Task.FromResult(new GoogleJsonWebSignature.Payload { Subject = "u1", Email = "x@gmail.com", EmailVerified = false });
                 if (!credential.StartsWith("good-")) throw new InvalidJwtException("bad");
                 var sub = credential[5..];
-                return Task.FromResult(new GoogleJsonWebSignature.Payload { Subject = sub, Email = $"{sub}@gmail.com", EmailVerified = true, Name = "زبون Google" });
+                return Task.FromResult(new GoogleJsonWebSignature.Payload { Subject = sub, Email = $"{sub}@gmail.com", EmailVerified = true, Name = "زبون Google", Picture = $"https://lh3.googleusercontent.com/a/{sub}=s96-c" });
             }
         }
 
-        public void Dispose() => _context.Dispose();
+        private readonly string _root = Path.Combine(Path.GetTempPath(), "google-tests-" + Guid.NewGuid().ToString("N"));
+        private readonly AvatarServiceTests.FakeFetcher _fetcher = new();
+
+        public void Dispose()
+        {
+            _context.Dispose();
+            if (Directory.Exists(_root)) Directory.Delete(_root, true);
+        }
 
         private GoogleAuthService Service()
         {
+            var env = new Mock<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+            env.Setup(e => e.WebRootPath).Returns(_root);
+            var avatars = new ecommerce.Services.AvatarService(_context, env.Object, _fetcher,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ecommerce.Services.AvatarService>.Instance);
             var auth = new AuthService(new UserRepository(_context), Options.Create(_jwt), new VendorRepository(_context),
                 Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<ISmsSender>(), Mock.Of<INotificationService>(),
                 new AuthThrottle(new MemoryCache(new MemoryCacheOptions())));
             return new GoogleAuthService(_context, auth, new FakeValidator(),
-                Options.Create(new GoogleOptions { ClientId = "client" }), Options.Create(_jwt));
+                Options.Create(new GoogleOptions { ClientId = "client" }), Options.Create(_jwt), avatars: avatars);
         }
 
         private User AddUser(string role, string phone, bool hasPassword = true)
@@ -71,6 +82,17 @@ namespace ecommerce.Tests.Services
             var again = await Service().SignInAsync("good-g1");
             Assert.Equal(user.Id, again.Login!.UserId);
             Assert.Equal(1, await _context.Users.CountAsync());
+        }
+
+        [Fact]
+        public async Task FirstSignIn_CopiesGooglePhoto_IntoTheSession()
+        {
+            _fetcher.Pictures["https://lh3.googleusercontent.com/a/g9=s256-c"] = AvatarServiceTests.Png;
+            var res = await Service().SignInAsync("good-g9");
+            Assert.StartsWith("/uploads/avatars/", res.Login!.AvatarUrl);
+            var user = await _context.Users.SingleAsync();
+            Assert.Equal(ecommerce.Services.AvatarSources.Google, user.AvatarSource);
+            Assert.Equal("https://lh3.googleusercontent.com/a/g9=s96-c", user.GooglePictureUrl);
         }
 
         [Fact]

@@ -111,6 +111,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("user_id");
 
+                    b.Property<Guid?>("ZoneId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("zone_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("City")
@@ -118,6 +122,8 @@ namespace ecommerce.Migrations
 
                     b.HasIndex("UserId")
                         .HasDatabaseName("idx_addresses_user_id");
+
+                    b.HasIndex("ZoneId");
 
                     b.HasIndex("UserId", "IsDefault")
                         .HasDatabaseName("idx_addresses_user_default");
@@ -546,9 +552,57 @@ namespace ecommerce.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("updated_by");
 
+                    b.Property<string>("ZonesMode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("zones_mode");
+
                     b.HasKey("Id");
 
                     b.ToTable("delivery_settings");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.DeliveryZone", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("Fee")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("fee");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("idx_delivery_zones_name");
+
+                    b.ToTable("delivery_zones");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Driver", b =>
@@ -1055,6 +1109,15 @@ namespace ecommerce.Migrations
                     b.Property<decimal?>("DeliveryLongitude")
                         .HasColumnType("decimal(11,8)")
                         .HasColumnName("delivery_longitude");
+
+                    b.Property<Guid?>("DeliveryZoneId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("delivery_zone_id");
+
+                    b.Property<string>("DeliveryZoneName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("delivery_zone_name");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("decimal(10,2)")
@@ -2631,6 +2694,16 @@ namespace ecommerce.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
+                    b.Property<string>("AvatarSource")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("avatar_source");
+
+                    b.Property<string>("AvatarUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("avatar_url");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -2658,6 +2731,11 @@ namespace ecommerce.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)")
                         .HasColumnName("google_id");
+
+                    b.Property<string>("GooglePictureUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)")
+                        .HasColumnName("google_picture_url");
 
                     b.Property<bool>("HasPassword")
                         .ValueGeneratedOnAdd()
@@ -2883,6 +2961,10 @@ namespace ecommerce.Migrations
                         .HasColumnName("updated_at")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
+                    b.Property<bool>("UseDeliveryZones")
+                        .HasColumnType("bit")
+                        .HasColumnName("use_delivery_zones");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IsActive")
@@ -3011,7 +3093,14 @@ namespace ecommerce.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ecommerce.Core.Models.DeliveryZone", "Zone")
+                        .WithMany()
+                        .HasForeignKey("ZoneId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("User");
+
+                    b.Navigation("Zone");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Cart", b =>

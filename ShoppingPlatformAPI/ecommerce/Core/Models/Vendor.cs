@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -43,6 +43,10 @@ namespace ecommerce.Core.Models
 
         [Column("delivery_fee", TypeName = "decimal(10,2)")]
         public decimal DeliveryFee { get; set; } = 0;
+
+        // مشمول بمناطق التوصيل عندما تختار الإدارة «متاجر محددة»
+        [Column("use_delivery_zones")]
+        public bool UseDeliveryZones { get; set; } = false;
 
         [Column("estimated_prep_time")]
         public int? EstimatedPrepTime { get; set; }

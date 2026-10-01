@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
 
 // ✅ مكون عرض الـ variant المختار
 const VariantBadges = ({ variantAttributes, variantSku }) => {
@@ -229,8 +230,14 @@ const CartPage = () => {
   const vendorsSummary = cartData?.vendorsSummary || []
   const warnings = cartData?.warnings || []
   const subtotal = cartData?.subtotal || 0
-  const totalDeliveryFees = cartData?.totalDeliveryFees || 0
-  const totalAmount = cartData?.totalAmount || 0
+  // المتاجر التي تتبع مناطق التوصيل: رسومها تُعرف عند اختيار العنوان في إتمام الطلب
+  const { data: zonesCfg } = usePublicZones()
+  const byZone = (vendorId) => vendorUsesZones(zonesCfg, vendorId)
+  const anyByZone = vendorsSummary.some(v => byZone(v.vendorId))
+  const fixedFees = vendorsSummary.filter(v => !byZone(v.vendorId)).reduce((s, v) => s + (v.deliveryFee || 0), 0)
+  const totalDeliveryFees = anyByZone ? fixedFees : (cartData?.totalDeliveryFees || 0)
+  const totalAmount = anyByZone ? subtotal + fixedFees : (cartData?.totalAmount || 0)
+  const feeText = (v) => byZone(v.vendorId) ? 'حسب منطقتك' : `${v.deliveryFee.toLocaleString()} د.ع`
 
   // ✅ استعادة الكوبون المحفوظ من صفحة إتمام الشراء (أو زيارة سابقة) تلقائياً
   useEffect(() => {
@@ -334,7 +341,7 @@ const CartPage = () => {
                         </p>
                         <p className="flex items-center gap-2 mt-0.5 text-xs text-gray-500">
                           <span className="flex items-center gap-1"><Package size={12} />{vendor.itemsCount} منتج</span>
-                          <span className="flex items-center gap-1"><Truck size={12} />توصيل {vendor.deliveryFee.toLocaleString()} د.ع</span>
+                          <span className="flex items-center gap-1"><Truck size={12} />توصيل {feeText(vendor)}</span>
                         </p>
                       </div>
                       <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{vendor.subtotal.toLocaleString()} د.ع</p>
@@ -487,14 +494,16 @@ const CartPage = () => {
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1"><Truck size={15} />رسوم التوصيل</span>
-                  <span>{totalDeliveryFees.toLocaleString()} د.ع</span>
+                  <span>{anyByZone
+                    ? (fixedFees > 0 ? `${fixedFees.toLocaleString()} د.ع + حسب منطقتك` : 'حسب منطقتك')
+                    : `${totalDeliveryFees.toLocaleString()} د.ع`}</span>
                 </div>
                 {vendorsSummary.length > 1 && (
                   <div className="pr-4 space-y-1">
                     {vendorsSummary.map(vendor => (
                       <div key={vendor.vendorId} className="flex justify-between text-xs text-gray-500">
                         <span>• {vendor.vendorNameAr || vendor.vendorName}</span>
-                        <span>{vendor.deliveryFee.toLocaleString()} د.ع</span>
+                        <span>{feeText(vendor)}</span>
                       </div>
                     ))}
                   </div>
@@ -508,7 +517,7 @@ const CartPage = () => {
               </div>
 
               <div className="flex justify-between items-baseline py-3 border-t border-gray-100">
-                <span className="text-base lg:text-lg font-bold">الإجمالي</span>
+                <span className="text-base lg:text-lg font-bold">الإجمالي{anyByZone && <span className="block text-[11px] font-normal text-gray-500">قبل رسوم توصيل منطقتك</span>}</span>
                 <span className="text-lg font-bold text-primary">{total.toLocaleString()} د.ع</span>
               </div>
 

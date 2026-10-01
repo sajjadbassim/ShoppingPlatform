@@ -1,4 +1,4 @@
-using ecommerce.Services.DriverTrackingService;
+﻿using ecommerce.Services.DriverTrackingService;
 using ecommerce.Services.OpsReportService;
 using ecommerce.Services.VendorAccessService;
 using ecommerce.Core.Interfaces;
@@ -103,6 +103,10 @@ namespace ecommerce.Extensions
             services.AddScoped<IAdminService, AdminService>();
 
             services.AddScoped<IFileService, FileService>();
+            services.AddScoped<ecommerce.Services.IAvatarService, ecommerce.Services.AvatarService>();
+            services.AddScoped<ecommerce.Services.IDeliveryZoneService, ecommerce.Services.DeliveryZoneService>();
+            services.AddScoped<ecommerce.Services.IGooglePictureFetcher, ecommerce.Services.GooglePictureFetcher>();
+            services.AddHttpClient("google-avatar", c => c.Timeout = TimeSpan.FromSeconds(5));
             services.AddScoped<IProductImageRepository, ProductImageRepository>();
 
             services.AddScoped<IWishlistRepository, WishlistRepository>();

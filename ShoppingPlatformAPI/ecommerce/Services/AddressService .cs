@@ -1,16 +1,28 @@
-using ecommerce.Core.DTO.Addresses;
+﻿using ecommerce.Core.DTO.Addresses;
 using ecommerce.Core.Models;
+using ecommerce.Data;
 using ecommerce.Repositories;
+using Microsoft.EntityFrameworkCore;
 
 namespace ecommerce.Services
 {
     public class AddressService : IAddressService
     {
         private readonly IAddressRepository _addressRepository;
+        private readonly AppDbContext? _context;
 
-        public AddressService(IAddressRepository addressRepository)
+        public AddressService(IAddressRepository addressRepository, AppDbContext? context = null)
         {
             _addressRepository = addressRepository;
+            _context = context;
+        }
+
+        // منطقة التوصيل: يجب أن تكون موجودة ومفعّلة
+        private async Task<DeliveryZone?> ZoneAsync(Guid? zoneId)
+        {
+            if (zoneId == null || zoneId == Guid.Empty || _context == null) return null;
+            return await _context.DeliveryZones.FirstOrDefaultAsync(z => z.Id == zoneId && z.IsActive)
+                ?? throw new Exception("منطقة التوصيل غير متاحة — اختر منطقة أخرى");
         }
         public async Task<IEnumerable<AddressResponseDto>> GetAllAsync()
         {
@@ -44,8 +56,10 @@ namespace ecommerce.Services
         public async Task<AddressResponseDto> CreateAsync(AddressCreateDto dto)
         {
             ValidatePin(dto.Latitude, dto.Longitude);
+            var zone = await ZoneAsync(dto.ZoneId);
             var address = new Address
             {
+                ZoneId = zone?.Id,
                 UserId = dto.UserId,
                 Label = dto.Label,
                 StreetAddress = dto.StreetAddress,
@@ -62,6 +76,7 @@ namespace ecommerce.Services
             };
 
             var createdAddress = await _addressRepository.CreateAsync(address);
+            createdAddress.Zone ??= zone;
             return MapToDto(createdAddress);
         }
 
@@ -89,6 +104,10 @@ namespace ecommerce.Services
                 address.Latitude = Math.Round(dto.Latitude!.Value, 7);
                 address.Longitude = Math.Round(dto.Longitude!.Value, 7);
             }
+
+            // null يُبقي المنطقة الحالية، Guid.Empty يزيلها
+            if (dto.ZoneId == Guid.Empty) { address.ZoneId = null; address.Zone = null; }
+            else if (dto.ZoneId != null && dto.ZoneId != address.ZoneId) { var zone = await ZoneAsync(dto.ZoneId); address.ZoneId = zone!.Id; address.Zone = zone; }
 
             var updatedAddress = await _addressRepository.UpdateAsync(address);
             return MapToDto(updatedAddress);
@@ -118,6 +137,8 @@ namespace ecommerce.Services
                 IsDefault = address.IsDefault,
                 Latitude = address.Latitude,
                 Longitude = address.Longitude,
+                ZoneId = address.ZoneId,
+                ZoneName = address.Zone?.Name,
                 CreatedAt = address.CreatedAt
             };
         }

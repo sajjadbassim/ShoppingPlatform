@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Net;
 
@@ -35,6 +35,18 @@ namespace ecommerce.Core.Models
 
         [MaxLength(255)]
         public string? GoogleEmail { get; set; }
+
+        // الصورة الشخصية: مسار محلي (/uploads/avatars/...) ومصدرها:
+        // upload = رفعها المستخدم، google = نسخة من صورة Google، none = حذفها بنفسه (لا مزامنة بعدها)
+        [MaxLength(500)]
+        public string? AvatarUrl { get; set; }
+
+        [MaxLength(10)]
+        public string? AvatarSource { get; set; }
+
+        // رابط صورة Google التي نسخناها آخر مرة — لنعرف متى تغيّرت
+        [MaxLength(1000)]
+        public string? GooglePictureUrl { get; set; }
 
         [Column("last_login")]
         public DateTime? LastLogin { get; set; }

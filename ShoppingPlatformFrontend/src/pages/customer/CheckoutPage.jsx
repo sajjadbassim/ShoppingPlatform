@@ -13,6 +13,7 @@ import { useCouponStore } from '../../stores/couponStore'
 import { useUserAddresses, useCreateAddress, useUpdateAddress } from '../../hooks/useAddresses'
 import Modal from '../../components/common/Modal'
 import AddPhoneModal from '../../components/auth/AddPhoneModal'
+import { usePublicZones, useDeliveryQuote, vendorUsesZones } from '../../hooks/useDeliveryZones'
 
 // الخريطة (leaflet) تُحمَّل عند الحاجة فقط
 const LocationPicker = lazy(() => import('../../components/common/LocationPicker'))
@@ -37,6 +38,15 @@ const VariantBadges = ({ variantAttributes }) => {
     </div>
   )
 }
+
+// قائمة مناطق التوصيل (مع سعر كل منطقة)
+const ZoneSelect = ({ zones = [], value, onChange, disabled }) => (
+  <select value={value || ''} disabled={disabled} onChange={e => onChange(e.target.value)}
+    className="w-full h-11 px-3 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary focus:border-primary">
+    <option value="">— اختر المنطقة —</option>
+    {zones.map(z => <option key={z.id} value={z.id}>{z.name} — {Number(z.fee).toLocaleString()} د.ع</option>)}
+  </select>
+)
 
 const CheckoutPage = () => {
   const navigate = useNavigate()
@@ -71,6 +81,7 @@ const CheckoutPage = () => {
     area: '',
     street: '',
     building: '',
+    zoneId: '',
     notes: '',
     paymentMethod: 'cash',
     saveAddress: false,
@@ -125,7 +136,16 @@ const CheckoutPage = () => {
 
   // ✅ استخدم cartData للإجماليات الصحيحة من الباك
   const subtotal          = cartData?.subtotal          || cartItems.reduce((s, i) => s + (i.price * i.quantity), 0)
-  const totalDeliveryFees = cartData?.totalDeliveryFees || 0
+  // مناطق التوصيل: الرسوم الفعلية تُحسب من منطقة العنوان (الخادم يعيد حسابها عند إنشاء الطلب)
+  const { data: zonesCfg } = usePublicZones()
+  // نعرض اختيار المنطقة فقط إذا كان في السلة متجر يتبع المناطق
+  const zonesOn = !!zonesCfg?.enabled && (cartItems || []).some(i => vendorUsesZones(zonesCfg, i.vendorId))
+  const { data: quote, isFetching: quoting } = useDeliveryQuote({
+    addressId: !useNewAddress ? selectedAddressId : null,
+    zoneId: useNewAddress ? formData.zoneId : null,
+    enabled: zonesOn && isAuthenticated && (cartItems?.length || 0) > 0 && (useNewAddress || !!selectedAddressId),
+  })
+  const totalDeliveryFees = zonesOn && quote ? quote.total : (cartData?.totalDeliveryFees || 0)
 
   // ✅ استعادة الكوبون المُطبَّق في السلة تلقائياً عند الوصول لإتمام الشراء
   useEffect(() => {
@@ -181,7 +201,7 @@ const CheckoutPage = () => {
   const pointsToEarn    = pointsEstimate?.pointsToEarn ?? 0
   const pointsDiscount  = usePoints ? Math.round(pointsToRedeem * pointValue) : 0
   const discountAmount  = appliedCoupon?.discountAmount ?? 0
-  const totalAmount     = Math.max(0, (cartData?.totalAmount || (subtotal + totalDeliveryFees)) - discountAmount - pointsDiscount)
+  const totalAmount     = Math.max(0, subtotal + totalDeliveryFees - discountAmount - pointsDiscount)
 
   // ✅ جلب السلة عند التحميل للحصول على variantAttributes
   useEffect(() => {
@@ -269,6 +289,7 @@ const CheckoutPage = () => {
           isDefault:       formData.saveAddress,
           latitude:        pin?.latitude,
           longitude:       pin?.longitude,
+          zoneId:          formData.zoneId || undefined,
         }
         const savedAddr = await createAddressMutation.mutateAsync(newAddress)
         addressId = savedAddr.id
@@ -427,6 +448,7 @@ const CheckoutPage = () => {
                           {[addr.city, addr.area, addr.streetAddress, addr.buildingNumber].filter(Boolean).join('، ')}
                         </span>
                         {addr.phone && <span className="block text-sm text-gray-500 mt-0.5 text-right" dir="ltr">{addr.phone}</span>}
+                        {zonesOn && addr.zoneName && <span className="inline-block mt-1 text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">منطقة التوصيل: {addr.zoneName}</span>}
                       </OptionCard>
                     ))}
                     {!useNewAddress && (() => {
@@ -437,6 +459,26 @@ const CheckoutPage = () => {
                           <p className="flex-1 text-sm text-amber-900">هذا العنوان بدون موقع على الخريطة — حدّده ليصل السائق إلى بابك مباشرة</p>
                           <button type="button" onClick={() => { setPinDraft(null); setPinFor(sel) }}
                             className="h-9 px-3 rounded-full bg-amber-600 text-white text-xs font-bold whitespace-nowrap">تحديد الموقع</button>
+                        </div>
+                      )
+                    })()}
+                    {zonesOn && !useNewAddress && (() => {
+                      const sel = savedAddresses.find(a => a.id === selectedAddressId)
+                      return sel && !sel.zoneId && (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 space-y-2">
+                          <p className="text-sm text-blue-900">اختر منطقة هذا العنوان لحساب رسوم التوصيل بدقة</p>
+                          <ZoneSelect zones={zonesCfg.zones} value="" disabled={updateAddressMutation.isPending}
+                            onChange={async (zoneId) => {
+                              if (!zoneId) return
+                              try {
+                                await updateAddressMutation.mutateAsync({ id: sel.id, addressData: {
+                                  label: sel.label || '', streetAddress: sel.streetAddress || '', city: sel.city || '', area: sel.area || '',
+                                  buildingNumber: sel.buildingNumber || '', floorNumber: sel.floorNumber || '', apartmentNumber: sel.apartmentNumber || '',
+                                  phone: sel.phone || '', notes: sel.notes || '', isDefault: !!sel.isDefault, zoneId,
+                                } })
+                                success('تم حفظ منطقة العنوان')
+                              } catch (err) { error(err.message || 'تعذّر حفظ المنطقة') }
+                            }} />
                         </div>
                       )
                     })()}
@@ -461,6 +503,14 @@ const CheckoutPage = () => {
                       <Input label="المدينة" name="city" value={formData.city} onChange={handleChange} error={errors.city} placeholder="بغداد" required />
                       <Input label="المنطقة" name="area" value={formData.area} onChange={handleChange} error={errors.area} placeholder="المنصور" required />
                     </div>
+                    {zonesOn && (
+                      <div className="md:col-span-2">
+                        <p className="text-sm font-medium text-gray-700 mb-1.5">منطقة التوصيل</p>
+                        <ZoneSelect zones={zonesCfg.zones} value={formData.zoneId}
+                          onChange={(zoneId) => setFormData(f => ({ ...f, zoneId }))} />
+                        <p className="text-xs text-gray-500 mt-1">تحدد رسوم التوصيل — إن لم تجد منطقتك اتركها فارغة</p>
+                      </div>
+                    )}
                     <Input label="الشارع" name="street" value={formData.street} onChange={handleChange} error={errors.street} placeholder="شارع 14 رمضان" required />
                     <Input label="رقم البناية (اختياري)" name="building" value={formData.building} onChange={handleChange} placeholder="بناية 5، شقة 3" />
                     <label className="md:col-span-2 flex items-center gap-2 cursor-pointer">
@@ -661,8 +711,9 @@ const CheckoutPage = () => {
                   <span>المجموع الفرعي</span><span>{subtotal.toLocaleString()} د.ع</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
-                  <span className="flex items-center gap-1"><Truck size={14} />رسوم التوصيل</span>
-                  <span>{totalDeliveryFees.toLocaleString()} د.ع</span>
+                  <span className="flex items-center gap-1"><Truck size={14} />رسوم التوصيل
+                    {quote?.zoneName && <span className="text-xs text-gray-400">({quote.zoneName})</span>}</span>
+                  <span className={quoting ? 'opacity-50' : ''}>{totalDeliveryFees.toLocaleString()} د.ع</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-green-600">

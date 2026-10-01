@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using ecommerce.Core.Constants;
 
@@ -40,6 +40,11 @@ namespace ecommerce.Core.Models
 
         [Column("default_commission_value", TypeName = "decimal(12,2)")]
         public decimal DefaultCommissionValue { get; set; } = 0;
+
+        // مناطق التوصيل: OFF (سعر كل متجر الثابت) | ALL (كل المتاجر) | SELECTED (المتاجر المحددة فقط)
+        [MaxLength(10)]
+        [Column("zones_mode")]
+        public string ZonesMode { get; set; } = "OFF";
 
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

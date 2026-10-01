@@ -12,6 +12,7 @@ import { apiGet, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 import { usePreferencesDraft } from '../../hooks/usePreferences'
+import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
 import {
   SettingsSection as Section, SettingsToggle as Toggle, AppearanceSection,
 } from '../../components/settings/SettingsSection'
@@ -22,6 +23,7 @@ const VendorSettings = () => {
   const { success, error: showError } = useToast()
   const { user } = useAuthStore()
   const vendorId = user?.vendorId || user?.id
+  const { data: zonesCfg } = usePublicZones()
   const queryClient = useQueryClient()
 
   // ===== جلب بيانات المتجر =====
@@ -196,6 +198,9 @@ const VendorSettings = () => {
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">رسوم التوصيل</label>
                 <input type="number" value={storeForm.DeliveryFee} onChange={e => setStoreForm({...storeForm, DeliveryFee: e.target.value})} className={inputCls} placeholder="0 د.ع" />
+                {vendorUsesZones(zonesCfg, vendor?.id || vendorId) && (
+                  <p className="text-xs text-blue-600 mt-1">متجرك يتبع مناطق التوصيل: الزبون يدفع سعر منطقته، وهذا السعر يُستخدم فقط للعناوين بلا منطقة</p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1 flex items-center gap-1">

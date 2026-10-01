@@ -66,6 +66,12 @@ namespace ecommerce.Core.Models
 
         // Navigation Properties
         [ForeignKey("UserId")]
+        // منطقة التوصيل (اختيارية) — تحدد رسوم التوصيل للمتاجر المشمولة بالمناطق
+        [Column("zone_id")]
+        public Guid? ZoneId { get; set; }
+
+        public virtual DeliveryZone? Zone { get; set; }
+
         public virtual User User { get; set; }
         public virtual ICollection<Order> Orders { get; set; }
 

@@ -6,6 +6,7 @@ import { useToast } from '../common/Toast'
 import { useAuthStore } from '../../stores/authStore'
 import { apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import AccountExistsHint, { isAccountExistsMessage } from './AccountExistsHint'
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -95,6 +96,14 @@ export const GoogleButton = ({ onCredential, text = 'continue_with', className =
   )
 }
 
+// البريد من بطاقة Google لتعبئة خانة الدخول فقط (التحقق الحقيقي يتم في الخادم)
+const emailOf = (credential) => {
+  try {
+    const part = credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    return JSON.parse(decodeURIComponent(escape(atob(part)))).email || ''
+  } catch { return '' }
+}
+
 const ROLE_HOME = { ADMIN: '/admin', VENDOR: '/vendor', OPS: '/operations', DRIVER: '/driver' }
 
 // الزر + التوجيه — لصفحتي الدخول والتسجيل
@@ -102,6 +111,7 @@ export const GoogleSignInSection = ({ redirectTo = '/', text = 'continue_with' }
   const navigate = useNavigate()
   const { success, error: showError } = useToast()
   const setSession = useAuthStore((s) => s.setSession)
+  const [exists, setExists] = useState(null)   // البريد لحساب آخر: نعرض طريق الدخول بكلمة المرور
 
   const finish = (login) => {
     const user = setSession(login)
@@ -110,17 +120,22 @@ export const GoogleSignInSection = ({ redirectTo = '/', text = 'continue_with' }
   }
 
   const onCredential = async (credential) => {
+    setExists(null)
     try {
       const res = await apiPost(API_ENDPOINTS.AUTH.GOOGLE, { credential })
       const data = res.data?.data ?? res.data
       finish(data.login)
     } catch (err) {
-      showError(err.message || 'تعذّر الدخول بـ Google')
+      if (isAccountExistsMessage(err.message)) setExists({ message: err.message, email: emailOf(credential) })
+      else showError(err.message || 'تعذّر الدخول بـ Google')
     }
   }
 
   if (!GOOGLE_CLIENT_ID) return null
   return (
-    <GoogleButton onCredential={onCredential} text={text} />
+    <>
+      <GoogleButton onCredential={onCredential} text={text} />
+      {exists && <AccountExistsHint message={exists.message} identifier={exists.email} className="mt-3" />}
+    </>
   )
 }

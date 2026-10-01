@@ -1,9 +1,10 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Auth;
 using ecommerce.Core.Exceptions;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Services.NotificationService;
+using ecommerce.Services;
 using Google.Apis.Auth;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -70,10 +71,13 @@ namespace ecommerce.Services.AuthService
         private readonly GoogleOptions _google;
         private readonly JwtSettings _jwt;
         private readonly INotificationService? _notifications;
+        private readonly IAvatarService? _avatars;
 
         public GoogleAuthService(AppDbContext context, IAuthService auth, IGoogleTokenValidator validator,
-            IOptions<GoogleOptions> google, IOptions<JwtSettings> jwt, INotificationService? notifications = null)
+            IOptions<GoogleOptions> google, IOptions<JwtSettings> jwt, INotificationService? notifications = null,
+            IAvatarService? avatars = null)
         {
+            _avatars = avatars;
             _context = context;
             _auth = auth;
             _validator = validator;
@@ -103,6 +107,7 @@ namespace ecommerce.Services.AuthService
             {
                 if (!user.IsActive)
                     throw new BusinessRuleException("الحساب معطل. يرجى التواصل مع الدعم الفني");
+                await SyncPictureAsync(user, payload);
                 return new GoogleSignInResultDto { Status = "ok", Login = await _auth.SignInAsync(user) };
             }
 
@@ -134,6 +139,8 @@ namespace ecommerce.Services.AuthService
                     ?? throw new BusinessRuleException(EmailUnavailableMessage);
                 return new GoogleSignInResultDto { Status = "ok", Login = await _auth.SignInAsync(again) };
             }
+
+            await SyncPictureAsync(created, payload);
 
             if (_notifications != null)
             {
@@ -170,6 +177,7 @@ namespace ecommerce.Services.AuthService
             user.GoogleId = payload.Subject;
             user.GoogleEmail = payload.Email;
             await _context.SaveChangesAsync();
+            await SyncPictureAsync(user, payload);
             return Status(user);
         }
 
@@ -184,6 +192,17 @@ namespace ecommerce.Services.AuthService
             user.GoogleEmail = null;
             await _context.SaveChangesAsync();
             return Status(user);
+        }
+
+        // صورة Google تُنسخ لحساب ليس له صورة رفعها بنفسه، وتتحدّث إذا غيّرها في Google
+        private async Task SyncPictureAsync(User user, GoogleJsonWebSignature.Payload payload)
+        {
+            if (_avatars == null) return;
+            await _avatars.SyncGoogleAsync(user, payload.Picture);
+            if (_context.Entry(user).State == EntityState.Modified)
+            {
+                try { await _context.SaveChangesAsync(); } catch (DbUpdateException) { /* لا تُفشل الدخول */ }
+            }
         }
 
         private static GoogleStatusDto Status(User u) => new()

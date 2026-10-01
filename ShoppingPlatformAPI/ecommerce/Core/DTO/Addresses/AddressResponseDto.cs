@@ -30,6 +30,9 @@
 
         public decimal? Longitude { get; set; }
 
+        public Guid? ZoneId { get; set; }
+        public string? ZoneName { get; set; }
+
         public DateTime CreatedAt { get; set; }
     }
 }

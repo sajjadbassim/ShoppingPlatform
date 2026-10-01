@@ -1,4 +1,4 @@
-using ecommerce.Core.Models;
+﻿using ecommerce.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using static Azure.Core.HttpHeader;
@@ -44,6 +44,7 @@ namespace ecommerce.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<PushSubscription> PushSubscriptions { get; set; }
         public DbSet<DeliverySettings> DeliverySettings { get; set; }
+        public DbSet<DeliveryZone> DeliveryZones { get; set; }
         public DbSet<OrderDriverRating> OrderDriverRatings { get; set; }
         public DbSet<VendorLedgerEntry> VendorLedgerEntries { get; set; }
 
@@ -98,6 +99,9 @@ namespace ecommerce.Data
                     .HasDatabaseName("idx_users_google_id");
                 entity.Property(e => e.GoogleId).HasColumnName("google_id");
                 entity.Property(e => e.GoogleEmail).HasColumnName("google_email");
+                entity.Property(e => e.AvatarUrl).HasColumnName("avatar_url");
+                entity.Property(e => e.AvatarSource).HasColumnName("avatar_source");
+                entity.Property(e => e.GooglePictureUrl).HasColumnName("google_picture_url");
                 entity.Property(e => e.HasPassword).HasColumnName("has_password").HasDefaultValue(true);
 
                 entity.HasIndex(e => e.Email)
@@ -130,6 +134,11 @@ namespace ecommerce.Data
             // ===================================
             // تكوين جدول Addresses
             // ===================================
+            modelBuilder.Entity<DeliveryZone>(entity =>
+            {
+                entity.HasIndex(e => e.Name).IsUnique().HasDatabaseName("idx_delivery_zones_name");
+            });
+
             modelBuilder.Entity<Address>(entity =>
             {
                 // اسم الجدول والمفتاح الأساسي
@@ -147,6 +156,11 @@ namespace ecommerce.Data
 
                 entity.HasIndex(e => e.City)
                     .HasDatabaseName("idx_addresses_city");
+
+                // حذف المنطقة لا يحذف العناوين — تبقى بلا منطقة
+                entity.HasOne(e => e.Zone).WithMany()
+                    .HasForeignKey(e => e.ZoneId)
+                    .OnDelete(DeleteBehavior.SetNull);
 
                 // =========================
                 // Properties & Constraints

@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Users;
 using ecommerce.Core.Models;
@@ -114,6 +114,7 @@ namespace ecommerce.Services
             {
                 Id = user.Id,
                 Phone = user.Phone,
+                AvatarUrl = user.AvatarUrl,
                 FullName = user.FullName,
                 Email = user.Email,
                 Role = user.Role,
@@ -145,6 +146,7 @@ namespace ecommerce.Services
                 Id = u.Id,
                 FullName = u.FullName,
                 Phone = u.Phone,
+                AvatarUrl = u.AvatarUrl,
                 Email = u.Email,
                 Role = u.Role,
                 IsActive = u.IsActive,

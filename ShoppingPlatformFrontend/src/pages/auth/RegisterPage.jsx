@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { GoogleSignInSection } from '../../components/auth/GoogleSignIn'
+import AccountExistsHint, { isAccountExistsMessage } from '../../components/auth/AccountExistsHint'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, Phone, Store, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
 import Button from '../../components/common/Button'
@@ -82,7 +83,7 @@ const RegisterPage = () => {
       success('تم إنشاء الحساب بنجاح! 🎉')
       navigate('/', { replace: true })
     } catch (err) {
-      showError(err.message || 'فشل إنشاء الحساب')
+      if (!isAccountExistsMessage(err.message)) showError(err.message || 'فشل إنشاء الحساب')
     }
   }
 
@@ -120,7 +121,7 @@ const RegisterPage = () => {
       }
 
     } catch (err) {
-      showError(err.message || 'فشل إنشاء الحساب')
+      if (!isAccountExistsMessage(err.message)) showError(err.message || 'فشل إنشاء الحساب')
     } finally {
       setSubmitting(false)
     }
@@ -178,7 +179,9 @@ const RegisterPage = () => {
           )}
 
           <div className="bg-white rounded-2xl shadow-xl p-7">
-            {authError && (
+            {isAccountExistsMessage(authError) ? (
+              <AccountExistsHint message={authError} identifier={formData.phone.replace(/\s/g, '')} className="mb-4" />
+            ) : authError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
                 <p className="text-red-700 text-sm">{authError}</p>
@@ -222,16 +225,16 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                <Input label="الاسم الكامل *" name="fullName" value={formData.fullName}
+                <Input label="الاسم الكامل" name="fullName" value={formData.fullName}
                   onChange={handleChange} error={errors.fullName} placeholder="أحمد محمد" required />
 
-                <Input label="رقم الهاتف *" name="phone" type="tel"
+                <Input label="رقم الهاتف" name="phone" type="tel"
                   value={formData.phone} onChange={handleChange} error={errors.phone}
                   placeholder="07XX XXX XXXX" dir="ltr" required />
 
-                <Input label="البريد الإلكتروني *" name="email" type="email"
+                <Input label="البريد الإلكتروني" name="email" type="email"
                   value={formData.email} onChange={handleChange} error={errors.email}
-                  placeholder="example@email.com" dir="ltr" />
+                  placeholder="example@email.com" dir="ltr" required />
 
                 {/* حقول المتجر — تظهر فقط للبائع */}
                 {formData.accountType === 'vendor' && (
@@ -309,7 +312,7 @@ const RegisterPage = () => {
                   <h2 className="font-bold text-gray-900">كلمة المرور</h2>
 
                   <div className="relative">
-                    <Input label="كلمة المرور *" name="password"
+                    <Input label="كلمة المرور" name="password"
                       type={showPassword ? 'text' : 'password'}
                       value={formData.password} onChange={handleChange}
                       error={errors.password} placeholder="••••••••" dir="ltr" required />
@@ -332,7 +335,7 @@ const RegisterPage = () => {
                     </div>
                   )}
 
-                  <Input label="تأكيد كلمة المرور *" name="confirmPassword" type="password"
+                  <Input label="تأكيد كلمة المرور" name="confirmPassword" type="password"
                     value={formData.confirmPassword} onChange={handleChange}
                     error={errors.confirmPassword} placeholder="••••••••" dir="ltr" required />
 

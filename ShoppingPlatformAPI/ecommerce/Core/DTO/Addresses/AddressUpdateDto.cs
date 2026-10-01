@@ -37,5 +37,8 @@ namespace ecommerce.Core.DTO.Addresses
 
         public decimal? Longitude { get; set; }
 
+        // منطقة التوصيل (اختيارية) — null يُبقي الحالية، Guid.Empty يزيلها
+        public Guid? ZoneId { get; set; }
+
     }
 }

@@ -23,6 +23,7 @@ import GlobalSearch from './GlobalSearch'
 import { getDashboardLink } from '../../utils/dashboardLink'
 import { useCategories } from '../../hooks/useCategories'
 import CategoryIcon from './CategoryIcon'
+import UserAvatar from './UserAvatar'
 
 const Header = () => {
   const navigate = useNavigate()
@@ -60,11 +61,6 @@ const Header = () => {
 
   // الحصول على رابط لوحة التحكم حسب الدور
   const dashboardLink = getDashboardLink(user?.role)
-
-  // الحصول على الحرف الأول من الاسم
-  const getInitial = () => {
-    return user?.fullName?.charAt(0) || user?.phone?.charAt(0) || 'م'
-  }
 
   // الحصول على اسم العرض
   const getDisplayName = () => {
@@ -230,9 +226,7 @@ const Header = () => {
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 onBlur={() => setTimeout(() => setUserMenuOpen(false), 200)}
               >
-                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                  <span className="text-primary font-semibold text-sm">{getInitial()}</span>
-                </div>
+                <UserAvatar user={user} className="w-8 h-8" />
                 <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[100px] truncate">
                   {getDisplayName()}
                 </span>

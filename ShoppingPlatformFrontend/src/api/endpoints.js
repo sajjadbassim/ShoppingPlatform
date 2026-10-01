@@ -143,6 +143,18 @@ export const API_ENDPOINTS = {
   },
 
   // ============ Addresses ============
+  DELIVERY_ZONES: {
+    BASE: '/api/delivery-zones',
+    ADMIN: '/api/delivery-zones/admin',
+    MODE: '/api/delivery-zones/mode',
+    QUOTE: '/api/delivery-zones/quote',
+    BY_ID: (id) => `/api/delivery-zones/${id}`,
+  },
+
+  PROFILE: {
+    AVATAR: '/api/profile/avatar',
+  },
+
   ADDRESSES: {
     BASE: '/api/Addresses',
     BY_ID: (id) => `/api/Addresses/${id}`,

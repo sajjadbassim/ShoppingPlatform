@@ -6,11 +6,12 @@ import { PageLoader } from '../common/PageLoader'
 import { useMobileTableLabels } from '../../hooks/useMobileTableLabels'
 import PushPrompt from '../common/PushPrompt'
 import { useOpsNotifications } from '../../hooks/useOpsNotifications'
+import UserAvatar from '../common/UserAvatar'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Store,
   BarChart3, Settings, LogOut, Menu, X, ChevronLeft, Wallet,
   Star, Tag, Zap, RotateCcw, Image,
-  Link2, Home,
+  Link2, Home, MapPinned,
 } from 'lucide-react'
 
 const DashboardLayout = ({ type = 'vendor' }) => {
@@ -54,6 +55,7 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         { icon: RotateCcw,       label: 'الإرجاع',     path: '/admin/returns'    },
         { icon: BarChart3,       label: 'التقارير',    path: '/admin/reports'    },
         { icon: Wallet,          label: 'المستحقات',   path: '/admin/finance'    },
+        { icon: MapPinned,       label: 'مناطق التوصيل', path: '/admin/delivery-zones' },
         { icon: Settings,        label: 'الإعدادات',   path: '/admin/settings'   },
       ]
     } else if (type === 'operations') {
@@ -107,11 +109,7 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         <div className="flex items-center gap-2">
           <NotificationBell />
           <div className="flex items-center gap-3 mr-2 pr-4 border-r border-gray-200">
-            <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-primary font-semibold text-sm">
-                {user?.fullName?.charAt(0) || 'أ'}
-              </span>
-            </div>
+            <UserAvatar user={user} className="w-9 h-9" fallback="أ" />
             <span className="hidden sm:block text-sm font-medium text-gray-700">
               {user?.fullName || 'المستخدم'}
             </span>

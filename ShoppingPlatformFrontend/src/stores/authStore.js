@@ -31,6 +31,7 @@ login: async (credentials) => {
       phone: data.phone,
       fullName: data.fullName,
       email: data.email,
+            avatarUrl: data.avatarUrl || null,
       role: data.role,
     };
     
@@ -62,6 +63,7 @@ login: async (credentials) => {
             phone: data.phone,
             fullName: data.fullName,
             email: data.email,
+            avatarUrl: data.avatarUrl || null,
             role: data.role,
           };
           
@@ -88,6 +90,7 @@ login: async (credentials) => {
           phone: data.phone,
           fullName: data.fullName,
           email: data.email,
+            avatarUrl: data.avatarUrl || null,
           role: data.role,
         };
         set({ user, token: data.token, isAuthenticated: true, isLoading: false, error: null });

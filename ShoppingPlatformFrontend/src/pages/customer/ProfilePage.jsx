@@ -5,7 +5,6 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
-import { Avatar } from '../../components/common/Badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/common/Tabs'
 import Breadcrumb from '../../components/common/Breadcrumb'
 import { Toggle } from '../../components/common/FormControls'
@@ -17,9 +16,11 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useUserAddresses, useCreateAddress, useUpdateAddress, useDeleteAddress } from '../../hooks/useAddresses'
 import { userService, authService } from '../../services'
 import { useQuery } from '@tanstack/react-query'
-import { apiGet } from '../../api/axios'
+import { apiGet, apiPutForm, apiDelete } from '../../api/axios'
+import UserAvatar from '../../components/common/UserAvatar'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import AddPhoneModal from '../../components/auth/AddPhoneModal'
+import { usePublicZones } from '../../hooks/useDeliveryZones'
 
 const ProfilePage = () => {
   const navigate = useNavigate()
@@ -78,6 +79,34 @@ useEffect(() => {
   fetchWishlist()
 }, [])
   const [addPhoneOpen, setAddPhoneOpen] = useState(false)
+  const { data: zonesCfg } = usePublicZones()
+  const [avatarBusy, setAvatarBusy] = useState(false)
+
+  const handleAvatarPick = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 3 * 1024 * 1024) { error('حجم الصورة يجب ألا يتجاوز 3MB'); return }
+    setAvatarBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await apiPutForm(API_ENDPOINTS.PROFILE.AVATAR, fd)
+      updateUser({ avatarUrl: (res.data?.data ?? res.data).avatarUrl })
+      success('تم تحديث الصورة')
+    } catch (err) { error(err.message || 'تعذّر رفع الصورة') }
+    finally { setAvatarBusy(false) }
+  }
+
+  const handleAvatarRemove = async () => {
+    setAvatarBusy(true)
+    try {
+      await apiDelete(API_ENDPOINTS.PROFILE.AVATAR)
+      updateUser({ avatarUrl: null })
+      success('تم حذف الصورة')
+    } catch (err) { error(err.message || 'تعذّر حذف الصورة') }
+    finally { setAvatarBusy(false) }
+  }
 
   useEffect(() => {
     if (user) setFormData({ fullName: user.fullName || '', email: user.email || '', phone: user.phone || '' })
@@ -113,11 +142,11 @@ useEffect(() => {
   const openAddressModal = (address = null) => {
     if (address) {
       setEditingAddress(address)
-      setAddressFormData({ title: address.label || '', phone: address.phone || '', city: address.city || '', area: address.area || '', street: address.streetAddress || '', building: address.buildingNumber || '', isDefault: address.isDefault || false,
+      setAddressFormData({ title: address.label || '', phone: address.phone || '', city: address.city || '', area: address.area || '', street: address.streetAddress || '', building: address.buildingNumber || '', isDefault: address.isDefault || false, zoneId: zonesCfg?.zones?.some(z => z.id === address.zoneId) ? address.zoneId : '',
         pin: address.latitude != null && address.longitude != null ? { latitude: address.latitude, longitude: address.longitude } : null })
     } else {
       setEditingAddress(null)
-      setAddressFormData({ title: '', phone: user?.phone || '', city: '', area: '', street: '', building: '', isDefault: addresses.length === 0, pin: null })
+      setAddressFormData({ title: '', phone: user?.phone || '', city: '', area: '', street: '', building: '', isDefault: addresses.length === 0, pin: null, zoneId: '' })
     }
     setShowAddressModal(true)
   }
@@ -126,7 +155,9 @@ useEffect(() => {
     const userId = user?.userId || user?.id
     if (!userId) { error('حدث خطأ في بيانات المستخدم'); return }
     if (!addressFormData.pin) { error('حدّد موقع العنوان على الخريطة'); return }
-    const apiData = { latitude: addressFormData.pin.latitude, longitude: addressFormData.pin.longitude, userId, label: addressFormData.title || '', streetAddress: addressFormData.street || '', city: addressFormData.city || '', area: addressFormData.area || '', buildingNumber: addressFormData.building || '', floorNumber: '', apartmentNumber: '', phone: addressFormData.phone || '', notes: '', isDefault: addressFormData.isDefault || false }
+    const apiData = { latitude: addressFormData.pin.latitude, longitude: addressFormData.pin.longitude, userId, label: addressFormData.title || '', streetAddress: addressFormData.street || '', city: addressFormData.city || '', area: addressFormData.area || '', buildingNumber: addressFormData.building || '', floorNumber: '', apartmentNumber: '', phone: addressFormData.phone || '', notes: '', isDefault: addressFormData.isDefault || false,
+      // بلا منطقة: عند التعديل نرسل Guid فارغاً لإزالتها
+      zoneId: addressFormData.zoneId || (editingAddress ? '00000000-0000-0000-0000-000000000000' : undefined) }
     try {
       if (editingAddress) {
         await updateAddressMutation.mutateAsync({ id: editingAddress.id, addressData: apiData })
@@ -188,12 +219,21 @@ const stats = {
             <div className="bg-white rounded-2xl lg:rounded-xl border border-gray-200 p-4 lg:p-6 lg:sticky lg:top-24">
               <div className="flex items-center gap-4 mb-4 lg:flex-col lg:text-center lg:mb-6">
                 <div className="relative flex-shrink-0">
-                  <Avatar name={user?.fullName || 'مستخدم'} size="xl" className="w-16 h-16 text-2xl lg:w-24 lg:h-24 lg:text-3xl" />
-                  <button className="hidden lg:flex absolute bottom-0 left-0 w-8 h-8 bg-primary text-white rounded-full items-center justify-center hover:bg-primary/90"><Camera size={16} /></button>
+                  <UserAvatar user={user} className={`w-16 h-16 lg:w-24 lg:h-24 ${avatarBusy ? 'opacity-50' : ''}`}
+                    textClassName="text-primary font-bold text-2xl lg:text-3xl" />
+                  <label title="تغيير الصورة"
+                    className="absolute bottom-0 left-0 w-7 h-7 lg:w-8 lg:h-8 bg-primary text-white rounded-full flex items-center justify-center hover:bg-primary/90 cursor-pointer ring-2 ring-white">
+                    <Camera size={15} />
+                    <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAvatarPick} disabled={avatarBusy} />
+                  </label>
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-lg lg:text-xl font-bold text-gray-900 truncate">{user?.fullName}</h2>
                   <p className="text-sm lg:text-base text-gray-500 truncate">{user?.email || user?.phone}</p>
+                  {user?.avatarUrl && (
+                    <button type="button" onClick={handleAvatarRemove} disabled={avatarBusy}
+                      className="text-xs text-red-500 hover:underline mt-1">حذف الصورة</button>
+                  )}
                 </div>
               </div>
 
@@ -342,6 +382,7 @@ const stats = {
                                 {[addr.city, addr.area, addr.streetAddress || addr.street, addr.buildingNumber].filter(Boolean).join('، ')}
                               </p>
                               {addr.phone && <p className="text-gray-500 text-sm mt-1 text-right" dir="ltr">{addr.phone}</p>}
+                              {zonesCfg?.enabled && addr.zoneName && <span className="inline-block mt-1 text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">منطقة التوصيل: {addr.zoneName}</span>}
                             </div>
                             <div className="flex gap-1.5 flex-shrink-0">
                               <button onClick={() => openAddressModal(addr)} aria-label="تعديل"
@@ -473,6 +514,17 @@ const stats = {
                   <Input label="المدينة" placeholder="بغداد" value={addressFormData.city} onChange={(e) => setAddressFormData({ ...addressFormData, city: e.target.value })} />
                   <Input label="المنطقة" placeholder="المنصور" value={addressFormData.area} onChange={(e) => setAddressFormData({ ...addressFormData, area: e.target.value })} />
                 </div>
+                {zonesCfg?.enabled && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">منطقة التوصيل</label>
+                    <select value={addressFormData.zoneId || ''} onChange={(e) => setAddressFormData({ ...addressFormData, zoneId: e.target.value })}
+                      className="w-full h-11 px-3 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary focus:border-primary">
+                      <option value="">— بدون منطقة —</option>
+                      {zonesCfg.zones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">تحدد رسوم التوصيل لبعض المتاجر</p>
+                  </div>
+                )}
                 <Input label="الشارع" placeholder="شارع 14 رمضان" value={addressFormData.street} onChange={(e) => setAddressFormData({ ...addressFormData, street: e.target.value })} />
                 <Input label="تفاصيل إضافية (اختياري)" placeholder="رقم البناية، الشقة..." value={addressFormData.building} onChange={(e) => setAddressFormData({ ...addressFormData, building: e.target.value })} />
                 <label className="flex items-center gap-2 cursor-pointer">

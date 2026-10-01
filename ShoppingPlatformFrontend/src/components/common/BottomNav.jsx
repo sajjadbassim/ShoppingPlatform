@@ -19,6 +19,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useToast } from './Toast'
 import { getDashboardLink } from '../../utils/dashboardLink'
+import UserAvatar from './UserAvatar'
 
 // المسارات التي تُعتبر ضمن تبويب "حسابي"
 const ACCOUNT_PATHS = ['/profile', '/orders', '/wishlist', '/settings', '/loyalty', '/returns', '/notifications']
@@ -153,11 +154,7 @@ const BottomNav = () => {
             {/* معلومات المستخدم أو الدخول */}
             {isAuthenticated ? (
               <div className="flex items-center gap-3 px-4 pb-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                  <span className="text-primary font-bold text-lg">
-                    {user?.fullName?.charAt(0) || user?.phone?.charAt(0) || 'م'}
-                  </span>
-                </div>
+                <UserAvatar user={user} className="w-12 h-12" textClassName="text-primary font-bold text-lg" />
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-gray-900 truncate">{user?.fullName || 'المستخدم'}</p>
                   <p className="text-sm text-gray-500 truncate text-right" dir="ltr">{user?.phone || user?.email}</p>

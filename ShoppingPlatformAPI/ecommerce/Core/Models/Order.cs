@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -53,6 +53,14 @@ namespace ecommerce.Core.Models
 
         [Column("delivery_longitude", TypeName = "decimal(11,8)")]
         public decimal? DeliveryLongitude { get; set; }
+
+        // منطقة التوصيل وقت الطلب (نسخة ثابتة — لا تتغير إن عُدّلت المنطقة لاحقاً)
+        [Column("delivery_zone_id")]
+        public Guid? DeliveryZoneId { get; set; }
+
+        [MaxLength(100)]
+        [Column("delivery_zone_name")]
+        public string? DeliveryZoneName { get; set; }
 
         // ===== الدفع عند الاستلام: ما استلمه السائق نقداً، ومتى سلّمه للعمليات =====
         [Column("cash_collected_amount", TypeName = "decimal(10,2)")]

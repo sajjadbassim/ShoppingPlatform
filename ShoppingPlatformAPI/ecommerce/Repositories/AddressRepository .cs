@@ -15,18 +15,21 @@ namespace ecommerce.Repositories
         public async Task<IEnumerable<Address>> GetAllAsync()
         {
             return await _context.Addresses
+                .Include(a => a.Zone)
                 .OrderByDescending(a => a.CreatedAt)
                 .ToListAsync();
         }
         public async Task<Address> GetByIdAsync(Guid id)
         {
             return await _context.Addresses
+                .Include(a => a.Zone)
                 .FirstOrDefaultAsync(a => a.Id == id);
         }
 
         public async Task<IEnumerable<Address>> GetByUserIdAsync(Guid userId)
         {
             return await _context.Addresses
+                .Include(a => a.Zone)
                 .Where(a => a.UserId == userId)
                 .OrderByDescending(a => a.IsDefault)
                 .ThenByDescending(a => a.CreatedAt)

@@ -17,7 +17,7 @@ const LoginPage = () => {
   
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
-    identifier: '',
+    identifier: location.state?.identifier || '',   // قادم من رسالة «إذا كان لديك حساب»
     password: '',
     remember: false,
   })

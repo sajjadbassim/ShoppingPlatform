@@ -13,6 +13,7 @@ import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
 import { useMyPreferences, useUpdateMyPreferences, useThemePreference } from '../../hooks/usePreferences'
 import { useInstallPrompt } from '../../hooks/useInstallPrompt'
+import UserAvatar from '../../components/common/UserAvatar'
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0'
 
@@ -159,9 +160,7 @@ const SettingsPage = () => {
           {/* بطاقة المستخدم */}
           <Link to="/profile"
             className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-l from-primary to-indigo-700 text-white shadow-sm">
-            <span className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-2xl font-bold flex-shrink-0">
-              {user?.fullName?.charAt(0) || 'م'}
-            </span>
+            <UserAvatar user={user} className="w-14 h-14 ring-2 ring-white/40" bgClassName="bg-white/20" textClassName="text-2xl font-bold" />
             <span className="flex-1 min-w-0">
               <span className="block font-bold text-lg truncate">{user?.fullName || 'المستخدم'}</span>
               <span className="block text-sm text-white/80 truncate text-right" dir="ltr">{user?.phone || user?.email}</span>
