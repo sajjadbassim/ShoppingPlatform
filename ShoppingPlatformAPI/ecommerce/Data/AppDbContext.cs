@@ -1220,6 +1220,8 @@ namespace ecommerce.Data
             {
                 entity.ToTable("banners");
                 entity.HasKey(e => e.Id);
+                // بانرات "بلوك البانرات" تُحذف مع قسمها
+                entity.HasOne<HomeSection>().WithMany().HasForeignKey(e => e.SectionId).OnDelete(DeleteBehavior.Cascade);
                 entity.Property(e => e.IsActive).HasDefaultValue(true);
                 entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETDATE()");
                 entity.Property(e => e.UpdatedAt).HasDefaultValueSql("GETDATE()");

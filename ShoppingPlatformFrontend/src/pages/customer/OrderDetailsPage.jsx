@@ -293,7 +293,7 @@ const OrderDetailsPage = () => {
       const subOrders = order.subOrders || []
       const items = subOrders.flatMap(sub => sub.items || [])
       for (const item of items) {
-        await addToCart(item.productId, item.quantity)
+        await addToCart(item.productId, item.quantity, item.variantId || null)
       }
       success('تمت إضافة المنتجات للسلة')
       navigate('/cart')
@@ -396,6 +396,7 @@ const OrderDetailsPage = () => {
       { key: 'PENDING_CONFIRMATION', label: 'تم استلام الطلب' },
       { key: 'CONFIRMED',            label: 'تم تأكيد الطلب' },
       { key: 'PREPARING',            label: 'قيد التحضير'    },
+      { key: 'READY',                label: 'جاهز للاستلام'  },
       { key: 'OUT_FOR_DELIVERY',     label: 'في الطريق'       },
       { key: 'DELIVERED',            label: 'تم التوصيل'     },
     ]
@@ -552,7 +553,7 @@ const OrderDetailsPage = () => {
                 <div className="divide-y divide-gray-200">
                   {items.map((item, index) => (
                     <div key={item.id || index} className="flex gap-4 py-4 first:pt-0 last:pb-0">
-                      <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="w-20 h-20 product-media rounded-lg overflow-hidden">
                         <img
                           src={getImageUrl(item.productImageUrl) || '/placeholder-product.png'}
                           alt=""

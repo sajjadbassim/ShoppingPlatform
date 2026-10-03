@@ -81,10 +81,29 @@ namespace ecommerce.Services
 
             var errors = new List<string>();
 
+            var cartProductIds = cart.Items.Select(i => i.ProductId).Distinct().ToList();
+            var productsWithVariants = (await _context.ProductVariants
+                    .Where(v => cartProductIds.Contains(v.ProductId))
+                    .Select(v => v.ProductId)
+                    .Distinct()
+                    .ToListAsync())
+                .ToHashSet();
+            var hiddenCategoryIds = await CategoryVisibility.GetHiddenCategoryIdsAsync(_context);
+
             foreach (var item in cart.Items)
             {
-                if (!item.Product.IsActive || !item.Product.IsAvailable)
+                // المنتج ذو المتغيرات: التوفر من المتغير (يُتحقق منه أدناه)
+                if (!item.Product.IsActive || (item.Variant == null && !item.Product.IsAvailable))
                     errors.Add($"المنتج '{item.Product.Name}' غير متوفر");
+
+                if (item.Product.Vendor == null || !item.Product.Vendor.IsActive)
+                    errors.Add($"المنتج '{item.Product.Name}' من متجر غير متاح حالياً");
+
+                if (item.Product.CategoryId.HasValue && hiddenCategoryIds.Contains(item.Product.CategoryId.Value))
+                    errors.Add($"المنتج '{item.Product.Name}' غير متاح حالياً");
+
+                if (item.Variant == null && productsWithVariants.Contains(item.ProductId))
+                    errors.Add($"المنتج '{item.Product.Name}' يحتاج اختيار الخيارات");
 
                 if (item.Variant != null)
                 {
@@ -302,12 +321,13 @@ namespace ecommerce.Services
             if (order == null) throw new Exception("الطلب غير موجود");
             if (!isAdmin && order.CustomerId != customerId) throw new UnauthorizedAccessException("ليس لديك صلاحية لعرض هذا الطلب");
 
-            var allStatuses = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED };
+            var allStatuses = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED };
             var statusArMap = new Dictionary<string, (string ar, string desc)>
             {
                 { OrderStatus.PENDING_CONFIRMATION, ("بانتظار التأكيد", "تم استلام طلبك وهو بانتظار التأكيد") },
                 { OrderStatus.CONFIRMED,            ("تم التأكيد",      "تم تأكيد طلبك وسيبدأ التحضير قريباً") },
                 { OrderStatus.PREPARING,            ("قيد التحضير",    "يتم تحضير طلبك الآن") },
+                { OrderStatus.READY,                ("جاهز للاستلام",  "طلبك جاهز وبانتظار السائق") },
                 { OrderStatus.OUT_FOR_DELIVERY,     ("في الطريق إليك", "طلبك في الطريق إليك") },
                 { OrderStatus.DELIVERED,            ("تم التسليم",      "تم تسليم طلبك بنجاح") },
                 { OrderStatus.CANCELLED,            ("ملغي",            "تم إلغاء الطلب") },
@@ -463,6 +483,7 @@ namespace ecommerce.Services
                 DeliveryPhone = order.Address?.Phone,
                 Subtotal = order.Subtotal,
                 DeliveryFees = order.DeliveryFees,
+                DeliveryZoneName = order.DeliveryZoneName,
                 DiscountAmount = order.DiscountAmount,
                 TotalAmount = order.TotalAmount,
                 CouponCode = order.CouponCode,

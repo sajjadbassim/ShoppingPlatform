@@ -12,7 +12,7 @@ namespace ecommerce.Services.HomeService
         // ===================================
         // Banners
         // ===================================
-        Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true);
+        Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true, bool heroOnly = false);
         Task<BannerDto> GetBannerByIdAsync(Guid id);
         Task<BannerDto> CreateBannerAsync(CreateBannerDto dto);
         Task<BannerDto> UpdateBannerAsync(Guid id, UpdateBannerDto dto);
@@ -26,6 +26,8 @@ namespace ecommerce.Services.HomeService
         Task<HomeSectionDto> CreateSectionAsync(CreateHomeSectionDto dto);
         Task<HomeSectionDto> UpdateSectionAsync(Guid id, UpdateHomeSectionDto dto);
         Task<bool> DeleteSectionAsync(Guid id);
+        Task<HomeSectionDto> SetSectionBannerAsync(Guid id, IFormFile image);
+        Task<bool> RemoveSectionBannerAsync(Guid id);
 
         // ===================================
         // Section Items (للـ custom_products)

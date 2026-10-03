@@ -41,11 +41,12 @@ namespace ecommerce.Repositories
         // ===================================
         public async Task<IEnumerable<Product>> GetAllAsync()
         {
-            return await _context.Products
+            var query = await ApplyVisibilityAsync(_context.Products, isActive: null);
+
+            return await query
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Where(p => p.IsActive)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
@@ -53,13 +54,19 @@ namespace ecommerce.Repositories
         // ===================================
         // GetByVendorAsync
         // ===================================
-        public async Task<IEnumerable<Product>> GetByVendorAsync(Guid vendorId)
+        public async Task<IEnumerable<Product>> GetByVendorAsync(Guid vendorId, bool includeInactiveVendor = false, bool includeHidden = false)
         {
-            return await _context.Products
+            var vendorProducts = _context.Products.Where(p => p.VendorId == vendorId);
+
+            // includeHidden (لوحة البائع): الظاهر والمخفي معاً — دون المحذوف
+            var query = includeHidden
+                ? vendorProducts.Where(p => !p.IsDeleted)
+                : await ApplyVisibilityAsync(vendorProducts, isActive: null, publicOnly: !includeInactiveVendor);
+
+            return await query
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Where(p => p.VendorId == vendorId && p.IsActive)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
@@ -69,11 +76,13 @@ namespace ecommerce.Repositories
         // ===================================
         public async Task<IEnumerable<Product>> GetByCategoryAsync(Guid categoryId)
         {
-            return await _context.Products
+            var query = await ApplyCategoryFilterAsync(_context.Products, categoryId);
+            query = await ApplyVisibilityAsync(query, isActive: null);
+
+            return await query
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Where(p => p.CategoryId == categoryId && p.IsActive)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
         }
@@ -87,12 +96,13 @@ namespace ecommerce.Repositories
                 return await GetAllAsync();
 
             searchTerm = searchTerm.Trim().ToLower();
+            var query = await ApplyVisibilityAsync(_context.Products, isActive: null);
 
-            return await _context.Products
+            return await query
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Where(p => p.IsActive &&
+                .Where(p =>
                     ((p.Name != null && p.Name.ToLower().Contains(searchTerm)) ||
                      (p.NameAr != null && p.NameAr.Contains(searchTerm)) ||
                      (p.Description != null && p.Description.ToLower().Contains(searchTerm))))
@@ -123,8 +133,7 @@ namespace ecommerce.Repositories
             if (vendorId.HasValue && vendorId.Value != Guid.Empty)
                 query = query.Where(p => p.VendorId == vendorId.Value);
 
-            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
-                query = query.Where(p => p.CategoryId == categoryId.Value);
+            query = await ApplyCategoryFilterAsync(query, categoryId);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -146,13 +155,9 @@ namespace ecommerce.Repositories
             if (maxPrice.HasValue && maxPrice.Value > 0)
                 query = query.Where(p => p.Price <= maxPrice.Value);
 
-            if (isAvailable.HasValue)
-                query = query.Where(p => p.IsAvailable == isAvailable.Value);
+            query = ApplyAvailabilityFilter(query, isAvailable);
 
-            if (isActive.HasValue)
-                query = query.Where(p => p.IsActive == isActive.Value);
-            else
-                query = query.Where(p => p.IsActive);
+            query = await ApplyVisibilityAsync(query, isActive);
 
             return await query
                 .OrderByDescending(p => p.CreatedAt)
@@ -171,15 +176,15 @@ namespace ecommerce.Repositories
             decimal? minPrice = null,
             decimal? maxPrice = null,
             bool? isAvailable = null,
-            bool? isActive = null)
+            bool? isActive = null,
+            bool publicOnly = true)
         {
             var query = _context.Products.AsQueryable();
 
             if (vendorId.HasValue && vendorId.Value != Guid.Empty)
                 query = query.Where(p => p.VendorId == vendorId.Value);
 
-            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
-                query = query.Where(p => p.CategoryId == categoryId.Value);
+            query = await ApplyCategoryFilterAsync(query, categoryId);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -201,13 +206,9 @@ namespace ecommerce.Repositories
             if (maxPrice.HasValue && maxPrice.Value > 0)
                 query = query.Where(p => p.Price <= maxPrice.Value);
 
-            if (isAvailable.HasValue)
-                query = query.Where(p => p.IsAvailable == isAvailable.Value);
+            query = ApplyAvailabilityFilter(query, isAvailable);
 
-            if (isActive.HasValue)
-                query = query.Where(p => p.IsActive == isActive.Value);
-            else
-                query = query.Where(p => p.IsActive);
+            query = await ApplyVisibilityAsync(query, isActive, publicOnly);
 
             return await query.CountAsync();
         }
@@ -236,8 +237,7 @@ namespace ecommerce.Repositories
             if (vendorId.HasValue && vendorId.Value != Guid.Empty)
                 query = query.Where(p => p.VendorId == vendorId.Value);
 
-            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
-                query = query.Where(p => p.CategoryId == categoryId.Value);
+            query = await ApplyCategoryFilterAsync(query, categoryId);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -255,13 +255,9 @@ namespace ecommerce.Repositories
             if (maxPrice.HasValue && maxPrice.Value > 0)
                 query = query.Where(p => p.Price <= maxPrice.Value);
 
-            if (isAvailable.HasValue)
-                query = query.Where(p => p.IsAvailable == isAvailable.Value);
+            query = ApplyAvailabilityFilter(query, isAvailable);
 
-            if (isActive.HasValue)
-                query = query.Where(p => p.IsActive == isActive.Value);
-            else
-                query = query.Where(p => p.IsActive);
+            query = await ApplyVisibilityAsync(query, isActive);
 
             query = query.OrderByDescending(p => p.CreatedAt);
 
@@ -291,19 +287,56 @@ namespace ecommerce.Repositories
             if (pageSize < 1) pageSize = 20;
             if (pageSize > 100) pageSize = 100;
 
-            var query = _context.Products
+            var query = await BuildAdvancedQueryAsync(
+                vendorId, categoryId, searchTerm, minPrice, maxPrice, isAvailable, isActive,
+                minRating, hasDiscount, sortBy, sortOrder);
+
+            return await query
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Include(p => p.Reviews)
-                .AsQueryable();
+                .ToPagedListAsync(pageNumber, pageSize);
+        }
+
+        // كل الفلاتر عدا السعر والخصم، بنفس الترتيب — للتسعير بالعروض في الذاكرة
+        public async Task<List<ProductPriceInfo>> GetAdvancedFilterCandidatesAsync(
+            Guid? vendorId, Guid? categoryId, string? searchTerm, bool? isAvailable, bool? isActive,
+            decimal? minRating, string sortBy, string sortOrder)
+        {
+            var query = await BuildAdvancedQueryAsync(
+                vendorId, categoryId, searchTerm, null, null, isAvailable, isActive,
+                minRating, null, sortBy, sortOrder);
+
+            return await query
+                .Select(p => new ProductPriceInfo(p.Id, p.Price, p.OriginalPrice, p.CategoryId, p.VendorId))
+                .ToListAsync();
+        }
+
+        public async Task<List<Product>> GetByIdsWithDetailsAsync(IReadOnlyCollection<Guid> ids)
+        {
+            var products = await _context.Products
+                .Include(p => p.Vendor)
+                .Include(p => p.Category)
+                .Include(p => p.Images)
+                .Where(p => ids.Contains(p.Id))
+                .ToListAsync();
+
+            // بنفس ترتيب المعرّفات المطلوبة
+            var order = ids.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+            return products.OrderBy(p => order[p.Id]).ToList();
+        }
+
+        private async Task<IQueryable<Product>> BuildAdvancedQueryAsync(
+            Guid? vendorId, Guid? categoryId, string? searchTerm, decimal? minPrice, decimal? maxPrice,
+            bool? isAvailable, bool? isActive, decimal? minRating, bool? hasDiscount, string sortBy, string sortOrder)
+        {
+            var query = _context.Products.AsQueryable();
 
             // الفلاتر الأساسية
             if (vendorId.HasValue && vendorId.Value != Guid.Empty)
                 query = query.Where(p => p.VendorId == vendorId.Value);
 
-            if (categoryId.HasValue && categoryId.Value != Guid.Empty)
-                query = query.Where(p => p.CategoryId == categoryId.Value);
+            query = await ApplyCategoryFilterAsync(query, categoryId);
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
@@ -325,13 +358,9 @@ namespace ecommerce.Repositories
             if (maxPrice.HasValue && maxPrice.Value > 0)
                 query = query.Where(p => p.Price <= maxPrice.Value);
 
-            if (isAvailable.HasValue)
-                query = query.Where(p => p.IsAvailable == isAvailable.Value);
+            query = ApplyAvailabilityFilter(query, isAvailable);
 
-            if (isActive.HasValue)
-                query = query.Where(p => p.IsActive == isActive.Value);
-            else
-                query = query.Where(p => p.IsActive);
+            query = await ApplyVisibilityAsync(query, isActive);
 
             // ✅ فلترة بالتقييم
             if (minRating.HasValue)
@@ -360,7 +389,7 @@ namespace ecommerce.Repositories
                 _ => query.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id)
             };
 
-            return await query.ToPagedListAsync(pageNumber, pageSize);
+            return query;
         }
 
         // ===================================
@@ -374,13 +403,13 @@ namespace ecommerce.Repositories
             var term = searchTerm.Trim().ToLower();
 
             // بحث في المنتجات
-            var products = await _context.Products
+            var visibleProducts = await ApplyVisibilityAsync(_context.Products, isActive: null);
+            var products = await visibleProducts
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
                 .Include(p => p.Images)
-                .Include(p => p.Reviews)
                 .Where(p =>
-                    p.IsActive && p.IsAvailable &&
+                    p.IsAvailable &&
                     ((p.Name != null && p.Name.ToLower().Contains(term)) ||
                      (p.NameAr != null && p.NameAr.Contains(term)) ||
                      (p.Description != null && p.Description.ToLower().Contains(term))))
@@ -390,31 +419,50 @@ namespace ecommerce.Repositories
                 .ToListAsync();
 
             // بحث في المتاجر
-            var vendors = await _context.Vendors
-                .Include(v => v.Products)
+            // إسقاط مباشر بدل تحميل كل منتجات المتجر لعدّها
+            var vendorResults = await _context.Vendors
                 .Where(v =>
                     v.IsActive &&
                     ((v.Name != null && v.Name.ToLower().Contains(term)) ||
                      (v.NameAr != null && v.NameAr.Contains(term))))
                 .Take(maxResults)
-                .AsNoTracking()
+                .Select(v => new VendorSearchResult
+                {
+                    Id = v.Id,
+                    Name = v.Name,
+                    NameAr = v.NameAr,
+                    LogoUrl = v.LogoUrl,
+                    ProductCount = v.Products.Count(p => p.IsActive)
+                })
                 .ToListAsync();
 
             // بحث في التصنيفات
+            // الفئات الظاهرة فقط، والعدد يشمل الفئات الفرعية (نفس عدّ صفحة الفئات)
+            var hiddenCategoryIds = (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).ToList();
             var categories = await _context.Categories
-                .Include(c => c.Products)
                 .Where(c =>
-                    c.IsActive &&
+                    !hiddenCategoryIds.Contains(c.Id) &&
                     ((c.Name != null && c.Name.ToLower().Contains(term)) ||
                      (c.NameAr != null && c.NameAr.Contains(term))))
                 .Take(maxResults)
                 .AsNoTracking()
                 .ToListAsync();
+            var categoryCounts = categories.Any()
+                ? await new CategoryRepository(_context).GetProductCountsAsync()
+                : new Dictionary<Guid, int>();
+
+            // تقييمات المنتجات المعروضة فقط (بدل تحميل كل المراجعات)
+            var productIds = products.Select(p => p.Id).ToList();
+            var ratings = await _context.Reviews
+                .Where(r => productIds.Contains(r.ProductId) && r.IsApproved)
+                .GroupBy(r => r.ProductId)
+                .Select(g => new { ProductId = g.Key, Average = g.Average(r => (double)r.Rating), Count = g.Count() })
+                .ToDictionaryAsync(x => x.ProductId);
 
             // تجميع النتائج
             var productResults = products.Select(p =>
             {
-                var approvedReviews = p.Reviews?.Where(r => r.IsApproved).ToList() ?? new();
+                ratings.TryGetValue(p.Id, out var rating);
                 var primaryImage = p.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl;
                 var basePrice = p.OriginalPrice ?? p.Price;
                 var hasDiscount = p.OriginalPrice.HasValue && p.OriginalPrice > p.Price;
@@ -432,23 +480,14 @@ namespace ecommerce.Repositories
                     HasDiscount = hasDiscount,
                     DiscountPercentage = discPct,
                     PrimaryImageUrl = primaryImage,
+                    VendorId = p.VendorId,
+                    CategoryId = p.CategoryId,
                     VendorName = p.Vendor?.Name ?? string.Empty,
                     CategoryName = p.Category?.Name ?? string.Empty,
-                    AverageRating = approvedReviews.Any()
-                        ? Math.Round((decimal)approvedReviews.Average(r => r.Rating), 1)
-                        : null,
-                    ReviewCount = approvedReviews.Count,
+                    AverageRating = rating != null ? Math.Round((decimal)rating.Average, 1) : null,
+                    ReviewCount = rating?.Count ?? 0,
                     IsAvailable = p.IsAvailable
                 };
-            }).ToList();
-
-            var vendorResults = vendors.Select(v => new VendorSearchResult
-            {
-                Id = v.Id,
-                Name = v.Name,
-                NameAr = v.NameAr,
-                LogoUrl = v.LogoUrl,
-                ProductCount = v.Products?.Count(p => p.IsActive) ?? 0
             }).ToList();
 
             var categoryResults = categories.Select(c => new CategorySearchResult
@@ -457,7 +496,7 @@ namespace ecommerce.Repositories
                 Name = c.Name,
                 NameAr = c.NameAr,
                 IconUrl = c.IconUrl,
-                ProductCount = c.Products?.Count(p => p.IsActive) ?? 0
+                ProductCount = categoryCounts.GetValueOrDefault(c.Id)
             }).ToList();
 
             return new UnifiedSearchResult
@@ -503,11 +542,19 @@ namespace ecommerce.Repositories
         public async Task<bool> DeleteAsync(Guid id)
         {
             var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            if (product == null || product.IsDeleted)
                 return false;
 
+            // حذف ناعم: يبقى السجل لأجل الطلبات القديمة، ويُخفى من كل مكان (IsActive = false أيضاً
+            // حتى تبقى كل فلاتر الظهور الحالية تستبعده)
+            product.IsDeleted = true;
+            product.DeletedAt = DateTime.UtcNow;
             product.IsActive = false;
             product.UpdatedAt = DateTime.UtcNow;
+
+            // لا يبقى منتج محذوف معلّقاً في سلال الزبائن أو قوائم أمنياتهم
+            _context.CartItems.RemoveRange(await _context.CartItems.Where(c => c.ProductId == id).ToListAsync());
+            _context.Wishlists.RemoveRange(await _context.Wishlists.Where(w => w.ProductId == id).ToListAsync());
 
             await _context.SaveChangesAsync();
             return true;
@@ -524,18 +571,85 @@ namespace ecommerce.Repositories
         // ===================================
         // UpdateStockAsync
         // ===================================
-        public async Task<bool> UpdateStockAsync(Guid id, int quantity)
+        public async Task<bool> UpdateStockAsync(Guid id, int quantity, bool isAvailable)
         {
             var product = await _context.Products.FindAsync(id);
             if (product == null)
                 return false;
 
             product.StockQuantity = quantity;
-            product.IsAvailable = quantity > 0;
+            product.IsAvailable = isAvailable;
             product.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        // ===================================
+        // Private: فلترة الفئة مع كل فئاتها الفرعية (أي عمق)
+        // ===================================
+        private async Task<IQueryable<Product>> ApplyCategoryFilterAsync(IQueryable<Product> query, Guid? categoryId)
+        {
+            if (!categoryId.HasValue || categoryId.Value == Guid.Empty)
+                return query;
+
+            var categoryIds = await CategoryVisibility.GetWithDescendantsAsync(_context, categoryId.Value);
+            return query.Where(p => p.CategoryId != null && categoryIds.Contains(p.CategoryId.Value));
+        }
+
+        // ===================================
+        // ظهور المنتج للعامة: مفعّل، من متجر مفعّل، وفئته (وأسلافها) غير معطّلة
+        // ===================================
+        public async Task<bool> IsPubliclyVisibleAsync(Guid productId)
+        {
+            var product = await _context.Products
+                .AsNoTracking()
+                .Where(p => p.Id == productId)
+                .Select(p => new { p.IsActive, p.IsDeleted, VendorActive = p.Vendor.IsActive, p.CategoryId })
+                .FirstOrDefaultAsync();
+
+            if (product == null || product.IsDeleted || !product.IsActive || !product.VendorActive)
+                return false;
+
+            return !product.CategoryId.HasValue ||
+                   !(await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).Contains(product.CategoryId.Value);
+        }
+
+        // "متوفر": بلا متغيرات → متوفر وبمخزون؛ بمتغيرات → يوجد متغير متوفر وبمخزون
+        private IQueryable<Product> ApplyAvailabilityFilter(IQueryable<Product> query, bool? isAvailable)
+        {
+            if (!isAvailable.HasValue)
+                return query;
+
+            var variants = _context.ProductVariants;
+            return isAvailable.Value
+                ? query.Where(p =>
+                    (!variants.Any(v => v.ProductId == p.Id) && p.IsAvailable && p.StockQuantity > 0) ||
+                    variants.Any(v => v.ProductId == p.Id && v.IsAvailable && v.StockQuantity > 0))
+                : query.Where(p => !(
+                    (!variants.Any(v => v.ProductId == p.Id) && p.IsAvailable && p.StockQuantity > 0) ||
+                    variants.Any(v => v.ProductId == p.Id && v.IsAvailable && v.StockQuantity > 0)));
+        }
+
+        // publicOnly = false لصاحب المتجر والإدارة: لا يُشترط تفعيل المتجر أو الفئة
+        private async Task<IQueryable<Product>> ApplyVisibilityAsync(IQueryable<Product> query, bool? isActive, bool publicOnly = true)
+        {
+            // المحذوف لا يظهر لأحد — ولا للإدارة عبر isActive = false
+            query = query.Where(p => !p.IsDeleted);
+
+            query = isActive.HasValue
+                ? query.Where(p => p.IsActive == isActive.Value)
+                : query.Where(p => p.IsActive);
+
+            if (!publicOnly)
+                return query;
+
+            query = query.Where(p => p.Vendor.IsActive);
+
+            var hiddenCategoryIds = (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).ToList();
+            return hiddenCategoryIds.Count == 0
+                ? query
+                : query.Where(p => p.CategoryId == null || !hiddenCategoryIds.Contains(p.CategoryId.Value));
         }
     }
 }

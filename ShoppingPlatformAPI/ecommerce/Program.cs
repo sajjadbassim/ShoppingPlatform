@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
@@ -64,7 +64,8 @@ builder.Services.AddControllers(options =>
         .Build();
 
     options.Filters.Add(new AuthorizeFilter(policy));
-});
+})
+.AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new ecommerce.Common.UtcDateTimeConverter()));
 
 // أخطاء التحقق من المدخلات بنفس شكل ApiResponse بدل ValidationProblemDetails
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -226,6 +227,15 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(10),
             QueueLimit = 0,
         }));
+    // تحديث محتوى حسابات التواصل (طلب عام يتصل بتيك توك وإنستغرام): يكفي لفتح المتاجر والريلز بشكل طبيعي
+    options.AddPolicy("social-refresh", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
 });
 
 // ===================================
@@ -246,7 +256,9 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddAppPersistence(builder.Configuration);
 builder.Services.AddAppServices();
+builder.Services.AddAppDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddTikTokIntegration(builder.Configuration);
+builder.Services.AddInstagramIntegration(builder.Configuration);
 
 //builder.WebHost.UseUrls("http://0.0.0.0:5000");
 

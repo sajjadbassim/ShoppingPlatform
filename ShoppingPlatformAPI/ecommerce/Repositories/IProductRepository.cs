@@ -11,13 +11,16 @@ namespace ecommerce.Repositories
         Task<Product> GetByIdAsync(Guid id);
         Task<Product> GetByIdWithDetailsAsync(Guid id);
         Task<IEnumerable<Product>> GetAllAsync();
-        Task<IEnumerable<Product>> GetByVendorAsync(Guid vendorId);
+        // includeInactiveVendor: لصاحب المتجر والإدارة — يرون منتجات متجرهم حتى قبل تفعيله
+        // includeHidden: لوحة البائع — تشمل المنتجات المخفية (لا المحذوفة)
+        Task<IEnumerable<Product>> GetByVendorAsync(Guid vendorId, bool includeInactiveVendor = false, bool includeHidden = false);
         Task<IEnumerable<Product>> GetByCategoryAsync(Guid categoryId);
         Task<Product> CreateAsync(Product product);
         Task<Product> UpdateAsync(Product product);
         Task<bool> DeleteAsync(Guid id);
         Task<bool> ExistsAsync(Guid id);
-        Task<bool> UpdateStockAsync(Guid id, int quantity);
+        Task<bool> UpdateStockAsync(Guid id, int quantity, bool isAvailable);
+        Task<bool> IsPubliclyVisibleAsync(Guid productId);
 
         // ===================================
         // البحث والفلترة
@@ -42,7 +45,8 @@ namespace ecommerce.Repositories
             decimal? minPrice = null,
             decimal? maxPrice = null,
             bool? isAvailable = null,
-            bool? isActive = null);
+            bool? isActive = null,
+            bool publicOnly = true);
 
         Task<PagedResult<Product>> GetPagedAsync(
             Guid? vendorId = null,
@@ -77,5 +81,11 @@ namespace ecommerce.Repositories
         // ✅ جديد: بحث موحد
         // ===================================
         Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5);
+
+        // للفلترة/الترتيب بالسعر بعد العروض (يُحسب في الذاكرة)
+        Task<List<ProductPriceInfo>> GetAdvancedFilterCandidatesAsync(
+            Guid? vendorId, Guid? categoryId, string? searchTerm, bool? isAvailable, bool? isActive,
+            decimal? minRating, string sortBy, string sortOrder);
+        Task<List<Product>> GetByIdsWithDetailsAsync(IReadOnlyCollection<Guid> ids);
     }
 }

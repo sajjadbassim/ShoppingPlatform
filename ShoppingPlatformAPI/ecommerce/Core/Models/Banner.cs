@@ -56,6 +56,10 @@ namespace ecommerce.Core.Models
         [Column("ends_at")]
         public DateTime? EndsAt { get; set; }
 
+        // مكان الظهور: null = السلايدر العلوي، وإلا = قسم "بلوك بانرات" في الصفحة الرئيسية
+        [Column("section_id")]
+        public Guid? SectionId { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -105,6 +109,11 @@ namespace ecommerce.Core.Models
 
         [Column("filter_vendor_id")]
         public Guid? FilterVendorId { get; set; }
+
+        // صورة بانر تظهر رأساً لقسم المنتجات (العنوان وزر "عرض المزيد" فوقها) — اختيارية
+        [MaxLength(500)]
+        [Column("banner_image_url")]
+        public string? BannerImageUrl { get; set; }
 
         [Column("is_active")]
         public bool IsActive { get; set; } = true;

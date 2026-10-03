@@ -12,11 +12,13 @@ namespace ecommerce.Services.ProductService
         {
             private readonly AppDbContext _context;
             private readonly IInventoryService _inventoryService;
+            private readonly IPromotionService _promotionService;
 
-            public VariantService(AppDbContext context, IInventoryService inventoryService)
+            public VariantService(AppDbContext context, IInventoryService inventoryService, IPromotionService promotionService)
             {
                 _context = context;
                 _inventoryService = inventoryService;
+                _promotionService = promotionService;
             }
 
             // ===================================
@@ -51,6 +53,10 @@ namespace ecommerce.Services.ProductService
 
                 if (!dto.Values.Any())
                     throw new Exception("يجب إضافة قيمة واحدة على الأقل");
+
+                // كل متغير يحمل قيمة لكل خاصية — خاصية جديدة تجعل المتغيرات الحالية ناقصة لا يمكن اختيارها
+                if (await _context.ProductVariants.AnyAsync(v => v.ProductId == productId))
+                    throw new Exception("لا يمكن إضافة خاصية جديدة بعد إنشاء متغيرات — احذف المتغيرات أولاً");
 
                 var attribute = new ProductAttribute
                 {
@@ -105,6 +111,10 @@ namespace ecommerce.Services.ProductService
 
                 if (attribute == null)
                     return false;
+
+                // قيم الخاصية مرتبطة بمتغيرات — حذفها يكسر تلك المتغيرات
+                if (attribute.Values.Any(v => v.VariantValues.Any()))
+                    throw new Exception("لا يمكن حذف الخاصية لأنها مستخدمة في متغيرات — احذف تلك المتغيرات أولاً");
 
                 _context.ProductAttributes.Remove(attribute);
                 await _context.SaveChangesAsync();
@@ -176,7 +186,8 @@ namespace ecommerce.Services.ProductService
                     .AsNoTracking()
                     .ToListAsync();
 
-                return variants.Select(v => MapVariantToDto(v, product.Price)).ToList();
+                var basePrice = await GetEffectiveBasePriceAsync(product);
+                return variants.Select(v => MapVariantToDto(v, basePrice)).ToList();
             }
 
             // ===================================
@@ -195,7 +206,7 @@ namespace ecommerce.Services.ProductService
                 if (variant == null)
                     throw new Exception("المتغير غير موجود");
 
-                return MapVariantToDto(variant, variant.Product.Price);
+                return MapVariantToDto(variant, await GetEffectiveBasePriceAsync(variant.Product));
             }
 
             // ===================================
@@ -211,14 +222,39 @@ namespace ecommerce.Services.ProductService
                 if (!dto.AttributeValueIds.Any())
                     throw new Exception("يجب تحديد خاصية واحدة على الأقل للمتغير");
 
+                var requestedIds = dto.AttributeValueIds.ToHashSet();
+                if (requestedIds.Count != dto.AttributeValueIds.Count)
+                    throw new Exception("لا يمكن تكرار نفس القيمة في المتغير");
+
                 // التحقق من وجود كل القيم
                 var attributeValues = await _context.ProductAttributeValues
                     .Include(av => av.Attribute)
-                    .Where(av => dto.AttributeValueIds.Contains(av.Id) && av.Attribute.ProductId == productId)
+                    .Where(av => requestedIds.Contains(av.Id) && av.Attribute.ProductId == productId)
                     .ToListAsync();
 
-                if (attributeValues.Count != dto.AttributeValueIds.Count)
+                if (attributeValues.Count != requestedIds.Count)
                     throw new Exception("بعض قيم الخصائص غير موجودة أو لا تنتمي لهذا المنتج");
+
+                // قيمة واحدة فقط من كل خاصية (لا S و M معاً)
+                if (attributeValues.GroupBy(av => av.AttributeId).Any(g => g.Count() > 1))
+                    throw new Exception("لا يمكن اختيار أكثر من قيمة لنفس الخاصية في المتغير");
+
+                // قيمة لكل خاصية — وإلا لا يستطيع الزبون الوصول للمتغير من صفحة المنتج
+                var attributeCount = await _context.ProductAttributes.CountAsync(a => a.ProductId == productId);
+                if (attributeValues.Count != attributeCount)
+                    throw new Exception("يجب اختيار قيمة لكل خاصية من خصائص المنتج");
+
+                // نفس التركيبة لا تتكرر في متغيرين
+                var existingCombinations = (await _context.ProductVariantAttributeValues
+                        .Where(x => x.Variant.ProductId == productId)
+                        .Select(x => new { x.VariantId, x.AttributeValueId })
+                        .ToListAsync())
+                    .GroupBy(x => x.VariantId)
+                    .Select(g => g.Select(x => x.AttributeValueId).ToHashSet());
+                if (existingCombinations.Any(combination => combination.SetEquals(requestedIds)))
+                    throw new Exception("يوجد متغير بنفس هذه الخيارات مسبقاً");
+
+                EnsureNonNegativePrice(product.Price, dto.PriceAdjustment);
 
                 var variant = new ProductVariant
                 {
@@ -256,7 +292,11 @@ namespace ecommerce.Services.ProductService
                 var previousStock = variant.StockQuantity;
 
                 if (dto.Sku != null) variant.Sku = dto.Sku;
-                if (dto.PriceAdjustment != null) variant.PriceAdjustment = dto.PriceAdjustment.Value;
+                if (dto.PriceAdjustment != null)
+                {
+                    EnsureNonNegativePrice(variant.Product.Price, dto.PriceAdjustment.Value);
+                    variant.PriceAdjustment = dto.PriceAdjustment.Value;
+                }
                 if (dto.StockQuantity != null) variant.StockQuantity = dto.StockQuantity.Value;
                 if (dto.IsAvailable != null) variant.IsAvailable = dto.IsAvailable.Value;
                 if (dto.ImageUrl != null) variant.ImageUrl = dto.ImageUrl;
@@ -287,6 +327,15 @@ namespace ecommerce.Services.ProductService
                 if (variant == null)
                     return false;
 
+                // المتغير في طلبات أو مرتجعات سابقة لا يُحذف (السجل يحتاجه) — يُخفى بدلاً من ذلك
+                if (await _context.SubOrderItems.AnyAsync(i => i.VariantId == variantId) ||
+                    await _context.ReturnItems.AnyAsync(i => i.VariantId == variantId))
+                    throw new Exception("لا يمكن حذف هذا المتغير لأنه موجود في طلبات سابقة — اجعله غير متوفر بدلاً من ذلك");
+
+                // إزالته من سلال الزبائن قبل الحذف
+                _context.CartItems.RemoveRange(
+                    await _context.CartItems.Where(c => c.VariantId == variantId).ToListAsync());
+
                 _context.ProductVariants.Remove(variant);
                 await _context.SaveChangesAsync();
                 return true;
@@ -295,6 +344,18 @@ namespace ecommerce.Services.ProductService
             // ===================================
             // Private Helpers
             // ===================================
+
+            private static void EnsureNonNegativePrice(decimal productPrice, decimal priceAdjustment)
+            {
+                if (productPrice + priceAdjustment < 0)
+                    throw new Exception("فرق السعر يجعل سعر المتغير سالباً");
+            }
+
+            // سعر المنتج بعد العرض الفعّال — نفس الأساس الذي تحسب عليه السلة والطلب سعر المتغير
+            private Task<decimal> GetEffectiveBasePriceAsync(Product product) =>
+                _promotionService.CalculateFinalPriceAsync(
+                    product.Id, product.CategoryId ?? Guid.Empty, product.VendorId, product.Price);
+
             private async Task<ProductAttributeDto> GetAttributeWithValuesAsync(Guid attributeId)
             {
                 var attribute = await _context.ProductAttributes

@@ -24,6 +24,7 @@ const STATUSES = [
   { value: PENDING, label: 'بانتظار قرارك' },
   { value: 'CONFIRMED', label: 'مؤكد' },
   { value: 'PREPARING', label: 'قيد التحضير' },
+  { value: 'READY', label: 'جاهز للاستلام' },
   { value: 'OUT_FOR_DELIVERY', label: 'في الطريق' },
   { value: 'DELIVERED', label: 'مكتمل' },
   { value: 'DELIVERY_FAILED', label: 'تعذّر التسليم' },
@@ -78,12 +79,12 @@ const useVendorOrders = (vendorId, params = {}) => useQuery({
 const ItemThumbs = ({ items = [] }) => (
   <div className="flex items-center -space-x-2 space-x-reverse">
     {items.slice(0, 3).map((it, i) => (
-      <span key={i} className="w-10 h-10 rounded-lg bg-gray-100 ring-2 ring-white overflow-hidden flex-shrink-0">
+      <span key={i} className="w-10 h-10 rounded-lg product-media ring-2 ring-white overflow-hidden flex-shrink-0">
         {it.productImageUrl && <img src={getImageUrl(it.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
       </span>
     ))}
     {items.length > 3 && (
-      <span className="w-10 h-10 rounded-lg bg-gray-100 ring-2 ring-white text-xs font-bold text-gray-500 flex items-center justify-center">+{items.length - 3}</span>
+      <span className="w-10 h-10 rounded-lg product-media ring-2 ring-white text-xs font-bold text-gray-500 flex items-center justify-center">+{items.length - 3}</span>
     )}
   </div>
 )
@@ -91,7 +92,27 @@ const ItemThumbs = ({ items = [] }) => (
 // ===========================
 // بطاقة طلب
 // ===========================
-const OrderCard = ({ order, onOpen, onAccept, onReject, busy }) => {
+// الخطوة التالية بعد القبول: بدء التحضير ← جاهز للاستلام (يُبلَّغ فريق التوصيل فوراً)
+const NEXT_STEP = {
+  CONFIRMED: { step: 'preparing', label: 'بدء التحضير', icon: Package, cls: 'bg-indigo-600 hover:bg-indigo-700' },
+  PREPARING: { step: 'ready', label: 'جاهز للاستلام', icon: CheckCircle, cls: 'bg-teal-600 hover:bg-teal-700' },
+}
+
+const NextStepButton = ({ order, onAdvance, busy, big = false }) => {
+  const next = NEXT_STEP[order.status]
+  if (!next) return order.status === 'READY'
+    ? <p className={`text-center text-teal-700 font-medium ${big ? 'text-sm py-2' : 'text-xs'}`}>✓ جاهز — بانتظار وصول السائق</p>
+    : null
+  const Icon = next.icon
+  return (
+    <button onClick={() => onAdvance(next.step)} disabled={busy}
+      className={`w-full ${big ? 'h-12' : 'h-10 text-sm'} rounded-xl text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50 ${next.cls}`}>
+      {busy ? <RefreshCw size={16} className="animate-spin" /> : <Icon size={big ? 18 : 16} />}{next.label}
+    </button>
+  )
+}
+
+const OrderCard = ({ order, onOpen, onAccept, onReject, onAdvance, busy }) => {
   const pending = order.status === PENDING
   const count = order.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0
   const names = order.items?.map(it => it.productNameAr || it.productName).join('، ')
@@ -124,6 +145,9 @@ const OrderCard = ({ order, onOpen, onAccept, onReject, busy }) => {
           </button>
         </div>
       )}
+      {!pending && (NEXT_STEP[order.status] || order.status === 'READY') && (
+        <div className="px-4 pb-4"><NextStepButton order={order} onAdvance={onAdvance} busy={busy} /></div>
+      )}
     </div>
   )
 }
@@ -131,7 +155,7 @@ const OrderCard = ({ order, onOpen, onAccept, onReject, busy }) => {
 // ===========================
 // تفاصيل الطلب — نافذة من الأسفل (هاتف) أو جانبية (كمبيوتر)
 // ===========================
-const OrderSheet = ({ order, onClose, onAccept, onReject, busy }) => {
+const OrderSheet = ({ order, onClose, onAccept, onReject, onAdvance, busy }) => {
   const pending = order.status === PENDING
   const wa = whatsappLink(order.customerPhone)
   return (
@@ -172,7 +196,7 @@ const OrderSheet = ({ order, onClose, onAccept, onReject, busy }) => {
           <div className="rounded-2xl border border-gray-200 divide-y divide-gray-100">
             {(order.items || []).map((it, i) => (
               <div key={i} className="flex items-center gap-3 p-3">
-                <span className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                <span className="w-12 h-12 rounded-xl product-media overflow-hidden flex-shrink-0">
                   {it.productImageUrl && <img src={getImageUrl(it.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -207,6 +231,11 @@ const OrderSheet = ({ order, onClose, onAccept, onReject, busy }) => {
               className="h-12 rounded-xl bg-green-600 text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
               {busy ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}قبول الطلب
             </button>
+          </div>
+        )}
+        {!pending && (NEXT_STEP[order.status] || order.status === 'READY') && (
+          <div className="p-4 border-t border-gray-100 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <NextStepButton order={order} onAdvance={onAdvance} busy={busy} big />
           </div>
         )}
       </div>
@@ -302,6 +331,16 @@ const VendorOrders = () => {
     onMutate: (o) => setBusyId(o.subOrderId),
     onSuccess: () => { success('تم قبول الطلب ✅'); afterChange() },
     onError: (err) => showError(err.message || 'فشل قبول الطلب'),
+    onSettled: () => setBusyId(null),
+  })
+
+  const advanceMutation = useMutation({
+    mutationFn: ({ order, step }) => apiPost(step === 'ready'
+      ? API_ENDPOINTS.VENDOR_DASHBOARD.MARK_READY(vendorId, order.subOrderId)
+      : API_ENDPOINTS.VENDOR_DASHBOARD.START_PREPARING(vendorId, order.subOrderId)),
+    onMutate: ({ order }) => setBusyId(order.subOrderId),
+    onSuccess: (_, { step }) => { success(step === 'ready' ? 'الطلب جاهز للاستلام — تم إشعار فريق التوصيل ✅' : 'بدأ تحضير الطلب 📦'); afterChange() },
+    onError: (err) => showError(err.message || 'تعذّر تحديث الطلب'),
     onSettled: () => setBusyId(null),
   })
 
@@ -415,6 +454,7 @@ const VendorOrders = () => {
               onOpen={() => setOpenOrder(o)}
               onAccept={() => acceptMutation.mutate(o)}
               onReject={() => setRejecting(o)}
+              onAdvance={(step) => advanceMutation.mutate({ order: o, step })}
               busy={busyId === o.subOrderId} />
           ))}
         </div>
@@ -431,6 +471,7 @@ const VendorOrders = () => {
         <OrderSheet order={openOrder} onClose={closeOrder}
           onAccept={() => acceptMutation.mutate(openOrder)}
           onReject={() => setRejecting(openOrder)}
+          onAdvance={(step) => advanceMutation.mutate({ order: openOrder, step })}
           busy={busyId === openOrder.subOrderId} />
       )}
       {rejecting && (

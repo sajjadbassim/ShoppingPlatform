@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { productService } from '../../services'
@@ -18,7 +19,8 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useCategories } from '../../hooks/useCategories'
-import { useProductsPaged, useAdvancedFilter, useUnifiedSearch, useProductsByCategory } from '../../hooks/useProducts'
+import { useProductsPaged, useAdvancedFilter, useUnifiedSearch } from '../../hooks/useProducts'
+import { useVendor } from '../../hooks/useVendors'
 
 // ===========================
 // Filter Section Component
@@ -60,6 +62,7 @@ const ProductsPage = () => {
   const searchTerm  = searchParams.get('search')   || ''
   const categoryId  = searchParams.get('category') || ''
   const vendorId    = searchParams.get('vendor')   || ''
+  const sectionId   = searchParams.get('section')  || ''   // قسم مختار يدوياً من الصفحة الرئيسية
   const sortBy      = searchParams.get('sort')     || 'newest'
   const minPrice    = searchParams.get('minPrice') || ''
   const maxPrice    = searchParams.get('maxPrice') || ''
@@ -87,12 +90,13 @@ const ProductsPage = () => {
     'price-high': { sortBy: 'price',   sortOrder: 'desc' },
     'rating':     { sortBy: 'rating',  sortOrder: undefined },
     'name':       { sortBy: 'name',    sortOrder: 'asc'  },
+    'sales':      { sortBy: 'sales',   sortOrder: undefined },
   }
   const { sortBy: apiSortBy, sortOrder: apiSortOrder } = SORT_MAP[sortBy] || SORT_MAP.newest
 
   const advancedFilterParams = {
     pageNumber: currentPage, pageSize: 12,
-    categoryId: filters.categories[0] || undefined,
+    categoryId: categoryId || undefined,
     vendorId:   vendorId || undefined,
     minPrice:   minPrice || undefined,
     maxPrice:   maxPrice || undefined,
@@ -107,52 +111,42 @@ const ProductsPage = () => {
   const { data: searchData, isLoading: searchLoading, isError: searchError } =
     useUnifiedSearch(searchTerm, { pageNumber: currentPage, pageSize: 12 })
 
+  // التصنيف (رئيسي أو فرعي) يُفلتر في الخادم مع كل فئاته الفرعية — نفس الفلاتر والترتيب والتقسيم
   const { data: filterData, isLoading: filterLoading, isError: filterError, error: filterErrorMsg } =
-    useAdvancedFilter(advancedFilterParams, !searchTerm && !categoryId)
+    useAdvancedFilter(advancedFilterParams, !searchTerm && !sectionId)
 
-  // ✅ تحقق إذا التصنيف رئيسي أم فرعي
-  const selectedCatObj = categoryId ? allCategories.find(c => c.id === categoryId) : null
-  const isRootCat = selectedCatObj && !selectedCatObj.parentId
-  // منتجات التصنيف الرئيسي نفسه + كل تصنيفاته الفرعية (قد يملك تصنيف رئيسي منتجات مباشرة بلا أي تصنيف فرعي)
-  const subCatIds = isRootCat ? [categoryId, ...getChildren(categoryId).map(c => c.id)] : []
+  // القسم المختار يدوياً: نفس منتجات القسم في الصفحة الرئيسية
+  const { data: sectionData, isLoading: sectionLoading, isError: sectionError } = useQuery({
+    queryKey: ['home-section', sectionId],
+    queryFn: () => apiGet(API_ENDPOINTS.HOME.SECTION_BY_ID(sectionId)).then(r => r.data.data),
+    enabled: !!sectionId,
+    staleTime: 60 * 1000,
+  })
+  const { data: vendorData } = useVendor(vendorId || null)
 
-  const { data: categoryData, isLoading: categoryLoading, isError: categoryError } =
-    useProductsByCategory(categoryId && !searchTerm && !isRootCat ? categoryId : null)
+  const data      = sectionId ? sectionData?.data : searchTerm ? searchData : filterData
+  const isLoading = sectionId ? sectionLoading : searchTerm ? searchLoading : filterLoading
+  const isError   = sectionId ? sectionError : searchTerm ? searchError : filterError
+  const error     = sectionId || searchTerm ? null : filterErrorMsg
 
-  const data      = searchTerm ? searchData : categoryId && !isRootCat ? categoryData : filterData
-  const isLoading = searchTerm ? searchLoading : categoryId && !isRootCat ? categoryLoading : filterLoading
-  const isError   = searchTerm ? searchError : categoryId && !isRootCat ? categoryError : filterError
-  const error     = searchTerm ? null : filterErrorMsg
+  const rawData    = data?.data || data
+  const products   = Array.isArray(rawData) ? rawData : (rawData?.items ?? rawData?.products ?? [])
+  const totalPages = sectionId ? 1 : rawData?.totalPages || 1
+  const totalCount = sectionId ? products.length : rawData?.totalCount ?? rawData?.totalResults ?? products.length
 
-  const rawData   = data?.data || data
-  let baseProducts = Array.isArray(rawData) ? rawData : (rawData?.items ?? rawData?.products ?? [])
-
-  // ✅ تصنيف رئيسي — جلب منتجات كل الأبناء
-  const [rootCatProducts, setRootCatProducts] = useState([])
-  const [rootCatLoading, setRootCatLoading]   = useState(false)
-
-  useEffect(() => {
-    if (!isRootCat || subCatIds.length === 0) { setRootCatProducts([]); return }
-    setRootCatLoading(true)
-    Promise.all(
-      subCatIds.map(cid =>
-        apiGet(API_ENDPOINTS.PRODUCTS.BY_CATEGORY(cid)).then(r => r.data.data || r.data || [])
-      )
-    ).then(results => {
-      const merged = results.flat().filter((p, i, arr) => arr.findIndex(x => x.id === p.id) === i)
-      setRootCatProducts(merged)
-      setRootCatLoading(false)
-    }).catch(() => setRootCatLoading(false))
-  }, [categoryId])
-
-  const products   = isRootCat && subCatIds.length > 0 ? rootCatProducts : baseProducts
-  const finalLoad  = isLoading || (isRootCat && rootCatLoading)
-  const totalPages = rawData?.totalPages || 1
-  const totalCount = isRootCat ? products.length : (rawData?.totalCount ?? rawData?.totalResults ?? products.length)
+  // العنوان يوضح ما يُعرض فعلاً: القسم، أو البحث، أو الفئة، أو المتجر
+  const selectedCategory = categoryId ? allCategories.find(c => c.id === categoryId) : null
+  const pageTitle = sectionId ? (sectionData?.titleAr || sectionData?.title || 'منتجات مختارة')
+    : searchTerm ? `نتائج: "${searchTerm}"`
+    : selectedCategory ? (selectedCategory.nameAr || selectedCategory.name)
+    : vendorId && vendorData ? `منتجات ${vendorData.nameAr || vendorData.name}`
+    : sortBy === 'sales' ? 'الأكثر مبيعاً'
+    : 'جميع المنتجات'
 
   useEffect(() => {
     setFilters(prev => ({
       ...prev,
+      categories:  searchParams.get('category') ? [searchParams.get('category')] : [],
       priceRange: { min: searchParams.get('minPrice') || '', max: searchParams.get('maxPrice') || '' },
       minRating:   searchParams.get('minRating') || '',
       hasDiscount: searchParams.get('hasDiscount') === 'true',
@@ -389,8 +383,8 @@ const ProductsPage = () => {
         <Breadcrumb items={[{ label: 'المنتجات' }]} className="mb-6 hidden lg:block" />
 
         <div className="flex gap-6">
-          {/* Desktop Sidebar */}
-          <aside className="hidden lg:block w-64 flex-shrink-0">
+          {/* Desktop Sidebar — لا فلاتر لقسم مختار يدوياً */}
+          <aside className={`${sectionId ? 'hidden' : 'hidden lg:block'} w-64 flex-shrink-0`}>
             <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-24">
               {sidebarContent}
             </div>
@@ -403,32 +397,40 @@ const ProductsPage = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h1 className="text-base sm:text-lg font-bold text-gray-900">
-                    {searchTerm ? `نتائج: "${searchTerm}"` : 'جميع المنتجات'}
+                    {pageTitle}
                   </h1>
                   <p className="text-sm text-gray-400 mt-0.5">
-                    {finalLoad ? 'جاري التحميل...' : `${totalCount} منتج`}
+                    {isLoading ? 'جاري التحميل...' : `${totalCount} منتج`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {/* Mobile filter btn */}
-                  <button onClick={() => setShowMobileFilters(true)}
+                  {!sectionId && <button onClick={() => setShowMobileFilters(true)}
                     className="lg:hidden flex-1 sm:flex-none justify-center flex items-center gap-1.5 h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-600 hover:border-primary hover:text-primary transition-colors">
                     <SlidersHorizontal size={15} />
                     الفلاتر
                     {activeCount > 0 && (
                       <span className="w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">{activeCount}</span>
                     )}
-                  </button>
+                  </button>}
+
+                  {sectionId && (
+                    <button onClick={() => setSearchParams({})}
+                      className="flex items-center gap-1 h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-600 hover:border-primary hover:text-primary">
+                      <X size={14} /> كل المنتجات
+                    </button>
+                  )}
 
                   {/* Sort */}
-                  <select value={sortBy} onChange={e => { const p = new URLSearchParams(searchParams); p.set('sort', e.target.value); p.set('page','1'); setSearchParams(p) }}
+                  {!sectionId && <select value={sortBy} onChange={e => { const p = new URLSearchParams(searchParams); p.set('sort', e.target.value); p.set('page','1'); setSearchParams(p) }}
                     className="flex-1 sm:flex-none h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary">
                     <option value="newest">الأحدث</option>
                     <option value="price-low">السعر: الأقل</option>
                     <option value="price-high">السعر: الأعلى</option>
                     <option value="rating">الأعلى تقييماً</option>
                     <option value="name">الاسم</option>
-                  </select>
+                    <option value="sales">الأكثر مبيعاً</option>
+                  </select>}
 
                   {/* View mode */}
                   <div className="hidden sm:flex border border-gray-300 rounded-lg overflow-hidden">
@@ -496,7 +498,7 @@ const ProductsPage = () => {
             )}
 
             {/* Products */}
-            {finalLoad ? (
+            {isLoading ? (
               <div className={viewMode === 'grid' ? 'product-grid' : 'space-y-4'}>
                 {[...Array(12)].map((_, i) => <ProductCardSkeleton key={i} />)}
               </div>
@@ -519,8 +521,8 @@ const ProductsPage = () => {
                       image:         product.primaryImageUrl,
                       price:         product.price,
                       originalPrice: product.originalPrice,
-                      rating:        product.rating       || 0,
-                      reviewsCount:  product.reviewsCount || 0,
+                      rating:        product.rating       || product.averageRating || 0,
+                      reviewsCount:  product.reviewsCount || product.reviewCount   || 0,
                       storeName:     product.vendor?.name || product.vendorName,
                       vendorId:      product.vendorId,
                       inStock:       product.isAvailable  && product.stockQuantity > 0,

@@ -49,6 +49,14 @@ namespace ecommerce.Core.Models
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
+        // الحذف ناعم: المنتج يبقى لسجل الطلبات، لكنه يختفي من كل مكان ولا يُدار بعد ذلك.
+        // يختلف عن IsActive = false (الإخفاء المؤقت الذي يستطيع البائع التراجع عنه).
+        [Column("is_deleted")]
+        public bool IsDeleted { get; set; } = false;
+
+        [Column("deleted_at")]
+        public DateTime? DeletedAt { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

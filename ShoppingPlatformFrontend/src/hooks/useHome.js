@@ -4,6 +4,12 @@ import { homeService } from '../services/homeService';
 const bannerKeys = { all: ['home-banners-admin'] };
 const sectionKeys = { all: ['home-sections-admin'] };
 
+// بانرات "بلوك البانرات" تظهر ضمن الأقسام، فتغيير البانرات يحدّث الاثنين
+const invalidateBanners = (queryClient) => {
+  queryClient.invalidateQueries({ queryKey: bannerKeys.all });
+  queryClient.invalidateQueries({ queryKey: sectionKeys.all });
+};
+
 // ============ Banners ============
 
 export const useBannersAdmin = () => useQuery({
@@ -16,7 +22,7 @@ export const useCreateBanner = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (formData) => homeService.createBanner(formData),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: bannerKeys.all }),
+    onSuccess: () => invalidateBanners(queryClient),
   });
 };
 
@@ -24,7 +30,7 @@ export const useUpdateBanner = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, formData }) => homeService.updateBanner(id, formData),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: bannerKeys.all }),
+    onSuccess: () => invalidateBanners(queryClient),
   });
 };
 
@@ -32,7 +38,7 @@ export const useDeleteBanner = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id) => homeService.deleteBanner(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: bannerKeys.all }),
+    onSuccess: () => invalidateBanners(queryClient),
   });
 };
 
@@ -80,6 +86,24 @@ export const useRemoveSectionItem = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ sectionId, productId }) => homeService.removeSectionItem(sectionId, productId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sectionKeys.all }),
+  });
+};
+
+// ============ بانر رأس القسم ============
+
+export const useSetSectionBanner = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, file }) => homeService.setSectionBanner(id, file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sectionKeys.all }),
+  });
+};
+
+export const useRemoveSectionBanner = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => homeService.removeSectionBanner(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sectionKeys.all }),
   });
 };

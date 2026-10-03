@@ -26,5 +26,9 @@ namespace ecommerce.Core.DTO.HomePage
         public int? DisplayOrder { get; set; }
         public DateTime? StartsAt { get; set; }
         public DateTime? EndsAt { get; set; }
+
+        // نقل البانر إلى قسم بلوك بانرات، أو إلى السلايدر العلوي بـ MoveToHero
+        public Guid? SectionId { get; set; }
+        public bool MoveToHero { get; set; }
     }
 }

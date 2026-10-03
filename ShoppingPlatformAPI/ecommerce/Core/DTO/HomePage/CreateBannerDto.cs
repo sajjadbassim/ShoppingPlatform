@@ -27,5 +27,8 @@ namespace ecommerce.Core.DTO.HomePage
         public int DisplayOrder { get; set; } = 0;
         public DateTime? StartsAt { get; set; }
         public DateTime? EndsAt { get; set; }
+
+        // null = السلايدر العلوي، وإلا = قسم "بلوك بانرات"
+        public Guid? SectionId { get; set; }
     }
 }

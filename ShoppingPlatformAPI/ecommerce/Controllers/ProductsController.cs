@@ -20,16 +20,21 @@ namespace ecommerce.Controllers
             _access = access;
         }
 
+        // المنتجات المعطّلة لا تُعرض في القوائم العامة إلا للإدارة والعمليات
+        private bool IsStaff => User.IsInRole("ADMIN") || User.IsInRole("OPS");
+        private bool? VisibleIsActive(bool? requested) => IsStaff ? requested : null;
+
         // ===================================
         // GET: api/products
         // ===================================
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int limit = 100)
         {
             try
             {
-                var products = await _productService.GetAllAsync();
+                // حد أعلى للنتائج — للقوائم الكاملة استخدم /paged
+                var products = (await _productService.GetAllAsync()).Take(Math.Clamp(limit, 1, 200));
                 return Ok(new { success = true, data = products });
             }
             catch (Exception ex)
@@ -58,7 +63,7 @@ namespace ecommerce.Controllers
             {
                 var result = await _productService.GetProductsPagedAsync(
                     vendorId, categoryId, searchTerm,
-                    minPrice, maxPrice, isAvailable, isActive,
+                    minPrice, maxPrice, isAvailable, VisibleIsActive(isActive),
                     pageNumber, pageSize);
 
                 return Ok(new
@@ -84,6 +89,12 @@ namespace ecommerce.Controllers
             try
             {
                 var product = await _productService.GetByIdAsync(id);
+
+                // المنتج المعطّل/المحذوف أو من متجر/فئة معطّلة: يراه صاحب المتجر والإدارة فقط
+                if (!await _productService.IsPubliclyVisibleAsync(id) &&
+                    !await _access.CanManageVendorAsync(product.VendorId))
+                    return NotFound(new { success = false, message = "المنتج غير موجود" });
+
                 return Ok(new { success = true, data = product });
             }
             catch (Exception ex)
@@ -97,11 +108,15 @@ namespace ecommerce.Controllers
         // ===================================
         [HttpGet("vendor/{vendorId}")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetByVendor(Guid vendorId)
+        public async Task<IActionResult> GetByVendor(Guid vendorId, [FromQuery] bool includeHidden = false)
         {
             try
             {
-                var products = await _productService.GetByVendorAsync(vendorId);
+                // صاحب المتجر والإدارة يرون المنتجات حتى لو المتجر غير مفعّل (مثلاً بانتظار الموافقة)
+                var canManage = await _access.CanManageVendorAsync(vendorId);
+                // includeHidden (لوحة البائع) يُحترم للمالك والإدارة فقط
+                var products = await _productService.GetByVendorAsync(
+                    vendorId, includeInactiveVendor: canManage, includeHidden: canManage && includeHidden);
                 return Ok(new { success = true, data = products });
             }
             catch (Exception ex)
@@ -161,7 +176,7 @@ namespace ecommerce.Controllers
                 if (string.IsNullOrWhiteSpace(term))
                     return BadRequest(new { success = false, message = "كلمة البحث مطلوبة" });
 
-                var result = await _productService.UnifiedSearchAsync(term, maxResults);
+                var result = await _productService.UnifiedSearchAsync(term, Math.Clamp(maxResults, 1, 20));
                 return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
@@ -179,6 +194,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                filter.IsActive = VisibleIsActive(filter.IsActive);
                 var (products, totalCount) = await _productService.GetFilteredAsync(filter);
 
                 return Ok(new
@@ -210,6 +226,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                filter.IsActive = VisibleIsActive(filter.IsActive);
                 var result = await _productService.GetAdvancedFilteredAsync(filter);
 
                 return Ok(new
@@ -243,7 +260,7 @@ namespace ecommerce.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { success = false, message = ex.InnerException?.Message ?? ex.Message });
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
 

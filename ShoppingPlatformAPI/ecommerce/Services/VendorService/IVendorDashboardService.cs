@@ -30,6 +30,8 @@ namespace ecommerce.Services
         // تأكيد / رفض الطلب
         // ===================================
         Task<VendorOrderDto> ConfirmOrderAsync(Guid vendorId, Guid subOrderId, Guid opsUserId);
+        Task<VendorOrderDto> StartPreparingAsync(Guid vendorId, Guid subOrderId, Guid userId);
+        Task<VendorOrderDto> MarkReadyAsync(Guid vendorId, Guid subOrderId, Guid userId);
         Task<VendorOrderDto> RejectOrderAsync(Guid vendorId, Guid subOrderId, Guid opsUserId, string reason);
 
         // ===================================

@@ -334,7 +334,16 @@ namespace ecommerce.Services.FinanceService
 
             var entries = await _context.VendorLedgerEntries.AsNoTracking()
                 .Where(e => e.VendorId == vendorId)
-                .OrderBy(e => e.CreatedAt).ThenBy(e => e.Id)
+                // الحركات المسجّلة في نفس اللحظة (بيع الطلب وعمولته) تُرتَّب بتسلسلها المنطقي لا عشوائياً،
+                // فيبقى الرصيد الجاري صحيحاً، وبعد العكس تظهر الأحدث أولاً حتى داخل الطلب الواحد
+                .OrderBy(e => e.CreatedAt)
+                .ThenBy(e => e.Type == LedgerType.Sale ? 0
+                           : e.Type == LedgerType.Commission ? 1
+                           : e.Type == LedgerType.VendorCoupon ? 2
+                           : e.Type == LedgerType.RefusalFee ? 3
+                           : e.Type == LedgerType.Return ? 4
+                           : e.Type == LedgerType.ReturnCommission ? 5 : 6)
+                .ThenBy(e => e.Id)
                 .Select(e => new { e, OrderNumber = e.OrderId == null ? null : _context.Orders.Where(o => o.Id == e.OrderId).Select(o => o.OrderNumber).FirstOrDefault() })
                 .ToListAsync(ct);
 

@@ -18,7 +18,9 @@ namespace ecommerce.Repositories
         Task<bool> DeleteAsync(Guid id);
 
         Task<bool> ExistsAsync(Guid id);
-        Task<bool> ExistsByNameAsync(string name);
+        // excludeId: لاستثناء الفئة نفسها عند التعديل
+        Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null);
+        Task<bool> ExistsByArabicNameAsync(string nameAr, Guid? excludeId = null);
 
 
         Task<PagedResult<Category>> GetPagedAsync(

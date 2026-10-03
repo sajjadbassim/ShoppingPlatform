@@ -80,8 +80,11 @@ namespace ecommerce.Core.DTO.Product
 
     public class CreateProductVariantDto
     {
+        [MaxLength(100)]
         public string? Sku { get; set; }
         public decimal PriceAdjustment { get; set; } = 0;
+
+        [Range(0, int.MaxValue, ErrorMessage = "الكمية يجب أن تكون أكبر من أو تساوي 0")]
         public int StockQuantity { get; set; } = 0;
         public bool IsAvailable { get; set; } = true;
         public string? ImageUrl { get; set; }
@@ -107,8 +110,11 @@ namespace ecommerce.Core.DTO.Product
 
     public class UpdateProductVariantDto
     {
+        [MaxLength(100)]
         public string? Sku { get; set; }
         public decimal? PriceAdjustment { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "الكمية يجب أن تكون أكبر من أو تساوي 0")]
         public int? StockQuantity { get; set; }
         public bool? IsAvailable { get; set; }
         public string? ImageUrl { get; set; }

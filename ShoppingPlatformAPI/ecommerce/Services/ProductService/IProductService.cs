@@ -9,8 +9,9 @@ namespace ecommerce.Services.ProductService.ProductService
         // CRUD الأساسي
         // ===================================
         Task<ProductDto> GetByIdAsync(Guid id);
+        Task<bool> IsPubliclyVisibleAsync(Guid id);
         Task<IEnumerable<ProductDto>> GetAllAsync();
-        Task<IEnumerable<ProductDto>> GetByVendorAsync(Guid vendorId);
+        Task<IEnumerable<ProductDto>> GetByVendorAsync(Guid vendorId, bool includeInactiveVendor = false, bool includeHidden = false);
         Task<IEnumerable<ProductDto>> GetByCategoryAsync(Guid categoryId);
         Task<ProductDto> CreateAsync(CreateProductDto dto);
         Task<ProductDto> UpdateAsync(Guid id, UpdateProductDto dto);

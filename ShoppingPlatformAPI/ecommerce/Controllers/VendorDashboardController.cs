@@ -1,4 +1,4 @@
-using ecommerce.Filters;
+﻿using ecommerce.Filters;
 using ecommerce.Core.DTO.Vendor;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -126,6 +126,36 @@ namespace ecommerce.Controllers
                 var opsUserId = GetCurrentUserId();
                 var order = await _dashboardService.ConfirmOrderAsync(vendorId, subOrderId, opsUserId);
                 return Ok(new { success = true, data = order, message = "تم تأكيد الطلب بنجاح" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        // POST: api/vendors/{vendorId}/dashboard/orders/{subOrderId}/preparing — بدء التحضير
+        [HttpPost("orders/{subOrderId}/preparing")]
+        public async Task<IActionResult> StartPreparing(Guid vendorId, Guid subOrderId)
+        {
+            try
+            {
+                var order = await _dashboardService.StartPreparingAsync(vendorId, subOrderId, GetCurrentUserId());
+                return Ok(new { success = true, data = order, message = "بدأ تحضير الطلب" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        // POST: api/vendors/{vendorId}/dashboard/orders/{subOrderId}/ready — جاهز للاستلام
+        [HttpPost("orders/{subOrderId}/ready")]
+        public async Task<IActionResult> MarkReady(Guid vendorId, Guid subOrderId)
+        {
+            try
+            {
+                var order = await _dashboardService.MarkReadyAsync(vendorId, subOrderId, GetCurrentUserId());
+                return Ok(new { success = true, data = order, message = "الطلب جاهز للاستلام — تم إشعار فريق التوصيل" });
             }
             catch (Exception ex)
             {

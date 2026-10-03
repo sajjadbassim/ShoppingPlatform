@@ -84,6 +84,25 @@ export const API_ENDPOINTS = {
     REELS_REFRESH: '/api/tiktok/reels/refresh',
   },
 
+  // ============ Instagram (المسار يطابق الروابط المسجّلة في تطبيق Meta) ============
+  INSTAGRAM: {
+    STATUS: '/api/integrations/instagram/status',
+    CONNECT_URL: '/api/integrations/instagram/connect-url',
+    SYNC: '/api/integrations/instagram/sync',
+    MEDIA: '/api/integrations/instagram/media',
+    MEDIA_ITEM: (id) => `/api/integrations/instagram/media/${id}`,
+    SETTINGS: '/api/integrations/instagram/settings',
+    CONNECTION: '/api/integrations/instagram/connection',
+  },
+
+  // ============ محتوى حسابات التواصل للزوار (تيك توك + إنستغرام) ============
+  SOCIAL: {
+    STORE_FEED: (vendorId) => `/api/social/stores/${vendorId}/feed`,
+    STORE_FEED_REFRESH: (vendorId) => `/api/social/stores/${vendorId}/feed/refresh`,
+    REELS: '/api/social/reels',
+    REELS_REFRESH: '/api/social/reels/refresh',
+  },
+
   VENDORS: {
     BASE: '/api/Vendors',
     BY_ID: (id) => `/api/Vendors/${id}`,
@@ -100,6 +119,8 @@ export const API_ENDPOINTS = {
     ORDER_BY_ID: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}`,
     CONFIRM_ORDER: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/confirm`,
     REJECT_ORDER: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/reject`,
+    START_PREPARING: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/preparing`,
+    MARK_READY: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/ready`,
     PRODUCTS: (vendorId) => `/api/vendors/${vendorId}/dashboard/products`,
   },
 
@@ -204,6 +225,7 @@ export const API_ENDPOINTS = {
     SECTIONS: '/api/Home/sections',
     SECTION_BY_ID: (id) => `/api/Home/sections/${id}`,
     SECTION_ITEMS: (id) => `/api/Home/sections/${id}/items`,
+    SECTION_BANNER: (id) => `/api/Home/sections/${id}/banner`,   // صورة بانر رأس قسم المنتجات
     SECTION_ITEM_DELETE: (sectionId, productId) => `/api/Home/sections/${sectionId}/items/${productId}`,
   },
 

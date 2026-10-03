@@ -2,6 +2,7 @@
 using ecommerce.Core.DTO.HomePage;
 using ecommerce.Core.Models;
 using ecommerce.Data;
+using ecommerce.Repositories;
 using ecommerce.Services.FileService;
 using Microsoft.EntityFrameworkCore;
 
@@ -25,8 +26,10 @@ namespace ecommerce.Services.HomeService
         {
             var now = DateTime.UtcNow;
 
+            // السلايدر العلوي فقط — بانرات البلوكات تأتي مع أقسامها
             var banners = await _context.Banners
                 .Where(b =>
+                    b.SectionId == null &&
                     b.IsActive &&
                     (b.StartsAt == null || b.StartsAt <= now) &&
                     (b.EndsAt == null || b.EndsAt >= now))
@@ -41,24 +44,23 @@ namespace ecommerce.Services.HomeService
                 .AsNoTracking()
                 .ToListAsync();
 
-            var sectionDtos = new List<HomeSectionDto>();
-            foreach (var section in sections)
-                sectionDtos.Add(await LoadSectionDataAsync(section));
-
             return new HomePageDto
             {
                 Banners = banners.Select(MapBannerToDto).ToList(),
-                Sections = sectionDtos
+                Sections = await BuildSectionDtosAsync(sections)
             };
         }
 
         // ===================================
         // GetBannersAsync
         // ===================================
-        public async Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true)
+        public async Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true, bool heroOnly = false)
         {
             var now = DateTime.UtcNow;
             var query = _context.Banners.AsQueryable();
+
+            if (heroOnly)
+                query = query.Where(b => b.SectionId == null);
 
             if (onlyActive)
                 query = query.Where(b =>
@@ -93,6 +95,9 @@ namespace ecommerce.Services.HomeService
         // ===================================
         public async Task<BannerDto> CreateBannerAsync(CreateBannerDto dto)
         {
+            if (dto.SectionId.HasValue)
+                await EnsureBannerSectionAsync(dto.SectionId.Value);
+
             var imageUrl = await _fileService.SaveImageAsync(dto.ImageFile, "banners");
 
             var banner = new Banner
@@ -107,7 +112,8 @@ namespace ecommerce.Services.HomeService
                 LinkEntityId = dto.LinkEntityId,
                 DisplayOrder = dto.DisplayOrder,
                 StartsAt = dto.StartsAt,
-                EndsAt = dto.EndsAt
+                EndsAt = dto.EndsAt,
+                SectionId = dto.SectionId
             };
 
             await _context.Banners.AddAsync(banner);
@@ -171,6 +177,14 @@ namespace ecommerce.Services.HomeService
             if (dto.StartsAt != null) banner.StartsAt = dto.StartsAt;
             if (dto.EndsAt != null) banner.EndsAt = dto.EndsAt;
 
+            if (dto.MoveToHero)
+                banner.SectionId = null;
+            else if (dto.SectionId.HasValue && dto.SectionId != banner.SectionId)
+            {
+                await EnsureBannerSectionAsync(dto.SectionId.Value);
+                banner.SectionId = dto.SectionId;
+            }
+
             banner.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -212,11 +226,7 @@ namespace ecommerce.Services.HomeService
                 .AsNoTracking()
                 .ToListAsync();
 
-            var dtos = new List<HomeSectionDto>();
-            foreach (var section in sections)
-                dtos.Add(await LoadSectionDataAsync(section));
-
-            return dtos;
+            return await BuildSectionDtosAsync(sections);
         }
 
         // ===================================
@@ -232,7 +242,7 @@ namespace ecommerce.Services.HomeService
             if (section == null)
                 throw new Exception("القسم غير موجود");
 
-            return await LoadSectionDataAsync(section);
+            return (await BuildSectionDtosAsync(new List<HomeSection> { section }))[0];
         }
 
         // ===================================
@@ -240,7 +250,7 @@ namespace ecommerce.Services.HomeService
         // ===================================
         public async Task<HomeSectionDto> CreateSectionAsync(CreateHomeSectionDto dto)
         {
-            var validTypes = new[] { "featured_products", "top_vendors", "top_categories", "custom_products" };
+            var validTypes = new[] { "featured_products", "top_vendors", "top_categories", "custom_products", "banners" };
             if (!validTypes.Contains(dto.Type))
                 throw new Exception($"نوع القسم غير صحيح. الأنواع المتاحة: {string.Join(", ", validTypes)}");
 
@@ -311,9 +321,55 @@ namespace ecommerce.Services.HomeService
 
             if (section == null) return false;
 
+            // صور بانرات البلوك وصورة رأس القسم (السجلات تُحذف تلقائياً مع القسم)
+            var bannerImages = await _context.Banners.Where(b => b.SectionId == id).Select(b => b.ImageUrl).ToListAsync();
+            foreach (var url in bannerImages.Append(section.BannerImageUrl).Where(u => !string.IsNullOrWhiteSpace(u) && u!.StartsWith("/uploads/")))
+                await _fileService.DeleteImageAsync(url!);
+
             _context.HomeSections.Remove(section);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        // ===================================
+        // صورة بانر رأس القسم (لأقسام المنتجات)
+        // ===================================
+        public async Task<HomeSectionDto> SetSectionBannerAsync(Guid id, IFormFile image)
+        {
+            var section = await _context.HomeSections.FirstOrDefaultAsync(s => s.Id == id)
+                ?? throw new Exception("القسم غير موجود");
+            if (section.Type is "banners" or "top_vendors" or "top_categories")
+                throw new Exception("صورة الرأس متاحة لأقسام المنتجات فقط");
+
+            // الجديدة أولاً ثم حذف القديمة بعد الحفظ
+            var old = section.BannerImageUrl;
+            section.BannerImageUrl = await _fileService.SaveImageAsync(image, "banners");
+            section.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            if (!string.IsNullOrWhiteSpace(old) && old.StartsWith("/uploads/"))
+                await _fileService.DeleteImageAsync(old);
+
+            return await GetSectionByIdAsync(id);
+        }
+
+        public async Task<bool> RemoveSectionBannerAsync(Guid id)
+        {
+            var section = await _context.HomeSections.FirstOrDefaultAsync(s => s.Id == id);
+            if (section == null || string.IsNullOrWhiteSpace(section.BannerImageUrl)) return false;
+
+            var old = section.BannerImageUrl;
+            section.BannerImageUrl = null;
+            section.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            if (old.StartsWith("/uploads/"))
+                await _fileService.DeleteImageAsync(old);
+            return true;
+        }
+
+        private async Task EnsureBannerSectionAsync(Guid sectionId)
+        {
+            if (!await _context.HomeSections.AnyAsync(s => s.Id == sectionId && s.Type == "banners"))
+                throw new Exception("القسم المحدد ليس قسم بانرات");
         }
 
         // ===================================
@@ -331,7 +387,7 @@ namespace ecommerce.Services.HomeService
             if (section.Type != "custom_products")
                 throw new Exception("إضافة عناصر يدوية متاحة فقط لأقسام custom_products");
 
-            var productExists = await _context.Products.AnyAsync(p => p.Id == dto.ProductId);
+            var productExists = await _context.Products.AnyAsync(p => p.Id == dto.ProductId && !p.IsDeleted);
             if (!productExists)
                 throw new Exception("المنتج غير موجود");
 
@@ -365,71 +421,178 @@ namespace ecommerce.Services.HomeService
         }
 
         // ===================================
-        // Private: LoadSectionDataAsync
+        // تحميل الأقسام
+        // البيانات المشتركة (شجرة الفئات، العروض، بانرات البلوكات) تُحمَّل مرة واحدة لكل الأقسام،
+        // ثم التقييمات ومخزون المتغيرات دفعة واحدة لكل منتجات الصفحة — بدل تكرارها في كل قسم
         // ===================================
-        private async Task<HomeSectionDto> LoadSectionDataAsync(HomeSection section)
+        private sealed class SectionLoadContext
         {
-            var dto = new HomeSectionDto
-            {
-                Id = section.Id,
-                Type = section.Type,
-                Title = section.Title,
-                TitleAr = section.TitleAr,
-                Subtitle = section.Subtitle,
-                SubtitleAr = section.SubtitleAr,
-                MaxItems = section.MaxItems,
-                DisplayOrder = section.DisplayOrder,
-                FilterCategoryId = section.FilterCategoryId,
-                FilterVendorId = section.FilterVendorId,
-                IsActive = section.IsActive
-            };
-
-            switch (section.Type)
-            {
-                case "featured_products":
-                    dto.Data = await GetFeaturedProductsAsync(section);
-                    break;
-                case "top_vendors":
-                    dto.Data = await GetTopVendorsAsync(section.MaxItems);
-                    break;
-                case "top_categories":
-                    dto.Data = await GetTopCategoriesAsync(section.MaxItems);
-                    break;
-                case "custom_products":
-                    dto.Data = await GetCustomProductsAsync(section);
-                    break;
-            }
-
-            return dto;
+            public required IReadOnlyCollection<CategoryVisibility.CategoryNode> CategoryTree { get; init; }
+            public required List<Guid> HiddenCategoryIds { get; init; }
+            public required List<Promotion> Promotions { get; init; }
+            public required ILookup<Guid, Banner> BlockBanners { get; init; }
         }
 
-        // ===================================
-        // Private: GetFeaturedProductsAsync
-        // ===================================
-        private async Task<object> GetFeaturedProductsAsync(HomeSection section)
+        private async Task<SectionLoadContext> CreateLoadContextAsync(IEnumerable<HomeSection> sections)
         {
-            var query = _context.Products
-                .Include(p => p.Images)
-                .Include(p => p.Vendor)
-                .Include(p => p.Reviews)
-                .Where(p => p.IsActive && p.IsAvailable);
+            var now = DateTime.UtcNow;
+            var tree = await CategoryVisibility.LoadTreeAsync(_context);
+
+            var promotions = await _context.Promotions.AsNoTracking()
+                .Where(p => p.IsActive && (p.StartsAt == null || p.StartsAt <= now) && (p.ExpiresAt == null || p.ExpiresAt >= now))
+                .ToListAsync();
+
+            var blockIds = sections.Where(s => s.Type == "banners").Select(s => s.Id).ToList();
+            var blockBanners = blockIds.Count == 0 ? new List<Banner>() : await _context.Banners.AsNoTracking()
+                .Where(b => b.SectionId != null && blockIds.Contains(b.SectionId.Value) && b.IsActive &&
+                            (b.StartsAt == null || b.StartsAt <= now) && (b.EndsAt == null || b.EndsAt >= now))
+                .OrderBy(b => b.DisplayOrder)
+                .ToListAsync();
+
+            return new SectionLoadContext
+            {
+                CategoryTree = tree,
+                HiddenCategoryIds = CategoryVisibility.ComputeHidden(tree).ToList(),
+                Promotions = promotions,
+                BlockBanners = blockBanners.ToLookup(b => b.SectionId!.Value),
+            };
+        }
+
+        private async Task<List<HomeSectionDto>> BuildSectionDtosAsync(List<HomeSection> sections)
+        {
+            var ctx = await CreateLoadContextAsync(sections);
+            var dtos = new List<HomeSectionDto>();
+            var picks = new List<(HomeSectionDto Dto, List<Guid> ProductIds)>();
+
+            // المرشحون: كل المنتجات الظاهرة والمتوفرة مع مبيعاتها المسلَّمة — استعلام خفيف واحد،
+            // ثم يُختار محتوى كل قسم في الذاكرة بدل استعلام مرتّب لكل قسم
+            List<ProductCandidate>? candidates = null;
+            async Task<List<ProductCandidate>> Candidates() => candidates ??= await LoadCandidatesAsync(ctx);
+
+            foreach (var section in sections)
+            {
+                var dto = new HomeSectionDto
+                {
+                    Id = section.Id,
+                    Type = section.Type,
+                    Title = section.Title,
+                    TitleAr = section.TitleAr,
+                    Subtitle = section.Subtitle,
+                    SubtitleAr = section.SubtitleAr,
+                    MaxItems = section.MaxItems,
+                    DisplayOrder = section.DisplayOrder,
+                    FilterCategoryId = section.FilterCategoryId,
+                    FilterVendorId = section.FilterVendorId,
+                    BannerImageUrl = section.BannerImageUrl,
+                    IsActive = section.IsActive
+                };
+                dtos.Add(dto);
+
+                switch (section.Type)
+                {
+                    case "featured_products":
+                        picks.Add((dto, PickFeatured(section, await Candidates(), ctx)));
+                        break;
+                    case "custom_products":
+                        picks.Add((dto, PickCustom(section, await Candidates())));
+                        break;
+                    case "top_vendors":
+                        dto.Data = await GetTopVendorsAsync(section.MaxItems);
+                        break;
+                    case "top_categories":
+                        dto.Data = await GetTopCategoriesAsync(section.MaxItems);
+                        break;
+                    case "banners":
+                        dto.Data = ctx.BlockBanners[section.Id].Select(MapBannerToDto).ToList();
+                        break;
+                }
+            }
+
+            // تفاصيل كل المنتجات المختارة + تقييماتها ومخزون متغيراتها — ثلاثة استعلامات لكل الصفحة
+            var ids = picks.SelectMany(x => x.ProductIds).Distinct().ToList();
+            var products = new Dictionary<Guid, Product>();
+            var ratings = new Dictionary<Guid, (double Average, int Count)>();
+            var variantStock = new Dictionary<Guid, int>();
+            if (ids.Count > 0)
+            {
+                products = await _context.Products.AsNoTracking()
+                    .Include(p => p.Images)
+                    .Include(p => p.Vendor)
+                    .Where(p => ids.Contains(p.Id))
+                    .ToDictionaryAsync(p => p.Id);
+                ratings = (await _context.Reviews.AsNoTracking()
+                        .Where(r => r.IsApproved && ids.Contains(r.ProductId))
+                        .GroupBy(r => r.ProductId)
+                        .Select(g => new { ProductId = g.Key, Average = g.Average(r => (double)r.Rating), Count = g.Count() })
+                        .ToListAsync())
+                    .ToDictionary(x => x.ProductId, x => (x.Average, x.Count));
+                variantStock = await _context.ProductVariants.AsNoTracking()
+                    .Where(v => ids.Contains(v.ProductId))
+                    .GroupBy(v => v.ProductId)
+                    .Select(g => new { ProductId = g.Key, Stock = g.Sum(v => v.IsAvailable ? v.StockQuantity : 0) })
+                    .ToDictionaryAsync(x => x.ProductId, x => x.Stock);
+            }
+
+            foreach (var (dto, productIds) in picks)
+                dto.Data = productIds
+                    .Where(products.ContainsKey)
+                    .Select(id => MapProductToSimpleDto(products[id], ctx.Promotions, variantStock, ratings))
+                    .ToList();
+
+            return dtos;
+        }
+
+        private sealed record ProductCandidate(Guid Id, Guid? CategoryId, Guid VendorId, DateTime CreatedAt, int Sold);
+
+        // الظاهر للعامة ومتوفر: بلا متغيرات → مفتاح المنتج؛ بمتغيرات → متغير متوفر بمخزون
+        private async Task<List<ProductCandidate>> LoadCandidatesAsync(SectionLoadContext ctx)
+        {
+            var query = _context.Products.AsNoTracking()
+                .Where(p => p.IsActive && !p.IsDeleted && p.Vendor.IsActive &&
+                    ((!_context.ProductVariants.Any(v => v.ProductId == p.Id) && p.IsAvailable) ||
+                     _context.ProductVariants.Any(v => v.ProductId == p.Id && v.IsAvailable && v.StockQuantity > 0)));
+
+            var hidden = ctx.HiddenCategoryIds;
+            if (hidden.Count > 0)
+                query = query.Where(p => p.CategoryId == null || !hidden.Contains(p.CategoryId.Value));
+
+            return await query
+                .Select(p => new ProductCandidate(p.Id, p.CategoryId, p.VendorId, p.CreatedAt,
+                    p.SubOrderItems.Where(i => i.SubOrder.Status == SubOrderStatus.Delivered).Sum(i => (int?)i.Quantity) ?? 0))
+                .ToListAsync();
+        }
+
+        // المميزة: الأكثر مبيعاً (ثم الأحدث)، والفئة الرئيسية تشمل فئاتها الفرعية
+        private static List<Guid> PickFeatured(HomeSection section, List<ProductCandidate> candidates, SectionLoadContext ctx)
+        {
+            IEnumerable<ProductCandidate> query = candidates;
 
             if (section.FilterCategoryId.HasValue)
-                query = query.Where(p => p.CategoryId == section.FilterCategoryId);
+            {
+                var categoryIds = CategoryVisibility.Descendants(ctx.CategoryTree, section.FilterCategoryId.Value).ToHashSet();
+                query = query.Where(p => p.CategoryId.HasValue && categoryIds.Contains(p.CategoryId.Value));
+            }
 
             if (section.FilterVendorId.HasValue)
                 query = query.Where(p => p.VendorId == section.FilterVendorId);
 
-            var products = await query
-                .OrderByDescending(p => p.SubOrderItems
-                    .Where(i => i.SubOrder.Status == SubOrderStatus.Delivered)
-                    .Sum(i => (int?)i.Quantity) ?? 0)
+            return query
+                .OrderByDescending(p => p.Sold)
                 .ThenByDescending(p => p.CreatedAt)
                 .Take(section.MaxItems)
-                .AsNoTracking()
-                .ToListAsync();
+                .Select(p => p.Id)
+                .ToList();
+        }
 
-            return products.Select(p => MapProductToSimpleDto(p));
+        // المختارة يدوياً: بترتيب الأدمن، الظاهرة والمتوفرة فقط
+        private static List<Guid> PickCustom(HomeSection section, List<ProductCandidate> candidates)
+        {
+            var visible = candidates.Select(c => c.Id).ToHashSet();
+            return section.Items
+                .OrderBy(i => i.DisplayOrder)
+                .Select(i => i.EntityId)
+                .Where(visible.Contains)
+                .ToList();
         }
 
         // ===================================
@@ -448,10 +611,13 @@ namespace ecommerce.Services.HomeService
                     v.Name,
                     v.NameAr,
                     v.LogoUrl,
+                    v.CoverImageUrl,
                     v.DeliveryFee,
                     v.EstimatedPrepTime,
                     v.MinOrderAmount,
-                    TotalOrders = v.SubOrders.Count(so => so.Status == SubOrderStatus.Delivered)
+                    TotalOrders = v.SubOrders.Count(so => so.Status == SubOrderStatus.Delivered),
+                    Rating = _context.SubOrderRatings.Where(r => r.VendorId == v.Id).Average(r => (double?)r.VendorRating),
+                    RatingsCount = _context.SubOrderRatings.Count(r => r.VendorId == v.Id)
                 })
                 .AsNoTracking()
                 .ToListAsync();
@@ -480,60 +646,44 @@ namespace ecommerce.Services.HomeService
         }
 
         // ===================================
-        // Private: GetCustomProductsAsync
-        // ===================================
-        private async Task<object> GetCustomProductsAsync(HomeSection section)
-        {
-            if (!section.Items.Any())
-                return new List<object>();
-
-            var productIds = section.Items
-                .OrderBy(i => i.DisplayOrder)
-                .Select(i => i.EntityId)
-                .ToList();
-
-            var products = await _context.Products
-                .Include(p => p.Images)
-                .Include(p => p.Vendor)
-                .Include(p => p.Reviews)
-                .Where(p => productIds.Contains(p.Id) && p.IsActive && p.IsAvailable)
-                .AsNoTracking()
-                .ToListAsync();
-
-            return productIds
-                .Select(id => products.FirstOrDefault(p => p.Id == id))
-                .Where(p => p != null)
-                .Select(p => MapProductToSimpleDto(p!));
-        }
-
-        // ===================================
         // Private: MapProductToSimpleDto
+        // نفس سعر العرض في القوائم والسلة، ومخزون/توفر المنتج ذي المتغيرات من متغيراته
         // ===================================
-        private static object MapProductToSimpleDto(Product p)
+        private static object MapProductToSimpleDto(Product p, List<Promotion> activePromotions,
+            Dictionary<Guid, int> variantStock, Dictionary<Guid, (double Average, int Count)> ratings)
         {
             var primaryImage = p.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl
                             ?? p.Images?.FirstOrDefault()?.ImageUrl;
-            var approvedReviews = p.Reviews?.Where(r => r.IsApproved).ToList() ?? new();
+
+            var promotion = PromotionPricing.SelectBest(activePromotions, p.Id, p.CategoryId, p.VendorId);
+            var price = promotion == null ? p.Price : PromotionPricing.CalculateDiscount(p.Price, promotion).FinalPrice;
+            var originalPrice = promotion == null ? p.OriginalPrice : p.OriginalPrice ?? p.Price;
+            var hasDiscount = originalPrice.HasValue && originalPrice > price;
+
+            var hasVariants = variantStock.TryGetValue(p.Id, out var stockFromVariants);
+            var hasRating = ratings.TryGetValue(p.Id, out var rating);
 
             return new
             {
                 p.Id,
                 p.Name,
                 p.NameAr,
-                p.Price,
-                p.OriginalPrice,
-                HasDiscount = p.OriginalPrice.HasValue && p.OriginalPrice > p.Price,
-                DiscountPercentage = p.OriginalPrice.HasValue && p.OriginalPrice > 0
-                    ? (int)Math.Round((1 - (double)p.Price / (double)p.OriginalPrice!) * 100)
+                Price = price,
+                OriginalPrice = originalPrice,
+                HasDiscount = hasDiscount,
+                DiscountPercentage = hasDiscount
+                    ? (int)Math.Round((1 - (double)price / (double)originalPrice!.Value) * 100)
                     : (int?)null,
+                HasPromotion = promotion != null,
+                PromotionNameAr = promotion?.NameAr,
                 PrimaryImageUrl = primaryImage,
+                p.VendorId,
                 VendorName = p.Vendor?.Name,
-                AverageRating = approvedReviews.Any()
-                    ? Math.Round((decimal)approvedReviews.Average(r => r.Rating), 1)
-                    : (decimal?)null,
-                ReviewCount = approvedReviews.Count,
-                p.IsAvailable,
-                p.StockQuantity
+                AverageRating = hasRating ? Math.Round((decimal)rating.Average, 1) : (decimal?)null,
+                ReviewCount = hasRating ? rating.Count : 0,
+                IsAvailable = hasVariants ? stockFromVariants > 0 : p.IsAvailable,
+                StockQuantity = hasVariants ? stockFromVariants : p.StockQuantity,
+                HasVariants = hasVariants
             };
         }
 
@@ -554,7 +704,8 @@ namespace ecommerce.Services.HomeService
             DisplayOrder = b.DisplayOrder,
             StartsAt = b.StartsAt,
             EndsAt = b.EndsAt,
-            IsActive = b.IsActive
+            IsActive = b.IsActive,
+            SectionId = b.SectionId
         };
     }
 }

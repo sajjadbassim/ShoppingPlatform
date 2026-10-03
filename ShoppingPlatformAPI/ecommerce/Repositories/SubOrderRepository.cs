@@ -128,6 +128,7 @@ namespace ecommerce.Repositories
                 Confirmed = subOrders.Count(so => so.Status == OrderStatus.CONFIRMED),
                 PartiallyConfirmed = subOrders.Count(so => so.Status == OrderStatus.PARTIALLY_CONFIRMED),
                 Preparing = subOrders.Count(so => so.Status == OrderStatus.PREPARING),
+                Ready = subOrders.Count(so => so.Status == OrderStatus.READY),
                 OutForDelivery = subOrders.Count(so => so.Status == OrderStatus.OUT_FOR_DELIVERY),
                 Delivered = subOrders.Count(so => so.Status == OrderStatus.DELIVERED),
                 Cancelled = subOrders.Count(so => so.Status == OrderStatus.CANCELLED),

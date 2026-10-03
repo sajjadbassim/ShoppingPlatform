@@ -25,7 +25,8 @@ const PAGE_SIZE = 20
 const useVendorProducts = (vendorId) => useQuery({
   queryKey: ['vendor-products', vendorId],
   queryFn: async () => {
-    const r = await apiGet(API_ENDPOINTS.PRODUCTS.BY_VENDOR(vendorId))
+    // includeHidden: المخفية تظهر هنا (فلتر «مخفي») — المحذوفة لا
+    const r = await apiGet(API_ENDPOINTS.PRODUCTS.BY_VENDOR(vendorId), { includeHidden: true })
     const data = r.data.data || r.data
     return Array.isArray(data) ? data : data?.items || []
   },
@@ -67,6 +68,16 @@ const StockEditor = ({ product, onSave, saving }) => {
     if (Number.isFinite(n) && n !== qty) onSave(n)
   }
 
+  // المنتج ذو المتغيرات: المخزون مجموع المتغيرات ويُعدَّل من صفحة المنتج (قسم المتغيرات)
+  if (product.hasVariants) {
+    return (
+      <span title="مجموع مخزون المتغيرات — يُعدَّل من صفحة المنتج"
+        className={`inline-flex items-center h-7 px-2.5 rounded-lg text-xs font-bold ${stockTone(qty)}`}>
+        {qty === 0 ? 'نفذ' : `${qty} قطعة`}
+      </span>
+    )
+  }
+
   if (editing) {
     return (
       <span className="inline-flex items-center gap-1">
@@ -104,7 +115,7 @@ const ProductRow = ({ product: p, selected, selecting, onSelect, onToggleActive,
         <input type="checkbox" checked={selected} onChange={onSelect} aria-label="تحديد"
           className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary flex-shrink-0" />
       )}
-      <Link to={`/vendor/products/${p.id}/edit`} className="relative w-16 h-16 sm:w-14 sm:h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+      <Link to={`/vendor/products/${p.id}/edit`} className="relative w-16 h-16 sm:w-14 sm:h-14 rounded-xl product-media overflow-hidden flex-shrink-0">
         {img ? <img src={img} alt="" loading="lazy" className={`w-full h-full object-cover ${hidden ? 'opacity-50 grayscale' : ''}`} onError={e => { e.currentTarget.style.display = 'none' }} />
           : <Package size={22} className="absolute inset-0 m-auto text-gray-300" />}
         {discount > 0 && <span className="absolute bottom-0 inset-x-0 text-center bg-rose-500 text-white text-[10px] font-bold">-{discount}%</span>}

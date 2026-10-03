@@ -89,7 +89,7 @@ const ProductsPreview = ({ storeId, count = 4, size = 'h-16' }) => {
   return (
     <div className="grid grid-cols-4 gap-1.5">
       {shown.map((p, i) => (
-        <div key={p.id} className={`relative ${size} rounded-xl overflow-hidden bg-gray-100`}>
+        <div key={p.id} className={`relative ${size} rounded-xl overflow-hidden product-media`}>
           <img src={getPrimaryImage(p)} alt="" loading="lazy" className="w-full h-full object-cover" />
           {i === shown.length - 1 && more > 0 && (
             <span className="absolute inset-0 bg-black/55 text-white text-sm font-bold flex items-center justify-center" dir="ltr">+{more}</span>

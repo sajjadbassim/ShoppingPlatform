@@ -210,7 +210,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                           onClick={() => handleProductClick(product)}
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-right"
                         >
-                          <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          <div className="w-12 h-12 product-media rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
                             {getPrimaryImage(product) ? (
                               <img src={getPrimaryImage(product)} alt="" className="w-full h-full object-cover" />
                             ) : (

@@ -41,6 +41,11 @@ export const useOpsNotifications = (enabled = true) => {
       success(`🛍️ طلب جديد #${order.subOrderNumber} يحتاج تأكيد`)
       refresh()
     })
+    // متجر أعلن «جاهز للاستلام» — يحتاج تعيين سائق
+    connection.on('SubOrderStatusChanged', (e) => {
+      if (e?.newStatus === 'READY') success(`✅ الطلب #${e.subOrderNumber} جاهز للاستلام — عيّن سائقاً`)
+      refresh()
+    })
     ;['NewOrder', 'SubOrderConfirmed', 'SubOrderCancelled', 'OrderStatusChanged', 'DriverUpdated']
       .forEach(event => connection.on(event, refresh))
 

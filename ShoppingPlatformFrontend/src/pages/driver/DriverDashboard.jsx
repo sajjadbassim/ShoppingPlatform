@@ -96,6 +96,9 @@ const ActiveOrderCard = ({ order, onDeliver, onFail }) => {
           <div className="space-y-2">
             <p className="text-xs font-bold text-gray-500">٢. التوصيل للزبون</p>
             <div className="rounded-xl border border-gray-200 p-3 space-y-1.5">
+              {order.zoneName && (
+                <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">المنطقة: {order.zoneName}</span>
+              )}
               <p className="text-sm text-gray-900 flex items-start gap-2">
                 <MapPin size={16} className="text-primary mt-0.5 flex-shrink-0" />
                 <span>{order.address}{order.addressDetails ? ` — ${order.addressDetails}` : ''}</span>

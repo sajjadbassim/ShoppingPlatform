@@ -36,7 +36,7 @@ const ImagePicker = ({ productId, value, onChange }) => {
       <label className="text-sm font-medium text-gray-700 block mb-1">صورة المتغير</label>
       <div className="flex items-center gap-2">
         {/* Preview */}
-        <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-200">
+        <div className="w-12 h-12 rounded-lg product-media overflow-hidden flex-shrink-0 border border-gray-200">
           {value
             ? <img src={value} alt="" className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
             : <Image size={20} className="m-auto text-gray-300 mt-3" />

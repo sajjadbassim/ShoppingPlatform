@@ -16,6 +16,9 @@ namespace ecommerce.Core.DTO.Category
 
         public Guid? ParentId { get; set; }
 
+        // true = نقل الفئة لتصبح رئيسية (ParentId الفارغ لا يُميَّز عن "لم يُرسل")
+        public bool MakeRoot { get; set; }
+
         public int? DisplayOrder { get; set; }
 
         public bool? IsActive { get; set; }

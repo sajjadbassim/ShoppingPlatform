@@ -11,6 +11,7 @@ namespace ecommerce.Services.VendorAccessService
     public interface IVendorAccessService
     {
         Task EnsureCanManageVendorAsync(Guid vendorId, CancellationToken ct = default);
+        Task<bool> CanManageVendorAsync(Guid vendorId, CancellationToken ct = default);
         Task EnsureCanManageProductAsync(Guid productId, CancellationToken ct = default);
         Task EnsureCanManageProductImageAsync(Guid imageId, CancellationToken ct = default);
         Task EnsureCanManageAttributeAsync(Guid productId, Guid attributeId, CancellationToken ct = default);
@@ -52,10 +53,23 @@ namespace ecommerce.Services.VendorAccessService
             EnsureOwner(ownerId.OwnerId);
         }
 
+        // نفس قاعدة EnsureOwner لكن بدون رمي استثناء — للنقاط العامة التي تعرض أكثر للمالك
+        public async Task<bool> CanManageVendorAsync(Guid vendorId, CancellationToken ct = default)
+        {
+            var user = _httpContextAccessor.HttpContext?.User;
+            if (user == null) return false;
+            if (user.IsInRole("ADMIN") || user.IsInRole("OPS")) return true;
+            if (!user.IsInRole("VENDOR") ||
+                !Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
+                return false;
+
+            return await _context.Vendors.AnyAsync(v => v.Id == vendorId && v.OwnerId == userId, ct);
+        }
+
         public async Task EnsureCanManageProductAsync(Guid productId, CancellationToken ct = default)
         {
             var product = await _context.Products
-                .Where(p => p.Id == productId)
+                .Where(p => p.Id == productId && !p.IsDeleted)
                 .Select(p => new { p.Vendor.OwnerId })
                 .FirstOrDefaultAsync(ct)
                 ?? throw new NotFoundException("المنتج غير موجود");
@@ -66,7 +80,7 @@ namespace ecommerce.Services.VendorAccessService
         public async Task EnsureCanManageProductImageAsync(Guid imageId, CancellationToken ct = default)
         {
             var image = await _context.ProductImages
-                .Where(i => i.Id == imageId)
+                .Where(i => i.Id == imageId && !i.Product.IsDeleted)
                 .Select(i => new { i.Product.Vendor.OwnerId })
                 .FirstOrDefaultAsync(ct)
                 ?? throw new NotFoundException("الصورة غير موجودة");

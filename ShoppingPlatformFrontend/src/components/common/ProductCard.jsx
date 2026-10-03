@@ -187,7 +187,7 @@ const ProductCard = ({
         onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
       >
         <Link to={`/products/${id}`} className="flex flex-col flex-1">
-          <div className="relative aspect-square bg-gray-100 overflow-hidden">
+          <div className="relative aspect-square product-media overflow-hidden">
             {!imageError ? (
               <img src={imageUrl} alt={name} onError={() => setImageError(true)}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -274,7 +274,7 @@ const ProductCard = ({
   if (variant === 'compact') {
     return (
       <Link to={`/products/${id}`} className={`card group block overflow-hidden ${className}`}>
-        <div className="relative aspect-square bg-gray-100 overflow-hidden">
+        <div className="relative aspect-square product-media overflow-hidden">
           {!imageError ? (
             <img src={imageUrl} alt={name} onError={() => setImageError(true)}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -311,7 +311,7 @@ const ProductCard = ({
   if (variant === 'horizontal') {
     return (
       <Link to={`/products/${id}`} className={`card group flex overflow-hidden ${className}`}>
-        <div className="relative w-32 h-32 flex-shrink-0 bg-gray-100 overflow-hidden">
+        <div className="relative w-32 h-32 flex-shrink-0 product-media overflow-hidden">
           {!imageError ? (
             <img src={imageUrl} alt={name} onError={() => setImageError(true)}
               className="w-full h-full object-cover" />

@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Ops
 {
@@ -72,6 +72,7 @@ namespace ecommerce.Core.DTO.Ops
         public string? CustomerName { get; set; }
         public string? CustomerPhone { get; set; }
         public string? Address { get; set; }
+        public string? ZoneName { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public List<string> Stores { get; set; } = new();

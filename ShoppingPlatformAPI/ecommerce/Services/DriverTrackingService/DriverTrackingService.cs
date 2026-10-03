@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Ops;
 using ecommerce.Core.Exceptions;
 using ecommerce.Data;
@@ -34,7 +34,7 @@ namespace ecommerce.Services.DriverTrackingService
         private static readonly string[] ActiveStatuses =
         {
             OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PARTIALLY_CONFIRMED,
-            OrderStatus.PREPARING, OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY,
         };
 
         private readonly AppDbContext _context;
@@ -176,7 +176,7 @@ namespace ecommerce.Services.DriverTrackingService
                         stage = StageOutForDelivery;
                         since = outForDelivery.Min(s => s.AssignedAt ?? s.UpdatedAt);
                     }
-                    else if (subs.All(s => s.Status == OrderStatus.PREPARING))
+                    else if (subs.All(s => s.Status == OrderStatus.READY))
                     {
                         stage = StageReadyForDriver;
                         since = subs.Max(s => s.UpdatedAt);
@@ -198,6 +198,7 @@ namespace ecommerce.Services.DriverTrackingService
                         Address = order.Address == null ? null
                             : string.Join("، ", new[] { order.Address.StreetAddress, order.Address.Area, order.Address.City }
                                 .Where(x => !string.IsNullOrWhiteSpace(x))),
+                        ZoneName = order.DeliveryZoneName,
                         Latitude = (double?)(order.DeliveryLatitude ?? order.Address?.Latitude),
                         Longitude = (double?)(order.DeliveryLongitude ?? order.Address?.Longitude),
                         Stores = subs.Select(s => s.Vendor?.NameAr ?? s.Vendor?.Name ?? "").Where(n => n != "").Distinct().ToList(),

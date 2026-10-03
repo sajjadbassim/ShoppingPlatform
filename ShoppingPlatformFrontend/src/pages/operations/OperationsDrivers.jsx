@@ -52,6 +52,7 @@ const getOrderStatusStyle = (status) => {
     PENDING_CONFIRMATION: { label: 'قيد الانتظار', color: 'bg-yellow-100 text-yellow-700'   },
     CONFIRMED:            { label: 'مؤكد',          color: 'bg-blue-100 text-blue-700'       },
     PREPARING:            { label: 'قيد التحضير',   color: 'bg-indigo-100 text-indigo-700'   },
+    READY:                { label: 'جاهز للاستلام', color: 'bg-teal-100 text-teal-700'       },
     OUT_FOR_DELIVERY:     { label: 'قيد التوصيل',   color: 'bg-purple-100 text-purple-700'   },
     DELIVERED:            { label: 'تم التوصيل',    color: 'bg-green-100 text-green-700'     },
     CANCELLED:            { label: 'ملغي',           color: 'bg-red-100 text-red-600'         },

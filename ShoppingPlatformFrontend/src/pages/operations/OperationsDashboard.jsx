@@ -43,6 +43,7 @@ const OperationsDashboard = () => {
   const pendingOrders   = orders.filter(o => o.status === 'PENDING_CONFIRMATION')
   const confirmedOrders = orders.filter(o => o.status === 'CONFIRMED')
   const preparingOrders = orders.filter(o => o.status === 'PREPARING')
+  const readyOrders     = orders.filter(o => o.status === 'READY')
   const shippedOrders   = orders.filter(o => o.status === 'OUT_FOR_DELIVERY')
   const deliveredOrders = orders.filter(o => o.status === 'DELIVERED')
   const cancelledOrders = orders.filter(o => o.status === 'CANCELLED')
@@ -51,6 +52,7 @@ const OperationsDashboard = () => {
   const busyDrivers      = drivers.filter(d => d.workStatus === 'delivering').length
 
   const activeOrders = [
+    ...readyOrders,
     ...pendingOrders,
     ...confirmedOrders,
     ...preparingOrders,
@@ -61,6 +63,7 @@ const OperationsDashboard = () => {
   const todayCards = [
     { label: 'بانتظار التأكيد', value: stats?.pendingConfirmation ?? pendingOrders.length, icon: Clock, tone: 'bg-amber-100 text-amber-700', to: 'PENDING_CONFIRMATION', urgent: true },
     { label: 'قيد التحضير', value: (stats?.confirmed ?? confirmedOrders.length) + (stats?.preparing ?? preparingOrders.length), icon: Package, tone: 'bg-indigo-100 text-indigo-700', to: 'PREPARING' },
+    { label: 'جاهز للاستلام', value: stats?.ready ?? readyOrders.length, icon: CheckCircle, tone: 'bg-teal-100 text-teal-700', to: 'READY', urgent: true },
     { label: 'مع السائق', value: stats?.outForDelivery ?? shippedOrders.length, icon: Truck, tone: 'bg-purple-100 text-purple-700', to: 'OUT_FOR_DELIVERY' },
     { label: 'تم التوصيل', value: stats?.delivered ?? deliveredOrders.length, icon: CheckCircle, tone: 'bg-green-100 text-green-700', to: 'DELIVERED' },
   ]
@@ -105,9 +108,9 @@ const OperationsDashboard = () => {
       <div>
         <p className="text-sm font-bold text-gray-500 mb-2">اليوم</p>
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 [&>*:last-child]:col-span-2 lg:[&>*:last-child]:col-span-1">
             {todayCards.map(c => (
               <Link key={c.label} to={`/operations/orders?status=${c.to}`}
                 className={`bg-white rounded-2xl border p-4 hover:shadow-md transition-shadow ${c.urgent && c.value > 0 ? 'border-amber-300' : 'border-gray-200'}`}>

@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Hubs;
 using ecommerce.Repositories;
@@ -118,6 +118,25 @@ namespace ecommerce.Services.NotificationService
             _logger.LogInformation("Sub-order cancelled notification sent. SubOrderNumber: {SubOrderNumber}", subOrderNumber);
         }
 
+        public async Task NotifySubOrderStatusChangedAsync(Guid subOrderId, string subOrderNumber, Guid orderId, string newStatus, bool pushToOps = true)
+        {
+            var message = OrderStatusText.StaffMessage(newStatus, subOrderNumber);
+            await _opsHub.Clients.Group("OpsTeam").SendAsync("SubOrderStatusChanged", new
+            {
+                subOrderId,
+                subOrderNumber,
+                orderId,
+                newStatus,
+                message,
+                timestamp = DateTime.UtcNow
+            });
+
+            // «جاهز للاستلام» يحتاج تحركاً فورياً من العمليات (تعيين سائق)
+            if (pushToOps && newStatus == OrderStatus.READY)
+                _push?.Enqueue(new PushMessage(message, Role: UserRoles.Ops,
+                    Url: $"/operations/orders?order={orderId}", Tag: $"order-{orderId}"));
+        }
+
         public async Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus, string? orderNumber = null)
         {
             await _opsHub.Clients.Group("OpsTeam").SendAsync("OrderStatusChanged", new
@@ -144,6 +163,8 @@ namespace ecommerce.Services.NotificationService
             Guid customerId, Guid orderId, string orderNumber, string newStatus)
         {
             if (!await IsEnabledAsync(customerId, NotificationCategory.OrderUpdates)) return;
+            // «مؤكد جزئياً» حالة عابرة (متجر أكّد وآخر لم يرد بعد) — الزبون يُبلَّغ حين يكتمل التأكيد
+            if (newStatus == OrderStatus.PARTIALLY_CONFIRMED) return;
 
             var message = OrderStatusText.CustomerMessage(newStatus, orderNumber);
             var data = new { orderId, orderNumber, status = newStatus };

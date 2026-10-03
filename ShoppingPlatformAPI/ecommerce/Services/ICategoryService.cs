@@ -12,7 +12,8 @@ namespace ecommerce.Services
         Task<CategoryResponseDto> GetByNameAsync(string name);
         Task<CategoryResponseDto> GetByArbicNameAsync(string name);
         Task<CategoryResponseDto> UpdateAsync(Guid id, CategoryUpdateDto dto);
-        Task<bool?> DeleteAsync(Guid id);
+        // تعطيل الفئة (حذف ناعم) — false إن لم توجد
+        Task<bool> DeleteAsync(Guid id);
 
         Task<PagedResponse<CategoryResponseDto>> GetPagedAsync(
             PaginationParams pagination,

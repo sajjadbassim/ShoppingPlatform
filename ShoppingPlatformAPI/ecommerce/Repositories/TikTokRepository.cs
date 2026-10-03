@@ -11,8 +11,12 @@ namespace ecommerce.Repositories
 
         // متتبَّع — للتعديل ثم الحفظ عبر IUnitOfWork
         Task<TikTokConnection?> GetConnectionAsync(Guid vendorId, bool includeVideos, CancellationToken ct = default);
-        // onlyVisible: الحسابات المعروضة للعامة فقط (لتحديث صفحة ريلز)
-        Task<List<TikTokConnection>> GetConnectionsDueForSyncAsync(DateTime syncedBefore, int take, CancellationToken ct = default, bool onlyVisible = false);
+
+        // بدون تتبّع — تُستدعى قبل أخذ قفل المزامنة، ثم يُحمَّل الحساب بعده بحالته الحالية
+        // (تحميله متتبَّعاً قبل القفل يعيد نسخة قديمة بعده فيُدرَج نفس الفيديو مرتين)
+        Task<bool> ConnectionExistsAsync(Guid vendorId, CancellationToken ct = default);
+        // onlyVisible: الحسابات المعروضة للعامة فقط (صفحة المتجر وريلز). vendorId: متجر محدد
+        Task<List<Guid>> GetVendorsDueForSyncAsync(DateTime syncedBefore, int take, bool onlyVisible, Guid? vendorId = null, CancellationToken ct = default);
         Task AddConnectionAsync(TikTokConnection connection, CancellationToken ct = default);
         void RemoveConnection(TikTokConnection connection);
         void AddVideo(TikTokVideo video);
@@ -47,17 +51,22 @@ namespace ecommerce.Repositories
         {
             IQueryable<TikTokConnection> query = _context.Set<TikTokConnection>();
             if (includeVideos)
-                query = query.Include(c => c.Videos).ThenInclude(v => v.Product!).ThenInclude(p => p.Images);
+                // الفيديوهات وصور منتجاتها مجموعتان: في استعلام واحد تتضاعف الصفوف (فيديو × صورة) — استعلامات منفصلة أخف
+                query = query.Include(c => c.Videos).ThenInclude(v => v.Product!).ThenInclude(p => p.Images).AsSplitQuery();
             return query.FirstOrDefaultAsync(c => c.VendorId == vendorId, ct);
         }
 
-        public Task<List<TikTokConnection>> GetConnectionsDueForSyncAsync(DateTime syncedBefore, int take, CancellationToken ct = default, bool onlyVisible = false) =>
+        public Task<bool> ConnectionExistsAsync(Guid vendorId, CancellationToken ct = default) =>
+            _context.Set<TikTokConnection>().AnyAsync(c => c.VendorId == vendorId, ct);
+
+        public Task<List<Guid>> GetVendorsDueForSyncAsync(DateTime syncedBefore, int take, bool onlyVisible, Guid? vendorId = null, CancellationToken ct = default) =>
             _context.Set<TikTokConnection>()
                 .Where(c => !c.NeedsReconnect && (c.LastSyncedAt == null || c.LastSyncedAt < syncedBefore))
                 .Where(c => !onlyVisible || (c.ShowOnStore && c.Vendor.IsActive))
+                .Where(c => vendorId == null || c.VendorId == vendorId)
                 .OrderBy(c => c.LastSyncedAt)
                 .Take(take)
-                .Include(c => c.Videos)
+                .Select(c => c.VendorId)
                 .ToListAsync(ct);
 
         public async Task AddConnectionAsync(TikTokConnection connection, CancellationToken ct = default) =>
@@ -75,6 +84,7 @@ namespace ecommerce.Repositories
                 .Include(c => c.Videos.Where(v => !v.IsHidden && !v.IsRemoved))
                     .ThenInclude(v => v.Product!)
                     .ThenInclude(p => p.Images)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(c => c.VendorId == vendorId && c.ShowOnStore && !c.NeedsReconnect, ct);
 
         public async Task AddStateAsync(TikTokOAuthState state, CancellationToken ct = default) =>

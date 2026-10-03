@@ -47,6 +47,19 @@ export const homeService = {
     return r.data;
   },
 
+  // صورة بانر رأس قسم المنتجات
+  setSectionBanner: async (id, file) => {
+    const fd = new FormData();
+    fd.append('image', file);
+    const r = await apiPostForm(API_ENDPOINTS.HOME.SECTION_BANNER(id), fd);
+    return r.data.data || r.data;
+  },
+
+  removeSectionBanner: async (id) => {
+    const r = await apiDelete(API_ENDPOINTS.HOME.SECTION_BANNER(id));
+    return r.data;
+  },
+
   addSectionItem: async (sectionId, productId, displayOrder = 0) => {
     const r = await apiPost(API_ENDPOINTS.HOME.SECTION_ITEMS(sectionId), { productId, displayOrder });
     return r.data.data || r.data;

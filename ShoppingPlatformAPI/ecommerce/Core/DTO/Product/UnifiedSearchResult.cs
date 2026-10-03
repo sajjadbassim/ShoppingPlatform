@@ -22,6 +22,8 @@
         public bool HasDiscount { get; set; }
         public decimal? DiscountPercentage { get; set; }
         public string? PrimaryImageUrl { get; set; }
+        public Guid VendorId { get; set; }
+        public Guid? CategoryId { get; set; }
         public string VendorName { get; set; }
         public string CategoryName { get; set; }
         public decimal? AverageRating { get; set; }

@@ -1,5 +1,5 @@
 // src/pages/customer/ReelsPage.jsx
-// تصفّح ريلز: فيديوهات تيك توك من كل المتاجر المربوطة، بملء الشاشة وتمرير عمودي
+// تصفّح ريلز: فيديوهات تيك توك ومنشورات إنستغرام (فيديو وصور وألبومات) من كل المتاجر المربوطة، بملء الشاشة وتمرير عمودي
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
@@ -15,9 +15,9 @@ const ReelsPage = () => {
   const queryClient = useQueryClient()
 
   const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } = useInfiniteQuery({
-    queryKey: ['tiktok-reels'],
+    queryKey: ['social-reels'],
     queryFn: async ({ pageParam }) => {
-      const r = await apiGet(API_ENDPOINTS.TIKTOK.REELS, { page: pageParam, pageSize: PAGE_SIZE })
+      const r = await apiGet(API_ENDPOINTS.SOCIAL.REELS, { page: pageParam, pageSize: PAGE_SIZE })
       return r.data?.data ?? r.data
     },
     initialPageParam: 1,
@@ -25,16 +25,16 @@ const ReelsPage = () => {
     staleTime: 30 * 1000,
   })
 
-  // جلب آخر الريلز المنشورة من تيك توك: عند فتح الصفحة، وعند السحب للأسفل من أول فيديو
+  // جلب آخر الريلز المنشورة من المنصات: عند فتح الصفحة، وعند السحب للأسفل من أول فيديو
   const [refreshing, setRefreshing] = useState(false)
   const refresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      const r = await apiPost(`${API_ENDPOINTS.TIKTOK.REELS_REFRESH}?pageSize=${PAGE_SIZE}`)
+      const r = await apiPost(`${API_ENDPOINTS.SOCIAL.REELS_REFRESH}?pageSize=${PAGE_SIZE}`)
       const first = r.data?.data ?? r.data
       if (!first?.items) return
       // الجديد يُضاف في الأعلى فقط، والقائمة المحمَّلة تبقى كما هي (لا يُعاد تحميل المشغلات ولا تنزاح الفيديوهات)
-      queryClient.setQueryData(['tiktok-reels'], (old) => {
+      queryClient.setQueryData(['social-reels'], (old) => {
         if (!old?.pages?.length) return { pages: [first], pageParams: [1] }
         const known = new Set(old.pages.flatMap(p => (p?.items || []).map(v => v.id)))
         const fresh = first.items.filter(v => !known.has(v.id))

@@ -11,6 +11,17 @@
         public string Sku { get; set; }
         public int StockQuantity { get; set; }
         public bool IsAvailable { get; set; }
+
+        // للمنتج ذي المتغيرات: المخزون والتوفر محسوبان من المتغيرات المتوفرة
+        public bool HasVariants { get; set; }
+
+        // القيم المخزّنة كما أدخلها البائع (قبل العروض ومخزون المتغيرات) — لنماذج التعديل.
+        // Price/OriginalPrice/StockQuantity/IsAvailable أعلاه هي ما يراه الزبون، وحفظها في النموذج
+        // كان يُنقص السعر الحقيقي بقيمة العرض عند كل حفظ
+        public decimal RegularPrice { get; set; }
+        public decimal? RegularOriginalPrice { get; set; }
+        public int RegularStockQuantity { get; set; }
+        public bool RegularIsAvailable { get; set; }
         public bool IsActive { get; set; }
 
         // معلومات المتجر

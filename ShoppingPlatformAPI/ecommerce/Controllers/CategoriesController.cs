@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.DTO.Category;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.DTO.Category;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,6 @@ namespace ecommerce.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    //[Authorize]
     public class CategoriesController : Controller
     {
         private readonly ICategoryService _categoryService;
@@ -20,6 +20,7 @@ namespace ecommerce.Controllers
 
         // ✅ POST: api/categories - مع رفع الأيقونة
         [HttpPost]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Create([FromForm] CategoryCreateDto dto)
         {
@@ -134,6 +135,7 @@ namespace ecommerce.Controllers
 
         // ✅ PUT: api/categories/{id} - مع رفع أيقونة جديدة
         [HttpPut("{id}")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> Update(Guid id, [FromForm] CategoryUpdateDto dto)
         {
@@ -150,6 +152,7 @@ namespace ecommerce.Controllers
 
         // ✅ POST: api/categories/{id}/icon - تحديث الأيقونة فقط
         [HttpPost("{id}/icon")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         [Consumes("multipart/form-data")]
         public async Task<IActionResult> UpdateIcon(Guid id, IFormFile icon)
         {
@@ -169,6 +172,7 @@ namespace ecommerce.Controllers
 
         // ✅ DELETE: api/categories/{id}/icon - حذف الأيقونة
         [HttpDelete("{id}/icon")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<IActionResult> DeleteIcon(Guid id)
         {
             try
@@ -181,11 +185,7 @@ namespace ecommerce.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.InnerException?.Message ?? ex.Message
-                });
+                return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
@@ -221,17 +221,16 @@ namespace ecommerce.Controllers
 
         // DELETE: api/categories/{id}
         [HttpDelete("{id}")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<IActionResult> Delete(Guid id)
         {
             try
             {
-                var isActive = await _categoryService.DeleteAsync(id);
-
-                if (isActive == null)
+                // تعطيل فقط — التفعيل عبر PUT بـ IsActive = true
+                if (!await _categoryService.DeleteAsync(id))
                     return NotFound(new { success = false, message = "التصنيف غير موجود" });
 
-                var message = isActive.Value ? "تم تفعيل التصنيف" : "تم تعطيل التصنيف";
-                return Ok(new { success = true, message });
+                return Ok(new { success = true, message = "تم تعطيل التصنيف" });
             }
             catch (Exception ex)
             {

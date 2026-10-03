@@ -46,21 +46,18 @@ const VendorDashboard = () => {
   const lowStock       = d.lowStockProducts    ?? 0
   const avgRating      = d.averageRating       ?? 0
   const totalReviews   = d.totalReviews        ?? 0
-  // ✅ إظهار الطلبات النشطة فقط (بدون DELIVERED و CANCELLED)
-  const allRecentOrders = d.recentOrders ?? []
-  const recentOrders = allRecentOrders.filter(o =>
-    !['DELIVERED', 'CANCELLED'].includes(o.status)
-  )
+  // الخادم يرسل النشطة أولاً ثم آخر المكتملة (حتى 5)
+  const recentOrders = d.recentOrders ?? []
   // ✅ إزالة التكرار — الـ API قد يرجع نفس المنتج مرتين
   const topProducts = [...new Map(
     (d.topProducts ?? []).map(p => [p.productId, p])
   ).values()]
 
   const stats = [
-    { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString()} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600', change: 0 },
-    { title: 'الطلبات',  value: (d.totalOrders ?? 0).toString(), icon: ShoppingCart, iconBg: 'bg-blue-100',   iconColor: 'text-blue-600',   change: 0 },
-    { title: 'المنتجات', value: `${activeProducts}/${totalProducts}`, icon: Package, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600', change: 0 },
-    { title: 'معلقة',    value: pendingOrders.toString(), icon: TrendingUp, iconBg: 'bg-purple-100', iconColor: 'text-purple-600', change: 0 },
+    { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString()} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
+    { title: 'الطلبات',  value: (d.totalOrders ?? 0).toString(), icon: ShoppingCart, iconBg: 'bg-blue-100',   iconColor: 'text-blue-600' },
+    { title: 'المنتجات', value: `${activeProducts}/${totalProducts}`, icon: Package, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
+    { title: 'معلقة',    value: pendingOrders.toString(), icon: TrendingUp, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
   ]
 
   return (
@@ -78,8 +75,8 @@ const VendorDashboard = () => {
           <select value={dateRange} onChange={e => setDateRange(e.target.value)}
             className="h-10 px-3 bg-white border border-gray-300 rounded-lg text-sm">
             <option value="today">اليوم</option>
-            <option value="week">هذا الأسبوع</option>
-            <option value="month">هذا الشهر</option>
+            <option value="week">آخر 7 أيام</option>
+            <option value="month">آخر 30 يوماً</option>
             <option value="year">الإجمالي</option>
           </select>
         </div>
@@ -163,8 +160,8 @@ const VendorDashboard = () => {
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: 'اليوم',        value: d.revenueToday     ?? 0 },
-                    { label: 'هذا الأسبوع',  value: d.revenueThisWeek  ?? 0 },
-                    { label: 'هذا الشهر',    value: d.revenueThisMonth ?? 0 },
+                    { label: 'آخر 7 أيام',   value: d.revenueThisWeek  ?? 0 },
+                    { label: 'آخر 30 يوماً', value: d.revenueThisMonth ?? 0 },
                   ].map((r, i) => (
                     <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                       <p className="font-bold text-gray-900 text-sm">
@@ -199,7 +196,7 @@ const VendorDashboard = () => {
                   <span className="w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {i + 1}
                   </span>
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                  <div className="w-10 h-10 product-media rounded-lg overflow-hidden flex-shrink-0">
                     <img src={getImageUrl(p.imageUrl) || p.imageUrl} alt=""
                       className="w-full h-full object-cover"
                       onError={e => e.target.style.display='none'} />

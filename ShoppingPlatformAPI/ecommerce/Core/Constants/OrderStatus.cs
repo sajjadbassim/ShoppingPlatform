@@ -1,4 +1,4 @@
-namespace ecommerce.Core.Constants
+﻿namespace ecommerce.Core.Constants
 {
     public static class OrderStatus
     {
@@ -6,6 +6,7 @@ namespace ecommerce.Core.Constants
         public const string CONFIRMED = "CONFIRMED";                        // مؤكد
         public const string PARTIALLY_CONFIRMED = "PARTIALLY_CONFIRMED";    // مؤكد جزئياً
         public const string PREPARING = "PREPARING";                        // قيد التحضير
+        public const string READY = "READY";                                // جاهز للاستلام (كل المتاجر جهّزت — يحتاج سائقاً)
         public const string OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY";         // في الطريق
         public const string DELIVERED = "DELIVERED";                        // تم التوصيل
         public const string CANCELLED = "CANCELLED";                        // ملغي

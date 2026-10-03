@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { apiGet } from '../../api/axios'
+import { API_ENDPOINTS } from '../../api/endpoints'
 import { Search, AlertCircle, X, Store } from 'lucide-react'
 import { Skeleton } from '../../components/common/Loading'
 import Pagination from '../../components/common/Pagination'
@@ -25,25 +28,40 @@ const StoresPage = () => {
 
   const currentPage = parseInt(searchParams.get('page')) || 1
   const sortBy = SORT_OPTIONS.some(o => o.value === searchParams.get('sort')) ? searchParams.get('sort') : 'products'
+  const sectionId = searchParams.get('section') || ''   // "متاجرنا المميزة" من الصفحة الرئيسية
 
-  const { data: vendorsData, isLoading, isError, error } = useVendorsPaged({
-    pageNumber: currentPage,
-    pageSize: 12,
+  // قسم المتاجر المميزة: نفس المتاجر وبنفس ترتيبها في الصفحة الرئيسية
+  const { data: section, isLoading: sectionLoading } = useQuery({
+    queryKey: ['home-section', sectionId],
+    queryFn: () => apiGet(API_ENDPOINTS.HOME.SECTION_BY_ID(sectionId)).then(r => r.data.data),
+    enabled: !!sectionId,
+    staleTime: 60 * 1000,
+  })
+  const featuredIds = useMemo(() => (section?.data || []).map(v => v.id), [section])
+
+  const { data: vendorsData, isLoading: vendorsLoading, isError, error } = useVendorsPaged({
+    pageNumber: sectionId ? 1 : currentPage,
+    pageSize: sectionId ? 100 : 12,
     isActive: true,
   })
+  const isLoading = vendorsLoading || (!!sectionId && sectionLoading)
 
-  const vendors = vendorsData?.items || vendorsData || []
-  const totalPages = vendorsData?.totalPages || 1
-  const totalCount = vendorsData?.totalCount || vendors.length
+  const allVendors = vendorsData?.items || vendorsData || []
+  const vendors = sectionId
+    ? featuredIds.map(id => allVendors.find(v => v.id === id)).filter(Boolean)
+    : allVendors
+  const totalPages = sectionId ? 1 : vendorsData?.totalPages || 1
+  const totalCount = sectionId ? vendors.length : vendorsData?.totalCount || vendors.length
   const totalProducts = vendors.reduce((sum, v) => sum + (v.productsCount || 0), 0)
 
-  // البحث بالاسم أو الوصف أو العنوان، ثم الترتيب
+  // البحث بالاسم أو الوصف أو العنوان، ثم الترتيب (المميزة تبقى بترتيبها: الأكثر طلبات)
   const shownVendors = useMemo(() => {
     const q = searchQuery.trim()
     const list = vendors.filter(v => !q || [v.nameAr, v.name, v.description, v.address].some(t => t?.includes(q)))
+    if (sectionId) return list
     const option = SORT_OPTIONS.find(o => o.value === sortBy)
     return [...list].sort(option.sort)
-  }, [vendors, searchQuery, sortBy])
+  }, [vendors, searchQuery, sortBy, sectionId])
 
   // المتجر المميز يظهر في الصفحة الأولى فقط ودون بحث
   const showFeatured = !searchQuery.trim() && currentPage === 1 && shownVendors.length > 1
@@ -72,12 +90,22 @@ const StoresPage = () => {
           <Store size={120} className="absolute -left-4 top-4 text-white/10 hidden sm:block" strokeWidth={1.2} />
 
           <div className="relative max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">اكتشف متاجر واسط</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">
+              {sectionId ? (section?.titleAr || section?.title || 'المتاجر المميزة') : 'اكتشف متاجر واسط'}
+            </h1>
             <p className="text-sm sm:text-base text-white/85 mt-1.5">
               {isLoading
                 ? 'جاري التحميل...'
-                : <>{totalCount} متجر محلي • أكثر من {totalProducts.toLocaleString()} منتج بانتظارك</>}
+                : sectionId
+                  ? <>أكثر {totalCount} متاجر طلباً عند زبائننا • {totalProducts.toLocaleString()} منتج</>
+                  : <>{totalCount} متجر محلي • أكثر من {totalProducts.toLocaleString()} منتج بانتظارك</>}
             </p>
+            {sectionId && (
+              <button onClick={() => setSearchParams({})}
+                className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-white/15 hover:bg-white/25 text-sm font-medium">
+                <Store size={15} /> عرض كل المتاجر
+              </button>
+            )}
 
             <div className="relative mt-4">
               <Search size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -99,8 +127,8 @@ const StoresPage = () => {
           </div>
         </div>
 
-        {/* الترتيب */}
-        <div className="flex gap-2 overflow-x-auto hide-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 mb-4">
+        {/* الترتيب — لا ينطبق على المميزة (مرتبة بالأكثر طلبات) */}
+        <div className={`${sectionId ? 'hidden' : 'flex'} gap-2 overflow-x-auto hide-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 pb-1 mb-4`}>
           {SORT_OPTIONS.map(option => (
             <button key={option.value} onClick={() => setParam('sort', option.value)}
               className={`h-9 px-4 rounded-full whitespace-nowrap text-sm font-medium transition-colors flex-shrink-0 ${
@@ -140,7 +168,7 @@ const StoresPage = () => {
 
             {rest.length > 0 && (
               <>
-                {featured && <h2 className="text-lg font-bold text-gray-900">كل المتاجر</h2>}
+                {featured && <h2 className="text-lg font-bold text-gray-900">{sectionId ? 'متاجر مميزة أخرى' : 'كل المتاجر'}</h2>}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5">
                   {rest.map((store, index) => (
                     <StoreCard key={store.id} store={store} index={index + 1} />

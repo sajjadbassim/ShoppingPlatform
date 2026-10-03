@@ -21,6 +21,7 @@ const STATUS_CONFIG = {
   CONFIRMED:            { label: 'مؤكد',           color: 'bg-blue-100 text-blue-700 border-blue-200',       icon: CheckCircle  },
   PARTIALLY_CONFIRMED:  { label: 'مؤكد جزئياً',   color: 'bg-cyan-100 text-cyan-700 border-cyan-200',       icon: CheckCircle  },
   PREPARING:            { label: 'قيد التحضير',   color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: Package      },
+  READY:                { label: 'جاهز للاستلام', color: 'bg-teal-100 text-teal-700 border-teal-200',       icon: Package      },
   OUT_FOR_DELIVERY:     { label: 'قيد التوصيل',   color: 'bg-purple-100 text-purple-700 border-purple-200', icon: Truck        },
   DELIVERED:            { label: 'تم التوصيل',    color: 'bg-green-100 text-green-700 border-green-200',    icon: CheckCircle  },
   CANCELLED:            { label: 'ملغي',           color: 'bg-red-100 text-red-600 border-red-200',          icon: XCircle      },
@@ -389,6 +390,7 @@ const AdminOrderDetails = () => {
             <InfoRow icon={User}  label="الاسم"   value={order.customerName} />
             <InfoRow icon={Phone} label="الهاتف"  value={order.customerPhone} dir="ltr" />
             <InfoRow icon={MapPin} label="عنوان التوصيل" value={order.deliveryAddress} />
+            {order.deliveryZoneName && <InfoRow icon={MapPin} label="منطقة التوصيل" value={order.deliveryZoneName} />}
             {order.deliveryPhone !== order.customerPhone && (
               <InfoRow icon={Phone} label="هاتف التوصيل" value={order.deliveryPhone} dir="ltr" />
             )}

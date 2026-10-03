@@ -15,5 +15,8 @@
         public DateTime? StartsAt { get; set; }
         public DateTime? EndsAt { get; set; }
         public bool IsActive { get; set; }
+
+        // null = السلايدر العلوي، وإلا = قسم بلوك البانرات
+        public Guid? SectionId { get; set; }
     }
 }

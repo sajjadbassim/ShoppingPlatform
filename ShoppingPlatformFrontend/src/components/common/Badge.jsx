@@ -95,6 +95,14 @@ export const StatusBadge = ({ status }) => {
           icon: '◐'
         };
       
+      case 'READY':
+        return {
+          label: 'جاهز للاستلام',
+          bg: 'bg-teal-100',
+          text: 'text-teal-800',
+          icon: '✓'
+        };
+
       case 'PREPARING':
       case 'PROCESSING':
         return {

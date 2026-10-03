@@ -56,7 +56,7 @@ const SuggestedTile = ({ product: p }) => {
   return (
     <Link to={`/products/${p.id}`}
       className="group flex-shrink-0 w-[42%] min-w-[150px] sm:w-auto sm:min-w-0 snap-start bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative aspect-square bg-gray-50">
+      <div className="relative aspect-square product-media">
         {p.primaryImageUrl && <img src={getImageUrl(p.primaryImageUrl)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />}
         {discount > 0 && <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-rose-500 text-white text-[11px] font-bold">-{discount}%</span>}
       </div>
@@ -375,7 +375,7 @@ const CartPage = () => {
                       return (
                         <div key={itemKey} className="p-3 lg:p-4 flex gap-3">
                           <Link to={`/products/${item.productId}`}
-                            className="w-20 h-20 lg:w-24 lg:h-24 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
+                            className="w-20 h-20 lg:w-24 lg:h-24 product-media rounded-xl overflow-hidden flex-shrink-0">
                             <img
                               src={getImageUrl(item.productImage) || '/placeholder-product.png'}
                               alt={item.productNameAr || item.productName}

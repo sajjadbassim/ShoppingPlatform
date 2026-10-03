@@ -322,6 +322,10 @@ namespace ecommerce.Services.LoyaltyService
                 .FirstOrDefaultAsync(t => t.OrderId == orderId && t.Type == LoyaltyTransactionType.Redeemed);
 
             if (redemption == null) return;
+            // أُعيدت مسبقاً (إلغاء متكرر أو إلغاء آخر متجر بعد إلغاء الطلب)
+            if (await _context.LoyaltyTransactions.AnyAsync(t => t.OrderId == orderId && t.Type == LoyaltyTransactionType.Adjusted
+                    && t.Points > 0 && t.Description == "إعادة نقاط بسبب إلغاء الطلب"))
+                return;
 
             var pointsToReturn = Math.Abs(redemption.Points);
             redemption.Account.Balance += pointsToReturn;

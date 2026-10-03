@@ -115,6 +115,7 @@ const CategoryModal = ({ category, parentId, categories, onClose, onSaved }) => 
     fd.append('DisplayOrder', String(Number(form.DisplayOrder) || 0))
     fd.append('IsActive',     String(form.IsActive))
     if (form.ParentId) fd.append('ParentId', form.ParentId)
+    else if (isEdit) fd.append('MakeRoot', 'true') // اختيار "بدون أب" يجعلها فئة رئيسية
     // POST = 'Icon', PUT = 'NewIcon'
     if (iconFile) fd.append(isEdit ? 'NewIcon' : 'Icon', iconFile)
     return fd
@@ -363,9 +364,15 @@ const AdminCategories = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return
+    // DELETE يعطّل فقط؛ إعادة التفعيل عبر التعديل (IsActive = true)
+    if (!deleteTarget.isActive) {
+      await handleToggle(deleteTarget)
+      setDeleteTarget(null)
+      return
+    }
     try {
       await deleteMutation.mutateAsync(deleteTarget.id)
-      success('تم تغيير حالة الفئة بنجاح')
+      success('تم تعطيل الفئة')
       setDeleteTarget(null)
     } catch (err) {
       showError(err.message || 'فشل تعطيل الفئة')

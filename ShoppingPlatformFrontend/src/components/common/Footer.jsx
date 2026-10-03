@@ -32,7 +32,8 @@ const Footer = () => {
   ]
 
   return (
-    <footer className="theme-static bg-gray-900 text-gray-300">
+    // على الهاتف (مع شريط التنقل السفلي) لا فوتر — مثل التطبيقات؛ روابطه موجودة في صفحة الإعدادات
+    <footer className="theme-static bg-gray-900 text-gray-300 hidden lg:block">
       {/* Main Footer */}
       <div className="container-main py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">

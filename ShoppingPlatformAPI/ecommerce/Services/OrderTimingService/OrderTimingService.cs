@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -74,7 +74,7 @@ namespace ecommerce.Services.OrderTimingService
             var subIds = subs.Select(s => s.Id).ToList();
             var logs = await _context.OrderStatusLogs.AsNoTracking()
                 .Where(l => l.SubOrderId != null && subIds.Contains(l.SubOrderId.Value)
-                    && (l.NewStatus == OrderStatus.PREPARING || l.NewStatus == OrderStatus.OUT_FOR_DELIVERY || l.NewStatus == OrderStatus.DELIVERED))
+                    && (l.NewStatus == OrderStatus.PREPARING || l.NewStatus == OrderStatus.READY || l.NewStatus == OrderStatus.OUT_FOR_DELIVERY || l.NewStatus == OrderStatus.DELIVERED))
                 .Select(l => new { SubOrderId = l.SubOrderId!.Value, l.NewStatus, l.CreatedAt })
                 .ToListAsync(ct);
             // آخر مرة دخل فيها كل طلب فرعي كل حالة (إعادة المحاولة تبدأ مرحلة جديدة)
@@ -97,6 +97,7 @@ namespace ecommerce.Services.OrderTimingService
 
                 var confirmed = Last(id => mine.First(s => s.Id == id).ConfirmedAt);
                 var preparing = Last(id => Log(id, OrderStatus.PREPARING));
+                var ready = Last(id => Log(id, OrderStatus.READY));
                 var assigned = Last(id => Log(id, OrderStatus.OUT_FOR_DELIVERY) ?? mine.First(s => s.Id == id).AssignedAt);
                 var pickedUp = Last(id => mine.First(s => s.Id == id).PickedUpAt);
                 var isDelivered = o.Status == OrderStatus.DELIVERED;
@@ -120,7 +121,15 @@ namespace ecommerce.Services.OrderTimingService
 
                 Stage("confirm", "انتظار تأكيد المتجر", o.CreatedAt, confirmed);
                 Stage("start", "حتى بدء التحضير", confirmed, preparing);
-                Stage("prepare", "التحضير وإسناد السائق", preparing, assigned);
+                if (ready.HasValue && ready >= preparing)
+                {
+                    Stage("prepare", "التحضير", preparing, ready);
+                    Stage("dispatch", "إسناد السائق", ready, assigned);
+                }
+                else
+                {
+                    Stage("prepare", "التحضير وإسناد السائق", preparing, assigned);   // طلبات ما قبل «جاهز للاستلام»
+                }
                 if (pickedUp.HasValue && pickedUp >= assigned)
                 {
                     Stage("pickup", "وصول السائق للمتجر", assigned, pickedUp);

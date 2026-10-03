@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ArrowLeft, Truck, Shield, Headphones, CreditCard, Store, Star, LayoutGrid, Heart, Plus, Search, Clock, BadgePercent } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowLeft, Truck, Shield, Headphones, CreditCard, Store, Star, Heart, Plus, Clock, LayoutGrid, BadgePercent } from 'lucide-react'
 import ProductCard from '../../components/common/ProductCard'
 import AppPromoSection from '../../components/common/AppPromoSection'
 import CategoryIcon from '../../components/common/CategoryIcon'
@@ -31,7 +31,8 @@ const useHomeData = () => useQuery({
 const useHomeBanners = () => useQuery({
   queryKey: ['home-banners'],
   queryFn: async () => {
-    const r = await apiGet('/api/Home/banners', { onlyActive: true })
+    // السلايدر العلوي فقط — بانرات البلوكات تأتي مع أقسامها
+    const r = await apiGet('/api/Home/banners', { onlyActive: true, heroOnly: true })
     return r.data.data || r.data
   },
   staleTime: 5 * 60 * 1000,
@@ -131,16 +132,16 @@ const HeroSlider = ({ banners, loading }) => {
   // على الهاتف نعتمد نسبة أبعاد البنر (1600×656) حتى تظهر الصورة كاملة دون قص
   const sizeClass = 'aspect-[1600/656]'
 
-  // على الهاتف: بطاقة بزوايا دائرية وهوامش، وعلى الشاشات الأكبر: عرض كامل
+  // على الهاتف: من الحافة للحافة بلا هوامش (مثل التطبيقات)، وعلى الشاشات الكبيرة: بطاقة بزوايا دائرية
   if (loading) return (
-    <div className="container-main pt-3 lg:pt-6">
-      <div className={`${sizeClass} bg-gray-200 animate-pulse rounded-2xl lg:rounded-3xl`} />
+    <div className="lg:container-main lg:pt-6">
+      <div className={`${sizeClass} bg-gray-200 animate-pulse lg:rounded-3xl`} />
     </div>
   )
 
   return (
-    <div className="container-main pt-3 lg:pt-6">
-    <section className={`relative ${sizeClass} overflow-hidden rounded-2xl lg:rounded-3xl shadow-sm`}
+    <div className="lg:container-main lg:pt-6">
+    <section className={`relative ${sizeClass} overflow-hidden lg:rounded-3xl lg:shadow-sm`}
       onTouchStart={e => { swipedRef.current = false; setTouchStartX(e.touches[0].clientX) }}
       onTouchEnd={handleTouchEnd}
       // منع فتح رابط البنر بعد السحب
@@ -186,25 +187,16 @@ const HeroSlider = ({ banners, loading }) => {
             className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-white/40 rounded-full items-center justify-center text-white backdrop-blur-sm transition-colors">
             <ChevronLeft size={22} />
           </button>
-          <div className="hidden">
+          {/* مؤشرات الشرائح فوق أسفل الصورة */}
+          <div className="absolute bottom-3 right-4 lg:right-1/2 lg:translate-x-1/2 flex gap-1.5 z-10">
             {displaySlides.map((_, i) => (
-              <button key={i} onClick={() => setCurrent(i)}
-                className={`h-2.5 rounded-full transition-all ${i === current ? 'bg-white w-8' : 'bg-white/50 w-2.5'}`} />
+              <button key={i} onClick={() => setCurrent(i)} aria-label={`الشريحة ${i + 1}`}
+                className={`h-1.5 rounded-full shadow transition-all ${i === current ? 'bg-white w-6' : 'bg-white/60 w-3'}`} />
             ))}
           </div>
         </>
       )}
     </section>
-
-    {/* مؤشرات الشرائح تحت البنر على الهاتف */}
-    {displaySlides.length > 1 && (
-      <div className="flex justify-center gap-1.5 pt-3">
-        {displaySlides.map((_, i) => (
-          <button key={i} onClick={() => setCurrent(i)} aria-label={`الشريحة ${i + 1}`}
-            className={`h-1.5 rounded-full transition-all ${i === current ? 'bg-primary w-5' : 'bg-gray-300 w-1.5'}`} />
-        ))}
-      </div>
-    )}
     </div>
   )
 }
@@ -222,7 +214,7 @@ const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = fal
   return (
     <Link to={`/products/${product.id}`}
       className={`block ${className} flex-shrink-0 snap-start text-gray-900 ${boxed ? 'bg-white rounded-2xl p-2 shadow-sm' : ''}`}>
-      <div className="relative aspect-square bg-gray-50 rounded-2xl overflow-hidden">
+      <div className="relative aspect-square product-media rounded-2xl overflow-hidden">
         {img
           ? <img src={img} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-gray-300"><Store size={32} /></div>}
@@ -256,56 +248,6 @@ const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = fal
   )
 }
 
-// تحية حسب الوقت + بحث سريع
-const GreetingBar = ({ user }) => {
-  const hour = new Date().getHours()
-  const greeting = hour >= 5 && hour < 12 ? 'صباح الخير' : 'مساء الخير'
-  const firstName = user?.fullName?.split(' ')[0]
-  return (
-    <section className="container-main pt-4 lg:pt-6">
-      <p className="text-lg lg:text-2xl font-bold text-gray-900">
-        {greeting}{firstName ? `، ${firstName}` : ''} 👋
-      </p>
-      <p className="text-sm text-gray-500 mt-0.5">ماذا تريد أن تتسوّق اليوم؟</p>
-      <button onClick={() => window.dispatchEvent(new Event('open-global-search'))}
-        className="md:hidden mt-3 w-full h-12 px-4 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center gap-3 text-gray-400 text-sm">
-        <Search size={18} className="text-primary" />
-        ابحث عن منتج، متجر، أو فئة...
-      </button>
-    </section>
-  )
-}
-
-// أقوى الخصومات — تُجمع من منتجات أقسام الصفحة نفسها
-const DealsSection = ({ products, onAddToCart, onToggleWishlist }) => {
-  if (products.length < 2) return null
-  return (
-    <section className="container-main pt-5 lg:pt-8">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-rose-500 via-red-500 to-orange-400 p-4 lg:p-6">
-        <div className="absolute -top-10 -left-8 w-40 h-40 rounded-full bg-white/15" />
-        <div className="absolute -bottom-12 left-1/3 w-32 h-32 rounded-full bg-yellow-300/25 blur-xl" />
-        <div className="relative flex items-center justify-between mb-3 lg:mb-4">
-          <div>
-            <h2 className="text-lg lg:text-2xl font-bold text-white">🔥 خصومات لا تفوّت</h2>
-            <p className="text-xs lg:text-sm text-white/85">أفضل الأسعار على منتجات مختارة</p>
-          </div>
-          <Link to="/products?hasDiscount=true"
-            className="h-9 px-4 rounded-full bg-white text-red-600 text-sm font-bold flex items-center gap-1 flex-shrink-0">
-            الكل <ArrowLeft size={15} />
-          </Link>
-        </div>
-        <div className="relative flex gap-3 overflow-x-auto snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 lg:mx-0 lg:px-0 lg:grid lg:grid-cols-5 lg:overflow-visible">
-          {products.map((p, i) => (
-            <MobileProductCard key={p.id} product={p} boxed
-              className={`w-[40%] min-w-[150px] lg:w-auto lg:min-w-0 ${i >= 5 ? 'lg:hidden' : ''}`}
-              onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // بطاقتان ملوّنتان: النقاط التشجيعية والمتاجر المحلية
 const PromoTiles = () => (
   <section className="container-main pt-5 lg:pt-8">
@@ -324,18 +266,75 @@ const PromoTiles = () => (
   </section>
 )
 
+// "عرض الكل" يفتح نفس محتوى القسم:
+// - المختار يدوياً: منتجات القسم نفسها
+// - المميز: نفس فلتر الفئة/المتجر ونفس الترتيب (الأكثر مبيعاً)
+const getSectionLink = (section) => {
+  if (section.type === 'custom_products') return `/products?section=${section.id}`
+  const params = new URLSearchParams()
+  if (section.filterCategoryId) params.set('category', section.filterCategoryId)
+  if (section.filterVendorId) params.set('vendor', section.filterVendorId)
+  params.set('sort', 'sales')
+  return `/products?${params}`
+}
+
 // رأس القسم: العنوان و"عرض الكل"
 const SectionHeader = ({ title, subtitle, to }) => (
   <div className="flex items-center justify-between mb-3 md:mb-6">
     <div>
       <h2 className="text-lg md:text-2xl font-bold text-gray-900">{title}</h2>
-      {subtitle && <p className="hidden md:block text-gray-500 mt-1">{subtitle}</p>}
+      {subtitle && <p className="text-xs md:text-base text-gray-500 mt-0.5 md:mt-1">{subtitle}</p>}
     </div>
     <Link to={to} className="text-primary hover:underline flex items-center gap-1 text-sm font-medium">
-      عرض الكل <ArrowLeft size={16} className="hidden md:block" />
+      عرض المزيد <ArrowLeft size={16} className="hidden md:block" />
     </Link>
   </div>
 )
+
+const bannerSrc = (url) => (url?.startsWith('/') ? getImageUrl(url) : url)
+
+// رأس قسم بصورة بانر: العنوان والوصف وزر "عرض المزيد" فوق الصورة
+const BannerSectionHeader = ({ image, title, subtitle, to }) => (
+  <div className="relative overflow-hidden -mx-4 md:mx-0 md:rounded-3xl bg-gray-100">
+    <img src={bannerSrc(image)} alt="" loading="lazy" className="w-full aspect-[2.3/1] md:aspect-[3.4/1] object-cover" />
+    {/* تدرّج من جهة النص (اليمين) ليبقى العنوان مقروءاً على أي صورة */}
+    <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/15 to-transparent" />
+    <div className="absolute inset-y-0 right-0 w-3/5 flex flex-col justify-center gap-1.5 md:gap-2 p-4 md:p-10 pb-14 md:pb-10">
+      <h2 className="text-white font-bold text-lg md:text-3xl leading-snug drop-shadow">{title}</h2>
+      {subtitle && <p className="text-white/85 text-xs md:text-base line-clamp-2">{subtitle}</p>}
+      <Link to={to} className="self-start mt-1 md:mt-3 px-4 md:px-6 py-1.5 md:py-2 rounded-xl border border-white/80 text-white text-sm md:text-base font-medium hover:bg-white/15 active:bg-white/25 transition-colors">
+        عرض المزيد
+      </Link>
+    </div>
+  </div>
+)
+
+// بلوك بانرات: 1 → عريض، 2 → متجاوران، 3+ → الأول عريض والبقية شبكة من عمودين
+const BannerTile = ({ banner, wide }) => (
+  <BannerLink to={getBannerLink(banner)}
+    className={`block overflow-hidden rounded-2xl md:rounded-3xl bg-gray-100 active:scale-[0.99] transition-transform ${wide ? 'aspect-[2.15/1] md:aspect-[3/1]' : 'aspect-square md:aspect-[16/10]'}`}>
+    <img src={bannerSrc(banner.imageUrl)} alt={banner.titleAr || banner.title || ''} loading="lazy" className="w-full h-full object-cover" />
+  </BannerLink>
+)
+
+const BannerBlockSection = ({ section }) => {
+  const banners = (section.data || []).filter(b => b.imageUrl)
+  if (banners.length === 0) return null
+  const [wide, ...grid] = banners.length === 2 ? [null, ...banners] : banners
+
+  return (
+    <section className="py-3 md:py-6">
+      <div className="container-main space-y-3 md:space-y-4">
+        {wide && <BannerTile banner={wide} wide />}
+        {grid.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
+            {grid.map(b => <BannerTile key={b.id} banner={b} />)}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
 
 const ProductSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }) => {
   const products = (section.data || []).map(p => ({
@@ -344,24 +343,33 @@ const ProductSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }
   }))
 
   if (products.length === 0) return null
+  const hasBanner = !!section.bannerImageUrl
 
   return (
     <section className="py-5 md:py-10">
       <div className="container-main">
-        <SectionHeader
-          title={section.titleAr || section.title}
-          subtitle={section.subtitleAr || section.subtitle}
-          to={section.filterCategoryId ? `/products?category=${section.filterCategoryId}` : '/products'} />
+        {hasBanner ? (
+          <BannerSectionHeader
+            image={section.bannerImageUrl}
+            title={section.titleAr || section.title}
+            subtitle={section.subtitleAr || section.subtitle}
+            to={getSectionLink(section)} />
+        ) : (
+          <SectionHeader
+            title={section.titleAr || section.title}
+            subtitle={section.subtitleAr || section.subtitle}
+            to={getSectionLink(section)} />
+        )}
 
-        {/* الهاتف: تمرير أفقي */}
-        <div className="md:hidden flex gap-3 overflow-x-auto snap-x scroll-px-4 hide-scrollbar -mx-4 px-4">
+        {/* الهاتف: تمرير أفقي — مع بانر الرأس تتداخل البطاقات مع أسفل البانر */}
+        <div className={`md:hidden flex gap-3 overflow-x-auto snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 ${hasBanner ? 'relative -mt-10' : ''}`}>
           {products.map(product => (
             <MobileProductCard key={product.id} product={product} onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
           ))}
         </div>
 
         {/* الشاشات الأكبر: شبكة */}
-        <div className="product-grid hidden md:grid">
+        <div className={`product-grid hidden md:grid ${hasBanner ? 'mt-6' : ''}`}>
           {products.map(product => (
             <ProductCard key={product.id} product={product}
               onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
@@ -372,7 +380,45 @@ const ProductSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }
   )
 }
 
-// المتاجر المميزة بأسلوب "القصص": شعار دائري بإطار ملوّن + الاسم + وقت التحضير
+// المتاجر المميزة: بطاقات أفقية بغلاف المتجر وشعاره، التقييم، وقت التحضير ورسوم التوصيل
+const StoreCardMini = ({ vendor }) => {
+  const logo = getVendorLogo(vendor)
+  const cover = vendor.coverImageUrl ? bannerSrc(vendor.coverImageUrl) : null
+  const rating = vendor.rating ? Number(vendor.rating).toFixed(1) : null
+
+  return (
+    <Link to={`/stores/${vendor.id}`}
+      className="group flex-shrink-0 w-[62%] min-w-[210px] max-w-[260px] md:w-auto md:max-w-none snap-start rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden active:scale-[0.99] transition-transform">
+      <div className="relative h-24 lg:h-28 bg-gradient-to-br from-primary/20 to-primary/40">
+        {cover && <img src={cover} alt="" loading="lazy" className="w-full h-full object-cover" />}
+        <span className="absolute -bottom-6 right-3 w-14 h-14 rounded-2xl bg-white shadow-md ring-2 ring-white overflow-hidden flex items-center justify-center">
+          {logo
+            ? <img src={logo} alt="" loading="lazy" className="w-full h-full object-cover" />
+            : <Store size={22} className="text-gray-400" />}
+        </span>
+      </div>
+      <div className="pt-8 px-3 pb-3">
+        <p className="font-bold text-sm text-gray-900 truncate">{vendor.nameAr || vendor.name}</p>
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-gray-500">
+          {rating && (
+            <span className="flex items-center gap-0.5 font-medium text-gray-800">
+              <Star size={12} className="text-warning fill-warning" />{rating}
+              {vendor.ratingsCount > 0 && <span className="text-gray-400 font-normal">({vendor.ratingsCount})</span>}
+            </span>
+          )}
+          {vendor.estimatedPrepTime != null && (
+            <span className="flex items-center gap-0.5"><Clock size={12} />{vendor.estimatedPrepTime} د</span>
+          )}
+        </div>
+        <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+          <Truck size={12} />
+          {vendor.deliveryFee > 0 ? `توصيل ${Number(vendor.deliveryFee).toLocaleString()} د.ع` : 'توصيل مجاني'}
+        </p>
+      </div>
+    </Link>
+  )
+}
+
 const VendorsSection = ({ section }) => {
   const vendors = section.data || []
   if (vendors.length === 0) return null
@@ -380,43 +426,10 @@ const VendorsSection = ({ section }) => {
   return (
     <section className="py-5 md:py-10">
       <div className="container-main">
-        <SectionHeader title={section.titleAr || section.title} to="/stores" />
-        <div className="flex gap-4 lg:gap-10 lg:justify-center overflow-x-auto hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1">
-          {vendors.map(vendor => {
-            const logo = getVendorLogo(vendor)
-            return (
-              <Link key={vendor.id} to={`/stores/${vendor.id}`}
-                className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
-                <span className="p-[3px] rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-primary group-hover:scale-105 transition-transform">
-                  <span className="block p-[3px] rounded-full bg-white">
-                    <span className="w-16 h-16 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {logo
-                        ? <img src={logo} alt="" loading="lazy" className="w-full h-full object-cover" />
-                        : <Store size={26} className="text-gray-400" />}
-                    </span>
-                  </span>
-                </span>
-                <span className="mt-2 text-xs lg:text-sm font-medium text-gray-900 leading-tight line-clamp-2">{vendor.nameAr || vendor.name}</span>
-                {vendor.estimatedPrepTime != null && (
-                  <span className="mt-0.5 flex items-center gap-0.5 text-[11px] text-gray-500">
-                    <Clock size={11} />{vendor.estimatedPrepTime} د
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-
-          {/* عرض كل المتاجر */}
-          <Link to="/stores" className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
-            <span className="p-[3px] rounded-full bg-gray-200">
-              <span className="block p-[3px] rounded-full bg-white">
-                <span className="w-16 h-16 lg:w-[88px] lg:h-[88px] rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
-                  <ArrowLeft size={24} />
-                </span>
-              </span>
-            </span>
-            <span className="mt-2 text-xs lg:text-sm font-medium text-primary">كل المتاجر</span>
-          </Link>
+        <SectionHeader title={section.titleAr || section.title} subtitle={section.subtitleAr || section.subtitle}
+          to={`/stores?section=${section.id}`} />
+        <div className="flex md:grid md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4 overflow-x-auto md:overflow-visible snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+          {vendors.map(vendor => <StoreCardMini key={vendor.id} vendor={vendor} />)}
         </div>
       </div>
     </section>
@@ -430,7 +443,7 @@ const VendorsSection = ({ section }) => {
 const HomePage = () => {
   const navigate  = useNavigate()
   const { success, error: showError } = useToast()
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated } = useAuthStore()
   const { addItem: addToCart } = useCartStore()
   const { toggleItem: toggleWishlist, isInWishlist } = useWishlistStore()
 
@@ -440,19 +453,8 @@ const HomePage = () => {
 
   const banners  = bannersData || homeData?.banners || []
   const sections = homeData?.sections?.filter(s => s.isActive).sort((a,b) => a.displayOrder - b.displayOrder) || []
-  const allRootCategories = (categoriesData || []).filter(c => !c.parentId)
-
-  // أقوى الخصومات من منتجات الأقسام (بدون تكرار، الأعلى خصماً أولاً)
-  const dealProducts = (() => {
-    const seen = new Set()
-    return sections
-      .filter(sec => sec.type !== 'top_vendors')
-      .flatMap(sec => sec.data || [])
-      .filter(p => p.originalPrice > p.price && !seen.has(p.id) && seen.add(p.id))
-      .map(p => ({ ...formatProduct(p), isWishlisted: isInWishlist(p.id) }))
-      .sort((a, b) => (1 - a.price / a.originalPrice) < (1 - b.price / b.originalPrice) ? 1 : -1)
-      .slice(0, 10)
-  })()
+  // شريط الفئات: الرئيسية التي فيها منتجات فقط (فئة فارغة تفتح صفحة بلا نتائج)
+  const allRootCategories = (categoriesData || []).filter(c => !c.parentId && c.productsCount > 0)
 
 
   const features = [
@@ -483,47 +485,50 @@ const HomePage = () => {
   return (
     <div className="min-h-screen">
 
-      {/* التحية والبحث */}
-      <GreetingBar user={isAuthenticated ? user : null} />
-
-      {/* شريط الفئات — تمرير أفقي على الهاتف، ويلتف على الشاشات الكبيرة */}
-      <section className="pt-4">
-        <div className="flex gap-2.5 lg:gap-3 overflow-x-auto hide-scrollbar px-4 pb-1 lg:container-main lg:flex-wrap lg:overflow-visible">
-          <Link to="/categories" className="flex-shrink-0 w-[72px] h-[84px] lg:w-[104px] lg:h-[104px] rounded-2xl bg-primary/10 flex flex-col items-center justify-center gap-1.5">
-            <LayoutGrid size={28} className="text-primary" fill="currentColor" />
-            <span className="text-[11px] font-bold text-gray-900">الكل</span>
-          </Link>
-          {/* العروض — بنفس روح زر العروض في الشريط السفلي: تدرّج، أيقونة تهتز، ونبض */}
-          <Link to="/products?hasDiscount=true" className="relative overflow-hidden flex-shrink-0 w-[72px] h-[84px] lg:w-[104px] lg:h-[104px] rounded-2xl bg-gradient-to-br from-rose-500 via-red-500 to-orange-400 shadow-md shadow-rose-500/30 flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-transform">
-            <span className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-white/15" aria-hidden="true" />
-            <span className="relative w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-white/20 flex items-center justify-center">
-              <span className="absolute inset-0 rounded-full bg-white/40 motion-safe:animate-soft-ping" aria-hidden="true" />
-              <BadgePercent size={24} strokeWidth={2.2} className="relative text-white motion-safe:animate-wiggle" />
-            </span>
-            <span className="relative text-[11px] lg:text-xs font-bold text-white">العروض</span>
-          </Link>
-          {categoriesLoading
-            ? [...Array(4)].map((_, i) => <Skeleton key={i} className="flex-shrink-0 w-[72px] h-[84px] lg:w-[104px] lg:h-[104px] rounded-2xl" />)
-            : allRootCategories.map((cat, i) => {
-              return (
-                <Link key={cat.id} to={`/products?category=${cat.id}`}
-                  className="flex-shrink-0 w-[72px] h-[84px] lg:w-[104px] lg:h-[104px] rounded-2xl bg-white border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-1.5 px-1">
-                  <CategoryIcon category={cat} index={i} className="w-8 h-8" emojiClassName="text-[26px]" />
-                  <span className="text-[11px] font-medium text-gray-800 w-full text-center truncate">{cat.nameAr || cat.name}</span>
-                </Link>
-              )
-            })}
-        </div>
-      </section>
-
-      {/* Hero */}
+      {/* السلايدر العلوي — من الحافة للحافة على الهاتف */}
       <HeroSlider banners={banners} loading={bannersLoading} />
 
-      {/* أقوى الخصومات */}
-      <DealsSection products={dealProducts} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} />
+      {/* الفئات: دوائر بصورة واسم تحتها — تمرير أفقي على الهاتف */}
+      <section className="pt-4 lg:pt-8">
+        <div className="flex gap-3 lg:gap-6 overflow-x-auto hide-scrollbar px-4 pb-1 lg:container-main lg:flex-wrap lg:justify-center lg:overflow-visible">
+          {/* العروض — بنفس روح زر العروض في الشريط السفلي: تدرّج، أيقونة تهتز، ونبض */}
+          <Link to="/products?hasDiscount=true" className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+            <span className="relative w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full overflow-hidden bg-gradient-to-br from-rose-500 via-red-500 to-orange-400 shadow-md shadow-rose-500/30 flex items-center justify-center group-active:scale-95 transition-transform">
+              <span className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-white/15" aria-hidden="true" />
+              <span className="relative w-11 h-11 lg:w-14 lg:h-14 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full bg-white/40 motion-safe:animate-soft-ping" aria-hidden="true" />
+                <BadgePercent size={26} strokeWidth={2.2} className="relative text-white motion-safe:animate-wiggle" />
+              </span>
+            </span>
+            <span className="mt-2 text-xs lg:text-sm font-bold text-rose-600 leading-tight">العروض</span>
+          </Link>
 
-      {/* النقاط والمتاجر المحلية */}
-      <PromoTiles />
+          {categoriesLoading
+            ? [...Array(5)].map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center gap-2">
+                <Skeleton className="w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full" />
+                <Skeleton className="h-3 w-14" />
+              </div>
+            ))
+            : allRootCategories.map((cat, i) => (
+              <Link key={cat.id} to={`/products?category=${cat.id}`}
+                className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+                <span className="w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full product-media overflow-hidden flex items-center justify-center group-active:scale-95 transition-transform">
+                  <CategoryIcon category={cat} index={i} className="w-[80%] h-[80%]" emojiClassName="text-[34px] lg:text-[44px]" />
+                </span>
+                <span className="mt-2 text-xs lg:text-sm font-medium text-gray-800 leading-tight line-clamp-2">{cat.nameAr || cat.name}</span>
+              </Link>
+            ))}
+
+          {/* عرض كل الفئات */}
+          <Link to="/categories" className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+            <span className="w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white group-active:scale-95 transition-all">
+              <LayoutGrid size={28} fill="currentColor" />
+            </span>
+            <span className="mt-2 text-xs lg:text-sm font-bold text-primary leading-tight">عرض الكل</span>
+          </Link>
+        </div>
+      </section>
 
       {/* Dynamic Sections من الـ API */}
       {homeLoading ? (
@@ -546,6 +551,13 @@ const HomePage = () => {
           return <div key={section.id} className={bg}><VendorsSection section={section} /></div>
         }
 
+        if (section.type === 'banners') {
+          return <div key={section.id} className={bg}><BannerBlockSection section={section} /></div>
+        }
+
+        // أنواع لا تعرضها الصفحة (مثل أفضل الفئات) بدل عرضها كبطاقات منتجات معطوبة
+        if (section.type !== 'featured_products' && section.type !== 'custom_products') return null
+
         // featured_products أو custom_products
         return (
           <div key={section.id} className={bg}>
@@ -558,6 +570,9 @@ const HomePage = () => {
           </div>
         )
       })}
+
+      {/* النقاط والمتاجر المحلية */}
+      <PromoTiles />
 
       {/* Features — على الهاتف: 3 في صف واحد بشكل مضغوط */}
       <section className="bg-white border-y border-gray-100 mt-2">

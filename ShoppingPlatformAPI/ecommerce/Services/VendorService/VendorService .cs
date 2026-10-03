@@ -336,7 +336,7 @@ namespace ecommerce.Services.VendorService.VendorService
 
         private async Task<VendorResponseDto> MapToDtoAsync(Vendor vendor)
         {
-            var productsCount = await _productRepository.GetCountAsync(vendorId: vendor.Id);
+            var productsCount = await _productRepository.GetCountAsync(vendorId: vendor.Id, publicOnly: false);
             var (rating, ratingsCount) = await _vendorRepository.GetRatingSummaryAsync(vendor.Id);
 
             return new VendorResponseDto

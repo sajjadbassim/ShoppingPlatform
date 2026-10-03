@@ -20,6 +20,8 @@ using ecommerce.Services.ProductService;
 using ecommerce.Services.ProductService.ProductService;
 using ecommerce.Services.SmsService;
 using ecommerce.Services.TikTokService;
+using ecommerce.Services.InstagramService;
+using ecommerce.Services.SocialFeedService;
 using ecommerce.Core.Models;
 using ecommerce.Services.UserPreferencesService;
 using ecommerce.Services.VendorService.VendorService;
@@ -149,7 +151,28 @@ namespace ecommerce.Extensions
             return services;
         }
 
-        // ربط متاجر التجار بتيك توك — المفاتيح من القسم "TikTok" (السر في user-secrets / متغيرات البيئة)
+        // مفاتيح Data Protection (تشفّر توكنات تيك توك وإنستغرام في قاعدة البيانات) في مجلد ثابت.
+        // بدونه قد تُحفظ المفاتيح في الذاكرة فقط (IIS بلا ملف مستخدم، الحاويات) فتضيع بإعادة التشغيل
+        // ويُطلب من كل التجار إعادة الربط. المسار: DataProtection:KeysPath، أو App_Data/DataProtection-Keys.
+        // نقل الخادم يتطلب نقل هذا المجلد معه (على ويندوز المفاتيح مشفّرة بـ DPAPI مرتبطة بالجهاز)
+        public static IServiceCollection AddAppDataProtection(this IServiceCollection services, IConfiguration config, IHostEnvironment env)
+        {
+            var keysPath = config["DataProtection:KeysPath"];
+            if (string.IsNullOrWhiteSpace(keysPath))
+                keysPath = Path.Combine(env.ContentRootPath, "App_Data", "DataProtection-Keys");
+
+            var builder = services.AddDataProtection()
+                .SetApplicationName("WasitPlatform")
+                .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+            // على مستوى الجهاز لا المستخدم: يعمل مهما كان حساب الخدمة على نفس الخادم
+            if (OperatingSystem.IsWindows())
+                builder.ProtectKeysWithDpapi(protectToLocalMachine: true);
+
+            return services;
+        }
+
+        // ربط متاجر التجار بتيك توك — المفاتيح من القسم "TikTok" (السر في user-secrets / متغيرات البيئة).
+        // يُستدعى بعد AddAppDataProtection (تشفير التوكنات)
         public static IServiceCollection AddTikTokIntegration(this IServiceCollection services, IConfiguration config)
         {
             services.Configure<TikTokOptions>(config.GetSection(TikTokOptions.SectionName));
@@ -165,14 +188,41 @@ namespace ecommerce.Extensions
                 });
             services.TryAddSingleton(TimeProvider.System);
 
-            // تشفير توكنات تيك توك في قاعدة البيانات
-            services.AddDataProtection().SetApplicationName("WasitPlatform");
+            // تشفير توكنات تيك توك في قاعدة البيانات (Data Protection من AddAppDataProtection)
             services.AddSingleton<ITikTokTokenProtector, TikTokTokenProtector>();
 
             services.AddScoped<ITikTokApiClient, TikTokApiClient>();
             services.AddScoped<ITikTokRepository, TikTokRepository>();
             services.AddScoped<ITikTokService, TikTokService>();
             services.AddHostedService<TikTokSyncBackgroundService>();
+
+            return services;
+        }
+
+        // ربط متاجر التجار بإنستغرام + المحتوى الموحّد (تيك توك وإنستغرام) للزوار.
+        // يُستدعى بعد AddAppDataProtection (تشفير التوكنات)
+        public static IServiceCollection AddInstagramIntegration(this IServiceCollection services, IConfiguration config)
+        {
+            services.Configure<InstagramOptions>(config.GetSection(InstagramOptions.SectionName));
+
+            services.AddHttpClient(InstagramApiClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    ConnectTimeout = TimeSpan.FromSeconds(6),
+                    ConnectCallback = TikTokConnectionHelper.ConnectToFastestAsync,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+                })
+                // إنستغرام يضع access_token و client_secret في رابط الطلب — سجلات HttpClient تطبع الروابط
+                .RemoveAllLoggers();
+            services.TryAddSingleton(TimeProvider.System);
+
+            services.AddSingleton<IInstagramTokenProtector, InstagramTokenProtector>();
+            services.AddScoped<IInstagramApiClient, InstagramApiClient>();
+            services.AddScoped<IInstagramRepository, InstagramRepository>();
+            services.AddScoped<IInstagramService, InstagramService>();
+            services.AddHostedService<InstagramSyncBackgroundService>();
+
+            services.AddScoped<ISocialFeedService, SocialFeedService>();
 
             return services;
         }

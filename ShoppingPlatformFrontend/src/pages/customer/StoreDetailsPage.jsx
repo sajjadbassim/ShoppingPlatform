@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { onPullRefresh } from '../../utils/pullRefresh'
-import TikTokLogo from '../../components/tiktok/TikTokLogo'
+import PlatformLogo from '../../components/social/PlatformLogo'
 import TikTokVideosTab from '../../components/tiktok/TikTokVideosTab'
 import { MapPin, Phone, Clock, Share2, Heart, Package, ChevronLeft, AlertCircle, DollarSign, Star } from 'lucide-react'
 import ProductCard from '../../components/common/ProductCard'
@@ -34,23 +34,24 @@ const StoreDetailsPage = () => {
   const { data: productsData, isLoading: productsLoading } = useProductsByVendor(id)
   const products = productsData || []
 
-  // فيديوهات تيك توك للمتجر — التبويب يظهر فقط إن كان المتجر مربوطاً ومفعّلاً العرض
-  const { data: tiktokFeed } = useQuery({
-    queryKey: ['tiktok-store-feed', id],
-    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.TIKTOK.STORE_FEED(id)); return r.data?.data ?? r.data },
+  // منشورات حسابات التواصل للمتجر (تيك توك + إنستغرام) — التبويب يظهر فقط إن وُجد محتوى ظاهر
+  const { data: socialFeed } = useQuery({
+    queryKey: ['social-store-feed', id],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.SOCIAL.STORE_FEED(id)); return r.data?.data ?? r.data },
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
   })
-  const tiktokVideos = tiktokFeed?.enabled ? tiktokFeed.videos || [] : []
+  const socialItems = socialFeed?.items || []
+  const socialPlatforms = [...new Set((socialFeed?.accounts || []).map(a => a.platform))]
 
-  // عند فتح المتجر أو سحبه للتحديث: جلب آخر الفيديوهات من تيك توك (الخادم يحدّ ذلك بمرة كل 30 ثانية لكل متجر)
+  // عند فتح المتجر أو سحبه للتحديث: جلب آخر المنشورات من المنصات (الخادم يحدّ تكرار المزامنة لكل متجر)
   const queryClient = useQueryClient()
   const [refreshingVideos, setRefreshingVideos] = useState(false)
   const refreshVideos = useCallback(() => {
     if (!id) return Promise.resolve()
     setRefreshingVideos(true)
-    return apiPost(API_ENDPOINTS.TIKTOK.STORE_FEED_REFRESH(id))
-      .then(r => queryClient.setQueryData(['tiktok-store-feed', id], r.data?.data ?? r.data))
+    return apiPost(API_ENDPOINTS.SOCIAL.STORE_FEED_REFRESH(id))
+      .then(r => queryClient.setQueryData(['social-store-feed', id], r.data?.data ?? r.data))
       .catch(() => { /* تبقى آخر نسخة محفوظة */ })
       .finally(() => setRefreshingVideos(false))
   }, [id, queryClient])
@@ -62,7 +63,7 @@ const StoreDetailsPage = () => {
   }, [id, refreshVideos])
   useEffect(() => onPullRefresh(refreshVideos), [refreshVideos])
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get('tab') === 'videos' && tiktokVideos.length > 0 ? 'videos' : searchParams.get('tab') === 'about' ? 'about' : 'products'
+  const tab = searchParams.get('tab') === 'videos' && socialItems.length > 0 ? 'videos' : searchParams.get('tab') === 'about' ? 'about' : 'products'
   const setTab = (value) => setSearchParams(value === 'products' ? {} : { tab: value }, { replace: true })
 
   const handleAddToCart = async ({ id: productId, quantity = 1 }) => {
@@ -218,9 +219,12 @@ const StoreDetailsPage = () => {
             <div className="px-6 border-b border-gray-200">
               <TabsList>
                 <TabsTrigger value="products">المنتجات ({products.length})</TabsTrigger>
-                {tiktokVideos.length > 0 && (
+                {socialItems.length > 0 && (
                   <TabsTrigger value="videos">
-                    <span className="inline-flex items-center gap-1.5"><TikTokLogo className="w-4 h-4" />الفيديوهات ({tiktokVideos.length})</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      {socialPlatforms.map(p => <PlatformLogo key={p} platform={p} className="w-4 h-4" />)}
+                      المنشورات ({socialItems.length})
+                    </span>
                   </TabsTrigger>
                 )}
                 <TabsTrigger value="about">عن المتجر</TabsTrigger>
@@ -256,9 +260,9 @@ const StoreDetailsPage = () => {
               )}
             </TabsContent>
 
-            {tiktokVideos.length > 0 && (
+            {socialItems.length > 0 && (
               <TabsContent value="videos" className="p-0 sm:p-6">
-                <TikTokVideosTab account={tiktokFeed.account} videos={tiktokVideos} refreshing={refreshingVideos} />
+                <TikTokVideosTab videos={socialItems} refreshing={refreshingVideos} />
               </TabsContent>
             )}
 

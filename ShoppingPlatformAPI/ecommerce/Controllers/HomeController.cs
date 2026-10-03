@@ -35,11 +35,12 @@ namespace ecommerce.Controllers
         // GET: api/home/banners
         [HttpGet("banners")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetBanners([FromQuery] bool onlyActive = true)
+        public async Task<IActionResult> GetBanners([FromQuery] bool onlyActive = true, [FromQuery] bool heroOnly = false)
         {
             try
             {
-                var banners = await _homeService.GetBannersAsync(onlyActive);
+                // heroOnly: بانرات السلايدر العلوي فقط (بدون بانرات بلوكات الأقسام)
+                var banners = await _homeService.GetBannersAsync(onlyActive, heroOnly);
                 return Ok(new { success = true, data = banners });
             }
             catch (Exception ex)
@@ -104,6 +105,36 @@ namespace ecommerce.Controllers
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
+        }
+
+        // POST: api/home/sections/{id}/banner — صورة بانر رأس قسم المنتجات
+        [HttpPost("sections/{id}/banner")]
+        [Authorize(Roles = "ADMIN")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> SetSectionBanner(Guid id, IFormFile image)
+        {
+            try
+            {
+                if (image == null)
+                    return BadRequest(new { success = false, message = "الصورة مطلوبة" });
+                var section = await _homeService.SetSectionBannerAsync(id, image);
+                return Ok(new { success = true, data = section, message = "تم تعيين بانر القسم" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        // DELETE: api/home/sections/{id}/banner
+        [HttpDelete("sections/{id}/banner")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> RemoveSectionBanner(Guid id)
+        {
+            var removed = await _homeService.RemoveSectionBannerAsync(id);
+            return removed
+                ? Ok(new { success = true, message = "تم حذف بانر القسم" })
+                : NotFound(new { success = false, message = "لا يوجد بانر لهذا القسم" });
         }
 
         // GET: api/home/sections

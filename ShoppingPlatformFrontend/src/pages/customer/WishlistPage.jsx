@@ -20,7 +20,7 @@ const WishlistRow = ({ item, onAddToCart, onRemove }) => {
   const hasDiscount = p.originalPrice && p.originalPrice > p.price
   return (
     <div className="flex gap-3 bg-white rounded-2xl border border-gray-200 p-3">
-      <Link to={`/products/${item.productId}`} className="relative w-24 h-24 lg:w-32 lg:h-32 flex-shrink-0 rounded-xl bg-gray-50 overflow-hidden">
+      <Link to={`/products/${item.productId}`} className="relative w-24 h-24 lg:w-32 lg:h-32 flex-shrink-0 rounded-xl product-media overflow-hidden">
         {img
           ? <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-gray-300"><ShoppingCart size={28} /></div>}

@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Drivers;
 using ecommerce.Core.DTO.Ops;
 using ecommerce.Core.Exceptions;
@@ -590,6 +590,7 @@ namespace ecommerce.Services.DriverAppService
                 AddressNotes = a?.Notes,
                 Latitude = order.DeliveryLatitude ?? a?.Latitude,
                 Longitude = order.DeliveryLongitude ?? a?.Longitude,
+                ZoneName = order.DeliveryZoneName,
                 CustomerNotes = order.CustomerNotes,
                 PaymentMethod = order.PaymentMethod,
                 PaymentStatus = order.PaymentStatus,

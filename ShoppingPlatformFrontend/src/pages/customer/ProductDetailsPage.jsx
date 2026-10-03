@@ -1,10 +1,10 @@
 // src/pages/customer/ProductDetailsPage.jsx
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   Star, Heart, Share2, Truck, Shield, RotateCcw,
   Minus, Plus, ShoppingCart, Store, AlertCircle, Check,
-  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent, ChevronDown, ChevronLeft
+  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Breadcrumb from '../../components/common/Breadcrumb'
@@ -197,7 +197,7 @@ const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) =>
   const inStock = p.isAvailable && p.stockQuantity > 0
   return (
     <Link to={`/products/${p.id}`} className="block w-[44%] min-w-[150px] sm:w-[200px] flex-shrink-0 snap-start text-gray-900">
-      <div className="relative aspect-square bg-gray-50 rounded-2xl overflow-hidden border border-gray-100">
+      <div className="relative aspect-square product-media rounded-2xl overflow-hidden border border-gray-100">
         {src
           ? <img src={src} alt="" loading="lazy" className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-gray-300"><ShoppingCart size={32} /></div>}
@@ -437,6 +437,84 @@ const VariantSelector = ({ attributeOptions, selectedValues, onSelect, selectedV
 // Main Page
 // ===========================
 
+// ===========================
+// معرض صور المنتج: سحب بالإصبع بين الصور (scroll-snap)، والمصغّرات تتبع الصورة الحالية
+// ===========================
+const ImageGallery = ({ images, alt }) => {
+  const trackRef = useRef(null)
+  const [index, setIndex] = useState(0)
+  const slides = images.length > 0 ? images : ['']
+
+  // الصورة الظاهرة حالياً — يعمل مع الاتجاه من اليمين لليسار دون حساب الإزاحات
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => { if (e.isIntersecting) setIndex(Number(e.target.dataset.index)) })
+    }, { root: track, threshold: 0.6 })
+    Array.from(track.children).forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [slides.length])
+
+  // تمرير الشريط أفقياً فقط (بدون تحريك الصفحة)؛ في الاتجاه من اليمين لليسار الإزاحة سالبة
+  const goTo = (i, behavior = 'smooth') => {
+    const track = trackRef.current
+    if (!track) return
+    const rtl = getComputedStyle(track).direction === 'rtl'
+    track.scrollTo({ left: (rtl ? -1 : 1) * i * track.clientWidth, behavior })
+  }
+
+  // تغيّرت الصورة الأولى (مثلاً اختيار متغير له صورة) → نعود إليها
+  useEffect(() => { goTo(0, 'auto'); setIndex(0) }, [slides[0]])
+
+  return (
+    <div>
+      <div className="relative mb-4">
+        <div ref={trackRef}
+          className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar rounded-lg product-media overscroll-x-contain">
+          {slides.map((src, i) => (
+            <div key={`${src}-${i}`} data-index={i} className="w-full flex-shrink-0 snap-center snap-always aspect-square">
+              {src && <img src={src} alt={alt} draggable={false} loading={i === 0 ? 'eager' : 'lazy'}
+                className="w-full h-full object-cover select-none" onError={(e) => { e.target.style.visibility = 'hidden' }} />}
+            </div>
+          ))}
+        </div>
+
+        {slides.length > 1 && (
+          <>
+            {/* عدّاد الصور */}
+            <span className="absolute top-3 left-3 px-2 py-0.5 rounded-full bg-black/45 text-white text-xs font-medium" dir="ltr">
+              {index + 1} / {slides.length}
+            </span>
+            {/* أسهم للحاسوب — على الهاتف السحب بالإصبع */}
+            <button type="button" onClick={() => goTo(Math.max(0, index - 1))} disabled={index === 0} aria-label="الصورة السابقة"
+              className="hidden md:flex absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 shadow items-center justify-center disabled:opacity-0 transition-opacity">
+              <ChevronRight size={20} />
+            </button>
+            <button type="button" onClick={() => goTo(Math.min(slides.length - 1, index + 1))} disabled={index === slides.length - 1} aria-label="الصورة التالية"
+              className="hidden md:flex absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/85 shadow items-center justify-center disabled:opacity-0 transition-opacity">
+              <ChevronLeft size={20} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {slides.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
+          {slides.map((src, i) => (
+            <button key={`${src}-${i}`} type="button" onClick={() => goTo(i)}
+              className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
+                i === index ? 'border-primary' : 'border-transparent hover:border-gray-300'
+              }`}>
+              <img src={src} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const ProductDetailsPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -492,7 +570,6 @@ const ProductDetailsPage = () => {
   const handleMarkHelpful = async (reviewId, isHelpful) => {
     try { await markHelpful({ id: reviewId, isHelpful }); refetchReviews() } catch {}
   }
-  const [selectedImage, setSelectedImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
 
   // الهاتف: عرض التقييمات كاملة أو كشريط أفقي، وتوزيع النجوم
@@ -689,33 +766,10 @@ const ProductDetailsPage = () => {
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-            {/* ===== Images ===== */}
-            <div>
-              {/* صورة الـ variant المختار إن وُجدت */}
-              <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
-                <img
-                  src={selectedVariant?.imageUrl || images[selectedImage] || ''}
-                  alt={product.nameAr || product.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = '' }}
-                />
-              </div>
-              {images.length > 1 && (
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {images.map((img, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedImage(i)}
-                      className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                        i === selectedImage ? 'border-primary' : 'border-transparent hover:border-gray-300'
-                      }`}
-                    >
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* ===== Images — سحب بالإصبع، وصورة المتغير المختار (إن وُجدت) أولاً ===== */}
+            <ImageGallery
+              images={selectedVariant?.imageUrl ? [selectedVariant.imageUrl, ...images.filter(i => i !== selectedVariant.imageUrl)] : images}
+              alt={product.nameAr || product.name} />
 
             {/* ===== Info ===== */}
             <div>

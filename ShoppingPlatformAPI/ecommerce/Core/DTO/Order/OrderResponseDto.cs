@@ -19,6 +19,7 @@
         // المبالغ
         public decimal Subtotal { get; set; }
         public decimal DeliveryFees { get; set; }
+        public string? DeliveryZoneName { get; set; }     // منطقة التوصيل وقت الطلب
         public decimal TotalAmount { get; set; }
 
         // الدفع

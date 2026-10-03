@@ -25,9 +25,9 @@ namespace ecommerce.Core.Models
         // المزامنة في الخلفية: كل حساب يُحدَّث إن مضى على آخر مزامنة له هذه المدة
         public int SyncIntervalMinutes { get; set; } = 15;
 
-        // فتح فيديوهات المتجر أو صفحة ريلز يزامن الحسابات فوراً؛ هذه المهلة القصيرة فقط تمنع
-        // تكرار نفس المزامنة عند وصول عدة طلبات في اللحظة نفسها
-        public int StoreRefreshSeconds { get; set; } = 5;
+        // فتح فيديوهات المتجر أو صفحة ريلز يزامن الحساب إن مضت هذه المدة على آخر مزامنة.
+        // هي الحد الفعلي لطلبات تيك توك من الزوار (مزامنة واحدة لكل متجر خلالها مهما كثر الزوار)
+        public int StoreRefreshSeconds { get; set; } = 60;
 
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(ClientKey) &&

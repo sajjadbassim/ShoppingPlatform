@@ -1,4 +1,4 @@
-using ecommerce.Core;
+﻿using ecommerce.Core;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Cart;
 using ecommerce.Core.DTO.Ops;
@@ -170,7 +170,11 @@ namespace ecommerce.Services
 
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new Exception("الطلب الفرعي غير موجود");
-            if (subOrder.Status != SubOrderStatus.PendingConfirmation && subOrder.Status != SubOrderStatus.DeliveryFailed)
+            // يُلغى في أي مرحلة قبل خروجه مع السائق (مثلاً المتجر اكتشف نقصاً بعد التأكيد)
+            var cancellable = new[] { SubOrderStatus.PendingConfirmation, SubOrderStatus.Confirmed, SubOrderStatus.Preparing, SubOrderStatus.Ready, SubOrderStatus.DeliveryFailed };
+            if (subOrder.Status == SubOrderStatus.OutForDelivery)
+                throw new Exception("الطلب مع السائق الآن — سجّل «تعذّر التسليم» من تطبيق السائق أولاً ثم ألغِه لإرجاع القطع للمخزون");
+            if (!cancellable.Contains(subOrder.Status))
                 throw new Exception($"لا يمكن إلغاء الطلب. الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
 
             var oldStatus = subOrder.Status;
@@ -187,8 +191,19 @@ namespace ecommerce.Services
             await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, SubOrderStatus.Cancelled, dto.OpsUserId, dto.CancellationReason);
             await _notificationService.NotifySubOrderCancelledAsync(subOrder.Id, subOrder.SubOrderNumber, dto.CancellationReason, subOrder.VendorId);
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.SUB_ORDER, $"تم إلغاء الطلب الفرعي: {subOrder.SubOrderNumber} — {dto.CancellationReason}", new { subOrderId = subOrder.Id, reason = dto.CancellationReason });
-            await _notificationService.NotifyCustomerAsync(subOrder.Order.CustomerId, $"تم إلغاء جزء من طلبك ({subOrder.Vendor.Name}): {dto.CancellationReason}", new { subOrderId = subOrder.Id });
+
+            // المبلغ المطلوب من الزبون = المتاجر الباقية فقط (وإلا يحصّل السائق ثمن ما أُلغي)
+            var order = await _orderRepository.GetByIdAsync(subOrder.OrderId);
+            if (OrderTotals.Recalculate(order, order.SubOrders)) await _orderRepository.UpdateAsync(order);
+            var wholeOrderCancelled = order.SubOrders.All(s => s.Status == OrderStatus.CANCELLED);
+
+            // إلغاء جزئي: الزبون يعرف ما أُلغي والمبلغ الجديد. الإلغاء الكامل يصله من تحديث حالة الطلب أدناه
+            if (!wholeOrderCancelled)
+                await _notificationService.NotifyCustomerAsync(order.CustomerId,
+                    $"تم إلغاء جزء من طلبك {order.OrderNumber} ({subOrder.Vendor.Name}): {dto.CancellationReason} — المبلغ الجديد {order.TotalAmount:N0} د.ع",
+                    new { orderId = order.Id, subOrderId = subOrder.Id });
             await UpdateMainOrderStatusAsync(subOrder.OrderId);
+            if (wholeOrderCancelled) await _loyaltyService.CancelRedemptionAsync(order.Id);   // النقاط المستخدمة ترجع للزبون
 
             return MapToDto(subOrder);
         }
@@ -208,9 +223,10 @@ namespace ecommerce.Services
             var allowedTransitions = new Dictionary<string, string[]>
             {
                 { OrderStatus.CONFIRMED,  new[] { OrderStatus.PREPARING } },
-                { OrderStatus.PREPARING,  new[] { SubOrderStatus.Ready } },   // ✅ جديد
+                { OrderStatus.PREPARING,  new[] { OrderStatus.READY } },          // جاهز للاستلام (احتياط إن نسي المتجر)
+                { OrderStatus.READY,      new[] { OrderStatus.PREPARING } },      // تراجع: ليس جاهزاً بعد
                 { OrderStatus.OUT_FOR_DELIVERY, new[] { OrderStatus.DELIVERED } },
-                { OrderStatus.DELIVERY_FAILED, new[] { OrderStatus.PREPARING } },   // إعادة المحاولة
+                { OrderStatus.DELIVERY_FAILED, new[] { OrderStatus.READY } },     // إعادة المحاولة: البضاعة محضّرة أصلاً
             };
 
             if (subOrder.Status == OrderStatus.DELIVERY_FAILED && subOrder.FailureReason == DeliveryFailureReason.CustomerRefused)
@@ -232,6 +248,7 @@ namespace ecommerce.Services
 
             await UpdateDriverWorkStatusAsync(subOrder, dto.NewStatus);
             await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, dto.NewStatus, dto.OpsUserId, dto.Notes);
+            await _notificationService.NotifySubOrderStatusChangedAsync(subOrder.Id, subOrder.SubOrderNumber, subOrder.OrderId, dto.NewStatus, pushToOps: false);
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.ORDER_STATUS, OrderStatusText.StaffMessage(dto.NewStatus, subOrder.SubOrderNumber), new { subOrderId = subOrder.Id, oldStatus, newStatus = dto.NewStatus });
 
             // ✅ كسب النقاط عند التسليم
@@ -259,11 +276,11 @@ namespace ecommerce.Services
             if (!activeSubOrders.Any())
                 throw new Exception("لا توجد طلبات فرعية فعالة بهذا الطلب");
 
-            // ✅ الشرط الأساسي: الكل لازم يكون PREPARING (نفس شرط AssignDriverAsync أدناه)
-            var notReady = activeSubOrders.Where(so => so.Status != OrderStatus.PREPARING).ToList();
+            // الشرط الأساسي: كل المتاجر «جاهز للاستلام» (نفس شرط AssignDriverAsync أدناه)
+            var notReady = activeSubOrders.Where(so => so.Status != OrderStatus.READY).ToList();
             if (notReady.Any())
                 throw new Exception(
-                    $"لا يمكن تعيين سائق. طلبات لسه ما جاهزة: {string.Join(", ", notReady.Select(so => so.SubOrderNumber))}");
+                    $"لا يمكن تعيين سائق قبل أن تجهز كل المتاجر. غير جاهز: {string.Join("، ", notReady.Select(so => $"{so.SubOrderNumber} ({OrderStatusText.Ar(so.Status)})"))}");
 
             var driver = await _driverRepository.GetByIdAsync(dto.DriverId);
             if (driver == null) throw new Exception("السائق غير موجود");
@@ -307,7 +324,7 @@ namespace ecommerce.Services
 
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new Exception("الطلب الفرعي غير موجود");
-            if (subOrder.Status != OrderStatus.PREPARING) throw new Exception($"لا يمكن تعيين سائق قبل اكتمال التحضير. الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
+            if (subOrder.Status != OrderStatus.READY) throw new Exception($"لا يمكن تعيين سائق قبل أن يصبح الطلب «جاهز للاستلام». الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
 
             var driver = await _driverRepository.GetByIdAsync(dto.DriverId);
             if (driver == null) throw new Exception("السائق غير موجود");
@@ -514,31 +531,22 @@ namespace ecommerce.Services
             var oldStatus = order.Status;
             var subOrders = await _subOrderRepository.GetByOrderIdAsync(orderId);
 
-            var total = subOrders.Count();
-            var cancelled = subOrders.Count(so => so.Status == OrderStatus.CANCELLED);
-            var delivered = subOrders.Count(so => so.Status == OrderStatus.DELIVERED);
-            var outForDel = subOrders.Count(so => so.Status == OrderStatus.OUT_FOR_DELIVERY);
-            var preparing = subOrders.Count(so => so.Status == OrderStatus.PREPARING);
-            var confirmed = subOrders.Count(so => so.Status == OrderStatus.CONFIRMED);
-            var failed = subOrders.Count(so => so.Status == OrderStatus.DELIVERY_FAILED);
-            var active = total - cancelled;
+            var statuses = subOrders.Select(so => so.Status).ToList();
+            int Count(string s) => statuses.Count(x => x == s);
+            var cancelled = Count(OrderStatus.CANCELLED);
+            var delivered = Count(OrderStatus.DELIVERED);
+            var outForDel = Count(OrderStatus.OUT_FOR_DELIVERY);
+            var preparing = Count(OrderStatus.PREPARING);
+            var ready = Count(OrderStatus.READY);
+            var confirmed = Count(OrderStatus.CONFIRMED);
 
-            string newStatus;
-            if (cancelled == total) newStatus = OrderStatus.CANCELLED;
-            else if (failed > 0 && delivered == 0 && failed == active) newStatus = OrderStatus.DELIVERY_FAILED;
-            else if (failed > 0 && delivered > 0 && delivered + failed == active) newStatus = OrderStatus.DELIVERED;
-            else if (delivered == active) newStatus = OrderStatus.DELIVERED;
-            else if (outForDel > 0) newStatus = OrderStatus.OUT_FOR_DELIVERY;
-            else if (preparing > 0) newStatus = OrderStatus.PREPARING;
-            else if (confirmed == active) newStatus = OrderStatus.CONFIRMED;
-            else if (confirmed > 0) newStatus = OrderStatus.PARTIALLY_CONFIRMED;
-            else newStatus = OrderStatus.PENDING_CONFIRMATION;
+            var newStatus = OrderStatusRollup.Compute(statuses);
 
             if (order.Status == newStatus) return;
 
             order.Status = newStatus;
             await _orderRepository.UpdateAsync(order);
-            await LogOrderStatusChangeAsync(order.Id, oldStatus, newStatus, null, $"تحديث تلقائي: {confirmed} مؤكد، {preparing} تحضير، {outForDel} توصيل، {delivered} مسلم، {cancelled} ملغي");
+            await LogOrderStatusChangeAsync(order.Id, oldStatus, newStatus, null, $"تحديث تلقائي: {confirmed} مؤكد، {preparing} تحضير، {ready} جاهز، {outForDel} توصيل، {delivered} مسلم، {cancelled} ملغي");
             await _notificationService.NotifyOrderStatusChangedAsync(order.Id, oldStatus, newStatus, order.OrderNumber);
             await _notificationService.NotifyCustomerOrderStatusAsync(order.CustomerId, order.Id, order.OrderNumber, newStatus);
         }

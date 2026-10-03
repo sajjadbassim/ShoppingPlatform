@@ -20,9 +20,8 @@ namespace ecommerce.Services
         //  CreateAsync المحدث - مع رفع الأيقونة
         public async Task<CategoryResponseDto> CreateAsync(CategoryCreateDto dto)
         {
-            // تحقق من تكرار الاسم
-            if (await _categoryRepository.ExistsByNameAsync(dto.Name))
-                throw new Exception("اسم التصنيف موجود مسبقاً");
+            // تحقق من تكرار الاسم (الإنجليزي والعربي)
+            await EnsureNamesUniqueAsync(dto.Name, dto.NameAr, excludeId: null);
 
             // تحقق من ParentId إذا كان موجود
             if (dto.ParentId.HasValue)
@@ -49,8 +48,8 @@ namespace ecommerce.Services
 
             var category = new Category
             {
-                Name = dto.Name,
-                NameAr = dto.NameAr,
+                Name = dto.Name.Trim(),
+                NameAr = dto.NameAr?.Trim(),
                 Description = dto.Description,
                 IconUrl = iconUrl, // ✅ حفظ مسار الأيقونة
                 ParentId = dto.ParentId,
@@ -118,8 +117,14 @@ namespace ecommerce.Services
             if (category == null)
                 throw new Exception("التصنيف غير موجود");
 
-            // تحقق من ParentId إن أُرسل
-            if (dto.ParentId.HasValue)
+            string? oldIconToDelete = null;
+
+            // نقل الفئة: لتصبح رئيسية، أو تحت أب جديد (مع منع الحلقات)
+            if (dto.MakeRoot)
+            {
+                category.ParentId = null;
+            }
+            else if (dto.ParentId.HasValue && dto.ParentId.Value != category.ParentId)
             {
                 if (dto.ParentId.Value == id)
                     throw new Exception("لا يمكن جعل التصنيف أباً لنفسه");
@@ -128,19 +133,25 @@ namespace ecommerce.Services
                 if (parent == null)
                     throw new Exception("التصنيف الأب غير موجود");
 
+                if (await IsDescendantAsync(parent, id))
+                    throw new Exception("لا يمكن نقل التصنيف تحت أحد تصنيفاته الفرعية");
+
                 category.ParentId = dto.ParentId.Value;
             }
+
+            // الاسم الجديد يجب ألا يتكرر مع فئة أخرى
+            await EnsureNamesUniqueAsync(
+                string.IsNullOrWhiteSpace(dto.Name) || dto.Name.Trim() == category.Name ? null : dto.Name,
+                string.IsNullOrWhiteSpace(dto.NameAr) || dto.NameAr.Trim() == category.NameAr ? null : dto.NameAr,
+                excludeId: id);
 
             // ✅ رفع أيقونة جديدة إذا وجدت
             if (dto.NewIcon != null)
             {
                 try
                 {
-                    // حذف الأيقونة القديمة
-                    if (!string.IsNullOrWhiteSpace(category.IconUrl))
-                        await _fileService.DeleteImageAsync(category.IconUrl);
-
-                    // رفع الأيقونة الجديدة
+                    // رفع الجديدة أولاً — القديمة تُحذف بعد نجاح الحفظ (انظر أسفل)
+                    oldIconToDelete = category.IconUrl;
                     category.IconUrl = await _fileService.SaveImageAsync(dto.NewIcon, "categories");
                 }
                 catch (Exception ex)
@@ -150,10 +161,10 @@ namespace ecommerce.Services
             }
 
             if (!string.IsNullOrWhiteSpace(dto.Name))
-                category.Name = dto.Name;
+                category.Name = dto.Name.Trim();
 
             if (!string.IsNullOrWhiteSpace(dto.NameAr))
-                category.NameAr = dto.NameAr;
+                category.NameAr = dto.NameAr.Trim();
 
             if (dto.Description != null)
                 category.Description = dto.Description;
@@ -165,20 +176,54 @@ namespace ecommerce.Services
                 category.IsActive = dto.IsActive.Value;
 
             var updated = await _categoryRepository.UpdateAsync(category);
+
+            if (!string.IsNullOrWhiteSpace(oldIconToDelete))
+                await _fileService.DeleteImageAsync(oldIconToDelete);
+
             return MapToDto(updated);
         }
         // DeleteAsync المحدث - مع حذف الأيقونة
 
-        public async Task<bool?> DeleteAsync(Guid id)
+        // DELETE = تعطيل فقط (عملية ثابتة النتيجة) — التفعيل يتم عبر التعديل IsActive = true
+        public async Task<bool> DeleteAsync(Guid id)
         {
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null)
-                return null; // غير موجود
+                return false;
 
-            category.IsActive = !category.IsActive;
-            await _categoryRepository.UpdateAsync(category);
+            if (category.IsActive)
+            {
+                category.IsActive = false;
+                await _categoryRepository.UpdateAsync(category);
+            }
 
-            return category.IsActive; // ✅ ترجع الحالة الجديدة
+            return true;
+        }
+
+        private async Task EnsureNamesUniqueAsync(string? name, string? nameAr, Guid? excludeId)
+        {
+            if (!string.IsNullOrWhiteSpace(name) && await _categoryRepository.ExistsByNameAsync(name, excludeId))
+                throw new Exception("اسم التصنيف موجود مسبقاً");
+
+            if (!string.IsNullOrWhiteSpace(nameAr) && await _categoryRepository.ExistsByArabicNameAsync(nameAr, excludeId))
+                throw new Exception("الاسم العربي للتصنيف موجود مسبقاً");
+        }
+
+        // هل الفئة المرشّحة أباً هي categoryId نفسها أو إحدى فئاته الفرعية؟ (الصعود من الأب الجديد للأعلى)
+        private async Task<bool> IsDescendantAsync(Category candidateParent, Guid categoryId)
+        {
+            var current = candidateParent;
+            var guard = 0;
+            while (current != null && guard++ < 50)
+            {
+                if (current.Id == categoryId)
+                    return true;
+
+                current = current.ParentId.HasValue
+                    ? await _categoryRepository.GetByIdAsync(current.ParentId.Value)
+                    : null;
+            }
+            return false;
         }
         // Helper method للتحويل من Model إلى DTO
         private CategoryResponseDto MapToDto(Category category)
@@ -230,14 +275,15 @@ namespace ecommerce.Services
             if (icon == null)
                 throw new Exception("الأيقونة مطلوبة");
 
-            // حذف الأيقونة القديمة
-            if (!string.IsNullOrWhiteSpace(category.IconUrl))
-                await _fileService.DeleteImageAsync(category.IconUrl);
-
-            // رفع الأيقونة الجديدة
+            // رفع الجديدة وحفظها أولاً، ثم حذف القديمة — فشل الرفع لا يترك رابطاً لملف محذوف
+            var oldIcon = category.IconUrl;
             category.IconUrl = await _fileService.SaveImageAsync(icon, "categories");
 
             var updated = await _categoryRepository.UpdateAsync(category);
+
+            if (!string.IsNullOrWhiteSpace(oldIcon))
+                await _fileService.DeleteImageAsync(oldIcon);
+
             return MapToDto(updated);
         }
         // ✅ حذف الأيقونة

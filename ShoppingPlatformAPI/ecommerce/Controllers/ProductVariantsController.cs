@@ -1,3 +1,4 @@
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Product;
 using ecommerce.Services;
 using ecommerce.Services.ProductService;
@@ -9,7 +10,7 @@ namespace ecommerce.Controllers
 {
     [ApiController]
     [Route("api/products/{productId}/variants")]
-    [Authorize(Policy = "OpsOrAdminOrVENDOR")]
+    [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
 
     public class ProductVariantsController : Controller
     {

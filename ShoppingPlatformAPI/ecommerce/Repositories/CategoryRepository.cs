@@ -32,8 +32,9 @@ namespace ecommerce.Repositories
         }
         public async Task<Dictionary<Guid, int>> GetProductCountsAsync()
         {
+            // المنتجات الظاهرة فقط (لا المحذوفة/المعطّلة ولا منتجات المتاجر المعطّلة)
             var direct = await _context.Products
-                .Where(p => p.CategoryId != null)
+                .Where(p => p.CategoryId != null && p.IsActive && p.Vendor.IsActive)
                 .GroupBy(p => p.CategoryId!.Value)
                 .Select(g => new { CategoryId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.CategoryId, x => x.Count);
@@ -64,10 +65,17 @@ namespace ecommerce.Repositories
             if (onlyActive)
                 query = query.Where(c => c.IsActive);
 
-            return await query
+            var categories = await query
                 .OrderBy(c => c.DisplayOrder)
                 .ThenByDescending(c => c.CreatedAt)
                 .ToListAsync();
+
+            if (!onlyActive)
+                return categories;
+
+            // فئة مفعّلة لكن أحد أسلافها معطّل → مخفية أيضاً
+            var hidden = await CategoryVisibility.GetHiddenCategoryIdsAsync(_context);
+            return categories.Where(c => !hidden.Contains(c.Id)).ToList();
         }
 
         public async Task<IEnumerable<Category>> GetByParentIdAsync(Guid? parentId, bool onlyActive = true)
@@ -79,7 +87,14 @@ namespace ecommerce.Repositories
                 : query.Where(c => c.ParentId == parentId);
 
             if (onlyActive)
+            {
                 query = query.Where(c => c.IsActive);
+
+                // أبناء فئة مخفية مخفيون كذلك
+                if (parentId.HasValue &&
+                    (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).Contains(parentId.Value))
+                    return new List<Category>();
+            }
 
             return await query
                 .OrderBy(c => c.DisplayOrder)
@@ -128,10 +143,18 @@ namespace ecommerce.Repositories
                 .AnyAsync(c => c.Id == id);
         }
 
-        public async Task<bool> ExistsByNameAsync(string name)
+        public async Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null)
         {
+            var trimmed = name.Trim();
             return await _context.Categories
-                .AnyAsync(c => c.Name == name);
+                .AnyAsync(c => c.Name == trimmed && c.Id != excludeId);
+        }
+
+        public async Task<bool> ExistsByArabicNameAsync(string nameAr, Guid? excludeId = null)
+        {
+            var trimmed = nameAr.Trim();
+            return await _context.Categories
+                .AnyAsync(c => c.NameAr == trimmed && c.Id != excludeId);
         }
 
         public async Task<PagedResult<Category>> GetPagedAsync(
@@ -150,9 +173,15 @@ namespace ecommerce.Repositories
             else
                 query = query.Where(c => c.ParentId == null);
 
-            // فلتر النشاط
+            // فلتر النشاط (أبناء فئة مخفية مخفيون كذلك)
             if (onlyActive)
+            {
                 query = query.Where(c => c.IsActive);
+
+                if (parentId.HasValue &&
+                    (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).Contains(parentId.Value))
+                    query = query.Where(c => false);
+            }
 
             query = query.OrderByDescending(c => c.CreatedAt);
 

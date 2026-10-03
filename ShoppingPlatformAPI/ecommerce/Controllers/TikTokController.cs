@@ -6,6 +6,7 @@ using ecommerce.Core.Models;
 using ecommerce.Services.TikTokService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace ecommerce.Controllers
@@ -136,6 +137,7 @@ namespace ecommerce.Controllers
         // عام: يزامن كل الحسابات المعروضة، مع منع التكرار (مزامنة واحدة لكل متجر كل StoreRefreshSeconds وتحديث واحد في نفس الوقت)
         [AllowAnonymous]
         [HttpPost("reels/refresh")]
+        [EnableRateLimiting("social-refresh")]
         public async Task<ActionResult<ApiResponse<TikTokReelsPageDto>>> RefreshReels(
             [FromQuery] int pageSize = 10, CancellationToken ct = default)
         {
@@ -156,6 +158,7 @@ namespace ecommerce.Controllers
         // عام لكن محدود: مزامنة واحدة لكل متجر كل StoreRefreshSeconds مهما كثرت الطلبات
         [AllowAnonymous]
         [HttpPost("stores/{vendorId:guid}/videos/refresh")]
+        [EnableRateLimiting("social-refresh")]
         public async Task<ActionResult<ApiResponse<TikTokStoreFeedDto>>> RefreshStoreFeed(Guid vendorId, CancellationToken ct)
         {
             var feed = await _tikTokService.RefreshStoreFeedAsync(vendorId, ct);

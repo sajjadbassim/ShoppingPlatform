@@ -54,9 +54,9 @@ namespace ecommerce.Services.AdminService
                 InactiveVendors = await _context.Vendors.CountAsync(v => !v.IsActive),
 
                 // Products
-                TotalProducts = await _context.Products.CountAsync(),
+                TotalProducts = await _context.Products.CountAsync(p => !p.IsDeleted),
                 ActiveProducts = await _context.Products.CountAsync(p => p.IsActive && p.IsAvailable),
-                OutOfStock = await _context.Products.CountAsync(p => p.StockQuantity == 0),
+                OutOfStock = await _context.Products.CountAsync(p => !p.IsDeleted && p.StockQuantity == 0),
 
                 // Orders
                 TotalOrders = await _context.Orders.CountAsync(),
@@ -266,6 +266,7 @@ namespace ecommerce.Services.AdminService
             var query = _context.Products
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
+                .Where(p => !p.IsDeleted)
                 .AsQueryable();
 
             if (isActive.HasValue)

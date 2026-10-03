@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Drivers
 {
@@ -32,6 +32,7 @@ namespace ecommerce.Core.DTO.Drivers
         public string? AddressNotes { get; set; }
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
+        public string? ZoneName { get; set; }             // منطقة التوصيل
         public string? CustomerNotes { get; set; }
         public string PaymentMethod { get; set; }
         public string PaymentStatus { get; set; }

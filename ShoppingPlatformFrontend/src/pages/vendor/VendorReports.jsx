@@ -167,7 +167,7 @@ const VendorReports = () => {
                 <span className="w-7 h-7 bg-primary/10 text-primary rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                   {i + 1}
                 </span>
-                <div className="w-11 h-11 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                <div className="w-11 h-11 rounded-xl overflow-hidden product-media flex-shrink-0">
                   <img src={getImageUrl(p.imageUrl) || p.imageUrl} alt=""
                     className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
                 </div>

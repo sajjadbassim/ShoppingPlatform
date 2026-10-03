@@ -1,6 +1,7 @@
 ﻿using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Data;
+using ecommerce.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace ecommerce.Repositories
@@ -107,26 +108,10 @@ namespace ecommerce.Repositories
                 .AsNoTracking()
                 .ToListAsync();
 
-            if (!activePromotions.Any())
-                return null;
-
-            // الأولوية: product أولاً، ثم category، ثم vendor، ثم all
-            var priorityOrder = new[]
-            {
-                PromotionTargetType.PRODUCT,
-                PromotionTargetType.CATEGORY,
-                PromotionTargetType.VENDOR,
-                PromotionTargetType.ALL
-            };
-
-            foreach (var targetType in priorityOrder)
-            {
-                var match = activePromotions.FirstOrDefault(p => p.TargetType == targetType);
-                if (match != null)
-                    return match;
-            }
-
-            return null;
+            // نفس قاعدة الاختيار المستخدمة في قوائم المنتجات
+            return PromotionPricing.SelectBest(
+                activePromotions, productId,
+                categoryId == Guid.Empty ? null : categoryId, vendorId);
         }
 
         // ===================================

@@ -21,3 +21,6 @@ node_modules/
 
 # Others
 *.DS_Store
+
+# مفاتيح Data Protection (تشفير توكنات حسابات التواصل) — لا تُرفع للمستودع
+**/App_Data/

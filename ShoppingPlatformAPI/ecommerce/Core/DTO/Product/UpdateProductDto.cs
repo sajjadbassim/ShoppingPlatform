@@ -35,6 +35,11 @@ namespace ecommerce.Core.DTO.Product
 
         public List<IFormFile>? NewImages { get; set; }
 
+        // الحقول الفارغة لا تُرسل في النموذج، لذا الإزالة تحتاج علماً صريحاً
+        public bool ClearOriginalPrice { get; set; }
+
+        public bool ClearCategory { get; set; }
+
 
     }
 }

@@ -22,7 +22,7 @@ const STALE_MS = 15 * 60 * 1000
 
 const STAGES = {
   OUT_FOR_DELIVERY: { label: 'في الطريق', chip: 'bg-purple-100 text-purple-800', lateAfter: 45 },
-  READY_FOR_DRIVER: { label: 'ينتظر سائقاً', chip: 'bg-primary/10 text-primary', lateAfter: 15 },
+  READY_FOR_DRIVER: { label: 'جاهز — ينتظر سائقاً', chip: 'bg-primary/10 text-primary', lateAfter: 15 },
   WAITING_STORES: { label: 'عند المتاجر', chip: 'bg-amber-100 text-amber-800', lateAfter: 30 },
 }
 
@@ -279,7 +279,7 @@ const OperationsTracking = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-800 mt-1.5 truncate">{d.customerName || 'زبون'}</p>
-                    <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={11} className="flex-shrink-0" />{d.address || '—'}</p>
+                    <p className="text-xs text-gray-500 truncate flex items-center gap-1"><MapPin size={11} className="flex-shrink-0" />{d.zoneName && <b className="text-gray-700">{d.zoneName} ·</b>}{d.address || '—'}</p>
                     <p className="text-xs text-gray-500 truncate flex items-center gap-1 mt-0.5"><Store size={11} className="flex-shrink-0" />{d.stores.join('، ')}</p>
                     <div className="flex items-center gap-2 mt-2">
                       {d.driverName && <span className="text-xs text-purple-800 bg-purple-50 rounded-lg px-2 py-1 inline-flex items-center gap-1"><Truck size={12} />{d.driverName}</span>}

@@ -54,7 +54,8 @@ namespace ecommerce.Services.TikTokService
         private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(5);
 
-        // مزامنة واحدة لكل متجر في نفس الوقت — تمنع تكرار إدراج نفس الفيديو عند تزامن عدة زوار
+        // قفل لكل متجر تمر به كل عمليات المزامنة والربط والإلغاء — يمنع إدراج نفس الفيديو مرتين.
+        // يُنشأ فقط لمتجر ثبت أن له حساباً مربوطاً (لا يكبر بطلبات عامة بمعرّفات عشوائية)
         private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> StoreSyncLocks = new();
 
         // تحديث واحد لصفحة ريلز في نفس الوقت — الطلب المتزامن ينتظر انتهاءه ثم يأخذ النتيجة الجديدة
@@ -91,6 +92,8 @@ namespace ecommerce.Services.TikTokService
         private DateTime Now => _time.GetUtcNow().UtcDateTime;
 
         private TimeSpan StoreRefreshInterval => TimeSpan.FromSeconds(Math.Max(1, _options.StoreRefreshSeconds));
+
+        private static SemaphoreSlim LockFor(Guid vendorId) => StoreSyncLocks.GetOrAdd(vendorId, _ => new SemaphoreSlim(1, 1));
 
         // ===================================
         // الحالة
@@ -174,33 +177,43 @@ namespace ecommerce.Services.TikTokService
             if (string.IsNullOrEmpty(token.OpenId) || string.IsNullOrEmpty(token.RefreshToken))
                 return TikTokConnectResult.Fail("token");
 
-            var connection = await _repository.GetConnectionAsync(pending.VendorId, includeVideos: true, ct);
-            if (connection == null)
+            var gate = LockFor(pending.VendorId);
+            if (!await gate.WaitAsync(RefreshWaitLimit, ct))
+                return TikTokConnectResult.Fail("busy");
+            try
             {
-                connection = new TikTokConnection { VendorId = pending.VendorId };
-                await _repository.AddConnectionAsync(connection, ct);
+                var connection = await _repository.GetConnectionAsync(pending.VendorId, includeVideos: true, ct);
+                if (connection == null)
+                {
+                    connection = new TikTokConnection { VendorId = pending.VendorId };
+                    await _repository.AddConnectionAsync(connection, ct);
+                }
+                else if (connection.OpenId != token.OpenId)
+                {
+                    // ربط حساب مختلف: فيديوهات الحساب السابق لم تعد تخص المتجر
+                    connection.Videos.Clear();
+                    connection.DisplayName = connection.Username = connection.AvatarUrl = connection.ProfileUrl = null;
+                    connection.FollowerCount = connection.LikesCount = connection.VideoCount = null;
+                }
+
+                var isNewAccount = connection.Videos.Count == 0;
+                ApplyToken(connection, token);
+                connection.OpenId = token.OpenId;
+                connection.ConnectedAt = Now;
+                connection.NeedsReconnect = false;
+                connection.LastSyncError = null;
+                await _unitOfWork.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Vendor {VendorId} connected TikTok account {OpenId}", pending.VendorId, token.OpenId);
+
+                // جلب الحساب والفيديوهات فوراً — فشلها لا يُلغي الربط، وستُعاد بالمزامنة الدورية
+                await SyncConnectionAsync(connection, showAllNewVideos: isNewAccount, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
             }
-            else if (connection.OpenId != token.OpenId)
+            finally
             {
-                // ربط حساب مختلف: فيديوهات الحساب السابق لم تعد تخص المتجر
-                connection.Videos.Clear();
-                connection.DisplayName = connection.Username = connection.AvatarUrl = connection.ProfileUrl = null;
-                connection.FollowerCount = connection.LikesCount = connection.VideoCount = null;
+                gate.Release();
             }
-
-            var isNewAccount = connection.Videos.Count == 0;
-            ApplyToken(connection, token);
-            connection.OpenId = token.OpenId;
-            connection.ConnectedAt = Now;
-            connection.NeedsReconnect = false;
-            connection.LastSyncError = null;
-            await _unitOfWork.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Vendor {VendorId} connected TikTok account {OpenId}", pending.VendorId, token.OpenId);
-
-            // جلب الحساب والفيديوهات فوراً — فشلها لا يُلغي الربط، وستُعاد بالمزامنة الدورية
-            await SyncConnectionAsync(connection, showAllNewVideos: isNewAccount, ct);
-            await _unitOfWork.SaveChangesAsync(ct);
 
             return TikTokConnectResult.Ok();
         }
@@ -210,16 +223,31 @@ namespace ecommerce.Services.TikTokService
         // ===================================
         public async Task<TikTokStatusDto> SyncAsync(Guid userId, CancellationToken ct = default)
         {
-            var connection = await GetConnectionOrThrowAsync(userId, includeVideos: true, ct);
-            await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
-            await _unitOfWork.SaveChangesAsync(ct);
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            if (!await _repository.ConnectionExistsAsync(vendorId, ct))
+                throw new NotFoundException("لا يوجد حساب تيك توك مربوط بمتجرك");
 
-            if (connection.NeedsReconnect)
-                throw new BusinessRuleException("انتهت صلاحية الربط مع تيك توك، يرجى إعادة ربط الحساب");
-            if (connection.LastSyncError != null)
-                throw new BusinessRuleException("تعذّرت المزامنة مع تيك توك حالياً، حاول لاحقاً");
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(RefreshWaitLimit, ct))
+                throw new BusinessRuleException("مزامنة جارية حالياً، حاول بعد لحظات");
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct)
+                    ?? throw new NotFoundException("لا يوجد حساب تيك توك مربوط بمتجرك");
+                await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
+                await _unitOfWork.SaveChangesAsync(ct);
 
-            return MapStatus(connection);
+                if (connection.NeedsReconnect)
+                    throw new BusinessRuleException("انتهت صلاحية الربط مع تيك توك، يرجى إعادة ربط الحساب");
+                if (connection.LastSyncError != null)
+                    throw new BusinessRuleException("تعذّرت المزامنة مع تيك توك حالياً، حاول لاحقاً");
+
+                return MapStatus(connection);
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
 
         public async Task<int> SyncDueConnectionsAsync(CancellationToken ct = default)
@@ -228,15 +256,45 @@ namespace ecommerce.Services.TikTokService
 
             await _repository.DeleteExpiredStatesAsync(Now, ct);
 
-            var due = await _repository.GetConnectionsDueForSyncAsync(
-                Now.AddMinutes(-Math.Max(5, _options.SyncIntervalMinutes)), take: 50, ct);
+            var syncedBefore = Now.AddMinutes(-Math.Max(5, _options.SyncIntervalMinutes));
+            var due = await _repository.GetVendorsDueForSyncAsync(syncedBefore, take: 50, onlyVisible: false, ct: ct);
 
-            foreach (var connection in due)
+            var synced = 0;
+            foreach (var vendorId in due)
             {
+                try
+                {
+                    // متجر تجري مزامنته الآن (فتحه زائر أو التاجر) يُتخطى — حديث أصلاً
+                    if (await SyncIfDueAsync(vendorId, TimeSpan.Zero, syncedBefore, onlyVisible: false, ct)) synced++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // متجر واحد متعطل لا يمنع مزامنة البقية
+                    _logger.LogWarning(ex, "TikTok background sync failed for vendor {VendorId}", vendorId);
+                }
+            }
+            return synced;
+        }
+
+        // يأخذ قفل المتجر ثم يحمّل الحساب بحالته الحالية — طلب آخر قد يكون زامنه أثناء الانتظار
+        private async Task<bool> SyncIfDueAsync(Guid vendorId, TimeSpan wait, DateTime syncedBefore, bool onlyVisible, CancellationToken ct)
+        {
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(wait, ct)) return false;
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct);
+                if (connection == null || connection.NeedsReconnect || (onlyVisible && !connection.ShowOnStore)) return false;
+                if (connection.LastSyncedAt >= syncedBefore) return false;
+
                 await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
                 await _unitOfWork.SaveChangesAsync(ct);
+                return true;
             }
-            return due.Count;
+            finally
+            {
+                gate.Release();
+            }
         }
 
         // ===================================
@@ -295,20 +353,36 @@ namespace ecommerce.Services.TikTokService
         // ===================================
         public async Task DisconnectAsync(Guid userId, CancellationToken ct = default)
         {
-            var connection = await GetConnectionOrThrowAsync(userId, includeVideos: true, ct);
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            if (!await _repository.ConnectionExistsAsync(vendorId, ct))
+                throw new NotFoundException("لا يوجد حساب تيك توك مربوط بمتجرك");
 
-            // إلغاء الإذن من جهة تيك توك — فشله لا يمنع حذف الربط من المنصة
-            if (_options.IsConfigured && TryUnprotect(connection.AccessTokenProtected, out var accessToken))
+            // تحت القفل: لا تحفظ مزامنة جارية تغييرات على حساب محذوف
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(RefreshWaitLimit, ct))
+                throw new BusinessRuleException("مزامنة جارية حالياً، حاول بعد لحظات");
+            try
             {
-                try { await _api.RevokeAsync(accessToken, ct); }
-                catch (Exception ex) when (ex is TikTokApiException or HttpRequestException or TaskCanceledException)
-                {
-                    _logger.LogWarning(ex, "TikTok revoke failed for vendor {VendorId}", connection.VendorId);
-                }
-            }
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct);
+                if (connection == null) return;
 
-            _repository.RemoveConnection(connection);
-            await _unitOfWork.SaveChangesAsync(ct);
+                // إلغاء الإذن من جهة تيك توك — فشله لا يمنع حذف الربط من المنصة
+                if (_options.IsConfigured && TryUnprotect(connection.AccessTokenProtected, out var accessToken))
+                {
+                    try { await _api.RevokeAsync(accessToken, ct); }
+                    catch (Exception ex) when (ex is TikTokApiException or HttpRequestException or TaskCanceledException)
+                    {
+                        _logger.LogWarning(ex, "TikTok revoke failed for vendor {VendorId}", connection.VendorId);
+                    }
+                }
+
+                _repository.RemoveConnection(connection);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
 
         // ===================================
@@ -318,26 +392,13 @@ namespace ecommerce.Services.TikTokService
         {
             if (_options.IsConfigured)
             {
-                var gate = StoreSyncLocks.GetOrAdd(vendorId, _ => new SemaphoreSlim(1, 1));
+                // فحص بلا تتبّع قبل إنشاء القفل: معرّف متجر عشوائي أو حساب حديث المزامنة لا يكلّف شيئاً
+                var syncedBefore = Now - StoreRefreshInterval;
+                var due = await _repository.GetVendorsDueForSyncAsync(syncedBefore, take: 1, onlyVisible: true, vendorId, ct);
 
                 // مزامنة جارية لنفس المتجر ⇒ ننتظر انتهاءها (فتصبح حديثة ولا تتكرر) ثم نعيد النتيجة
-                if (await gate.WaitAsync(RefreshWaitLimit, ct))
-                {
-                    try
-                    {
-                        var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct);
-                        if (connection is { ShowOnStore: true, NeedsReconnect: false } &&
-                            (connection.LastSyncedAt == null || connection.LastSyncedAt <= Now - StoreRefreshInterval))
-                        {
-                            await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
-                            await _unitOfWork.SaveChangesAsync(ct);
-                        }
-                    }
-                    finally
-                    {
-                        gate.Release();
-                    }
-                }
+                if (due.Count > 0)
+                    await SyncIfDueAsync(vendorId, RefreshWaitLimit, syncedBefore, onlyVisible: true, ct);
             }
 
             return await GetStoreFeedAsync(vendorId, ct);
@@ -349,26 +410,20 @@ namespace ecommerce.Services.TikTokService
             {
                 try
                 {
-                    var due = await _repository.GetConnectionsDueForSyncAsync(
-                        Now - StoreRefreshInterval, ReelsRefreshMaxStores, ct, onlyVisible: true);
+                    var syncedBefore = Now - StoreRefreshInterval;
+                    var due = await _repository.GetVendorsDueForSyncAsync(syncedBefore, ReelsRefreshMaxStores, onlyVisible: true, ct: ct);
 
-                    foreach (var connection in due)
+                    foreach (var vendorId in due)
                     {
-                        var gate = StoreSyncLocks.GetOrAdd(connection.VendorId, _ => new SemaphoreSlim(1, 1));
-                        if (!await gate.WaitAsync(0, ct)) continue;
                         try
                         {
-                            await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
-                            await _unitOfWork.SaveChangesAsync(ct);
+                            // متجر تجري مزامنته الآن يُتخطى
+                            await SyncIfDueAsync(vendorId, TimeSpan.Zero, syncedBefore, onlyVisible: true, ct);
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
                             // متجر واحد متعطل لا يمنع تحديث البقية
-                            _logger.LogWarning(ex, "Reels refresh failed for vendor {VendorId}", connection.VendorId);
-                        }
-                        finally
-                        {
-                            gate.Release();
+                            _logger.LogWarning(ex, "Reels refresh failed for vendor {VendorId}", vendorId);
                         }
                     }
                 }

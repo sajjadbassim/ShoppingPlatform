@@ -21,6 +21,7 @@ const PROGRESS_STEPS = [
   { key: 'PENDING_CONFIRMATION', label: 'استلام' },
   { key: 'CONFIRMED',            label: 'تأكيد' },
   { key: 'PREPARING',            label: 'تحضير' },
+  { key: 'READY',                label: 'جاهز' },
   { key: 'OUT_FOR_DELIVERY',     label: 'في الطريق' },
   { key: 'DELIVERED',            label: 'توصيل' },
 ]
@@ -30,13 +31,14 @@ const STATUS_INFO = {
   CONFIRMED:            { label: 'تم التأكيد',      color: 'bg-blue-100 text-blue-700',   icon: Check },
   PARTIALLY_CONFIRMED:  { label: 'مؤكد جزئياً',     color: 'bg-blue-100 text-blue-700',   icon: Check },
   PREPARING:            { label: 'قيد التحضير',     color: 'bg-indigo-100 text-indigo-700', icon: Package },
+  READY:                { label: 'جاهز للاستلام',   color: 'bg-teal-100 text-teal-700', icon: Package },
   OUT_FOR_DELIVERY:     { label: 'في الطريق إليك',  color: 'bg-purple-100 text-purple-700', icon: Truck },
   DELIVERED:            { label: 'تم التوصيل',      color: 'bg-green-100 text-green-700', icon: Check },
   CANCELLED:            { label: 'ملغي',            color: 'bg-red-100 text-red-600',     icon: X },
   DELIVERY_FAILED:      { label: 'تعذّر التسليم',   color: 'bg-orange-100 text-orange-800', icon: X },
 }
 
-const ACTIVE_STATUSES = ['PENDING_CONFIRMATION', 'CONFIRMED', 'PARTIALLY_CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY']
+const ACTIVE_STATUSES = ['PENDING_CONFIRMATION', 'CONFIRMED', 'PARTIALLY_CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY']
 
 // مجموعات الفلترة — بدل سبعة تبويبات
 const GROUPS = [
@@ -120,7 +122,7 @@ const OrderCard = ({ order, onReorder, reordering }) => {
           <div className="flex -space-x-3 space-x-reverse flex-shrink-0">
             {shown.map((item, i) => (
               <div key={item.id || i}
-                className="relative w-14 h-14 rounded-xl overflow-hidden bg-gray-100 ring-2 ring-white">
+                className="relative w-14 h-14 rounded-xl overflow-hidden product-media ring-2 ring-white">
                 {item.productImageUrl && <img src={getImageUrl(item.productImageUrl)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                 {i === shown.length - 1 && more > 0 && (
                   <span className="absolute inset-0 bg-black/55 text-white text-xs font-bold flex items-center justify-center" dir="ltr">+{more}</span>

@@ -25,6 +25,10 @@
             if (!_allowedExtensions.Contains(extension))
                 throw new ArgumentException("صيغة الصورة غير مدعومة. الصيغ المسموحة: jpg, jpeg, png, gif, webp");
 
+            // الامتداد وحده يمكن تزويره — نتحقق من توقيع الملف الفعلي
+            if (!await HasImageSignatureAsync(file, extension))
+                throw new ArgumentException("الملف ليس صورة صالحة");
+
             // إنشاء اسم فريد للملف
             var fileName = $"{Guid.NewGuid()}{extension}";
             var folderPath = Path.Combine(_environment.WebRootPath, "uploads", folder);
@@ -80,7 +84,12 @@
 
             try
             {
-                var filePath = Path.Combine(_environment.WebRootPath, imageUrl.TrimStart('/'));
+                var filePath = Path.GetFullPath(Path.Combine(_environment.WebRootPath, imageUrl.TrimStart('/')));
+
+                // الحذف داخل مجلد الرفع فقط
+                var uploadsRoot = Path.GetFullPath(Path.Combine(_environment.WebRootPath, "uploads")) + Path.DirectorySeparatorChar;
+                if (!filePath.StartsWith(uploadsRoot, StringComparison.OrdinalIgnoreCase))
+                    return false;
 
                 if (File.Exists(filePath))
                 {
@@ -94,6 +103,26 @@
             {
                 return false;
             }
+        }
+
+        private static async Task<bool> HasImageSignatureAsync(IFormFile file, string extension)
+        {
+            var header = new byte[12];
+            int read;
+            using (var stream = file.OpenReadStream())
+                read = await stream.ReadAsync(header.AsMemory(0, header.Length));
+
+            bool Starts(params byte[] sig) => read >= sig.Length && header.AsSpan(0, sig.Length).SequenceEqual(sig);
+
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => Starts(0xFF, 0xD8, 0xFF),
+                ".png" => Starts(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A),
+                ".gif" => Starts(0x47, 0x49, 0x46, 0x38),                               // GIF8
+                ".webp" => Starts(0x52, 0x49, 0x46, 0x46) && read >= 12 &&               // RIFF....WEBP
+                           header.AsSpan(8, 4).SequenceEqual(new byte[] { 0x57, 0x45, 0x42, 0x50 }),
+                _ => false
+            };
         }
 
         public async Task<bool> DeleteImagesAsync(List<string> imageUrls)

@@ -1,0 +1,3614 @@
+[
+ {
+  "sourceId": 1,
+  "store": "beauty",
+  "category": "makeup",
+  "name": "Essence Mascara Lash Princess",
+  "nameAr": "ماسكارا إيسنس لاش برنسيس",
+  "descriptionAr": "ماسكارا تمنح الرموش كثافة وطولاً واضحين من أول تطبيق، مقاومة للتكتل وتدوم طوال اليوم.",
+  "brand": "Essence",
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/beauty/essence-mascara-lash-princess/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 2,
+  "store": "beauty",
+  "category": "makeup",
+  "name": "Eyeshadow Palette with Mirror",
+  "nameAr": "باليت ظلال عيون مع مرآة",
+  "descriptionAr": "مجموعة ظلال بألوان متناسقة مطفية ولامعة مع مرآة مدمجة، مثالية للإطلالات اليومية والسهرات.",
+  "brand": "Glamour Beauty",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/beauty/eyeshadow-palette-with-mirror/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 3,
+  "store": "beauty",
+  "category": "makeup",
+  "name": "Powder Canister",
+  "nameAr": "بودرة مضغوطة فيلفت تاتش",
+  "descriptionAr": "بودرة ناعمة تثبت المكياج وتخفف لمعان البشرة وتمنحها مظهراً مخملياً طبيعياً.",
+  "brand": "Velvet Touch",
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/beauty/powder-canister/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 4,
+  "store": "beauty",
+  "category": "makeup",
+  "name": "Red Lipstick",
+  "nameAr": "أحمر شفاه أحمر",
+  "descriptionAr": "أحمر شفاه بلون أحمر كلاسيكي وتركيبة مرطبة تدوم لساعات طويلة.",
+  "brand": "Chic Cosmetics",
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/beauty/red-lipstick/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 5,
+  "store": "beauty",
+  "category": "makeup",
+  "name": "Red Nail Polish",
+  "nameAr": "طلاء أظافر أحمر",
+  "descriptionAr": "طلاء أظافر بلون أحمر جذاب، سريع الجفاف ولمعان يدوم.",
+  "brand": "Nail Couture",
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/beauty/red-nail-polish/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 6,
+  "store": "beauty",
+  "category": "perfumes",
+  "name": "Calvin Klein CK One",
+  "nameAr": "عطر كالفن كلاين سي كي ون",
+  "descriptionAr": "عطر منعش للجنسين بنفحات حمضيات وشاي أخضر، مناسب للاستخدام اليومي.",
+  "brand": "Calvin Klein",
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/fragrances/calvin-klein-ck-one/1.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/calvin-klein-ck-one/2.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/calvin-klein-ck-one/3.webp"
+  ],
+  "variants": {
+   "name": "Volume",
+   "nameAr": "الحجم",
+   "values": [
+    [
+     "50 ml",
+     "50 مل",
+     0
+    ],
+    [
+     "100 ml",
+     "100 مل",
+     29000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 7,
+  "store": "beauty",
+  "category": "perfumes",
+  "name": "Chanel Coco Noir Eau De",
+  "nameAr": "عطر شانيل كوكو نوار",
+  "descriptionAr": "عطر نسائي فاخر بنفحات شرقية دافئة من الورد والباتشولي، للمناسبات والسهرات.",
+  "brand": "Chanel",
+  "price": 190000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/fragrances/chanel-coco-noir-eau-de/1.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/chanel-coco-noir-eau-de/2.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/chanel-coco-noir-eau-de/3.webp"
+  ],
+  "variants": {
+   "name": "Volume",
+   "nameAr": "الحجم",
+   "values": [
+    [
+     "50 ml",
+     "50 مل",
+     0
+    ],
+    [
+     "100 ml",
+     "100 مل",
+     75000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 8,
+  "store": "beauty",
+  "category": "perfumes",
+  "name": "Dior J'adore",
+  "nameAr": "عطر ديور جادور",
+  "descriptionAr": "عطر نسائي زهري أنيق بنفحات الياسمين والورد، من أشهر عطور ديور.",
+  "brand": "Dior",
+  "price": 130000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/fragrances/dior-j'adore/1.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/dior-j'adore/2.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/dior-j'adore/3.webp"
+  ],
+  "variants": {
+   "name": "Volume",
+   "nameAr": "الحجم",
+   "values": [
+    [
+     "50 ml",
+     "50 مل",
+     0
+    ],
+    [
+     "100 ml",
+     "100 مل",
+     52000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 9,
+  "store": "beauty",
+  "category": "perfumes",
+  "name": "Dolce Shine Eau de",
+  "nameAr": "عطر دولتشي آند غابانا دولتشي شاين",
+  "descriptionAr": "عطر نسائي فاكهي مشرق بنفحات المانجو والياسمين، خفيف ومناسب للنهار.",
+  "brand": "Dolce & Gabbana",
+  "price": 100000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/fragrances/dolce-shine-eau-de/1.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/dolce-shine-eau-de/2.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/dolce-shine-eau-de/3.webp"
+  ],
+  "variants": {
+   "name": "Volume",
+   "nameAr": "الحجم",
+   "values": [
+    [
+     "50 ml",
+     "50 مل",
+     0
+    ],
+    [
+     "100 ml",
+     "100 مل",
+     41000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 10,
+  "store": "beauty",
+  "category": "perfumes",
+  "name": "Gucci Bloom Eau de",
+  "nameAr": "عطر غوتشي بلوم",
+  "descriptionAr": "عطر نسائي زهري بنفحات الياسمين والتيوبيروز، أنثوي وثابت.",
+  "brand": "Gucci",
+  "price": 115000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/fragrances/gucci-bloom-eau-de/1.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/gucci-bloom-eau-de/2.webp",
+   "https://cdn.dummyjson.com/product-images/fragrances/gucci-bloom-eau-de/3.webp"
+  ],
+  "variants": {
+   "name": "Volume",
+   "nameAr": "الحجم",
+   "values": [
+    [
+     "50 ml",
+     "50 مل",
+     0
+    ],
+    [
+     "100 ml",
+     "100 مل",
+     46000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 11,
+  "store": "decor",
+  "category": "furniture",
+  "name": "Annibale Colombo Bed",
+  "nameAr": "سرير أنيبال كولومبو",
+  "descriptionAr": "سرير خشبي فاخر بتصميم كلاسيكي إيطالي وتنجيد ناعم، يضفي فخامة على غرفة النوم.",
+  "brand": "Annibale Colombo",
+  "price": 2755000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-bed/1.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-bed/2.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-bed/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 12,
+  "store": "decor",
+  "category": "furniture",
+  "name": "Annibale Colombo Sofa",
+  "nameAr": "قنفة أنيبال كولومبو",
+  "descriptionAr": "قنفة فاخرة بتصميم إيطالي كلاسيكي ومقاعد مريحة، مناسبة لصالات الاستقبال.",
+  "brand": "Annibale Colombo",
+  "price": 3625000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-sofa/1.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-sofa/2.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/annibale-colombo-sofa/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 13,
+  "store": "decor",
+  "category": "furniture",
+  "name": "Bedside Table African Cherry",
+  "nameAr": "كومودينو خشب الكرز",
+  "descriptionAr": "كومودينو جانبي من خشب الكرز الأفريقي مع درج للتخزين، متين وأنيق.",
+  "brand": "Furniture Co.",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/furniture/bedside-table-african-cherry/1.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/bedside-table-african-cherry/2.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/bedside-table-african-cherry/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 14,
+  "store": "decor",
+  "category": "furniture",
+  "name": "Knoll Saarinen Executive Conference Chair",
+  "nameAr": "كرسي مكتب كنول سارينين",
+  "descriptionAr": "كرسي اجتماعات تنفيذي مريح بتصميم عصري ومسند ظهر داعم.",
+  "brand": "Knoll",
+  "price": 725000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/furniture/knoll-saarinen-executive-conference-chair/1.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/knoll-saarinen-executive-conference-chair/2.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/knoll-saarinen-executive-conference-chair/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 15,
+  "store": "decor",
+  "category": "furniture",
+  "name": "Wooden Bathroom Sink With Mirror",
+  "nameAr": "مغسلة حمام خشبية مع مرآة",
+  "descriptionAr": "وحدة مغسلة خشبية مع مرآة وخزانة تخزين، تمنح الحمام مظهراً عصرياً.",
+  "brand": "Bath Trends",
+  "price": 1160000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/furniture/wooden-bathroom-sink-with-mirror/1.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/wooden-bathroom-sink-with-mirror/2.webp",
+   "https://cdn.dummyjson.com/product-images/furniture/wooden-bathroom-sink-with-mirror/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 16,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Apple",
+  "nameAr": "تفاح أحمر (1 كغم)",
+  "descriptionAr": "تفاح أحمر طازج ومقرمش، غني بالألياف والفيتامينات.",
+  "brand": null,
+  "price": 3000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/apple/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 17,
+  "store": "mart",
+  "category": "meat",
+  "name": "Beef Steak",
+  "nameAr": "ستيك لحم بقر (1 كغم)",
+  "descriptionAr": "قطع ستيك لحم بقر طازج ومنتقى، مثالي للشوي والطبخ.",
+  "brand": null,
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/beef-steak/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 18,
+  "store": "mart",
+  "category": "pet-food",
+  "name": "Cat Food",
+  "nameAr": "طعام قطط",
+  "descriptionAr": "طعام جاف متكامل للقطط بنكهة الدجاج، يدعم الصحة والنشاط.",
+  "brand": null,
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/cat-food/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 19,
+  "store": "mart",
+  "category": "meat",
+  "name": "Chicken Meat",
+  "nameAr": "لحم دجاج طازج (1 كغم)",
+  "descriptionAr": "دجاج طازج منظف وجاهز للطبخ، من مزارع محلية.",
+  "brand": null,
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/chicken-meat/1.webp",
+   "https://cdn.dummyjson.com/product-images/groceries/chicken-meat/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 20,
+  "store": "mart",
+  "category": "pantry",
+  "name": "Cooking Oil",
+  "nameAr": "زيت طبخ (1.8 لتر)",
+  "descriptionAr": "زيت نباتي نقي للقلي والطبخ، خفيف وصحي.",
+  "brand": null,
+  "price": 7250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/cooking-oil/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 21,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Cucumber",
+  "nameAr": "خيار (1 كغم)",
+  "descriptionAr": "خيار طازج ومقرمش من المزارع المحلية.",
+  "brand": null,
+  "price": 2250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/cucumber/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 22,
+  "store": "mart",
+  "category": "pet-food",
+  "name": "Dog Food",
+  "nameAr": "طعام كلاب",
+  "descriptionAr": "طعام جاف متوازن للكلاب بالبروتين والفيتامينات.",
+  "brand": null,
+  "price": 16000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/dog-food/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 23,
+  "store": "mart",
+  "category": "dairy",
+  "name": "Eggs",
+  "nameAr": "بيض (طبقة 30 بيضة)",
+  "descriptionAr": "بيض طازج من مزارع محلية، طبقة كاملة.",
+  "brand": null,
+  "price": 4250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/eggs/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 24,
+  "store": "mart",
+  "category": "meat",
+  "name": "Fish Steak",
+  "nameAr": "ستيك سمك (1 كغم)",
+  "descriptionAr": "شرائح سمك طازجة ومنظفة، جاهزة للقلي أو الشوي.",
+  "brand": null,
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/fish-steak/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 25,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Green Bell Pepper",
+  "nameAr": "فلفل أخضر حلو (1 كغم)",
+  "descriptionAr": "فلفل رومي أخضر طازج للسلطات والطبخ.",
+  "brand": null,
+  "price": 1750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/green-bell-pepper/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 26,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Green Chili Pepper",
+  "nameAr": "فلفل حار أخضر (500 غم)",
+  "descriptionAr": "فلفل حار أخضر طازج يضيف نكهة قوية للأطباق.",
+  "brand": null,
+  "price": 1500,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/green-chili-pepper/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 27,
+  "store": "mart",
+  "category": "pantry",
+  "name": "Honey Jar",
+  "nameAr": "عسل طبيعي (500 غم)",
+  "descriptionAr": "عسل نحل طبيعي صافٍ بطعم غني.",
+  "brand": null,
+  "price": 10000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/honey-jar/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 28,
+  "store": "mart",
+  "category": "dairy",
+  "name": "Ice Cream",
+  "nameAr": "آيس كريم (1 لتر)",
+  "descriptionAr": "آيس كريم كريمي بنكهات متنوعة، منعش لأيام الصيف.",
+  "brand": null,
+  "price": 8000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/ice-cream/1.webp",
+   "https://cdn.dummyjson.com/product-images/groceries/ice-cream/2.webp",
+   "https://cdn.dummyjson.com/product-images/groceries/ice-cream/3.webp",
+   "https://cdn.dummyjson.com/product-images/groceries/ice-cream/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 29,
+  "store": "mart",
+  "category": "drinks",
+  "name": "Juice",
+  "nameAr": "عصير برتقال (1 لتر)",
+  "descriptionAr": "عصير برتقال طبيعي بدون سكر مضاف.",
+  "brand": null,
+  "price": 5750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/juice/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 30,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Kiwi",
+  "nameAr": "كيوي (500 غم)",
+  "descriptionAr": "فاكهة كيوي طازجة غنية بفيتامين C.",
+  "brand": null,
+  "price": 3500,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/kiwi/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 31,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Lemon",
+  "nameAr": "ليمون (1 كغم)",
+  "descriptionAr": "ليمون طازج وعصيري للطبخ والمشروبات.",
+  "brand": null,
+  "price": 1250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/lemon/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 32,
+  "store": "mart",
+  "category": "dairy",
+  "name": "Milk",
+  "nameAr": "حليب كامل الدسم (1 لتر)",
+  "descriptionAr": "حليب طازج كامل الدسم مبستر.",
+  "brand": null,
+  "price": 5000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/milk/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 33,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Mulberry",
+  "nameAr": "توت (250 غم)",
+  "descriptionAr": "توت طازج حلو المذاق، غني بمضادات الأكسدة.",
+  "brand": null,
+  "price": 7250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/mulberry/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 34,
+  "store": "mart",
+  "category": "drinks",
+  "name": "Nescafe Coffee",
+  "nameAr": "قهوة نسكافيه (200 غم)",
+  "descriptionAr": "قهوة سريعة التحضير بطعم غني ورائحة مميزة.",
+  "brand": null,
+  "price": 12000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/nescafe-coffee/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 35,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Potatoes",
+  "nameAr": "بطاطا (1 كغم)",
+  "descriptionAr": "بطاطا طازجة مناسبة للقلي والطبخ.",
+  "brand": null,
+  "price": 3250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/potatoes/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 36,
+  "store": "mart",
+  "category": "pantry",
+  "name": "Protein Powder",
+  "nameAr": "بروتين واي (1 كغم)",
+  "descriptionAr": "مسحوق بروتين لدعم بناء العضلات بعد التمرين، بنكهة الشوكولاتة.",
+  "brand": null,
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/protein-powder/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 37,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Red Onions",
+  "nameAr": "بصل أحمر (1 كغم)",
+  "descriptionAr": "بصل أحمر طازج للسلطات والطبخ.",
+  "brand": null,
+  "price": 3000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/red-onions/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 38,
+  "store": "mart",
+  "category": "pantry",
+  "name": "Rice",
+  "nameAr": "رز بسمتي (5 كغم)",
+  "descriptionAr": "رز بسمتي طويل الحبة، يطبخ مفلفلاً وبرائحة زكية.",
+  "brand": null,
+  "price": 8750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/rice/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 39,
+  "store": "mart",
+  "category": "drinks",
+  "name": "Soft Drinks",
+  "nameAr": "مشروبات غازية (علبة 6)",
+  "descriptionAr": "مشروبات غازية منعشة، عبوة من 6 علب.",
+  "brand": null,
+  "price": 3000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/soft-drinks/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 40,
+  "store": "mart",
+  "category": "fruits-veg",
+  "name": "Strawberry",
+  "nameAr": "فراولة (500 غم)",
+  "descriptionAr": "فراولة طازجة حلوة المذاق.",
+  "brand": null,
+  "price": 5750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/strawberry/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 41,
+  "store": "mart",
+  "category": "household",
+  "name": "Tissue Paper Box",
+  "nameAr": "مناديل ورقية (علبة)",
+  "descriptionAr": "مناديل ناعمة ومتينة، علبة كبيرة للاستخدام اليومي.",
+  "brand": null,
+  "price": 3500,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/tissue-paper-box/1.webp",
+   "https://cdn.dummyjson.com/product-images/groceries/tissue-paper-box/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 42,
+  "store": "mart",
+  "category": "drinks",
+  "name": "Water",
+  "nameAr": "مياه شرب (كرتونة 12)",
+  "descriptionAr": "مياه شرب نقية معبأة، كرتونة 12 قنينة.",
+  "brand": null,
+  "price": 1500,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/groceries/water/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 43,
+  "store": "decor",
+  "category": "decor",
+  "name": "Decoration Swing",
+  "nameAr": "أرجوحة ديكور",
+  "descriptionAr": "أرجوحة ديكور معلقة بتصميم أنيق للحدائق والشرفات.",
+  "brand": null,
+  "price": 87000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/home-decoration/decoration-swing/1.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/decoration-swing/2.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/decoration-swing/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 44,
+  "store": "decor",
+  "category": "decor",
+  "name": "Family Tree Photo Frame",
+  "nameAr": "إطار صور شجرة العائلة",
+  "descriptionAr": "إطار صور متعدد بتصميم شجرة العائلة لعرض صور الأحبة.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/home-decoration/family-tree-photo-frame/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 45,
+  "store": "decor",
+  "category": "decor",
+  "name": "House Showpiece Plant",
+  "nameAr": "نبتة زينة صناعية",
+  "descriptionAr": "نبتة صناعية بمظهر طبيعي تضيف لمسة خضراء للمنزل دون عناية.",
+  "brand": null,
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/home-decoration/house-showpiece-plant/1.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/house-showpiece-plant/2.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/house-showpiece-plant/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 46,
+  "store": "decor",
+  "category": "decor",
+  "name": "Plant Pot",
+  "nameAr": "سندانة زرع",
+  "descriptionAr": "سندانة أنيقة للنباتات الداخلية والخارجية.",
+  "brand": null,
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/home-decoration/plant-pot/1.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/plant-pot/2.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/plant-pot/3.webp",
+   "https://cdn.dummyjson.com/product-images/home-decoration/plant-pot/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 47,
+  "store": "decor",
+  "category": "decor",
+  "name": "Table Lamp",
+  "nameAr": "أباجورة طاولة",
+  "descriptionAr": "أباجورة بإضاءة دافئة وتصميم عصري لغرف النوم والمكاتب.",
+  "brand": null,
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/home-decoration/table-lamp/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 48,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Bamboo Spatula",
+  "nameAr": "ملعقة طبخ من الخيزران",
+  "descriptionAr": "ملعقة طبخ خشبية من الخيزران لا تخدش أواني التيفال.",
+  "brand": null,
+  "price": 12000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/bamboo-spatula/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 49,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Black Aluminium Cup",
+  "nameAr": "كوب ألمنيوم أسود",
+  "descriptionAr": "كوب ألمنيوم خفيف ومتين للمشروبات الساخنة والباردة.",
+  "brand": null,
+  "price": 8750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/black-aluminium-cup/1.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/black-aluminium-cup/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 50,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Black Whisk",
+  "nameAr": "خفاقة سوداء",
+  "descriptionAr": "خفاقة يدوية لخفق البيض والكريمة بسهولة.",
+  "brand": null,
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/black-whisk/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 51,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Boxed Blender",
+  "nameAr": "خلاط كهربائي",
+  "descriptionAr": "خلاط كهربائي قوي للعصائر والصلصات مع إبريق سعة كبيرة.",
+  "brand": null,
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/boxed-blender/1.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/boxed-blender/2.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/boxed-blender/3.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/boxed-blender/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 52,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Carbon Steel Wok",
+  "nameAr": "مقلاة ووك فولاذ كربوني",
+  "descriptionAr": "مقلاة ووك للقلي السريع والأطباق الآسيوية، توزيع حرارة متساوٍ.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/carbon-steel-wok/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 53,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Chopping Board",
+  "nameAr": "لوح تقطيع",
+  "descriptionAr": "لوح تقطيع متين وسهل التنظيف للخضار واللحوم.",
+  "brand": null,
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/chopping-board/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 54,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Citrus Squeezer Yellow",
+  "nameAr": "عصارة حمضيات صفراء",
+  "descriptionAr": "عصارة يدوية لليمون والبرتقال، سهلة الاستخدام.",
+  "brand": null,
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/citrus-squeezer-yellow/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 55,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Egg Slicer",
+  "nameAr": "قطاعة بيض",
+  "descriptionAr": "أداة لتقطيع البيض المسلوق إلى شرائح متساوية.",
+  "brand": null,
+  "price": 10000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/egg-slicer/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 56,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Electric Stove",
+  "nameAr": "طباخ كهربائي",
+  "descriptionAr": "طباخ كهربائي بعينين وتحكم بدرجة الحرارة، مثالي للشقق.",
+  "brand": null,
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/electric-stove/1.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/electric-stove/2.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/electric-stove/3.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/electric-stove/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 57,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Fine Mesh Strainer",
+  "nameAr": "مصفاة شبكية ناعمة",
+  "descriptionAr": "مصفاة ستانلس ستيل ناعمة للدقيق والعصائر.",
+  "brand": null,
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/fine-mesh-strainer/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 58,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Fork",
+  "nameAr": "شوكة طعام",
+  "descriptionAr": "شوكة ستانلس ستيل متينة ومقاومة للصدأ.",
+  "brand": null,
+  "price": 5750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/fork/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 59,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Glass",
+  "nameAr": "كأس زجاج",
+  "descriptionAr": "كأس زجاج شفاف للماء والعصير.",
+  "brand": null,
+  "price": 7250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/glass/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 60,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Grater Black",
+  "nameAr": "مبشرة سوداء",
+  "descriptionAr": "مبشرة متعددة الأوجه للجبن والخضار.",
+  "brand": null,
+  "price": 16000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/grater-black/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 61,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Hand Blender",
+  "nameAr": "خلاط يدوي",
+  "descriptionAr": "خلاط يدوي كهربائي للشوربات والعصائر مباشرة في القدر.",
+  "brand": null,
+  "price": 51000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/hand-blender/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 62,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Ice Cube Tray",
+  "nameAr": "قالب ثلج",
+  "descriptionAr": "قالب مكعبات ثلج مرن وسهل الإخراج.",
+  "brand": null,
+  "price": 8750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/ice-cube-tray/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 63,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Kitchen Sieve",
+  "nameAr": "منخل مطبخ",
+  "descriptionAr": "منخل للدقيق والسكر مع مقبض مريح.",
+  "brand": null,
+  "price": 12000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/kitchen-sieve/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 64,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Knife",
+  "nameAr": "سكين مطبخ",
+  "descriptionAr": "سكين مطبخ حاد من الستانلس ستيل للتقطيع الدقيق.",
+  "brand": null,
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/knife/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 65,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Lunch Box",
+  "nameAr": "علبة غداء",
+  "descriptionAr": "علبة غداء محكمة الإغلاق بأقسام متعددة.",
+  "brand": null,
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/lunch-box/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 66,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Microwave Oven",
+  "nameAr": "فرن مايكروويف",
+  "descriptionAr": "مايكروويف بسعة 25 لتر مع وظائف تسخين وإذابة تلقائية.",
+  "brand": null,
+  "price": 130000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/microwave-oven/1.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/microwave-oven/2.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/microwave-oven/3.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/microwave-oven/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 67,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Mug Tree Stand",
+  "nameAr": "حامل أكواب",
+  "descriptionAr": "حامل أكواب أنيق يوفر مساحة على سطح المطبخ.",
+  "brand": null,
+  "price": 23000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/mug-tree-stand/1.webp",
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/mug-tree-stand/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 68,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Pan",
+  "nameAr": "طاوة تيفال",
+  "descriptionAr": "طاوة غير لاصقة للقلي الصحي بزيت أقل.",
+  "brand": null,
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/pan/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 69,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Plate",
+  "nameAr": "صحن طعام",
+  "descriptionAr": "صحن خزف أبيض أنيق للاستخدام اليومي.",
+  "brand": null,
+  "price": 5750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/plate/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 70,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Red Tongs",
+  "nameAr": "ملقط طبخ أحمر",
+  "descriptionAr": "ملقط طبخ مقاوم للحرارة للشوي والتقليب.",
+  "brand": null,
+  "price": 10000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/red-tongs/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 71,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Silver Pot With Glass Cap",
+  "nameAr": "قدر ستانلس مع غطاء زجاجي",
+  "descriptionAr": "قدر ستانلس ستيل بغطاء زجاجي لمتابعة الطبخ.",
+  "brand": null,
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/silver-pot-with-glass-cap/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 72,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Slotted Turner",
+  "nameAr": "مقلب مثقب",
+  "descriptionAr": "مقلب مثقب لتقليب الأطعمة وتصفية الزيت.",
+  "brand": null,
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/slotted-turner/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 73,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Spice Rack",
+  "nameAr": "حامل بهارات",
+  "descriptionAr": "حامل بهارات دوار مع علب زجاجية لتنظيم المطبخ.",
+  "brand": null,
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/spice-rack/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 74,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Spoon",
+  "nameAr": "ملعقة طعام",
+  "descriptionAr": "ملعقة ستانلس ستيل متينة للاستخدام اليومي.",
+  "brand": null,
+  "price": 7250,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/spoon/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 75,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Tray",
+  "nameAr": "صينية تقديم",
+  "descriptionAr": "صينية تقديم أنيقة للشاي والضيافة.",
+  "brand": null,
+  "price": 25000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/tray/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 76,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Wooden Rolling Pin",
+  "nameAr": "شوبك خشبي",
+  "descriptionAr": "شوبك خشبي لفرد العجين والمعجنات.",
+  "brand": null,
+  "price": 17000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/wooden-rolling-pin/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 77,
+  "store": "home",
+  "category": "kitchen",
+  "name": "Yellow Peeler",
+  "nameAr": "مقشرة صفراء",
+  "descriptionAr": "مقشرة خضار وفواكه حادة وسهلة الاستخدام.",
+  "brand": null,
+  "price": 8750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/kitchen-accessories/yellow-peeler/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 78,
+  "store": "elite",
+  "category": "laptops",
+  "name": "Apple MacBook Pro 14 Inch Space Grey",
+  "nameAr": "لابتوب أبل ماك بوك برو 14 إنش",
+  "descriptionAr": "ماك بوك برو بشاشة 14 إنش ومعالج قوي لأعمال التصميم والبرمجة.",
+  "brand": "Apple",
+  "price": 2900000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/laptops/apple-macbook-pro-14-inch-space-grey/1.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/apple-macbook-pro-14-inch-space-grey/2.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/apple-macbook-pro-14-inch-space-grey/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 79,
+  "store": "elite",
+  "category": "laptops",
+  "name": "Asus Zenbook Pro Dual Screen Laptop",
+  "nameAr": "لابتوب أسوس زينبوك برو بشاشتين",
+  "descriptionAr": "لابتوب بشاشتين لزيادة الإنتاجية، مثالي للمصممين وصناع المحتوى.",
+  "brand": "Asus",
+  "price": 2610000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/laptops/asus-zenbook-pro-dual-screen-laptop/1.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/asus-zenbook-pro-dual-screen-laptop/2.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/asus-zenbook-pro-dual-screen-laptop/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 80,
+  "store": "elite",
+  "category": "laptops",
+  "name": "Huawei Matebook X Pro",
+  "nameAr": "لابتوب هواوي ميت بوك إكس برو",
+  "descriptionAr": "لابتوب نحيف بشاشة لمس عالية الدقة وبطارية تدوم طويلاً.",
+  "brand": "Huawei",
+  "price": 2030000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/laptops/huawei-matebook-x-pro/1.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/huawei-matebook-x-pro/2.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/huawei-matebook-x-pro/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 81,
+  "store": "elite",
+  "category": "laptops",
+  "name": "Lenovo Yoga 920",
+  "nameAr": "لابتوب لينوفو يوغا 920",
+  "descriptionAr": "لابتوب قابل للتحويل إلى تابلت بشاشة لمس ومفصل 360 درجة.",
+  "brand": "Lenovo",
+  "price": 1595000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/laptops/lenovo-yoga-920/1.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/lenovo-yoga-920/2.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/lenovo-yoga-920/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 82,
+  "store": "elite",
+  "category": "laptops",
+  "name": "New DELL XPS 13 9300 Laptop",
+  "nameAr": "لابتوب ديل إكس بي إس 13",
+  "descriptionAr": "لابتوب خفيف بشاشة بلا حواف تقريباً وأداء ممتاز.",
+  "brand": "Dell",
+  "price": 2175000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/laptops/new-dell-xps-13-9300-laptop/1.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/new-dell-xps-13-9300-laptop/2.webp",
+   "https://cdn.dummyjson.com/product-images/laptops/new-dell-xps-13-9300-laptop/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 83,
+  "store": "fashion",
+  "category": "mens-clothing",
+  "name": "Blue & Black Check Shirt",
+  "nameAr": "قميص كاروهات أزرق وأسود",
+  "descriptionAr": "قميص رجالي قطني بنقشة كاروهات، مريح للاستخدام اليومي.",
+  "brand": "Fashion Trends",
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/blue-&-black-check-shirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 84,
+  "store": "fashion",
+  "category": "mens-clothing",
+  "name": "Gigabyte Aorus Men Tshirt",
+  "nameAr": "تيشيرت رجالي غيغابايت أوروس",
+  "descriptionAr": "تيشيرت قطني بشعار أوروس لعشاق الألعاب.",
+  "brand": "Gigabyte",
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/gigabyte-aorus-men-tshirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 85,
+  "store": "fashion",
+  "category": "mens-clothing",
+  "name": "Man Plaid Shirt",
+  "nameAr": "قميص رجالي مربعات",
+  "descriptionAr": "قميص رجالي بنقشة مربعات كلاسيكية وأكمام طويلة.",
+  "brand": "Classic Wear",
+  "price": 51000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-plaid-shirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 86,
+  "store": "fashion",
+  "category": "mens-clothing",
+  "name": "Man Short Sleeve Shirt",
+  "nameAr": "قميص رجالي نص ردن",
+  "descriptionAr": "قميص صيفي خفيف بأكمام قصيرة.",
+  "brand": "Casual Comfort",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/man-short-sleeve-shirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 87,
+  "store": "fashion",
+  "category": "mens-clothing",
+  "name": "Men Check Shirt",
+  "nameAr": "قميص رجالي كاروهات",
+  "descriptionAr": "قميص كاروهات عصري بقصة مريحة.",
+  "brand": "Urban Chic",
+  "price": 41000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shirts/men-check-shirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 88,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Nike Air Jordan 1 Red And Black",
+  "nameAr": "حذاء نايكي إير جوردن 1 أحمر وأسود",
+  "descriptionAr": "حذاء رياضي أيقوني بتصميم جوردن الكلاسيكي باللونين الأحمر والأسود.",
+  "brand": "Nike",
+  "price": 215000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-air-jordan-1-red-and-black/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "40",
+     "40",
+     0
+    ],
+    [
+     "41",
+     "41",
+     0
+    ],
+    [
+     "42",
+     "42",
+     0
+    ],
+    [
+     "43",
+     "43",
+     0
+    ],
+    [
+     "44",
+     "44",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 89,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Nike Baseball Cleats",
+  "nameAr": "حذاء نايكي رياضي بمسامير",
+  "descriptionAr": "حذاء رياضي بمسامير للملاعب العشبية وثبات أفضل.",
+  "brand": "Nike",
+  "price": 115000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/nike-baseball-cleats/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "40",
+     "40",
+     0
+    ],
+    [
+     "41",
+     "41",
+     0
+    ],
+    [
+     "42",
+     "42",
+     0
+    ],
+    [
+     "43",
+     "43",
+     0
+    ],
+    [
+     "44",
+     "44",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 90,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Puma Future Rider Trainers",
+  "nameAr": "حذاء بوما فيوتشر رايدر",
+  "descriptionAr": "حذاء رياضي خفيف ومريح للمشي والتمارين.",
+  "brand": "Puma",
+  "price": 130000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/puma-future-rider-trainers/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "40",
+     "40",
+     0
+    ],
+    [
+     "41",
+     "41",
+     0
+    ],
+    [
+     "42",
+     "42",
+     0
+    ],
+    [
+     "43",
+     "43",
+     0
+    ],
+    [
+     "44",
+     "44",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 91,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Sports Sneakers Off White & Red",
+  "nameAr": "سنيكرز أوف وايت أبيض وأحمر",
+  "descriptionAr": "حذاء سنيكرز عصري باللونين الأبيض والأحمر.",
+  "brand": "Off White",
+  "price": 175000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-&-red/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "40",
+     "40",
+     0
+    ],
+    [
+     "41",
+     "41",
+     0
+    ],
+    [
+     "42",
+     "42",
+     0
+    ],
+    [
+     "43",
+     "43",
+     0
+    ],
+    [
+     "44",
+     "44",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 92,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Sports Sneakers Off White Red",
+  "nameAr": "سنيكرز أوف وايت أحمر",
+  "descriptionAr": "سنيكرز رياضي بتصميم جريء ونعل مريح.",
+  "brand": "Off White",
+  "price": 160000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/3.webp",
+   "https://cdn.dummyjson.com/product-images/mens-shoes/sports-sneakers-off-white-red/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "40",
+     "40",
+     0
+    ],
+    [
+     "41",
+     "41",
+     0
+    ],
+    [
+     "42",
+     "42",
+     0
+    ],
+    [
+     "43",
+     "43",
+     0
+    ],
+    [
+     "44",
+     "44",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 93,
+  "store": "watches",
+  "category": "watches",
+  "name": "Brown Leather Belt Watch",
+  "nameAr": "ساعة رجالية بحزام جلد بني",
+  "descriptionAr": "ساعة كلاسيكية بحزام جلد طبيعي بني ومينا أنيقة.",
+  "brand": "Fashion Timepieces",
+  "price": 130000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/brown-leather-belt-watch/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 94,
+  "store": "watches",
+  "category": "watches",
+  "name": "Longines Master Collection",
+  "nameAr": "ساعة لونجين ماستر كولكشن",
+  "descriptionAr": "ساعة سويسرية أوتوماتيكية فاخرة من مجموعة لونجين ماستر.",
+  "brand": "Longines",
+  "price": 2175000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/longines-master-collection/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 95,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Cellini Date Black Dial",
+  "nameAr": "ساعة رولكس سيليني ديت مينا سوداء",
+  "descriptionAr": "ساعة رولكس فاخرة بمينا سوداء ونافذة للتاريخ.",
+  "brand": "Rolex",
+  "price": 13050000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-date-black-dial/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 96,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Cellini Moonphase",
+  "nameAr": "ساعة رولكس سيليني مون فيز",
+  "descriptionAr": "ساعة رولكس فاخرة تعرض أطوار القمر بتصميم كلاسيكي.",
+  "brand": "Rolex",
+  "price": 18850000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-cellini-moonphase/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 97,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Datejust",
+  "nameAr": "ساعة رولكس ديت جست",
+  "descriptionAr": "ساعة رولكس ديت جست الكلاسيكية، رمز الأناقة.",
+  "brand": "Rolex",
+  "price": 15950000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-datejust/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 98,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Submariner Watch",
+  "nameAr": "ساعة رولكس صب مارينر",
+  "descriptionAr": "ساعة غوص فاخرة من رولكس مقاومة للماء.",
+  "brand": "Rolex",
+  "price": 20300000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/1.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/2.webp",
+   "https://cdn.dummyjson.com/product-images/mens-watches/rolex-submariner-watch/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 99,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Amazon Echo Plus",
+  "nameAr": "مكبر صوت أمازون إيكو بلس",
+  "descriptionAr": "مكبر صوت ذكي بمساعد صوتي للتحكم بالمنزل الذكي.",
+  "brand": "Amazon",
+  "price": 145000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/amazon-echo-plus/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/amazon-echo-plus/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 100,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple Airpods",
+  "nameAr": "سماعات أبل إيربودز",
+  "descriptionAr": "سماعات لاسلكية بصوت نقي واتصال سريع بأجهزة أبل.",
+  "brand": "Apple",
+  "price": 190000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods/2.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 101,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple AirPods Max Silver",
+  "nameAr": "سماعات أبل إيربودز ماكس فضي",
+  "descriptionAr": "سماعات رأس لاسلكية فاخرة بعزل ضوضاء نشط.",
+  "brand": "Apple",
+  "price": 795000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpods-max-silver/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 102,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple Airpower Wireless Charger",
+  "nameAr": "شاحن أبل لاسلكي",
+  "descriptionAr": "شاحن لاسلكي لشحن الآيفون والإيربودز والساعة.",
+  "brand": "Apple",
+  "price": 115000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-airpower-wireless-charger/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 103,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple HomePod Mini Cosmic Grey",
+  "nameAr": "مكبر صوت أبل هوم بود ميني",
+  "descriptionAr": "مكبر صوت ذكي صغير بصوت غني ومساعد سيري.",
+  "brand": "Apple",
+  "price": 145000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-homepod-mini-cosmic-grey/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 104,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple iPhone Charger",
+  "nameAr": "شاحن آيفون أصلي",
+  "descriptionAr": "شاحن أبل أصلي سريع وآمن لأجهزة الآيفون.",
+  "brand": "Apple",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-iphone-charger/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-iphone-charger/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 105,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple MagSafe Battery Pack",
+  "nameAr": "بطارية أبل ماغ سيف",
+  "descriptionAr": "بطارية مغناطيسية تلتصق بظهر الآيفون للشحن أثناء التنقل.",
+  "brand": "Apple",
+  "price": 145000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-magsafe-battery-pack/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-magsafe-battery-pack/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 106,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Apple Watch Series 4 Gold",
+  "nameAr": "ساعة أبل الإصدار 4 ذهبي",
+  "descriptionAr": "ساعة ذكية لتتبع النشاط والصحة والإشعارات.",
+  "brand": "Apple",
+  "price": 505000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-watch-series-4-gold/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-watch-series-4-gold/2.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/apple-watch-series-4-gold/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 107,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Beats Flex Wireless Earphones",
+  "nameAr": "سماعات بيتس فليكس لاسلكية",
+  "descriptionAr": "سماعات لاسلكية مرنة بصوت قوي وبطارية تدوم 12 ساعة.",
+  "brand": "Beats",
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/beats-flex-wireless-earphones/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 108,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "iPhone 12 Silicone Case with MagSafe Plum",
+  "nameAr": "كفر آيفون 12 سيليكون ماغ سيف",
+  "descriptionAr": "كفر سيليكون أصلي يدعم الشحن المغناطيسي، لون بنفسجي.",
+  "brand": "Apple",
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum/2.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum/3.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/iphone-12-silicone-case-with-magsafe-plum/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 109,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Monopod",
+  "nameAr": "عصا تصوير أحادية",
+  "descriptionAr": "حامل أحادي قابل للتمديد للتصوير بالهاتف.",
+  "brand": "TechGear",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/monopod/1.webp",
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/monopod/2.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 110,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Selfie Lamp with iPhone",
+  "nameAr": "ضوء سيلفي للهاتف",
+  "descriptionAr": "ضوء دائري صغير يثبت على الهاتف لصور سيلفي أوضح.",
+  "brand": "GadgetMaster",
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/selfie-lamp-with-iphone/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 111,
+  "store": "elite",
+  "category": "mobile-acc",
+  "name": "Selfie Stick Monopod",
+  "nameAr": "عصا سيلفي",
+  "descriptionAr": "عصا سيلفي قابلة للطي مع زر تحكم لاسلكي.",
+  "brand": "SnapTech",
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/mobile-accessories/selfie-stick-monopod/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 118,
+  "store": "beauty",
+  "category": "skincare",
+  "name": "Attitude Super Leaves Hand Soap",
+  "nameAr": "صابون يدين أتيتيود",
+  "descriptionAr": "صابون سائل لليدين بمكونات طبيعية ولطيف على البشرة.",
+  "brand": "Attitude",
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/skin-care/attitude-super-leaves-hand-soap/1.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/attitude-super-leaves-hand-soap/2.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/attitude-super-leaves-hand-soap/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 119,
+  "store": "beauty",
+  "category": "skincare",
+  "name": "Olay Ultra Moisture Shea Butter Body Wash",
+  "nameAr": "غسول جسم أولاي بزبدة الشيا",
+  "descriptionAr": "غسول جسم مرطب بزبدة الشيا يترك البشرة ناعمة.",
+  "brand": "Olay",
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/skin-care/olay-ultra-moisture-shea-butter-body-wash/1.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/olay-ultra-moisture-shea-butter-body-wash/2.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/olay-ultra-moisture-shea-butter-body-wash/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 120,
+  "store": "beauty",
+  "category": "skincare",
+  "name": "Vaseline Men Body and Face Lotion",
+  "nameAr": "لوشن فازلين للرجال للوجه والجسم",
+  "descriptionAr": "لوشن خفيف سريع الامتصاص يرطب بشرة الرجال.",
+  "brand": "Vaseline",
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/skin-care/vaseline-men-body-and-face-lotion/1.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/vaseline-men-body-and-face-lotion/2.webp",
+   "https://cdn.dummyjson.com/product-images/skin-care/vaseline-men-body-and-face-lotion/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 121,
+  "store": "elite",
+  "category": "phones",
+  "name": "iPhone 5s",
+  "nameAr": "ايفون 5 إس",
+  "descriptionAr": "هاتف آيفون 5 إس بشاشة 4 إنش ومستشعر بصمة.",
+  "brand": "Apple",
+  "price": 290000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-5s/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-5s/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-5s/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 122,
+  "store": "elite",
+  "category": "phones",
+  "name": "iPhone 6",
+  "nameAr": "ايفون 6",
+  "descriptionAr": "هاتف آيفون 6 بشاشة 4.7 إنش وتصميم نحيف.",
+  "brand": "Apple",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-6/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-6/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-6/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 123,
+  "store": "elite",
+  "category": "phones",
+  "name": "iPhone 13 Pro",
+  "nameAr": "ايفون 13 برو",
+  "descriptionAr": "آيفون 13 برو بكاميرا ثلاثية احترافية وشاشة 120 هرتز.",
+  "brand": "Apple",
+  "price": 1595000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-13-pro/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-13-pro/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-13-pro/3.webp"
+  ],
+  "variants": {
+   "name": "Storage",
+   "nameAr": "السعة",
+   "values": [
+    [
+     "128GB",
+     "128 غيغا",
+     0
+    ],
+    [
+     "256GB",
+     "256 غيغا",
+     240000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 124,
+  "store": "elite",
+  "category": "phones",
+  "name": "iPhone X",
+  "nameAr": "ايفون إكس",
+  "descriptionAr": "آيفون إكس بشاشة OLED كاملة وخاصية بصمة الوجه.",
+  "brand": "Apple",
+  "price": 1305000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-x/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-x/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/iphone-x/3.webp"
+  ],
+  "variants": {
+   "name": "Storage",
+   "nameAr": "السعة",
+   "values": [
+    [
+     "128GB",
+     "128 غيغا",
+     0
+    ],
+    [
+     "256GB",
+     "256 غيغا",
+     195000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 125,
+  "store": "elite",
+  "category": "phones",
+  "name": "Oppo A57",
+  "nameAr": "هاتف أوبو A57",
+  "descriptionAr": "هاتف بسعر مناسب وبطارية كبيرة وشحن سريع.",
+  "brand": "Oppo",
+  "price": 360000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-a57/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-a57/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-a57/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 126,
+  "store": "elite",
+  "category": "phones",
+  "name": "Oppo F19 Pro Plus",
+  "nameAr": "هاتف أوبو F19 برو بلس",
+  "descriptionAr": "هاتف بكاميرا رباعية وشحن سريع 50 واط.",
+  "brand": "Oppo",
+  "price": 580000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-f19-pro-plus/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-f19-pro-plus/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-f19-pro-plus/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 127,
+  "store": "elite",
+  "category": "phones",
+  "name": "Oppo K1",
+  "nameAr": "هاتف أوبو K1",
+  "descriptionAr": "هاتف بشاشة AMOLED وبصمة تحت الشاشة.",
+  "brand": "Oppo",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-k1/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-k1/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-k1/3.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/oppo-k1/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 128,
+  "store": "elite",
+  "category": "phones",
+  "name": "Realme C35",
+  "nameAr": "هاتف ريلمي C35",
+  "descriptionAr": "هاتف اقتصادي بشاشة كبيرة وبطارية 5000 ملي أمبير.",
+  "brand": "Realme",
+  "price": 215000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-c35/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-c35/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-c35/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 129,
+  "store": "elite",
+  "category": "phones",
+  "name": "Realme X",
+  "nameAr": "هاتف ريلمي X",
+  "descriptionAr": "هاتف بكاميرا منبثقة وشاشة كاملة بلا نتوء.",
+  "brand": "Realme",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-x/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-x/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-x/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 130,
+  "store": "elite",
+  "category": "phones",
+  "name": "Realme XT",
+  "nameAr": "هاتف ريلمي XT",
+  "descriptionAr": "هاتف بكاميرا 64 ميغابكسل وأداء قوي.",
+  "brand": "Realme",
+  "price": 505000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-xt/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-xt/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/realme-xt/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 131,
+  "store": "elite",
+  "category": "phones",
+  "name": "Samsung Galaxy S7",
+  "nameAr": "هاتف سامسونج غالاكسي S7",
+  "descriptionAr": "هاتف سامسونج مقاوم للماء بكاميرا ممتازة.",
+  "brand": "Samsung",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s7/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s7/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s7/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 132,
+  "store": "elite",
+  "category": "phones",
+  "name": "Samsung Galaxy S8",
+  "nameAr": "هاتف سامسونج غالاكسي S8",
+  "descriptionAr": "هاتف بشاشة إنفينيتي منحنية وتصميم أنيق.",
+  "brand": "Samsung",
+  "price": 725000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s8/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s8/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s8/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 133,
+  "store": "elite",
+  "category": "phones",
+  "name": "Samsung Galaxy S10",
+  "nameAr": "هاتف سامسونج غالاكسي S10",
+  "descriptionAr": "هاتف رائد بكاميرا ثلاثية وبصمة فوق صوتية.",
+  "brand": "Samsung",
+  "price": 1015000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s10/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s10/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/samsung-galaxy-s10/3.webp"
+  ],
+  "variants": {
+   "name": "Storage",
+   "nameAr": "السعة",
+   "values": [
+    [
+     "128GB",
+     "128 غيغا",
+     0
+    ],
+    [
+     "256GB",
+     "256 غيغا",
+     150000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 134,
+  "store": "elite",
+  "category": "phones",
+  "name": "Vivo S1",
+  "nameAr": "هاتف فيفو S1",
+  "descriptionAr": "هاتف بكاميرا منبثقة أمامية وشاشة AMOLED.",
+  "brand": "Vivo",
+  "price": 360000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-s1/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-s1/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-s1/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 135,
+  "store": "elite",
+  "category": "phones",
+  "name": "Vivo V9",
+  "nameAr": "هاتف فيفو V9",
+  "descriptionAr": "هاتف بكاميرا سيلفي 24 ميغابكسل وشاشة كبيرة.",
+  "brand": "Vivo",
+  "price": 435000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-v9/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-v9/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-v9/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 136,
+  "store": "elite",
+  "category": "phones",
+  "name": "Vivo X21",
+  "nameAr": "هاتف فيفو X21",
+  "descriptionAr": "هاتف ببصمة داخل الشاشة وكاميرا مزدوجة.",
+  "brand": "Vivo",
+  "price": 725000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-x21/1.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-x21/2.webp",
+   "https://cdn.dummyjson.com/product-images/smartphones/vivo-x21/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 137,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "American Football",
+  "nameAr": "كرة قدم أمريكية",
+  "descriptionAr": "كرة قدم أمريكية جلدية بقبضة ممتازة.",
+  "brand": null,
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/american-football/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 138,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Baseball Ball",
+  "nameAr": "كرة بيسبول",
+  "descriptionAr": "كرة بيسبول قياسية للتدريب والمباريات.",
+  "brand": null,
+  "price": 13000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/baseball-ball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 139,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Baseball Glove",
+  "nameAr": "قفاز بيسبول",
+  "descriptionAr": "قفاز بيسبول جلدي مريح ومتين.",
+  "brand": null,
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/baseball-glove/1.webp",
+   "https://cdn.dummyjson.com/product-images/sports-accessories/baseball-glove/2.webp",
+   "https://cdn.dummyjson.com/product-images/sports-accessories/baseball-glove/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 140,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Basketball",
+  "nameAr": "كرة سلة",
+  "descriptionAr": "كرة سلة مطاطية للملاعب الداخلية والخارجية، مقاس 7.",
+  "brand": null,
+  "price": 22000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/basketball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 141,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Basketball Rim",
+  "nameAr": "حلقة كرة سلة",
+  "descriptionAr": "حلقة كرة سلة معدنية مع شبكة للتثبيت على الجدار.",
+  "brand": null,
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/basketball-rim/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 142,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Cricket Ball",
+  "nameAr": "كرة كريكيت",
+  "descriptionAr": "كرة كريكيت جلدية للتدريب والمباريات.",
+  "brand": null,
+  "price": 19000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-ball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 143,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Cricket Bat",
+  "nameAr": "مضرب كريكيت",
+  "descriptionAr": "مضرب كريكيت خشبي خفيف ومتوازن.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-bat/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 144,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Cricket Helmet",
+  "nameAr": "خوذة كريكيت",
+  "descriptionAr": "خوذة حماية للرأس مع واقي للوجه.",
+  "brand": null,
+  "price": 65000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-helmet/1.webp",
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-helmet/2.webp",
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-helmet/3.webp",
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-helmet/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 145,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Cricket Wicket",
+  "nameAr": "أوتاد كريكيت",
+  "descriptionAr": "مجموعة أوتاد كريكيت خشبية.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/cricket-wicket/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 146,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Feather Shuttlecock",
+  "nameAr": "ريشة تنس",
+  "descriptionAr": "ريشة تنس طاولة من الريش الطبيعي، ثبات في الطيران.",
+  "brand": null,
+  "price": 8750,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/feather-shuttlecock/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 147,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Football",
+  "nameAr": "كرة قدم",
+  "descriptionAr": "كرة قدم مقاس 5 مخيطة يدوياً للملاعب العشبية.",
+  "brand": null,
+  "price": 26000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/football/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 148,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Golf Ball",
+  "nameAr": "كرة غولف",
+  "descriptionAr": "كرة غولف عالية الأداء لمسافات أطول.",
+  "brand": null,
+  "price": 14000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/golf-ball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 149,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Iron Golf",
+  "nameAr": "مضرب غولف حديد",
+  "descriptionAr": "مضرب غولف حديد بقبضة مريحة.",
+  "brand": null,
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/iron-golf/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 150,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Metal Baseball Bat",
+  "nameAr": "مضرب بيسبول معدني",
+  "descriptionAr": "مضرب بيسبول من الألمنيوم خفيف وقوي.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/metal-baseball-bat/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 151,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Tennis Ball",
+  "nameAr": "كرة تنس",
+  "descriptionAr": "كرات تنس أرضي، علبة من 3 كرات.",
+  "brand": null,
+  "price": 10000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/tennis-ball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 152,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Tennis Racket",
+  "nameAr": "مضرب تنس",
+  "descriptionAr": "مضرب تنس أرضي خفيف مع حقيبة حمل.",
+  "brand": null,
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/tennis-racket/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 153,
+  "store": "shoes",
+  "category": "sports-gear",
+  "name": "Volleyball",
+  "nameAr": "كرة طائرة",
+  "descriptionAr": "كرة طائرة ناعمة الملمس للشاطئ والصالات.",
+  "brand": null,
+  "price": 17000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sports-accessories/volleyball/1.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 154,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Black Sun Glasses",
+  "nameAr": "نظارة شمسية سوداء",
+  "descriptionAr": "نظارة شمسية بعدسات سوداء تحمي من الأشعة فوق البنفسجية.",
+  "brand": "Fashion Shades",
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/1.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/2.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/black-sun-glasses/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 155,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Classic Sun Glasses",
+  "nameAr": "نظارة شمسية كلاسيك",
+  "descriptionAr": "نظارة شمسية بتصميم كلاسيكي يناسب الجميع.",
+  "brand": "Fashion Shades",
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/1.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/2.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/classic-sun-glasses/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 156,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Green and Black Glasses",
+  "nameAr": "نظارة خضراء وسوداء",
+  "descriptionAr": "نظارة عصرية بإطار أخضر وأسود.",
+  "brand": "Fashion Shades",
+  "price": 51000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/1.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/2.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/green-and-black-glasses/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 157,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Party Glasses",
+  "nameAr": "نظارة حفلات",
+  "descriptionAr": "نظارة ملونة مرحة للحفلات والمناسبات.",
+  "brand": "Fashion Fun",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/1.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/2.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/party-glasses/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 158,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Sunglasses",
+  "nameAr": "نظارة شمسية",
+  "descriptionAr": "نظارة شمسية خفيفة بعدسات مستقطبة.",
+  "brand": "Fashion Shades",
+  "price": 33000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/1.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/2.webp",
+   "https://cdn.dummyjson.com/product-images/sunglasses/sunglasses/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 159,
+  "store": "elite",
+  "category": "tablets",
+  "name": "iPad Mini 2021 Starlight",
+  "nameAr": "آيباد ميني 2021",
+  "descriptionAr": "آيباد ميني بشاشة 8.3 إنش ومعالج قوي، لون ستارلايت.",
+  "brand": "Apple",
+  "price": 725000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tablets/ipad-mini-2021-starlight/1.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/ipad-mini-2021-starlight/2.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/ipad-mini-2021-starlight/3.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/ipad-mini-2021-starlight/4.webp"
+  ],
+  "variants": {
+   "name": "Storage",
+   "nameAr": "السعة",
+   "values": [
+    [
+     "128GB",
+     "128 غيغا",
+     0
+    ],
+    [
+     "256GB",
+     "256 غيغا",
+     110000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 160,
+  "store": "elite",
+  "category": "tablets",
+  "name": "Samsung Galaxy Tab S8 Plus Grey",
+  "nameAr": "سامسونج غالاكسي تاب S8 بلس رمادي",
+  "descriptionAr": "تابلت بشاشة AMOLED كبيرة وقلم S Pen.",
+  "brand": "Samsung",
+  "price": 870000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-s8-plus-grey/1.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-s8-plus-grey/2.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-s8-plus-grey/3.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-s8-plus-grey/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 161,
+  "store": "elite",
+  "category": "tablets",
+  "name": "Samsung Galaxy Tab White",
+  "nameAr": "سامسونج غالاكسي تاب أبيض",
+  "descriptionAr": "تابلت عملي للدراسة والترفيه بشاشة كبيرة.",
+  "brand": "Samsung",
+  "price": 505000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/1.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/2.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/3.webp",
+   "https://cdn.dummyjson.com/product-images/tablets/samsung-galaxy-tab-white/4.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 162,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Blue Frock",
+  "nameAr": "فستان أزرق",
+  "descriptionAr": "فستان قطني أزرق مريح بقصة بسيطة.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tops/blue-frock/1.webp",
+   "https://cdn.dummyjson.com/product-images/tops/blue-frock/2.webp",
+   "https://cdn.dummyjson.com/product-images/tops/blue-frock/3.webp",
+   "https://cdn.dummyjson.com/product-images/tops/blue-frock/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 163,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Girl Summer Dress",
+  "nameAr": "فستان صيفي بناتي",
+  "descriptionAr": "فستان صيفي خفيف بألوان مبهجة.",
+  "brand": null,
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/1.webp",
+   "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/2.webp",
+   "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/3.webp",
+   "https://cdn.dummyjson.com/product-images/tops/girl-summer-dress/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 164,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Gray Dress",
+  "nameAr": "فستان رمادي",
+  "descriptionAr": "فستان رمادي أنيق بقصة مستقيمة.",
+  "brand": null,
+  "price": 51000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tops/gray-dress/1.webp",
+   "https://cdn.dummyjson.com/product-images/tops/gray-dress/2.webp",
+   "https://cdn.dummyjson.com/product-images/tops/gray-dress/3.webp",
+   "https://cdn.dummyjson.com/product-images/tops/gray-dress/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 165,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Short Frock",
+  "nameAr": "فستان قصير",
+  "descriptionAr": "فستان قصير عصري للخروجات.",
+  "brand": null,
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tops/short-frock/1.webp",
+   "https://cdn.dummyjson.com/product-images/tops/short-frock/2.webp",
+   "https://cdn.dummyjson.com/product-images/tops/short-frock/3.webp",
+   "https://cdn.dummyjson.com/product-images/tops/short-frock/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 166,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Tartan Dress",
+  "nameAr": "فستان تارتان",
+  "descriptionAr": "فستان بنقشة تارتان كلاسيكية.",
+  "brand": null,
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/tops/tartan-dress/1.webp",
+   "https://cdn.dummyjson.com/product-images/tops/tartan-dress/2.webp",
+   "https://cdn.dummyjson.com/product-images/tops/tartan-dress/3.webp",
+   "https://cdn.dummyjson.com/product-images/tops/tartan-dress/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 172,
+  "store": "watches",
+  "category": "bags",
+  "name": "Blue Women's Handbag",
+  "nameAr": "حقيبة يد نسائية زرقاء",
+  "descriptionAr": "حقيبة يد أنيقة بلون أزرق وحزام كتف.",
+  "brand": "Fashionista",
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/blue-women's-handbag/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 173,
+  "store": "watches",
+  "category": "bags",
+  "name": "Heshe Women's Leather Bag",
+  "nameAr": "حقيبة جلد نسائية هيشي",
+  "descriptionAr": "حقيبة من الجلد الطبيعي بتصميم عملي وأنيق.",
+  "brand": "Heshe",
+  "price": 190000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/heshe-women's-leather-bag/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 174,
+  "store": "watches",
+  "category": "bags",
+  "name": "Prada Women Bag",
+  "nameAr": "حقيبة برادا نسائية",
+  "descriptionAr": "حقيبة برادا فاخرة بتصميم إيطالي راقٍ.",
+  "brand": "Prada",
+  "price": 870000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/prada-women-bag/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 175,
+  "store": "watches",
+  "category": "bags",
+  "name": "White Faux Leather Backpack",
+  "nameAr": "حقيبة ظهر جلد صناعي بيضاء",
+  "descriptionAr": "حقيبة ظهر بيضاء عصرية للجامعة والخروجات.",
+  "brand": "Urban Chic",
+  "price": 58000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/white-faux-leather-backpack/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 176,
+  "store": "watches",
+  "category": "bags",
+  "name": "Women Handbag Black",
+  "nameAr": "حقيبة يد نسائية سوداء",
+  "descriptionAr": "حقيبة يد سوداء كلاسيكية تناسب كل الإطلالات.",
+  "brand": "Elegance Collection",
+  "price": 87000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-bags/women-handbag-black/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 177,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Black Women's Gown",
+  "nameAr": "فستان سهرة أسود",
+  "descriptionAr": "فستان سهرة طويل أسود للمناسبات.",
+  "brand": null,
+  "price": 190000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/black-women's-gown/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 178,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Corset Leather With Skirt",
+  "nameAr": "كورسيه جلد مع تنورة",
+  "descriptionAr": "طقم كورسيه جلد مع تنورة بتصميم جريء.",
+  "brand": null,
+  "price": 130000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-leather-with-skirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 179,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Corset With Black Skirt",
+  "nameAr": "كورسيه مع تنورة سوداء",
+  "descriptionAr": "طقم أنيق من كورسيه وتنورة سوداء.",
+  "brand": null,
+  "price": 115000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/corset-with-black-skirt/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 180,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Dress Pea",
+  "nameAr": "فستان بي",
+  "descriptionAr": "فستان ناعم بقصة أنثوية.",
+  "brand": null,
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/dress-pea/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 181,
+  "store": "fashion",
+  "category": "womens-clothing",
+  "name": "Marni Red & Black Suit",
+  "nameAr": "طقم مارني أحمر وأسود",
+  "descriptionAr": "طقم نسائي فاخر باللونين الأحمر والأسود.",
+  "brand": null,
+  "price": 260000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-dresses/marni-red-&-black-suit/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "المقاس",
+   "values": [
+    [
+     "S",
+     "S",
+     0
+    ],
+    [
+     "M",
+     "M",
+     0
+    ],
+    [
+     "L",
+     "L",
+     0
+    ],
+    [
+     "XL",
+     "XL",
+     1000
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 182,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Green Crystal Earring",
+  "nameAr": "حلق كريستال أخضر",
+  "descriptionAr": "حلق نسائي بأحجار كريستال خضراء لامعة.",
+  "brand": null,
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-crystal-earring/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 183,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Green Oval Earring",
+  "nameAr": "حلق بيضاوي أخضر",
+  "descriptionAr": "حلق بيضاوي أنيق بلون أخضر زمردي.",
+  "brand": null,
+  "price": 36000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/green-oval-earring/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 184,
+  "store": "watches",
+  "category": "accessories",
+  "name": "Tropical Earring",
+  "nameAr": "حلق استوائي",
+  "descriptionAr": "حلق ملون بتصميم استوائي مرح.",
+  "brand": null,
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-jewellery/tropical-earring/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 185,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Black & Brown Slipper",
+  "nameAr": "نعال أسود وبني",
+  "descriptionAr": "نعال نسائي مريح للمنزل والاستخدام اليومي.",
+  "brand": "Comfort Trends",
+  "price": 29000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/black-&-brown-slipper/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "36",
+     "36",
+     0
+    ],
+    [
+     "37",
+     "37",
+     0
+    ],
+    [
+     "38",
+     "38",
+     0
+    ],
+    [
+     "39",
+     "39",
+     0
+    ],
+    [
+     "40",
+     "40",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 186,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Calvin Klein Heel Shoes",
+  "nameAr": "حذاء كعب كالفن كلاين",
+  "descriptionAr": "حذاء نسائي بكعب عالٍ أنيق من كالفن كلاين.",
+  "brand": "Calvin Klein",
+  "price": 115000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/calvin-klein-heel-shoes/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "36",
+     "36",
+     0
+    ],
+    [
+     "37",
+     "37",
+     0
+    ],
+    [
+     "38",
+     "38",
+     0
+    ],
+    [
+     "39",
+     "39",
+     0
+    ],
+    [
+     "40",
+     "40",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 187,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Golden Shoes Woman",
+  "nameAr": "حذاء نسائي ذهبي",
+  "descriptionAr": "حذاء نسائي ذهبي لامع للسهرات.",
+  "brand": "Fashion Diva",
+  "price": 72000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/golden-shoes-woman/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "36",
+     "36",
+     0
+    ],
+    [
+     "37",
+     "37",
+     0
+    ],
+    [
+     "38",
+     "38",
+     0
+    ],
+    [
+     "39",
+     "39",
+     0
+    ],
+    [
+     "40",
+     "40",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 188,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Pampi Shoes",
+  "nameAr": "حذاء بامبي",
+  "descriptionAr": "حذاء نسائي مريح بتصميم عصري.",
+  "brand": "Pampi",
+  "price": 43000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/pampi-shoes/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "36",
+     "36",
+     0
+    ],
+    [
+     "37",
+     "37",
+     0
+    ],
+    [
+     "38",
+     "38",
+     0
+    ],
+    [
+     "39",
+     "39",
+     0
+    ],
+    [
+     "40",
+     "40",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 189,
+  "store": "shoes",
+  "category": "shoes",
+  "name": "Red Shoes",
+  "nameAr": "حذاء أحمر",
+  "descriptionAr": "حذاء نسائي أحمر جذاب.",
+  "brand": "Fashion Express",
+  "price": 51000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/3.webp",
+   "https://cdn.dummyjson.com/product-images/womens-shoes/red-shoes/4.webp"
+  ],
+  "variants": {
+   "name": "Size",
+   "nameAr": "القياس",
+   "values": [
+    [
+     "36",
+     "36",
+     0
+    ],
+    [
+     "37",
+     "37",
+     0
+    ],
+    [
+     "38",
+     "38",
+     0
+    ],
+    [
+     "39",
+     "39",
+     0
+    ],
+    [
+     "40",
+     "40",
+     0
+    ]
+   ]
+  }
+ },
+ {
+  "sourceId": 190,
+  "store": "watches",
+  "category": "watches",
+  "name": "IWC Ingenieur Automatic Steel",
+  "nameAr": "ساعة آي دبليو سي إنجينيور أوتوماتيك",
+  "descriptionAr": "ساعة سويسرية أوتوماتيكية من الستيل بتصميم رياضي فاخر.",
+  "brand": "IWC",
+  "price": 7250000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/iwc-ingenieur-automatic-steel/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 191,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Cellini Moonphase",
+  "nameAr": "ساعة رولكس سيليني مون فيز نسائية",
+  "descriptionAr": "ساعة رولكس فاخرة بعرض أطوار القمر.",
+  "brand": "Rolex",
+  "price": 23200000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-cellini-moonphase/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 192,
+  "store": "watches",
+  "category": "watches",
+  "name": "Rolex Datejust Women",
+  "nameAr": "ساعة رولكس ديت جست نسائية",
+  "descriptionAr": "ساعة رولكس ديت جست النسائية الكلاسيكية.",
+  "brand": "Rolex",
+  "price": 15950000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/rolex-datejust-women/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 193,
+  "store": "watches",
+  "category": "watches",
+  "name": "Watch Gold for Women",
+  "nameAr": "ساعة نسائية ذهبية",
+  "descriptionAr": "ساعة نسائية بلون ذهبي ومينا أنيقة.",
+  "brand": "Fashion Gold",
+  "price": 1160000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/watch-gold-for-women/3.webp"
+  ],
+  "variants": null
+ },
+ {
+  "sourceId": 194,
+  "store": "watches",
+  "category": "watches",
+  "name": "Women's Wrist Watch",
+  "nameAr": "ساعة يد نسائية",
+  "descriptionAr": "ساعة يد نسائية خفيفة بتصميم بسيط.",
+  "brand": "Fashion Co.",
+  "price": 190000,
+  "images": [
+   "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/1.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/2.webp",
+   "https://cdn.dummyjson.com/product-images/womens-watches/women's-wrist-watch/3.webp"
+  ],
+  "variants": null
+ }
+]

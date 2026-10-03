@@ -59,7 +59,9 @@ namespace ecommerce.Services
 
             if (promotion != null)
             {
-                (finalPrice, discountAmount) = CalculateDiscount(originalPrice, promotion);
+                // الخصم على سعر البيع (كما في السلة)، والتوفير يُحسب مقابل السعر المشطوب
+                (finalPrice, _) = PromotionPricing.CalculateDiscount(product.Price, promotion);
+                discountAmount = originalPrice - finalPrice;
                 discountPercentage = originalPrice > 0
                     ? Math.Round(discountAmount / originalPrice * 100, 1)
                     : 0;
@@ -91,7 +93,7 @@ namespace ecommerce.Services
             if (promotion == null)
                 return originalPrice;
 
-            var (finalPrice, _) = CalculateDiscount(originalPrice, promotion);
+            var (finalPrice, _) = PromotionPricing.CalculateDiscount(originalPrice, promotion);
             return finalPrice;
         }
 
@@ -223,29 +225,6 @@ namespace ecommerce.Services
         // ===================================
         // Private Helpers
         // ===================================
-        private static (decimal finalPrice, decimal discountAmount) CalculateDiscount(
-            decimal originalPrice, Promotion promotion)
-        {
-            decimal discountAmount;
-
-            if (promotion.DiscountType == DiscountType.PERCENTAGE)
-            {
-                discountAmount = originalPrice * (promotion.DiscountValue / 100);
-
-                if (promotion.MaxDiscountAmount.HasValue)
-                    discountAmount = Math.Min(discountAmount, promotion.MaxDiscountAmount.Value);
-            }
-            else // FIXED
-            {
-                discountAmount = Math.Min(promotion.DiscountValue, originalPrice);
-            }
-
-            discountAmount = Math.Round(discountAmount, 2);
-            var finalPrice = Math.Round(originalPrice - discountAmount, 2);
-
-            return (finalPrice, discountAmount);
-        }
-
         private async Task<PromotionDto> MapToDtoAsync(Promotion p)
         {
             string? targetName = null;

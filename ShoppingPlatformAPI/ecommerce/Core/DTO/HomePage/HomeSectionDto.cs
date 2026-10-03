@@ -12,6 +12,7 @@
         public int DisplayOrder { get; set; }
         public Guid? FilterCategoryId { get; set; }
         public Guid? FilterVendorId { get; set; }
+        public string? BannerImageUrl { get; set; }
         public bool IsActive { get; set; }
         public object? Data { get; set; } // المنتجات / البائعين / التصنيفات المحملة
     }

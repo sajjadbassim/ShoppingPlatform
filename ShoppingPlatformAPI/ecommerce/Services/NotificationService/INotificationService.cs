@@ -1,4 +1,4 @@
-using ecommerce.Core.Constants;
+﻿using ecommerce.Core.Constants;
 
 namespace ecommerce.Services.NotificationService
 {
@@ -12,6 +12,8 @@ namespace ecommerce.Services.NotificationService
         Task NotifyNewSubOrderAsync(Guid subOrderId, string subOrderNumber, Guid vendorId);
         Task NotifySubOrderConfirmedAsync(Guid subOrderId, string subOrderNumber, Guid vendorId);
         Task NotifySubOrderCancelledAsync(Guid subOrderId, string subOrderNumber, string reason, Guid vendorId);
+        // تغيّر حالة طلب فرعي (تحضير/جاهز...) — تحديث شاشات العمليات، وإشعار هواتفهم عند «جاهز للاستلام»
+        Task NotifySubOrderStatusChangedAsync(Guid subOrderId, string subOrderNumber, Guid orderId, string newStatus, bool pushToOps = true);
         Task NotifyOrderStatusChangedAsync(Guid orderId, string oldStatus, string newStatus, string? orderNumber = null);
 
         // تحديث لحظي لشاشات العمليات: تغيّرت حالة سائق أو طلباته (استلام/تسليم)

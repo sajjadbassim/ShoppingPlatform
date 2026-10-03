@@ -72,8 +72,20 @@ namespace ecommerce.Tests.Services
                 Scopes = "user.info.basic,video.list"
             };
             configure?.Invoke(c);
-            _repository.Setup(r => r.GetConnectionAsync(_vendorId, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(c);
+            SetupConnection(c);
             return c;
+        }
+
+        // الاستعلامات بلا تتبّع (قبل القفل) تُحاكى من حالة الحساب نفسه، كما يفعل المستودع
+        private void SetupConnection(TikTokConnection c)
+        {
+            _repository.Setup(r => r.GetConnectionAsync(c.VendorId, It.IsAny<bool>(), It.IsAny<CancellationToken>())).ReturnsAsync(c);
+            _repository.Setup(r => r.ConnectionExistsAsync(c.VendorId, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            _repository.Setup(r => r.GetVendorsDueForSyncAsync(It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<bool>(), c.VendorId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((DateTime before, int _, bool onlyVisible, Guid? _, CancellationToken _) =>
+                    !c.NeedsReconnect && (c.LastSyncedAt == null || c.LastSyncedAt < before) && (!onlyVisible || c.ShowOnStore)
+                        ? new List<Guid> { c.VendorId }
+                        : new List<Guid>());
         }
 
         // ===================================
@@ -354,10 +366,13 @@ namespace ecommerce.Tests.Services
             };
             var failing = Due("bad");
             var healthy = Due("good");
-            _repository.Setup(r => r.GetConnectionsDueForSyncAsync(Now.AddSeconds(-5), It.IsAny<int>(), It.IsAny<CancellationToken>(), true))
-                .ReturnsAsync(new List<TikTokConnection> { failing, healthy });
+            SetupConnection(failing);
+            SetupConnection(healthy);
+            _repository.Setup(r => r.GetVendorsDueForSyncAsync(Now.AddSeconds(-60), It.IsAny<int>(), true, null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Guid> { failing.VendorId, healthy.VendorId });
+            // فشل حفظ متجر (خطأ قاعدة بيانات وليس من تيك توك) لا يوقف البقية
             _api.Setup(a => a.ListVideosAsync("bad", It.IsAny<long?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                .ThrowsAsync(new HttpRequestException("timeout"));
+                .ThrowsAsync(new InvalidOperationException("db"));
             _repository.Setup(r => r.GetPublicReelsAsync(0, 11, It.IsAny<CancellationToken>())).ReturnsAsync(new List<TikTokVideo>());
 
             var page = await CreateService().RefreshReelsAsync(pageSize: 10);
@@ -376,7 +391,69 @@ namespace ecommerce.Tests.Services
 
             await CreateService().RefreshReelsAsync(pageSize: 10);
 
-            _repository.Verify(r => r.GetConnectionsDueForSyncAsync(It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+            _repository.Verify(r => r.GetVendorsDueForSyncAsync(It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        // ===================================
+        // التزامن والأقفال
+        // ===================================
+        [Fact]
+        public async Task RefreshStoreFeed_UnknownStore_DoesNotLoadOrLockAnything()
+        {
+            var unknown = Guid.NewGuid();
+            _repository.Setup(r => r.GetVendorsDueForSyncAsync(It.IsAny<DateTime>(), It.IsAny<int>(), It.IsAny<bool>(), unknown, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Guid>());
+
+            await CreateService().RefreshStoreFeedAsync(unknown);
+
+            _repository.Verify(r => r.GetConnectionAsync(It.IsAny<Guid>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task BackgroundSync_StoreSyncedWhileWaiting_IsNotSyncedAgain()
+        {
+            // القائمة قالت "حان وقته"، لكن عند تحميله بعد القفل وُجد أن طلباً آخر زامنه للتو
+            var c = Connection(x => x.LastSyncedAt = Now);
+            _repository.Setup(r => r.GetVendorsDueForSyncAsync(It.IsAny<DateTime>(), It.IsAny<int>(), false, null, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<Guid> { c.VendorId });
+
+            var synced = await CreateService().SyncDueConnectionsAsync();
+
+            Assert.Equal(0, synced);
+            _api.Verify(a => a.ListVideosAsync(It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task ConcurrentSyncs_OfSameStore_RunOneAfterAnother()
+        {
+            Connection();
+            var firstInside = new TaskCompletionSource();
+            var release = new TaskCompletionSource();
+            var calls = 0;
+            _api.Setup(a => a.ListVideosAsync(It.IsAny<string>(), It.IsAny<long?>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .Returns(async () =>
+                {
+                    if (Interlocked.Increment(ref calls) == 1) { firstInside.SetResult(); await release.Task; }
+                    return new TikTokVideoListData { Videos = new(), HasMore = false };
+                });
+
+            var first = CreateService().SyncAsync(_userId);
+            await firstInside.Task;
+            var second = CreateService().SyncAsync(_userId);
+            await Task.Delay(100);
+
+            // الثاني ينتظر القفل: لم يحمّل الحساب بعد
+            _repository.Verify(r => r.GetConnectionAsync(_vendorId, true, It.IsAny<CancellationToken>()), Times.Once);
+
+            release.SetResult();
+            await Task.WhenAll(first, second);
+            _repository.Verify(r => r.GetConnectionAsync(_vendorId, true, It.IsAny<CancellationToken>()), Times.Exactly(2));
+        }
+
+        [Fact]
+        public async Task Disconnect_WithoutConnection_IsNotFound()
+        {
+            await Assert.ThrowsAsync<NotFoundException>(() => CreateService().DisconnectAsync(_userId));
         }
 
         // ===================================

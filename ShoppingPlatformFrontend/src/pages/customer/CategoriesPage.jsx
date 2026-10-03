@@ -33,7 +33,7 @@ const CategoryProductCard = ({ p }) => {
   const rating = p.averageRating || p.rating || 0
   return (
     <Link to={`/products/${p.id}`} className="block text-gray-900">
-      <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+      <div className="relative aspect-square product-media rounded-xl overflow-hidden border border-gray-100">
         {img && <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />}
         {hasDiscount && (
           <span className="absolute top-1.5 right-1.5 bg-error text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">

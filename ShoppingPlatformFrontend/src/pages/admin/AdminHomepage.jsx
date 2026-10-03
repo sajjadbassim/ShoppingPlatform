@@ -19,7 +19,7 @@ import { useVendors } from '../../hooks/useVendors'
 import {
   useBannersAdmin, useCreateBanner, useUpdateBanner, useDeleteBanner,
   useSectionsAdmin, useCreateSection, useUpdateSection, useDeleteSection,
-  useAddSectionItem, useRemoveSectionItem,
+  useAddSectionItem, useRemoveSectionItem, useSetSectionBanner, useRemoveSectionBanner,
 } from '../../hooks/useHome'
 
 // ===========================
@@ -89,11 +89,19 @@ const LINK_TYPE_LABELS = {
   product: 'منتج',
 }
 
-const BannerModal = ({ banner, onClose }) => {
+// مكان ظهور البانر: السلايدر العلوي أو أحد أقسام "بلوك بانرات"
+const IMAGE_HINTS = {
+  hero: <>المقاس المثالي: <span dir="ltr">1200×500</span> بكسل — صورة عريضة للسلايدر أعلى الصفحة الرئيسية</>,
+  block: <>عريض <span dir="ltr">1200×560</span> للبانر الأول (أو الوحيد) في البلوك، ومربع <span dir="ltr">800×800</span> للبانرات المتجاورة — اكتب النص على الصورة نفسها</>,
+}
+
+const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
   const { success, error: showError } = useToast()
   const isEdit = !!banner?.id
   const { data: categories = [] } = useCategories(true)
   const { data: vendors = [] } = useVendors(true)
+  const { data: sectionsData } = useSectionsAdmin()
+  const blockSections = (Array.isArray(sectionsData) ? sectionsData : []).filter(s => s.type === 'banners')
 
   const [form, setForm] = useState({
     Title: banner?.title || '',
@@ -105,6 +113,7 @@ const BannerModal = ({ banner, onClose }) => {
     LinkEntityId: banner?.linkEntityId || '',
     DisplayOrder: banner?.displayOrder ?? 0,
     IsActive: banner?.isActive ?? true,
+    SectionId: banner?.sectionId || defaultSectionId || '',
   })
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(banner?.imageUrl ? getImageUrl(banner.imageUrl) : null)
@@ -137,6 +146,8 @@ const BannerModal = ({ banner, onClose }) => {
       fd.append('LinkType', 'none')
     }
     if (isEdit) fd.append('IsActive', String(form.IsActive))
+    if (form.SectionId) fd.append('SectionId', form.SectionId)
+    else if (isEdit && banner?.sectionId) fd.append('MoveToHero', 'true')
     if (imageFile) fd.append('ImageFile', imageFile)
     return fd
   }
@@ -176,6 +187,18 @@ const BannerModal = ({ banner, onClose }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* مكان الظهور */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 block mb-1">مكان الظهور</label>
+            <select value={form.SectionId} onChange={e => setForm({...form, SectionId: e.target.value})} className={inputCls}>
+              <option value="">السلايدر العلوي</option>
+              {blockSections.map(s => <option key={s.id} value={s.id}>بلوك: {s.titleAr || s.title}</option>)}
+            </select>
+            {blockSections.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1.5">لإظهار بانرات بين الأقسام أنشئ قسماً من نوع «بلوك بانرات» في تبويب الأقسام</p>
+            )}
+          </div>
+
           {/* Image */}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-2">
@@ -191,7 +214,7 @@ const BannerModal = ({ banner, onClose }) => {
               <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
             </label>
             <p className="text-xs text-gray-400 mt-2 flex items-start gap-1.5 leading-relaxed">
-              <Info size={12} className="flex-shrink-0 mt-0.5" /><span>المقاس المثالي: <span dir="ltr">1200×500</span> بكسل (نسبة عرض إلى ارتفاع <span dir="ltr">12:5</span>) — صورة عريضة تُعرض في أعلى الصفحة الرئيسية</span>
+              <Info size={12} className="flex-shrink-0 mt-0.5" /><span>{form.SectionId ? IMAGE_HINTS.block : IMAGE_HINTS.hero}</span>
             </p>
           </div>
 
@@ -306,6 +329,11 @@ const BannerModal = ({ banner, onClose }) => {
 const BannersTab = () => {
   const { success, error: showError } = useToast()
   const { data, isLoading, refetch } = useBannersAdmin()
+  const { data: sectionsData } = useSectionsAdmin()
+  const sectionName = (id) => {
+    const sec = (Array.isArray(sectionsData) ? sectionsData : []).find(x => x.id === id)
+    return sec ? `بلوك: ${sec.titleAr || sec.title}` : 'بلوك بانرات'
+  }
   const updateMutation = useUpdateBanner()
   const deleteMutation = useDeleteBanner()
 
@@ -339,7 +367,7 @@ const BannersTab = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-gray-500 text-sm">{banners.length} بانر — يظهر في السلايدر العلوي بالصفحة الرئيسية</p>
+        <p className="text-gray-500 text-sm">{banners.length} بانر — في السلايدر العلوي أو داخل أقسام «بلوك بانرات»</p>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
@@ -368,6 +396,7 @@ const BannersTab = () => {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">البانر</th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">مكان الظهور</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">الوجهة</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">الترتيب</th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">الحالة</th>
@@ -384,6 +413,11 @@ const BannersTab = () => {
                       </div>
                       <p className="font-medium text-gray-900 text-sm">{b.titleAr || b.title}</p>
                     </div>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`text-xs px-2.5 py-1 rounded-full ${b.sectionId ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                      {b.sectionId ? sectionName(b.sectionId) : 'السلايدر العلوي'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-gray-500">{LINK_TYPE_LABELS[b.linkType || ''] || b.linkType}</td>
                   <td className="px-4 py-3 text-center text-sm text-gray-500">{b.displayOrder}</td>
@@ -441,7 +475,11 @@ const SECTION_TYPES = {
   top_vendors: { label: 'متاجر مميزة (تلقائي)', icon: Store },
   top_categories: { label: 'تصنيفات مميزة (تلقائي)', icon: LayoutGrid },
   custom_products: { label: 'منتجات مختارة يدوياً', icon: Package },
+  banners: { label: 'بلوك بانرات (صور إعلانية)', icon: ImageIcon },
 }
+
+// أقسام المنتجات يمكن أن يكون لها بانر رأس
+const PRODUCT_SECTION_TYPES = ['featured_products', 'custom_products']
 
 const SectionModal = ({ section, onClose }) => {
   const { success, error: showError } = useToast()
@@ -470,7 +508,25 @@ const SectionModal = ({ section, onClose }) => {
   const updateMutation = useUpdateSection()
   const addItemMutation = useAddSectionItem()
   const removeItemMutation = useRemoveSectionItem()
-  const isPending = createMutation.isPending || updateMutation.isPending
+  const setBannerMutation = useSetSectionBanner()
+  const removeBannerMutation = useRemoveSectionBanner()
+  const isPending = createMutation.isPending || updateMutation.isPending || setBannerMutation.isPending
+
+  // نسخة حيّة من القسم (لتحديث قائمة بانرات البلوك وصورة الرأس بعد الحفظ)
+  const { data: liveSections } = useSectionsAdmin()
+  const live = (Array.isArray(liveSections) ? liveSections : []).find(x => x.id === section?.id) || section
+
+  // بانر رأس قسم المنتجات
+  const [headerFile, setHeaderFile] = useState(null)
+  const [headerPreview, setHeaderPreview] = useState(section?.bannerImageUrl ? getImageUrl(section.bannerImageUrl) : null)
+  const [removeHeader, setRemoveHeader] = useState(false)
+  const [bannerModal, setBannerModal] = useState(undefined)   // بانرات البلوك: undefined مغلق، null إضافة، كائن تعديل
+
+  const saveHeaderBanner = async (sectionId) => {
+    if (!PRODUCT_SECTION_TYPES.includes(form.Type)) return
+    if (headerFile) await setBannerMutation.mutateAsync({ id: sectionId, file: headerFile })
+    else if (removeHeader && section?.bannerImageUrl) await removeBannerMutation.mutateAsync(sectionId)
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -491,9 +547,10 @@ const SectionModal = ({ section, onClose }) => {
             filterVendorId: form.FilterVendorId || null,
           },
         })
+        await saveHeaderBanner(section.id)
         success('تم تحديث القسم بنجاح')
       } else {
-        await createMutation.mutateAsync({
+        const created = await createMutation.mutateAsync({
           type: form.Type,
           title: form.Title,
           titleAr: form.TitleAr || null,
@@ -505,7 +562,8 @@ const SectionModal = ({ section, onClose }) => {
           displayOrder: Number(form.DisplayOrder) || 0,
           productIds: form.Type === 'custom_products' ? pickedProducts.map(p => p.id) : null,
         })
-        success('تم إنشاء القسم بنجاح')
+        if (created?.id) await saveHeaderBanner(created.id)
+        success(form.Type === 'banners' ? 'تم إنشاء القسم — أضف بانراته من «تعديل» أو من تبويب البانرات' : 'تم إنشاء القسم بنجاح')
       }
       onClose()
     } catch (err) {
@@ -564,7 +622,9 @@ const SectionModal = ({ section, onClose }) => {
               <Info size={12} />
               {form.Type === 'custom_products'
                 ? 'تختار المنتجات يدوياً بنفسك أدناه'
-                : 'يُملأ تلقائياً بأحدث/أفضل البيانات المطابقة من قاعدة البيانات — لا حاجة لاختيار عناصر يدوياً'}
+                : form.Type === 'banners'
+                  ? 'صور إعلانية بين الأقسام: بانر واحد يظهر عريضاً، اثنان متجاوران، ثلاثة = عريض واثنان تحته'
+                  : 'يُملأ تلقائياً بأحدث/أفضل البيانات المطابقة من قاعدة البيانات — لا حاجة لاختيار عناصر يدوياً'}
             </p>
           </div>
 
@@ -595,11 +655,11 @@ const SectionModal = ({ section, onClose }) => {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
+            {form.Type !== 'banners' && <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">أقصى عدد عناصر</label>
               <input type="number" min="1" max="50" value={form.MaxItems}
                 onChange={e => setForm({...form, MaxItems: e.target.value})} className={inputCls} />
-            </div>
+            </div>}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1">ترتيب العرض</label>
               <input type="number" min="0" value={form.DisplayOrder}
@@ -645,6 +705,64 @@ const SectionModal = ({ section, onClose }) => {
             </div>
           )}
 
+          {/* بانر رأس قسم المنتجات */}
+          {PRODUCT_SECTION_TYPES.includes(form.Type) && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">بانر رأس القسم (اختياري)</label>
+              <div className="w-full h-28 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 mb-2">
+                {headerPreview
+                  ? <img src={headerPreview} alt="" className="w-full h-full object-cover" />
+                  : <ImageIcon size={26} className="text-gray-300" />}
+              </div>
+              <div className="flex gap-2">
+                <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                  <Upload size={14} />{headerPreview ? 'تغيير الصورة' : 'رفع صورة'}
+                  <input type="file" accept="image/*" className="hidden" onChange={e => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    setHeaderFile(file); setHeaderPreview(URL.createObjectURL(file)); setRemoveHeader(false)
+                  }} />
+                </label>
+                {headerPreview && (
+                  <button type="button" onClick={() => { setHeaderFile(null); setHeaderPreview(null); setRemoveHeader(true) }}
+                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-red-500 hover:bg-red-50">إزالة</button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-2 flex items-start gap-1.5 leading-relaxed">
+                <Info size={12} className="flex-shrink-0 mt-0.5" />
+                <span>يظهر أعلى القسم ويُكتب فوقه العنوان وزر «عرض المزيد». المقاس المثالي <span dir="ltr">1200×520</span> — اجعل صورة المنتج على اليسار واترك اليمين للعنوان</span>
+              </p>
+            </div>
+          )}
+
+          {/* بانرات البلوك */}
+          {form.Type === 'banners' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-2">
+                بانرات القسم ({Array.isArray(live?.data) ? live.data.length : 0})
+              </label>
+              {isEdit ? (
+                <>
+                  {Array.isArray(live?.data) && live.data.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      {live.data.map(b => (
+                        <button key={b.id} type="button" onClick={() => setBannerModal(b)}
+                          className="aspect-square rounded-lg overflow-hidden bg-gray-100 border border-gray-200 hover:ring-2 hover:ring-primary">
+                          <img src={getImageUrl(b.imageUrl)} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setBannerModal(null)}>
+                    <Plus size={14} className="ml-1" />إضافة بانر لهذا القسم
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs text-gray-400">احفظ القسم أولاً، ثم افتحه بـ«تعديل» لإضافة البانرات</p>
+              )}
+            </div>
+          )}
+
           {isEdit && (
             <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <input type="checkbox" checked={form.IsActive}
@@ -665,6 +783,10 @@ const SectionModal = ({ section, onClose }) => {
           </div>
         </form>
       </div>
+
+      {bannerModal !== undefined && (
+        <BannerModal banner={bannerModal} defaultSectionId={section?.id} onClose={() => setBannerModal(undefined)} />
+      )}
     </div>
   )
 }
@@ -819,7 +941,7 @@ const AdminHomepage = () => {
       <Tabs value={tab} onValueChange={setTab}>
         <div className="border-b border-gray-200">
           <TabsList>
-            <TabsTrigger value="banners">البانرات (السلايدر العلوي)</TabsTrigger>
+            <TabsTrigger value="banners">البانرات</TabsTrigger>
             <TabsTrigger value="sections">أقسام المحتوى</TabsTrigger>
           </TabsList>
         </div>

@@ -57,11 +57,27 @@ namespace ecommerce.Services
             if (product == null)
                 throw new Exception("المنتج غير موجود");
 
+            if (product.IsDeleted)
+                throw new Exception("هذا المنتج لم يعد متوفراً");
+
             if (!product.IsActive)
                 throw new Exception("المنتج غير مفعل");
 
-            if (!product.IsAvailable)
+            // المنتج ذو المتغيرات يُحكم عليه بتوفر المتغير المختار (يُتحقق منه أدناه)
+            if (!dto.VariantId.HasValue && !product.IsAvailable)
                 throw new Exception("المنتج غير متوفر حالياً");
+
+            if (!await _context.Vendors.AnyAsync(v => v.Id == product.VendorId && v.IsActive))
+                throw new Exception("المتجر غير متاح حالياً");
+
+            // فئة المنتج (أو أحد أسلافها) معطّلة
+            if (!await _productRepository.IsPubliclyVisibleAsync(product.Id))
+                throw new Exception("المنتج غير متاح حالياً");
+
+            // المنتج ذو المتغيرات لا يُضاف بدون اختيار متغير (المخزون والسعر على مستوى المتغير)
+            if (!dto.VariantId.HasValue &&
+                await _context.ProductVariants.AnyAsync(v => v.ProductId == product.Id))
+                throw new Exception("يرجى اختيار خيارات المنتج قبل إضافته للسلة");
 
             // ─── التحقق من الـ Variant إذا أُرسل ───────────────────────────
             ProductVariant? variant = null;
@@ -231,6 +247,16 @@ namespace ecommerce.Services
             var warnings = new List<string>();
             var items = new List<CartItemDto>();
 
+            // المنتجات التي لها متغيرات — عنصر منها بلا متغير لا يمكن طلبه
+            var productIds = cart.Items.Select(i => i.ProductId).Distinct().ToList();
+            var productsWithVariants = (await _context.ProductVariants
+                    .Where(v => productIds.Contains(v.ProductId))
+                    .Select(v => v.ProductId)
+                    .Distinct()
+                    .ToListAsync())
+                .ToHashSet();
+            var hiddenCategoryIds = await CategoryVisibility.GetHiddenCategoryIdsAsync(_context);
+
             foreach (var item in cart.Items)
             {
                 // ─── السعر النهائي (بعد تطبيق أفضل عرض فعّال على المنتج) ─────
@@ -252,12 +278,17 @@ namespace ecommerce.Services
 
                 // ─── المخزون والتوفر ─────────────────────────────────────────
                 var stockQty = item.Variant?.StockQuantity ?? item.Product.StockQuantity;
-                var isAvailable = item.Variant != null
-                    ? item.Variant.IsAvailable
-                    : item.Product.IsAvailable && item.Product.IsActive;
+                var needsVariant = item.Variant == null && productsWithVariants.Contains(item.ProductId);
+                var vendorActive = item.Product.Vendor?.IsActive ?? false;
+                var categoryHidden = item.Product.CategoryId.HasValue && hiddenCategoryIds.Contains(item.Product.CategoryId.Value);
+                var isAvailable = vendorActive && !categoryHidden && !needsVariant && (item.Variant != null
+                    ? item.Variant.IsAvailable && item.Product.IsActive
+                    : item.Product.IsAvailable && item.Product.IsActive);
 
                 // ─── تحذيرات ────────────────────────────────────────────────
-                if (!item.Product.IsActive || !isAvailable)
+                if (needsVariant)
+                    warnings.Add($"المنتج '{item.Product.NameAr ?? item.Product.Name}' يحتاج اختيار الخيارات — احذفه وأضفه من صفحة المنتج");
+                else if (!isAvailable)
                     warnings.Add($"المنتج '{item.Product.NameAr ?? item.Product.Name}' غير متوفر حالياً");
 
                 if (item.Quantity > stockQty)

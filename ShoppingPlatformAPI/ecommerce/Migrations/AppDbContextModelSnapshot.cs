@@ -176,6 +176,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("link_url");
 
+                    b.Property<Guid?>("SectionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("section_id");
+
                     b.Property<DateTime?>("StartsAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("starts_at");
@@ -208,6 +212,8 @@ namespace ecommerce.Migrations
                         .HasDefaultValueSql("GETDATE()");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SectionId");
 
                     b.ToTable("banners", (string)null);
                 });
@@ -714,6 +720,11 @@ namespace ecommerce.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("id");
 
+                    b.Property<string>("BannerImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("banner_image_url");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -806,6 +817,245 @@ namespace ecommerce.Migrations
                     b.HasIndex("SectionId");
 
                     b.ToTable("home_section_items", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AccessTokenExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("access_token_expires_at");
+
+                    b.Property<DateTime>("AccessTokenIssuedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("access_token_issued_at");
+
+                    b.Property<string>("AccessTokenProtected")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("access_token_protected");
+
+                    b.Property<string>("AccountId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("AccountType")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("account_type");
+
+                    b.Property<bool>("AutoShowNewMedia")
+                        .HasColumnType("bit")
+                        .HasColumnName("auto_show_new_media");
+
+                    b.Property<DateTime>("ConnectedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("connected_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("FollowersCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("followers_count");
+
+                    b.Property<string>("InstagramUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("instagram_user_id");
+
+                    b.Property<DateTime?>("LastFullSyncedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_full_synced_at");
+
+                    b.Property<string>("LastSyncError")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("last_sync_error");
+
+                    b.Property<DateTime?>("LastSyncedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<long?>("MediaCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("media_count");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("NeedsReconnect")
+                        .HasColumnType("bit")
+                        .HasColumnName("needs_reconnect");
+
+                    b.Property<string>("ProfilePictureUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("profile_picture_url");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("scopes");
+
+                    b.Property<bool>("ShowOnStore")
+                        .HasColumnType("bit")
+                        .HasColumnName("show_on_store");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("username");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstagramUserId");
+
+                    b.HasIndex("VendorId")
+                        .IsUnique();
+
+                    b.ToTable("instagram_connections", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramMedia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Caption")
+                        .HasMaxLength(2200)
+                        .HasColumnType("nvarchar(2200)")
+                        .HasColumnName("caption");
+
+                    b.Property<string>("ChildrenJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("children_json");
+
+                    b.Property<long?>("CommentsCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("comments_count");
+
+                    b.Property<Guid>("ConnectionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("connection_id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("external_id");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_hidden");
+
+                    b.Property<bool>("IsRemoved")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_removed");
+
+                    b.Property<long?>("LikeCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("like_count");
+
+                    b.Property<string>("MediaProductType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("media_product_type");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("media_type");
+
+                    b.Property<string>("MediaUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("media_url");
+
+                    b.Property<string>("Permalink")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("permalink");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("product_id");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("thumbnail_url");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("ConnectionId", "ExternalId")
+                        .IsUnique();
+
+                    b.ToTable("instagram_media", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramOAuthState", b =>
+                {
+                    b.Property<string>("State")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("NonceHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("nonce_hash");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("State");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("instagram_oauth_states", (string)null);
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.LoyaltyAccount", b =>
@@ -1425,6 +1675,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
 
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("deleted_at");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)")
@@ -1441,6 +1695,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true)
                         .HasColumnName("is_available");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_deleted");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -3103,6 +3361,14 @@ namespace ecommerce.Migrations
                     b.Navigation("Zone");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.Banner", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.HomeSection", null)
+                        .WithMany()
+                        .HasForeignKey("SectionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.Cart", b =>
                 {
                     b.HasOne("ecommerce.Core.Models.User", "User")
@@ -3212,6 +3478,35 @@ namespace ecommerce.Migrations
                         .IsRequired();
 
                     b.Navigation("Section");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramConnection", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramMedia", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.InstagramConnection", "Connection")
+                        .WithMany("Media")
+                        .HasForeignKey("ConnectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("Connection");
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.LoyaltyAccount", b =>
@@ -3778,6 +4073,11 @@ namespace ecommerce.Migrations
             modelBuilder.Entity("ecommerce.Core.Models.HomeSection", b =>
                 {
                     b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.InstagramConnection", b =>
+                {
+                    b.Navigation("Media");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.LoyaltyAccount", b =>

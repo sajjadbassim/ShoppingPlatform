@@ -7,6 +7,7 @@ namespace ecommerce.Core.DTO.Ops
         public int Confirmed { get; set; }
         public int PartiallyConfirmed { get; set; }
         public int Preparing { get; set; }
+        public int Ready { get; set; }          // جاهز للاستلام — يحتاج سائقاً
         public int OutForDelivery { get; set; }
         public int Delivered { get; set; }
         public int Cancelled { get; set; }

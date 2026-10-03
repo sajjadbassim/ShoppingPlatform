@@ -45,7 +45,7 @@ namespace ecommerce.Services.ProductService.ProductService
         public async Task<ProductDto> GetByIdAsync(Guid id)
         {
             var product = await _productRepository.GetByIdWithDetailsAsync(id);
-            if (product == null)
+            if (product == null || product.IsDeleted)
                 throw new Exception("المنتج غير موجود");
 
             var images = await _imageRepository.GetByProductIdAsync(id);
@@ -65,6 +65,10 @@ namespace ecommerce.Services.ProductService.ProductService
                 Sku = product.Sku,
                 StockQuantity = product.StockQuantity,
                 IsAvailable = product.IsAvailable,
+                RegularPrice = product.Price,
+                RegularOriginalPrice = product.OriginalPrice,
+                RegularStockQuantity = product.StockQuantity,
+                RegularIsAvailable = product.IsAvailable,
                 IsActive = product.IsActive,
                 CreatedAt = product.CreatedAt,
                 UpdatedAt = product.UpdatedAt,
@@ -78,8 +82,11 @@ namespace ecommerce.Services.ProductService.ProductService
             };
 
             await ApplyPromotionAsync(dto, product);
+            await ApplyVariantStockAsync(new List<ProductDto> { dto });
             return dto;
         }
+
+        public Task<bool> IsPubliclyVisibleAsync(Guid id) => _productRepository.IsPubliclyVisibleAsync(id);
 
         // ===================================
         // GetAllAsync
@@ -88,18 +95,18 @@ namespace ecommerce.Services.ProductService.ProductService
         {
             var products = await _productRepository.GetAllAsync();
             var dtos = products.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, products.ToList());
+            await FinalizeListAsync(dtos, products.ToList());
             return dtos;
         }
 
         // ===================================
         // GetByVendorAsync
         // ===================================
-        public async Task<IEnumerable<ProductDto>> GetByVendorAsync(Guid vendorId)
+        public async Task<IEnumerable<ProductDto>> GetByVendorAsync(Guid vendorId, bool includeInactiveVendor = false, bool includeHidden = false)
         {
-            var products = await _productRepository.GetByVendorAsync(vendorId);
+            var products = await _productRepository.GetByVendorAsync(vendorId, includeInactiveVendor, includeHidden);
             var dtos = products.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, products.ToList());
+            await FinalizeListAsync(dtos, products.ToList());
             return dtos;
         }
 
@@ -110,7 +117,7 @@ namespace ecommerce.Services.ProductService.ProductService
         {
             var products = await _productRepository.GetByCategoryAsync(categoryId);
             var dtos = products.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, products.ToList());
+            await FinalizeListAsync(dtos, products.ToList());
             return dtos;
         }
 
@@ -124,7 +131,7 @@ namespace ecommerce.Services.ProductService.ProductService
 
             var products = await _productRepository.SearchAsync(searchTerm);
             var dtos = products.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, products.ToList());
+            await FinalizeListAsync(dtos, products.ToList());
             return dtos;
         }
 
@@ -145,7 +152,7 @@ namespace ecommerce.Services.ProductService.ProductService
                 filter.MinPrice, filter.MaxPrice, filter.IsAvailable, filter.IsActive);
 
             var dtos = products.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, products.ToList());
+            await FinalizeListAsync(dtos, products.ToList());
 
             return (dtos, totalCount);
         }
@@ -170,7 +177,7 @@ namespace ecommerce.Services.ProductService.ProductService
                 pageNumber, pageSize);
 
             var dtos = pagedProducts.Items.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, pagedProducts.Items.ToList());
+            await FinalizeListAsync(dtos, pagedProducts.Items.ToList());
 
             return new PagedResponse<ProductDto>(
                 dtos,
@@ -184,6 +191,20 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         public async Task<PagedResponse<ProductDto>> GetAdvancedFilteredAsync(ProductFilterDto filter)
         {
+            // السعر الفعلي بعد العرض لا يُحسب في SQL — عند الفلترة/الترتيب بالسعر أو بالخصم مع وجود عروض
+            // نحسبه في الذاكرة على بيانات خفيفة ثم نجلب الصفحة المطلوبة فقط
+            var sortOrder = filter.SortOrder?.ToLower();
+            var priceSort = string.Equals(filter.SortBy, "price", StringComparison.OrdinalIgnoreCase) &&
+                            (sortOrder == "asc" || sortOrder == "desc");
+            var needsPromoPricing = priceSort || filter.MinPrice > 0 || filter.MaxPrice > 0 || filter.HasDiscount == true;
+
+            if (needsPromoPricing)
+            {
+                var activePromotions = (await _promotionRepository.GetActivePromotionsAsync()).ToList();
+                if (activePromotions.Any())
+                    return await GetAdvancedFilteredWithPromotionsAsync(filter, activePromotions, priceSort, sortOrder == "desc");
+            }
+
             var pagedProducts = await _productRepository.GetAdvancedFilteredAsync(
                 vendorId: filter.VendorId,
                 categoryId: filter.CategoryId,
@@ -200,13 +221,48 @@ namespace ecommerce.Services.ProductService.ProductService
                 pageSize: filter.PageSize);
 
             var dtos = pagedProducts.Items.Select(MapToDto).ToList();
-            await ApplyPromotionsBatchAsync(dtos, pagedProducts.Items.ToList());
+            await FinalizeListAsync(dtos, pagedProducts.Items.ToList());
 
             return new PagedResponse<ProductDto>(
                 dtos,
                 pagedProducts.TotalCount,
                 pagedProducts.PageNumber,
                 pagedProducts.PageSize);
+        }
+
+        private async Task<PagedResponse<ProductDto>> GetAdvancedFilteredWithPromotionsAsync(
+            ProductFilterDto filter, List<Promotion> activePromotions, bool priceSort, bool descending)
+        {
+            var pageNumber = filter.PageNumber < 1 ? 1 : filter.PageNumber;
+            var pageSize = filter.PageSize < 1 ? 20 : Math.Min(filter.PageSize, 100);
+
+            var candidates = await _productRepository.GetAdvancedFilterCandidatesAsync(
+                filter.VendorId, filter.CategoryId, filter.SearchTerm, filter.IsAvailable, filter.IsActive,
+                filter.MinRating, filter.SortBy, filter.SortOrder);
+
+            var priced = candidates.Select(c =>
+            {
+                var promotion = PromotionPricing.SelectBest(activePromotions, c.Id, c.CategoryId, c.VendorId);
+                var finalPrice = promotion == null ? c.Price : PromotionPricing.CalculateDiscount(c.Price, promotion).FinalPrice;
+                return new { c.Id, FinalPrice = finalPrice, HasDiscount = (c.OriginalPrice ?? c.Price) > finalPrice };
+            });
+
+            if (filter.MinPrice > 0) priced = priced.Where(x => x.FinalPrice >= filter.MinPrice.Value);
+            if (filter.MaxPrice > 0) priced = priced.Where(x => x.FinalPrice <= filter.MaxPrice.Value);
+            if (filter.HasDiscount == true) priced = priced.Where(x => x.HasDiscount);
+            if (priceSort)
+                priced = descending
+                    ? priced.OrderByDescending(x => x.FinalPrice).ThenBy(x => x.Id)
+                    : priced.OrderBy(x => x.FinalPrice).ThenBy(x => x.Id);
+
+            var matches = priced.ToList();
+            var pageIds = matches.Skip((pageNumber - 1) * pageSize).Take(pageSize).Select(x => x.Id).ToList();
+
+            var products = await _productRepository.GetByIdsWithDetailsAsync(pageIds);
+            var dtos = products.Select(MapToDto).ToList();
+            await FinalizeListAsync(dtos, products);
+
+            return new PagedResponse<ProductDto>(dtos, matches.Count, pageNumber, pageSize);
         }
 
         // ===================================
@@ -217,7 +273,31 @@ namespace ecommerce.Services.ProductService.ProductService
             if (string.IsNullOrWhiteSpace(searchTerm))
                 throw new Exception("كلمة البحث مطلوبة");
 
-            return await _productRepository.UnifiedSearchAsync(searchTerm, maxResults);
+            var result = await _productRepository.UnifiedSearchAsync(searchTerm, maxResults);
+
+            // نفس تسعير العروض في بقية القوائم والسلة
+            var activePromotions = (await _promotionRepository.GetActivePromotionsAsync()).ToList();
+            if (activePromotions.Any())
+            {
+                foreach (var p in result.Products)
+                {
+                    var promotion = PromotionPricing.SelectBest(activePromotions, p.Id, p.CategoryId, p.VendorId);
+                    if (promotion == null)
+                        continue;
+
+                    var referencePrice = p.OriginalPrice ?? p.Price;
+                    var (finalPrice, _) = PromotionPricing.CalculateDiscount(p.Price, promotion);
+
+                    p.OriginalPrice = referencePrice;
+                    p.Price = finalPrice;
+                    p.HasDiscount = referencePrice > finalPrice;
+                    p.DiscountPercentage = p.HasDiscount && referencePrice > 0
+                        ? Math.Round((referencePrice - finalPrice) / referencePrice * 100, 1)
+                        : null;
+                }
+            }
+
+            return result;
         }
 
         // ===================================
@@ -225,6 +305,14 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         public async Task<ProductDto> CreateAsync(CreateProductDto dto)
         {
+            EnsureValidPrices(dto.Price, dto.OriginalPrice);
+
+            if (dto.CategoryId.HasValue)
+                await EnsureCategoryAssignableAsync(dto.CategoryId.Value);
+
+            if (dto.Images != null && dto.Images.Count > 5)
+                throw new Exception("لا يمكن رفع أكثر من 5 صور للمنتج");
+
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -248,12 +336,6 @@ namespace ecommerce.Services.ProductService.ProductService
 
                 if (dto.Images != null && dto.Images.Count > 0)
                 {
-                    if (dto.Images.Count > 5)
-                    {
-                        await transaction.RollbackAsync();
-                        throw new Exception("لا يمكن رفع أكثر من 5 صور للمنتج");
-                    }
-
                     List<string> uploadedImages = new List<string>();
 
                     try
@@ -276,8 +358,8 @@ namespace ecommerce.Services.ProductService.ProductService
                     }
                     catch (Exception ex)
                     {
+                        // التراجع عن المعاملة يتم مرة واحدة في catch الخارجي
                         await _fileService.DeleteImagesAsync(uploadedImages);
-                        await transaction.RollbackAsync();
                         throw new Exception($"فشل رفع الصور: {ex.Message}");
                     }
                 }
@@ -306,12 +388,46 @@ namespace ecommerce.Services.ProductService.ProductService
             if (!string.IsNullOrWhiteSpace(dto.Name)) product.Name = dto.Name;
             if (!string.IsNullOrWhiteSpace(dto.NameAr)) product.NameAr = dto.NameAr;
             if (!string.IsNullOrWhiteSpace(dto.Description)) product.Description = dto.Description;
-            if (dto.CategoryId.HasValue) product.CategoryId = dto.CategoryId;
+
+            if (dto.ClearCategory)
+            {
+                product.CategoryId = null;
+            }
+            else if (dto.CategoryId.HasValue && dto.CategoryId != product.CategoryId)
+            {
+                // التحقق فقط عند تغيير الفئة — منتج في فئة عُطّلت لاحقاً يبقى قابلاً للتعديل
+                await EnsureCategoryAssignableAsync(dto.CategoryId.Value);
+                product.CategoryId = dto.CategoryId;
+            }
+
             if (dto.Price.HasValue) product.Price = dto.Price.Value;
-            if (dto.OriginalPrice.HasValue) product.OriginalPrice = dto.OriginalPrice;
+            if (dto.ClearOriginalPrice) product.OriginalPrice = null;
+            else if (dto.OriginalPrice.HasValue) product.OriginalPrice = dto.OriginalPrice;
+
+            if (dto.Price.HasValue || dto.OriginalPrice.HasValue)
+                EnsureValidPrices(product.Price, product.OriginalPrice);
+
+            // خفض السعر يجب ألا يجعل سعر أي متغير سالباً
+            if (dto.Price.HasValue)
+            {
+                var minAdjustment = await _context.ProductVariants
+                    .Where(v => v.ProductId == id)
+                    .MinAsync(v => (decimal?)v.PriceAdjustment);
+                if (minAdjustment.HasValue && product.Price + minAdjustment.Value < 0)
+                    throw new Exception("السعر الجديد يجعل سعر أحد المتغيرات سالباً");
+            }
             if (!string.IsNullOrWhiteSpace(dto.Sku)) product.Sku = dto.Sku;
             if (dto.StockQuantity.HasValue) product.StockQuantity = dto.StockQuantity.Value;
             if (dto.IsAvailable.HasValue) product.IsAvailable = dto.IsAvailable.Value;
+
+            // نفس قاعدة PATCH /stock: نفاد الكمية = غير متوفر (الاختيار الصريح للبائع يُحترم في غير ذلك)
+            if (dto.StockQuantity.HasValue && product.StockQuantity != previousStock &&
+                !await _context.ProductVariants.AnyAsync(v => v.ProductId == id))
+            {
+                product.IsAvailable = dto.IsAvailable.HasValue && product.StockQuantity > 0
+                    ? dto.IsAvailable.Value
+                    : ResolveAvailability(product.IsAvailable, previousStock, product.StockQuantity);
+            }
             if (dto.IsActive.HasValue) product.IsActive = dto.IsActive.Value;
 
             product.UpdatedAt = DateTime.UtcNow;
@@ -354,18 +470,32 @@ namespace ecommerce.Services.ProductService.ProductService
                 throw new Exception("الكمية لا يمكن أن تكون سالبة");
 
             var product = await _productRepository.GetByIdAsync(id);
-            var previousStock = product?.StockQuantity;
+            if (product == null)
+                return false;
 
-            var updated = await _productRepository.UpdateStockAsync(id, quantity);
+            var previousStock = product.StockQuantity;
 
-            if (updated && product != null && previousStock.HasValue)
+            // منتج له متغيرات: المخزون الفعلي على المتغيرات، فلا نغيّر توفر المنتج من مخزونه العام
+            var isAvailable = await _context.ProductVariants.AnyAsync(v => v.ProductId == id)
+                ? product.IsAvailable
+                : ResolveAvailability(product.IsAvailable, previousStock, quantity);
+
+            var updated = await _productRepository.UpdateStockAsync(id, quantity, isAvailable);
+
+            if (updated)
             {
                 product.StockQuantity = quantity;
-                await NotifyIfStockBecameLowAsync(product, previousStock.Value);
+                await NotifyIfStockBecameLowAsync(product, previousStock);
             }
 
             return updated;
         }
+
+        // الكمية صفر = غير متوفر؛ إعادة التخزين من صفر = متوفر؛ غير ذلك يبقى اختيار البائع (مثل الإخفاء اليدوي)
+        private static bool ResolveAvailability(bool current, int previousStock, int newStock) =>
+            newStock == 0 ? false
+            : previousStock == 0 ? true
+            : current;
 
         // تنبيه نقص المخزون (قاعدة عبور الحد موحّدة داخل InventoryService)
         private Task NotifyIfStockBecameLowAsync(Product product, int previousStock) =>
@@ -392,8 +522,9 @@ namespace ecommerce.Services.ProductService.ProductService
             {
                 ProductId = productId,
                 ImageUrl = imageUrl,
-                IsPrimary = existingImages.Count == 0,
-                DisplayOrder = existingImages.Count
+                IsPrimary = existingImages.Count == 0 || !existingImages.Any(i => i.IsPrimary),
+                // بعد حذف صور قد يتكرر العدد — نأخذ أكبر ترتيب + 1
+                DisplayOrder = existingImages.Any() ? existingImages.Max(i => i.DisplayOrder) + 1 : 0
             };
 
             var created = await _imageRepository.CreateAsync(productImage);
@@ -416,8 +547,25 @@ namespace ecommerce.Services.ProductService.ProductService
             if (image == null)
                 return false;
 
-            await _fileService.DeleteImageAsync(image.ImageUrl);
-            return await _imageRepository.DeleteAsync(imageId);
+            var wasPrimary = image.IsPrimary;
+            var productId = image.ProductId;
+            var imageUrl = image.ImageUrl;
+
+            // حذف السجل أولاً — لو فشل لا نكون قد حذفنا الملف
+            if (!await _imageRepository.DeleteAsync(imageId))
+                return false;
+
+            await _fileService.DeleteImageAsync(imageUrl);
+
+            // حذف الصورة الرئيسية: أول صورة متبقية تصبح رئيسية
+            if (wasPrimary)
+            {
+                var next = (await _imageRepository.GetByProductIdAsync(productId)).FirstOrDefault();
+                if (next != null)
+                    await _imageRepository.SetPrimaryImageAsync(next.Id, productId);
+            }
+
+            return true;
         }
 
         // ===================================
@@ -433,16 +581,27 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         public async Task<bool> DeleteAsync(Guid id)
         {
-            var product = await _productRepository.GetByIdAsync(id);
-            if (product == null)
-                return false;
-
-            var images = await _imageRepository.GetByProductIdAsync(id);
-            var imageUrls = images.Select(i => i.ImageUrl).ToList();
-            await _fileService.DeleteImagesAsync(imageUrls);
-            await _imageRepository.DeleteByProductIdAsync(id);
-
+            // حذف ناعم (تعطيل) — الصور تبقى لأن المنتج يظهر في سجل الطلبات ويمكن إعادة تفعيله
             return await _productRepository.DeleteAsync(id);
+        }
+
+        // ===================================
+        // Private: التحقق من الأسعار والفئة
+        // ===================================
+        private static void EnsureValidPrices(decimal price, decimal? originalPrice)
+        {
+            // السعر الأصلي يُعرض مشطوباً كخصم، فلا معنى له إن لم يكن أعلى من سعر البيع
+            if (originalPrice.HasValue && originalPrice.Value <= price)
+                throw new Exception("السعر الأصلي يجب أن يكون أعلى من سعر البيع");
+        }
+
+        private async Task EnsureCategoryAssignableAsync(Guid categoryId)
+        {
+            if (!await _context.Categories.AnyAsync(c => c.Id == categoryId))
+                throw new Exception("التصنيف غير موجود");
+
+            if ((await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).Contains(categoryId))
+                throw new Exception("التصنيف غير مفعّل");
         }
 
         // ===================================
@@ -450,36 +609,44 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         private async Task ApplyPromotionAsync(ProductDto dto, Product product)
         {
-            var categoryId = product.CategoryId ?? Guid.Empty;
-
             var promotion = await _promotionRepository.GetBestPromotionForProductAsync(
-                product.Id, categoryId, product.VendorId);
+                product.Id, product.CategoryId ?? Guid.Empty, product.VendorId);
 
-            if (promotion == null)
+            ApplyPromotion(dto, product, promotion);
+        }
+
+        // ===================================
+        // Private: تجهيز القوائم — العروض + مخزون المتغيرات
+        // ===================================
+        private async Task FinalizeListAsync(List<ProductDto> dtos, List<Product> products)
+        {
+            await ApplyPromotionsBatchAsync(dtos, products);
+            await ApplyVariantStockAsync(dtos);
+        }
+
+        // المنتج ذو المتغيرات: المخزون = مجموع المتغيرات المتوفرة، والتوفر = وجود مخزون فيها
+        // (مفتاح "متوفر" العام للمنتج لا يُستخدم هنا؛ الإخفاء هو المفتاح الرئيسي)
+        private async Task ApplyVariantStockAsync(List<ProductDto> dtos)
+        {
+            if (!dtos.Any())
                 return;
 
-            var basePrice = product.OriginalPrice ?? product.Price;
+            var ids = dtos.Select(d => d.Id).ToList();
+            var variantStock = await _context.ProductVariants
+                .Where(v => ids.Contains(v.ProductId))
+                .GroupBy(v => v.ProductId)
+                .Select(g => new { ProductId = g.Key, Stock = g.Sum(v => v.IsAvailable ? v.StockQuantity : 0) })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Stock);
 
-            decimal discountAmount;
-            if (promotion.DiscountType == "percentage")
+            foreach (var dto in dtos)
             {
-                discountAmount = basePrice * (promotion.DiscountValue / 100);
-                if (promotion.MaxDiscountAmount.HasValue)
-                    discountAmount = Math.Min(discountAmount, promotion.MaxDiscountAmount.Value);
-            }
-            else
-            {
-                discountAmount = Math.Min(promotion.DiscountValue, basePrice);
-            }
+                if (!variantStock.TryGetValue(dto.Id, out var stock))
+                    continue;
 
-            discountAmount = Math.Round(discountAmount, 2);
-
-            dto.OriginalPrice = basePrice;
-            dto.Price = Math.Round(basePrice - discountAmount, 2);
-            dto.HasPromotion = true;
-            dto.PromotionName = promotion.Name;
-            dto.PromotionNameAr = promotion.NameAr;
-            dto.PromotionExpiresAt = promotion.ExpiresAt;
+                dto.HasVariants = true;
+                dto.StockQuantity = stock;
+                dto.IsAvailable = stock > 0;
+            }
         }
 
         // ===================================
@@ -498,42 +665,31 @@ namespace ecommerce.Services.ProductService.ProductService
 
             for (int i = 0; i < dtos.Count; i++)
             {
-                var dto = dtos[i];
                 var product = products[i];
-                var categoryId = product.CategoryId ?? Guid.Empty;
+                var promotion = PromotionPricing.SelectBest(
+                    promotionList, product.Id, product.CategoryId, product.VendorId);
 
-                var promotion =
-                    promotionList.FirstOrDefault(p => p.TargetType == "product" && p.TargetId == product.Id) ??
-                    promotionList.FirstOrDefault(p => p.TargetType == "category" && p.TargetId == categoryId) ??
-                    promotionList.FirstOrDefault(p => p.TargetType == "vendor" && p.TargetId == product.VendorId) ??
-                    promotionList.FirstOrDefault(p => p.TargetType == "all");
-
-                if (promotion == null)
-                    continue;
-
-                var basePrice = product.OriginalPrice ?? product.Price;
-
-                decimal discountAmount;
-                if (promotion.DiscountType == "percentage")
-                {
-                    discountAmount = basePrice * (promotion.DiscountValue / 100);
-                    if (promotion.MaxDiscountAmount.HasValue)
-                        discountAmount = Math.Min(discountAmount, promotion.MaxDiscountAmount.Value);
-                }
-                else
-                {
-                    discountAmount = Math.Min(promotion.DiscountValue, basePrice);
-                }
-
-                discountAmount = Math.Round(discountAmount, 2);
-
-                dto.OriginalPrice = basePrice;
-                dto.Price = Math.Round(basePrice - discountAmount, 2);
-                dto.HasPromotion = true;
-                dto.PromotionName = promotion.Name;
-                dto.PromotionNameAr = promotion.NameAr;
-                dto.PromotionExpiresAt = promotion.ExpiresAt;
+                ApplyPromotion(dtos[i], product, promotion);
             }
+        }
+
+        // ===================================
+        // Private: ApplyPromotion
+        // الخصم على Price (نفس حساب السلة والطلب)؛ السعر المشطوب = السعر الأصلي إن وُجد وإلا Price
+        // ===================================
+        private static void ApplyPromotion(ProductDto dto, Product product, Promotion? promotion)
+        {
+            if (promotion == null)
+                return;
+
+            var (finalPrice, _) = PromotionPricing.CalculateDiscount(product.Price, promotion);
+
+            dto.OriginalPrice = product.OriginalPrice ?? product.Price;
+            dto.Price = finalPrice;
+            dto.HasPromotion = true;
+            dto.PromotionName = promotion.Name;
+            dto.PromotionNameAr = promotion.NameAr;
+            dto.PromotionExpiresAt = promotion.ExpiresAt;
         }
 
         // ===================================
@@ -552,6 +708,10 @@ namespace ecommerce.Services.ProductService.ProductService
                 Sku = product.Sku,
                 StockQuantity = product.StockQuantity,
                 IsAvailable = product.IsAvailable,
+                RegularPrice = product.Price,
+                RegularOriginalPrice = product.OriginalPrice,
+                RegularStockQuantity = product.StockQuantity,
+                RegularIsAvailable = product.IsAvailable,
                 IsActive = product.IsActive,
                 VendorId = product.VendorId,
                 VendorName = product.Vendor?.Name,

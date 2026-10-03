@@ -29,6 +29,7 @@ const STATUS = {
   CONFIRMED: { label: 'مؤكد', chip: 'bg-blue-100 text-blue-800', dot: 'bg-blue-500', icon: CheckCircle },
   PARTIALLY_CONFIRMED: { label: 'مؤكد جزئياً', chip: 'bg-cyan-100 text-cyan-800', dot: 'bg-cyan-500', icon: CheckCircle },
   PREPARING: { label: 'قيد التحضير', chip: 'bg-indigo-100 text-indigo-800', dot: 'bg-indigo-500', icon: Package },
+  READY: { label: 'جاهز للاستلام', chip: 'bg-teal-100 text-teal-800', dot: 'bg-teal-500', icon: CheckCircle },
   OUT_FOR_DELIVERY: { label: 'مع السائق', chip: 'bg-purple-100 text-purple-800', dot: 'bg-purple-500', icon: Truck },
   DELIVERED: { label: 'تم التوصيل', chip: 'bg-green-100 text-green-800', dot: 'bg-green-500', icon: CheckCircle },
   CANCELLED: { label: 'ملغي', chip: 'bg-red-100 text-red-700', dot: 'bg-red-500', icon: XCircle },
@@ -42,13 +43,16 @@ const FILTERS = [
   { value: 'CONFIRMED', label: 'مؤكد' },
   { value: 'PARTIALLY_CONFIRMED', label: 'مؤكد جزئياً' },
   { value: 'PREPARING', label: 'قيد التحضير' },
+  { value: 'READY', label: 'جاهز للاستلام' },
   { value: 'OUT_FOR_DELIVERY', label: 'مع السائق' },
   { value: 'DELIVERED', label: 'تم التوصيل' },
   { value: 'DELIVERY_FAILED', label: 'تعذّر التسليم' },
   { value: 'CANCELLED', label: 'ملغي' },
 ]
 
-const CANCEL_REASONS = ['المتجر لم يرد', 'المنتج غير متوفر', 'طلب الزبون الإلغاء', 'تعذّر الوصول للزبون']
+const CANCEL_REASONS = ['المتجر لم يرد', 'المنتج غير متوفر', 'نقص عند المتجر بعد التأكيد', 'طلب الزبون الإلغاء', 'تعذّر الوصول للزبون']
+// الإلغاء متاح في كل المراحل قبل خروج الطلب مع السائق
+const CANCELLABLE_LATE = ['CONFIRMED', 'PREPARING', 'READY']
 
 const money = (n) => `${(n || 0).toLocaleString()} د.ع`
 const timeAgo = (d) => {
@@ -78,9 +82,12 @@ const nextStep = (order) => {
     return { text: `بانتظار تأكيد ${pending === 1 ? 'متجر' : pending + ' متاجر'}${mins < 99 ? ` · ${mins > 0 ? `باقي ${mins} د` : 'انتهت المهلة'}` : ''}`, tone: mins <= 0 ? 'text-red-600' : 'text-amber-700', urgent: true }
   }
   if (count('DELIVERY_FAILED')) return { text: 'تعذّر التسليم — أعد المحاولة أو ألغِ', tone: 'text-orange-700', urgent: true }
-  if (count('CONFIRMED')) return { text: 'ابدأ التحضير', tone: 'text-blue-700', urgent: true }
-  if (subs.every(x => x.status === 'PREPARING')) return { text: 'جاهز — عيّن سائقاً', tone: 'text-primary', urgent: true }
-  if (count('PREPARING')) return { text: 'قيد التحضير', tone: 'text-indigo-700' }
+  if (subs.every(x => x.status === 'READY' || x.status === 'DELIVERED') && count('READY'))
+    return { text: 'جاهز للاستلام — عيّن سائقاً', tone: 'text-teal-700', urgent: true }
+  const ready = count('READY')
+  if (ready) return { text: `${ready} من ${subs.length} متاجر جاهزة — بانتظار الباقي`, tone: 'text-indigo-700' }
+  if (count('PREPARING')) return { text: 'قيد التحضير في المتجر', tone: 'text-indigo-700' }
+  if (count('CONFIRMED')) return { text: 'مؤكد — بانتظار بدء التحضير', tone: 'text-blue-700' }
   if (count('OUT_FOR_DELIVERY')) {
     const d = subs.find(x => x.driverName)?.driverName
     return { text: d ? `مع ${d}` : 'في الطريق', tone: 'text-purple-700' }
@@ -119,7 +126,7 @@ const OrderRow = ({ order, active, onOpen, timing }) => {
       <div className="flex items-center gap-2 mt-2">
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-gray-900 truncate">{order.customerName || 'زبون'}</span>
-          <span className="block text-xs text-gray-500 truncate">{area || '—'} · {subs.length} {subs.length === 1 ? 'متجر' : 'متاجر'}</span>
+          <span className="block text-xs text-gray-500 truncate">{order.deliveryZoneName ? <b className="text-gray-700">{order.deliveryZoneName}</b> : (area || '—')} · {subs.length} {subs.length === 1 ? 'متجر' : 'متاجر'}</span>
         </span>
         <span className="font-bold text-gray-900 text-sm flex-shrink-0">{money(order.totalAmount)}</span>
       </div>
@@ -181,7 +188,7 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
       {sub.status === 'DELIVERY_FAILED' && (
         <p className="mx-3 mb-3 text-xs text-orange-800 bg-orange-50 rounded-lg p-2">
           تعذّر التسليم: <b>{sub.failureReasonAr || '—'}</b>{sub.failureNote ? ` — ${sub.failureNote}` : ''}
-          <span className="block mt-0.5 text-orange-700">البضاعة رجعت مع السائق. إعادة المحاولة تعيده للتحضير لتعيين سائق، والإلغاء يعيد القطع للمخزون.</span>
+          <span className="block mt-0.5 text-orange-700">البضاعة رجعت مع السائق. إعادة المحاولة تعيده «جاهز للاستلام» لتعيين سائق، والإلغاء يعيد القطع للمخزون.</span>
         </p>
       )}
 
@@ -193,14 +200,24 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
             <button onClick={() => onConfirm(sub)} disabled={busy} className="h-9 px-4 rounded-lg bg-green-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />تأكيد</button>
           </>
         )}
+        {CANCELLABLE_LATE.includes(sub.status) && (
+          <button onClick={() => onCancel(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm font-bold disabled:opacity-50">إلغاء</button>
+        )}
+        {/* المتجر هو من يغيّر التحضير والجاهزية — هذه احتياط إن نسي */}
         {sub.status === 'CONFIRMED' && (
           <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-4 rounded-lg bg-indigo-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Package size={15} />بدء التحضير</button>
+        )}
+        {sub.status === 'PREPARING' && (
+          <button onClick={() => onStatus(sub, 'READY')} disabled={busy} className="h-9 px-4 rounded-lg bg-teal-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />جاهز للاستلام</button>
+        )}
+        {sub.status === 'READY' && (
+          <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-3 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium disabled:opacity-50">ليس جاهزاً بعد</button>
         )}
         {sub.status === 'DELIVERY_FAILED' && (
           <>
             <button onClick={() => onCancel(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm font-bold disabled:opacity-50">إلغاء</button>
             {sub.failureReason !== 'customer_refused' && (
-              <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-4 rounded-lg bg-orange-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Truck size={15} />إعادة المحاولة</button>
+              <button onClick={() => onStatus(sub, 'READY')} disabled={busy} className="h-9 px-4 rounded-lg bg-orange-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Truck size={15} />إعادة المحاولة</button>
             )}
           </>
         )}
@@ -220,7 +237,7 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
   const order = detail ? { ...fallback, ...detail } : fallback
   const subs = order?.subOrders || []
   const active = subs.filter(s => s.status !== 'CANCELLED')
-  const readyForDriver = active.length > 0 && active.every(s => s.status === 'PREPARING')
+  const readyForDriver = active.some(s => s.status === 'READY') && active.every(s => s.status === 'READY' || s.status === 'DELIVERED')
   const wa = waLink(order?.customerPhone || order?.deliveryPhone)
   const phone = order?.deliveryPhone || order?.customerPhone
 
@@ -246,7 +263,7 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
           <button onClick={() => actions.assign(order)}
             className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-primary text-white text-right shadow-md shadow-primary/30">
             <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><Truck size={20} /></span>
-            <span className="flex-1"><span className="block font-bold">الطلب جاهز — عيّن سائقاً</span><span className="block text-xs text-white/80">كل المتاجر أنهت التحضير</span></span>
+            <span className="flex-1"><span className="block font-bold">جاهز للاستلام — عيّن سائقاً</span><span className="block text-xs text-white/80">كل المتاجر أعلنت أن الطلب جاهز</span></span>
             <ChevronLeft size={20} />
           </button>
         )}
@@ -263,6 +280,11 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
             </div>
             <span className="text-xs font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-700">{order.paymentMethod === 'COD' ? 'دفع عند الاستلام' : order.paymentMethod || '—'}</span>
           </div>
+          {order.deliveryZoneName && (
+            <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+              <MapPin size={13} />منطقة التوصيل: {order.deliveryZoneName}
+            </p>
+          )}
           {order.deliveryAddress && (
             <p className="mt-3 text-sm text-gray-700 flex items-start gap-1.5"><MapPin size={15} className="mt-0.5 flex-shrink-0 text-gray-400" />{cleanAddress(order.deliveryAddress)}</p>
           )}
@@ -319,7 +341,7 @@ const CancelSheet = ({ sub, onClose, onSubmit, busy }) => {
   return (
     <Sheet onClose={onClose} busy={busy}>
       <h3 className="font-bold text-gray-900">إلغاء طلب {sub.vendorNameAr || sub.vendorName}</h3>
-      <p className="text-sm text-gray-500 mt-1">بقية متاجر الطلب لا تتأثر. السبب يظهر للزبون.</p>
+      <p className="text-sm text-gray-500 mt-1">بقية متاجر الطلب لا تتأثر، ويُعاد حساب المبلغ المطلوب من الزبون. السبب يظهر للزبون، والقطع ترجع للمخزون.</p>
       <div className="flex flex-wrap gap-2 mt-4">
         {[...CANCEL_REASONS, 'other'].map(r => (
           <button key={r} onClick={() => setReason(r)}
@@ -436,7 +458,8 @@ const OperationsOrders = () => {
     },
     cancel: (sub) => setCancelSub(sub),
     status: async (sub, newStatus) => {
-      try { await updateStatus({ id: sub.id, data: { opsUserId, newStatus } }); after(newStatus === 'DELIVERED' ? 'تم تسجيل التوصيل' : 'بدأ التحضير') }
+      const done = { DELIVERED: 'تم تسجيل التوصيل', PREPARING: sub.status === 'READY' ? 'أُعيد إلى التحضير' : 'بدأ التحضير', READY: sub.status === 'DELIVERY_FAILED' ? 'جاهز لمحاولة جديدة — عيّن سائقاً' : 'جاهز للاستلام' }
+      try { await updateStatus({ id: sub.id, data: { opsUserId, newStatus } }); after(done[newStatus] || 'تم التحديث') }
       catch (e) { toastError(e.message || 'فشل تحديث الحالة') }
     },
     assign: (order) => setAssignOrder(order),

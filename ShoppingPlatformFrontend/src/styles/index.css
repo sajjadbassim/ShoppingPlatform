@@ -512,3 +512,9 @@ html.has-bottom-nav {
 /* زر Google: iframe بخلفية شفافة وزوايا مثل أزرار الصفحة */
 .google-btn iframe { color-scheme: normal; background: transparent !important; border-radius: 10px; max-width: 100% !important; }
 .google-btn > div { max-width: 100%; display: flex; justify-content: center; }
+
+/* خلفية صور المنتجات: فاتحة دائماً حتى في الوضع الداكن.
+   صور المنتجات غالباً PNG/WebP شفافة، فالمنتجات الداكنة (أحمر شفاه، طلاء أظافر، ساعات سوداء)
+   تختفي فوق خلفية داكنة. في الداكن لون أخفت قليلاً من الأبيض حتى لا يبهر العين */
+.product-media { background-color: #F4F5F7; }
+.dark .product-media { background-color: #E6E8EC; }

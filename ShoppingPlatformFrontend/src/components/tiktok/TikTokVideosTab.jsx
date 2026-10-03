@@ -4,21 +4,21 @@ import { ReelsGrid, ReelTile } from './ReelsGrid'
 import TikTokFeedViewer from './TikTokFeedViewer'
 
 /**
- * تبويب فيديوهات تيك توك: رأس الحساب + شبكة الأغلفة، والضغط يفتح العارض بملء الشاشة
+ * تبويب محتوى حسابات التواصل (تيك توك + إنستغرام): شبكة الأغلفة، والضغط يفتح العارض بملء الشاشة
  */
 const TikTokVideosTab = ({ account, videos, refreshing = false }) => {
   const [openIndex, setOpenIndex] = useState(null)
 
   return (
     <div>
-      {/* تحديث الفيديوهات من تيك توك — بدون عرض اسم الحساب أو زر المتابعة */}
+      {/* تحديث المحتوى من المنصات — بدون عرض اسم الحساب أو زر المتابعة */}
       {refreshing && (
         <p className="flex items-center gap-1.5 text-xs text-primary px-4 py-2 sm:px-0 sm:pt-0">
-          <RefreshCw size={12} className="animate-spin" />جاري تحديث الفيديوهات...
+          <RefreshCw size={12} className="animate-spin" />جاري تحديث المنشورات...
         </p>
       )}
 
-      {/* الشبكة — بأسلوب صفحة الحساب في تيك توك */}
+      {/* الشبكة — بأسلوب صفحة الحساب في تيك توك/إنستغرام */}
       <ReelsGrid>
         {videos.map((v, i) => <ReelTile key={v.id} video={v} onClick={() => setOpenIndex(i)} />)}
       </ReelsGrid>

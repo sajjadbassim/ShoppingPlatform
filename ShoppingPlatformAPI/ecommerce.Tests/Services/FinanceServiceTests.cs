@@ -48,6 +48,27 @@ namespace ecommerce.Tests.Services
         private decimal Sum(string type) => _context.VendorLedgerEntries.Where(e => e.Type == type).Sum(e => e.Amount);
 
         [Fact]
+        public async Task Statement_NewestFirst_EvenWhenSaleAndCommissionShareTimestamp()
+        {
+            var older = Delivered(_vendor);
+            var newer = Delivered(_vendor);
+            await Service().EnsureSubOrderEntriesAsync(older.Id);
+            await Service().EnsureSubOrderEntriesAsync(newer.Id);
+
+            // نفس اللحظة لبيع الطلب وعمولته — الترتيب يجب ألا يعتمد على المعرّف العشوائي
+            var t0 = new DateTime(2026, 9, 1, 10, 0, 0, DateTimeKind.Utc);
+            foreach (var e in _context.VendorLedgerEntries)
+                e.CreatedAt = e.SubOrderId == older.Id ? t0 : t0.AddDays(1);
+            await _context.SaveChangesAsync();
+
+            var entries = (await Service().GetStatementAsync(_vendor.Id)).Entries;
+
+            Assert.Equal(new[] { LedgerType.Commission, LedgerType.Sale, LedgerType.Commission, LedgerType.Sale }, entries.Select(e => e.Type));
+            Assert.Equal(newer.OrderId, entries[0].OrderId);
+            Assert.Equal(new decimal[] { 99_000, 104_500, 49_500, 55_000 }, entries.Select(e => e.RunningBalance));
+        }
+
+        [Fact]
         public async Task Delivery_RecordsSaleAndPercentageCommission_Once()
         {
             var sub = Delivered(_vendor);

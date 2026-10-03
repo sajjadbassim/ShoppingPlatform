@@ -71,13 +71,14 @@ const VendorProductForm = () => {
       Name: existing.name || '',
       NameAr: existing.nameAr || '',
       Description: existing.description && existing.description !== '-' ? existing.description : '',
-      Price: existing.price?.toString() || '',
-      OriginalPrice: existing.originalPrice?.toString() || '',
+      // القيم المخزّنة لا المعروضة للزبون (السعر بعد العرض) — وإلا ينقص السعر الحقيقي بقيمة العرض عند الحفظ
+      Price: (existing.regularPrice ?? existing.price)?.toString() || '',
+      OriginalPrice: (existing.regularOriginalPrice !== undefined ? existing.regularOriginalPrice : existing.originalPrice)?.toString() || '',
       Sku: existing.sku || '',
-      StockQuantity: existing.stockQuantity?.toString() || '0',
+      StockQuantity: (existing.regularStockQuantity ?? existing.stockQuantity)?.toString() || '0',
       CategoryId: existing.categoryId || '',
       IsActive: existing.isActive ?? true,
-      IsAvailable: existing.isAvailable ?? true,
+      IsAvailable: existing.regularIsAvailable ?? existing.isAvailable ?? true,
     })
     setExistingImages([...(existing.images || [])].sort((a, b) =>
       a.isPrimary ? -1 : b.isPrimary ? 1 : (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
@@ -134,9 +135,11 @@ const VendorProductForm = () => {
     fd.append('Description', form.Description.trim() || '-')
     fd.append('Price', String(price))
     if (form.OriginalPrice) fd.append('OriginalPrice', String(original))
+    else if (isEditing) fd.append('ClearOriginalPrice', 'true') // مسح السعر قبل الخصم
     if (form.Sku.trim()) fd.append('Sku', form.Sku.trim())
     fd.append('StockQuantity', String(Math.max(0, Number(form.StockQuantity) || 0)))
     if (form.CategoryId) fd.append('CategoryId', form.CategoryId)
+    else if (isEditing) fd.append('ClearCategory', 'true')
     fd.append('IsActive', String(form.IsActive))
     fd.append('IsAvailable', String(form.IsAvailable))
     // الإنشاء يستقبل 'Images' والتعديل 'NewImages'
@@ -227,7 +230,7 @@ const VendorProductForm = () => {
           <Section title="الصور" hint={`حتى ${MAX_IMAGES} صور — الأولى هي التي تظهر في المتجر`}>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
               {existingImages.map(img => (
-                <div key={img.id} className={`relative aspect-square rounded-xl overflow-hidden bg-gray-100 ${img.isPrimary ? 'ring-2 ring-primary' : ''}`}>
+                <div key={img.id} className={`relative aspect-square rounded-xl overflow-hidden product-media ${img.isPrimary ? 'ring-2 ring-primary' : ''}`}>
                   <img src={getImageUrl(img.imageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />
                   {imageBusy === img.id && <span className="absolute inset-0 bg-white/60 flex items-center justify-center"><RefreshCw size={18} className="animate-spin text-primary" /></span>}
                   {img.isPrimary
@@ -239,7 +242,7 @@ const VendorProductForm = () => {
                 </div>
               ))}
               {newImages.map((img, i) => (
-                <div key={img.preview} className={`relative aspect-square rounded-xl overflow-hidden bg-gray-100 ${existingImages.length === 0 && i === 0 ? 'ring-2 ring-primary' : ''}`}>
+                <div key={img.preview} className={`relative aspect-square rounded-xl overflow-hidden product-media ${existingImages.length === 0 && i === 0 ? 'ring-2 ring-primary' : ''}`}>
                   <img src={img.preview} alt="" className="w-full h-full object-cover" />
                   {existingImages.length === 0 && i === 0 && <span className="absolute bottom-1 right-1 text-[10px] font-bold bg-primary text-white px-1.5 py-0.5 rounded-md">الرئيسية</span>}
                   {isEditing && <span className="absolute bottom-1 left-1 text-[10px] font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded-md">جديدة</span>}
