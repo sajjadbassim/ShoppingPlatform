@@ -1,11 +1,11 @@
 // src/pages/vendor/VendorSocialAccounts.jsx
 // ربط حسابات التواصل الاجتماعي للمتجر — تيك توك (API: /api/tiktok) وإنستغرام (API: /api/integrations/instagram)
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Link2, Unlink, CheckCircle2, ShieldCheck, Eye, EyeOff, Video, Users, Play, Heart, Image as ImageIcon,
-  RefreshCw, X, Package, ExternalLink, Search, AlertTriangle, Settings2, Info,
+  RefreshCw, X, Package, ExternalLink, Search, AlertTriangle, Settings2, Info, Send, RotateCcw, Ban, Clock,
 } from 'lucide-react'
 import { useToast } from '../../components/common/Toast'
 import { Toggle } from '../../components/common/FormControls'
@@ -13,9 +13,10 @@ import { Skeleton } from '../../components/common/Loading'
 import { useAuthStore } from '../../stores/authStore'
 import { apiGet, apiPatch, apiPut, apiPost, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
-import { getPrimaryImage } from '../../utils/imageHelper'
+import { getPrimaryImage, getImageUrl } from '../../utils/imageHelper'
 import TikTokLogo, { usernameFromVideos } from '../../components/tiktok/TikTokLogo'
 import InstagramLogo from '../../components/social/InstagramLogo'
+import FacebookLogo from '../../components/social/FacebookLogo'
 import TikTokFeedViewer from '../../components/tiktok/TikTokFeedViewer'
 import { ReelsGrid, ReelTile } from '../../components/tiktok/ReelsGrid'
 
@@ -29,6 +30,7 @@ const connectErrors = (name) => ({
   invalid_state: 'تعذّر التحقق من طلب الربط، حاول مرة أخرى من نفس المتصفح',
   token: `رفض ${name} طلب الربط، حاول لاحقاً`,
   busy: 'مزامنة جارية لحسابك، حاول بعد لحظات',
+  no_pages: 'لم تُمنح أي صفحة — اختر صفحة متجرك في نافذة فيسبوك (الحساب الشخصي لا يُربط)',
 })
 
 // ===========================
@@ -58,6 +60,7 @@ const PLATFORMS = {
       { icon: Video, text: 'عرض الفيديوهات المنشورة للعامة' },
       { icon: Eye, text: 'قراءة عدد المشاهدات والإعجابات' },
     ],
+    promise: 'لن ننشر أي شيء على حسابك، ولن نطّلع على رسائلك أو كلمة المرور. يمكنك إلغاء الربط في أي وقت.',
     privacyUrl: 'https://www.tiktok.com/legal/page/global/privacy-policy/ar',
     profile: (status, items) => {
       const a = status?.account
@@ -94,7 +97,9 @@ const PLATFORMS = {
       { icon: Users, text: 'قراءة اسم الحساب والصورة' },
       { icon: ImageIcon, text: 'عرض المنشورات والريلز المنشورة' },
       { icon: Heart, text: 'قراءة عدد الإعجابات والتعليقات' },
+      { icon: Send, text: 'نشر صور منتجاتك على حسابك — فقط عندما تختارها وتضغط «نشر» بنفسك' },
     ],
+    promise: 'لا ننشر شيئاً تلقائياً أو دون موافقتك، ولن نطّلع على رسائلك أو كلمة المرور. يمكنك إلغاء الربط في أي وقت.',
     note: 'يتطلب حساباً احترافياً (Business أو Creator). يمكنك تحويل حسابك مجاناً من إعدادات إنستغرام.',
     privacyUrl: 'https://privacycenter.instagram.com/policy',
     profile: (status, items) => {
@@ -111,7 +116,93 @@ const PLATFORMS = {
     },
   },
 }
-const PLATFORM_LIST = [PLATFORMS.instagram, PLATFORMS.tiktok]
+PLATFORMS.facebook = {
+  key: 'facebook',
+  name: 'Facebook',
+  Logo: FacebookLogo,
+  api: {
+    status: API_ENDPOINTS.FACEBOOK.STATUS,
+    connectUrl: API_ENDPOINTS.FACEBOOK.CONNECT_URL,
+    sync: API_ENDPOINTS.FACEBOOK.SYNC,
+    items: API_ENDPOINTS.FACEBOOK.MEDIA,
+    item: API_ENDPOINTS.FACEBOOK.MEDIA_ITEM,
+    settings: API_ENDPOINTS.FACEBOOK.SETTINGS,
+    connection: API_ENDPOINTS.FACEBOOK.CONNECTION,
+  },
+  normalizeItem: (m) => m,
+  autoShowKey: 'autoShowNewMedia',
+  autoShowTitle: 'إظهار المنشورات الجديدة تلقائياً',
+  pitch: 'فيديوهات وريلز وصور صفحتك تظهر في متجرك وفي صفحة ريلز، مع زر «اشترِ الآن»',
+  permissions: [
+    { icon: Users, text: 'قراءة اسم الصفحة وصورتها وعدد المتابعين' },
+    { icon: ImageIcon, text: 'عرض الفيديوهات والريلز والصور المنشورة على الصفحة' },
+  ],
+  promise: 'لن ننشر أي شيء على صفحتك، ولن نطّلع على رسائلك أو حسابك الشخصي. يمكنك إلغاء الربط في أي وقت.',
+  note: 'يُربط صفحة فيسبوك تديرها (صفحة متجرك)، لا الحساب الشخصي. اختر الصفحة في نافذة فيسبوك.',
+  privacyUrl: 'https://www.facebook.com/privacy/policy',
+  profile: (status, items) => {
+    const a = status?.account
+    return {
+      displayName: a?.name,
+      username: a?.username,
+      avatarUrl: a?.pictureUrl,
+      stats: [
+        { label: 'متابع', value: a?.followersCount },
+        { label: 'منشور', value: items.length },
+      ],
+    }
+  },
+}
+const PLATFORM_LIST = [PLATFORMS.instagram, PLATFORMS.facebook, PLATFORMS.tiktok]
+
+// ===========================
+// اختيار صفحة فيسبوك — عندما يدير التاجر أكثر من صفحة (?facebook=choose&selection=...)
+// ===========================
+const FacebookPagePicker = ({ selection, onClose, onConnected }) => {
+  const { error: showError } = useToast()
+  const { data: pages = [], isLoading, isError } = useQuery({
+    queryKey: ['facebook-pages', selection],
+    queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.FACEBOOK.PAGES, { selection })) || [],
+    retry: false,
+  })
+  const select = useMutation({
+    mutationFn: async (pageId) => unwrap(await apiPost(API_ENDPOINTS.FACEBOOK.SELECT_PAGE, { selectionId: selection, pageId })),
+    onSuccess: onConnected,
+    onError: (err) => showError(err.message || 'تعذّر ربط الصفحة'),
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={select.isPending ? undefined : onClose} />
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 animate-slide-up pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center gap-3 mb-1">
+          <FacebookLogo className="w-8 h-8" />
+          <h2 className="flex-1 font-bold text-gray-900">اختر صفحة متجرك</h2>
+          <button onClick={onClose} disabled={select.isPending} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center" aria-label="إغلاق"><X size={16} /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">تدير أكثر من صفحة — ستظهر منشورات الصفحة التي تختارها في متجرك.</p>
+        {isLoading ? (
+          <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+        ) : isError ? (
+          <p className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3">انتهت مهلة الاختيار. اضغط «ربط» بجانب Facebook مرة أخرى.</p>
+        ) : (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {pages.map(p => (
+              <button key={p.id} onClick={() => select.mutate(p.id)} disabled={select.isPending}
+                className="w-full flex items-center gap-3 p-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-right disabled:opacity-60">
+                <span className="w-11 h-11 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  {p.pictureUrl ? <img src={p.pictureUrl} alt="" referrerPolicy="no-referrer" className="w-full h-full object-cover" /> : <FacebookLogo className="w-6 h-6" />}
+                </span>
+                <span className="flex-1 min-w-0 font-medium text-gray-900 truncate">{p.name || p.id}</span>
+                {select.isPending && select.variables === p.id && <RefreshCw size={16} className="animate-spin text-gray-500" />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ===========================
 // حالة منصة واحدة: الحالة + العناصر + العمليات
@@ -140,9 +231,16 @@ const usePlatform = (cfg) => {
   }
 
   // الخطوة 1: الخادم يعطي رابط التفويض ويضع كوكي التحقق، ثم ينتقل المتصفح للمنصة
+  // كوكي التحقق يُكتب على عنوان الصفحة الحالية، والمنصة تعيد المتصفح إلى عنوان الرجوع المسجّل لديها.
+  // إن اختلفا (مثلاً الصفحة مفتوحة من 127.0.0.1 والرجوع إلى نطاق Tailscale) يُرفض الرجوع — ننبّه قبل التحويل
+  const [wrongOrigin, setWrongOrigin] = useState(null)
   const connect = useMutation({
     mutationFn: async () => unwrap(await apiGet(cfg.api.connectUrl)),
-    onSuccess: (data) => window.location.assign(data.authorizeUrl),
+    onSuccess: (data) => {
+      const target = callbackOrigin(data.authorizeUrl)
+      if (target && target !== window.location.origin) { setWrongOrigin(target); return }
+      window.location.assign(data.authorizeUrl)
+    },
     onError: (err) => showError(err.message || 'تعذّر بدء الربط'),
   })
 
@@ -185,13 +283,24 @@ const usePlatform = (cfg) => {
     items: itemsQuery.data || [],
     itemsLoading: connected && itemsQuery.isLoading,
     refresh, connect, sync, settings, updateItem, disconnect,
+    wrongOrigin, clearWrongOrigin: () => setWrongOrigin(null),
   }
 }
 
 // ===========================
 // نافذة الموافقة على الربط
 // ===========================
-const ConnectModal = ({ cfg, onClose, onConfirm, connecting }) => (
+// عنوان الرجوع (redirect_uri) داخل رابط التفويض — موجود في روابط المنصات الثلاث
+const callbackOrigin = (authorizeUrl) => {
+  try {
+    const redirect = new URL(authorizeUrl).searchParams.get('redirect_uri')
+    return redirect ? new URL(redirect).origin : null
+  } catch {
+    return null
+  }
+}
+
+const ConnectModal = ({ cfg, onClose, onConfirm, connecting, wrongOrigin }) => (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
     <div className="absolute inset-0 bg-black/50" onClick={connecting ? undefined : onClose} />
     <div className="relative w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl overflow-hidden animate-slide-up">
@@ -224,8 +333,22 @@ const ConnectModal = ({ cfg, onClose, onConfirm, connecting }) => (
         )}
         <p className="mt-3 flex items-start gap-2 text-xs text-gray-500 bg-green-50 rounded-xl p-3">
           <ShieldCheck size={16} className="text-green-600 flex-shrink-0" />
-          لن ننشر أي شيء على حسابك، ولن نطّلع على رسائلك أو كلمة المرور. يمكنك إلغاء الربط في أي وقت.
+          {cfg.promise}
         </p>
+
+        {wrongOrigin && (
+          <div className="mt-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="font-bold flex items-center gap-1.5"><AlertTriangle size={16} />افتح المنصة من العنوان المسجّل لإتمام الربط</p>
+            <p className="text-xs mt-1">
+              {cfg.name} سيعيدك بعد الموافقة إلى <span dir="ltr" className="font-mono">{wrongOrigin}</span>، والصفحة مفتوحة الآن من
+              {' '}<span dir="ltr" className="font-mono">{window.location.origin}</span> — فيُرفض الرجوع للأمان. سجّل الدخول من العنوان المسجّل ثم اضغط «ربط».
+            </p>
+            <a href={`${wrongOrigin}/vendor/social?connect=${cfg.key}`}
+              className="mt-2 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-amber-600 text-white text-xs font-bold">
+              <ExternalLink size={14} />فتح المنصة من العنوان الصحيح
+            </a>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2 mt-5">
           <button onClick={onClose} disabled={connecting}
@@ -321,7 +444,6 @@ const timeAgo = (date) => {
 
 // المنصات القادمة — تظهر كصفوف مختصرة في نفس القائمة
 const UPCOMING = [
-  { name: 'Facebook', color: 'from-blue-500 to-blue-700', letter: 'f' },
   { name: 'YouTube', color: 'from-red-500 to-red-700', letter: '▶' },
   { name: 'Snapchat', color: 'from-yellow-300 to-yellow-400', letter: '👻' },
 ]
@@ -447,6 +569,21 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
             </div>
           )}
 
+          {cfg.key === 'instagram' && status.publishingEnabled && !status.needsReconnect && (
+            status.canPublish ? (
+              <div className="flex items-center gap-2 text-sm text-green-800 bg-green-50 rounded-2xl p-3">
+                <Send size={16} className="flex-shrink-0" />
+                <span className="flex-1">النشر من المنصة مفعّل — انشر أي منتج من صفحة «منتجاتي»</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 text-sm text-amber-900 bg-amber-50 rounded-2xl p-3">
+                <Send size={16} className="flex-shrink-0 mt-0.5" />
+                <span className="flex-1">لنشر منتجاتك من المنصة أعد الربط ووافق على صلاحية «نشر المحتوى».</span>
+                <button onClick={onReconnect} disabled={!status.configured} className="text-sm font-bold underline disabled:opacity-50">إعادة الربط</button>
+              </div>
+            )
+          )}
+
           {stats.length > 0 && (
             <div className="flex divide-x divide-x-reverse divide-gray-100 rounded-2xl bg-gray-50 py-3">
               {stats.map(s => (
@@ -509,6 +646,116 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
 }
 
 // ===========================
+// سجل منشورات إنستغرام من المنصة (منشور / مجدول / فشل)
+// ===========================
+const POST_STATUS = {
+  PUBLISHED: { label: 'منشور', tone: 'ok' },
+  SCHEDULED: { label: 'مجدول', tone: 'info' },
+  PUBLISHING: { label: 'جارٍ النشر', tone: 'info' },
+  FAILED: { label: 'فشل', tone: 'error' },
+  CANCELLED: { label: 'ملغى', tone: 'muted' },
+}
+const toneClass = { ok: 'bg-green-50 text-green-700', info: 'bg-blue-50 text-blue-700', error: 'bg-red-50 text-red-700', muted: 'bg-gray-100 text-gray-500' }
+const formatPostDate = (d) => new Date(d).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })
+
+const InstagramPostsSection = () => {
+  const { success, error: showError } = useToast()
+  const queryClient = useQueryClient()
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ['instagram-posts'],
+    queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.INSTAGRAM.POSTS)) || [],
+    // تحديث تلقائي ما دام هناك منشور مجدول أو قيد النشر
+    refetchInterval: (q) => (q.state.data || []).some(p => p.status === 'SCHEDULED' || p.status === 'PUBLISHING') ? 30000 : false,
+  })
+  // القدوم من رابط «سجل المنشورات»
+  useEffect(() => {
+    if (!isLoading && window.location.hash === '#instagram-posts')
+      document.getElementById('instagram-posts')?.scrollIntoView({ behavior: 'smooth' })
+  }, [isLoading])
+  const action = useMutation({
+    mutationFn: async ({ post, kind }) => unwrap(await apiPost(
+      kind === 'retry' ? API_ENDPOINTS.INSTAGRAM.POST_RETRY(post.id) : API_ENDPOINTS.INSTAGRAM.POST_CANCEL(post.id))),
+    onSuccess: (post, { kind }) => {
+      queryClient.invalidateQueries({ queryKey: ['instagram-posts'] })
+      queryClient.invalidateQueries({ queryKey: ['instagram-items'] })
+      if (kind === 'cancel') success('تم إلغاء المنشور المجدول')
+      else if (post.status === 'PUBLISHED') success('تم النشر على إنستغرام 🎉')
+      else if (post.status === 'FAILED') showError(post.error || 'تعذّر النشر')
+    },
+    onError: (err) => showError(err.message || 'تعذّر تنفيذ العملية'),
+  })
+
+  return (
+    <section id="instagram-posts" className="scroll-mt-20">
+      <div className="flex items-center gap-2 mb-3">
+        <InstagramLogo className="w-5 h-5" />
+        <h2 className="text-lg font-bold text-gray-900 flex-1">منشورات من المنصة</h2>
+        <Link to="/vendor/products" className="text-sm font-bold text-gray-700 inline-flex items-center gap-1 hover:text-black">
+          <Send size={14} />نشر منتج
+        </Link>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-24 rounded-2xl" />
+      ) : posts.length === 0 ? (
+        <div className="text-center text-sm text-gray-500 bg-white rounded-2xl border border-dashed border-gray-300 py-8 px-4">
+          لم تنشر من المنصة بعد — من «منتجاتي» اختر منتجاً ثم «نشر»
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+          {posts.map(p => {
+            const st = POST_STATUS[p.status] || POST_STATUS.SCHEDULED
+            const busy = action.isPending && action.variables?.post.id === p.id
+            return (
+              <div key={p.id} className="flex items-start gap-3 p-3.5">
+                <span className="w-14 h-14 rounded-xl bg-white border border-gray-100 overflow-hidden flex-shrink-0 relative">
+                  {p.images[0] && (/\.(mp4|mov)$/i.test(p.images[0])
+                    ? <video src={getImageUrl(p.images[0])} muted playsInline preload="metadata" className="w-full h-full object-cover bg-black" />
+                    : <img src={getImageUrl(p.images[0])} alt="" className="w-full h-full object-contain" />)}
+                  {p.images.length > 1 && <span className="absolute bottom-0.5 left-0.5 text-[10px] font-bold bg-black/70 text-white px-1 rounded">{p.images.length}</span>}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-gray-900 truncate flex-1">{p.productName || 'منتج محذوف'}</p>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${toneClass[st.tone]}`}>{st.label}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{p.caption}</p>
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Clock size={11} />{formatPostDate(p.status === 'PUBLISHED' ? p.publishedAt : p.scheduledAt)}
+                  </p>
+                  {p.error && p.status !== 'PUBLISHED' && p.status !== 'CANCELLED' && (
+                    <p className={`text-xs mt-1 ${p.status === 'FAILED' ? 'text-red-600' : 'text-amber-700'}`}>{p.error}</p>
+                  )}
+                  {(p.permalink || p.status === 'FAILED' || p.status === 'SCHEDULED') && (
+                    <div className="flex gap-3 mt-1.5">
+                      {p.permalink && (
+                        <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-gray-700 inline-flex items-center gap-1 hover:text-black">
+                          <ExternalLink size={12} />عرض على إنستغرام
+                        </a>
+                      )}
+                      {p.status === 'FAILED' && (
+                        <button onClick={() => action.mutate({ post: p, kind: 'retry' })} disabled={busy} className="text-xs font-bold text-gray-700 inline-flex items-center gap-1 disabled:opacity-50">
+                          <RotateCcw size={12} className={busy ? 'animate-spin' : ''} />إعادة المحاولة
+                        </button>
+                      )}
+                      {p.status === 'SCHEDULED' && (
+                        <button onClick={() => confirm('إلغاء هذا المنشور المجدول؟') && action.mutate({ post: p, kind: 'cancel' })} disabled={busy}
+                          className="text-xs font-bold text-red-600 inline-flex items-center gap-1 disabled:opacity-50">
+                          <Ban size={12} />إلغاء
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ===========================
 // الصفحة
 // ===========================
 const VendorSocialAccounts = () => {
@@ -519,7 +766,8 @@ const VendorSocialAccounts = () => {
 
   const tiktok = usePlatform(PLATFORMS.tiktok)
   const instagram = usePlatform(PLATFORMS.instagram)
-  const byKey = { tiktok, instagram }
+  const facebook = usePlatform(PLATFORMS.facebook)
+  const byKey = { tiktok, instagram, facebook }
   const platforms = PLATFORM_LIST.map(p => byKey[p.key])
 
   const [connectKey, setConnectKey] = useState(null)     // نافذة الموافقة على الربط
@@ -529,16 +777,26 @@ const VendorSocialAccounts = () => {
   const [actionVideo, setActionVideo] = useState(null)
   const [filter, setFilter] = useState('all')
   const [platformFilter, setPlatformFilter] = useState('all')
+  const [pageSelection, setPageSelection] = useState(null)  // اختيار صفحة فيسبوك بعد العودة
 
   // نتيجة العودة من المنصة (مرة واحدة — StrictMode يشغّل التأثير مرتين في التطوير)
   const handledResult = useRef(false)
   useEffect(() => {
     if (handledResult.current) return
+    // ?connect=instagram (من شاشة النشر) يفتح نافذة الموافقة على الربط
+    const connectParam = searchParams.get('connect')
+    if (PLATFORMS[connectParam]) {
+      handledResult.current = true
+      setConnectKey(connectParam)
+      setSearchParams({}, { replace: true })
+      return
+    }
     const p = PLATFORM_LIST.find(cfg => searchParams.get(cfg.key))
     if (!p) return
     handledResult.current = true
     const result = searchParams.get(p.key)
-    if (result === 'connected') success(`تم ربط حساب ${p.name} بنجاح 🎉`)
+    if (result === 'choose' && searchParams.get('selection')) setPageSelection(searchParams.get('selection'))
+    else if (result === 'connected') success(`تم ربط حساب ${p.name} بنجاح 🎉`)
     else if (result === 'deleted') success(`تم حذف بيانات ${p.name} من المنصة`)
     else showError(connectErrors(p.name)[searchParams.get('reason')] || `تعذّر ربط حساب ${p.name}`)
     setSearchParams({}, { replace: true })
@@ -660,17 +918,26 @@ const VendorSocialAccounts = () => {
         </section>
       )}
 
+      {instagram.connected && instagram.status?.publishingEnabled && <InstagramPostsSection />}
+
       {accountPlatform?.connected && (
         <AccountSheet platform={accountPlatform}
           onClose={() => setAccountKey(null)}
           onReconnect={() => { setAccountKey(null); setConnectKey(accountPlatform.cfg.key) }} />
       )}
 
+      {pageSelection && (
+        <FacebookPagePicker selection={pageSelection}
+          onClose={() => setPageSelection(null)}
+          onConnected={() => { setPageSelection(null); success('تم ربط صفحة فيسبوك بنجاح 🎉'); facebook.refresh() }} />
+      )}
+
       {connectPlatform && (
         <ConnectModal cfg={connectPlatform.cfg}
-          onClose={() => setConnectKey(null)}
+          onClose={() => { connectPlatform.clearWrongOrigin(); setConnectKey(null) }}
           onConfirm={() => connectPlatform.connect.mutate(undefined, { onError: () => setConnectKey(null) })}
-          connecting={connectPlatform.connect.isPending || connectPlatform.connect.isSuccess} />
+          wrongOrigin={connectPlatform.wrongOrigin}
+          connecting={connectPlatform.connect.isPending || (connectPlatform.connect.isSuccess && !connectPlatform.wrongOrigin)} />
       )}
 
       {actionVideo && (

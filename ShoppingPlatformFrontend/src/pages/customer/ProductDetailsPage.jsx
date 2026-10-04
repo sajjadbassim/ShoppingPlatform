@@ -122,6 +122,14 @@ const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful }) => {
         </div>
       )}
 
+      {/* رد المتجر */}
+      {review.vendorReply && (
+        <div className="mt-3 mr-3 border-r-2 border-primary/40 bg-primary/5 rounded-l-xl p-3">
+          <p className="text-xs font-bold text-primary mb-0.5">رد المتجر</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{review.vendorReply}</p>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 mt-3">
         <button
           onClick={() => onMarkHelpful(review.id, review.isHelpful)}
@@ -177,6 +185,14 @@ const MobileReviewCard = ({ review, onMarkHelpful }) => {
           <p className="text-sm text-gray-700 leading-relaxed line-clamp-4">{review.body || '—'}</p>
         )}
       </div>
+      {/* رد المتجر */}
+      {review.vendorReply && (
+        <div className="mt-3 mr-3 border-r-2 border-primary/40 bg-primary/5 rounded-l-xl p-3">
+          <p className="text-xs font-bold text-primary mb-0.5">رد المتجر</p>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{review.vendorReply}</p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2 mt-3">
         <button onClick={() => onMarkHelpful(review.id, voted)}
           className={`flex items-center gap-1.5 px-3 h-9 rounded-full border text-xs font-medium ${voted ? 'border-primary text-primary bg-primary/5' : 'border-gray-200 text-gray-800'}`}>

@@ -5,6 +5,12 @@ namespace ecommerce.Core.DTO.Review
     // ===================================
     // Create DTO
     // ===================================
+    public class VendorReplyDto
+    {
+        [MaxLength(1000)]
+        public string? Reply { get; set; }
+    }
+
     public class CreateReviewDto
     {
         [Required(ErrorMessage = "المنتج مطلوب")]

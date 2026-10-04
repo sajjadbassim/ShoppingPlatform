@@ -15,6 +15,10 @@ namespace ecommerce.Core.DTO.Instagram
         public DateTime? LastSyncedAt { get; set; }
         public string? LastSyncError { get; set; }
         public List<string> Scopes { get; set; } = new();
+
+        // النشر من المنصة: مفعّل على الخادم (رابط عام مضبوط)، وهل منح التاجر صلاحية النشر عند الربط
+        public bool PublishingEnabled { get; set; }
+        public bool CanPublish { get; set; }
     }
 
     public class InstagramAccountDto

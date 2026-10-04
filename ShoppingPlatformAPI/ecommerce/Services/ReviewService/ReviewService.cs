@@ -312,6 +312,34 @@ namespace ecommerce.Services
         // ===================================
         // ReportAsync
         // ===================================
+        public async Task<ReviewDto> SetVendorReplyAsync(Guid reviewId, string? reply)
+        {
+            var review = await _reviewRepository.GetByIdAsync(reviewId)
+                ?? throw new Exception("المراجعة غير موجودة");
+
+            var text = reply?.Trim();
+            if (text?.Length > 1000)
+                throw new Exception("الرد طويل جداً (الحد 1000 حرف)");
+
+            var isNew = string.IsNullOrEmpty(review.VendorReply) && !string.IsNullOrEmpty(text);
+            review.VendorReply = string.IsNullOrEmpty(text) ? null : text;
+            review.VendorReplyAt = review.VendorReply == null ? null : DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // إشعار الزبون بأول رد فقط (لا عند كل تعديل)
+            if (isNew)
+            {
+                try
+                {
+                    await _notificationService.NotifyCustomerAsync(review.UserId, "ردّ المتجر على تقييمك",
+                        new { productId = review.ProductId, reviewId = review.Id });
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Vendor reply notification failed"); }
+            }
+
+            return await GetByIdAsync(reviewId);
+        }
+
         public async Task<bool> ReportAsync(Guid userId, Guid reviewId, ReportReviewDto dto)
         {
             var review = await _reviewRepository.GetByIdAsync(reviewId);

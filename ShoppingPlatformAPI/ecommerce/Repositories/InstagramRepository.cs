@@ -80,8 +80,13 @@ namespace ecommerce.Repositories
         public async Task AddConnectionAsync(InstagramConnection connection, CancellationToken ct = default) =>
             await _context.Set<InstagramConnection>().AddAsync(connection, ct);
 
-        public void RemoveConnection(InstagramConnection connection) =>
+        // المنشورات المجلوبة تُحذف معه (Cascade)، وسجل النشر من المنصة (والمجدول منه) يُحذف أيضاً
+        public void RemoveConnection(InstagramConnection connection)
+        {
             _context.Set<InstagramConnection>().Remove(connection);
+            _context.Set<InstagramPost>().RemoveRange(
+                _context.Set<InstagramPost>().Where(p => p.VendorId == connection.VendorId).ToList());
+        }
 
         public void AddMedia(InstagramMedia media) =>
             _context.Set<InstagramMedia>().Add(media);

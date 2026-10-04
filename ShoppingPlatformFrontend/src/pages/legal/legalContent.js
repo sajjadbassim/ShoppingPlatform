@@ -195,6 +195,24 @@ export const legalDocuments = {
         ],
       },
       {
+        id: 'social',
+        title: 'ربط حسابات إنستغرام وتيك توك (للبائعين)',
+        content: [
+          'يستطيع البائع ربط حساب إنستغرام الاحترافي أو حساب تيك توك الخاص بمتجره، باختياره وبعد موافقته في صفحة المنصة نفسها. عند الربط نحصل على:',
+          {
+            list: [
+              'بيانات الحساب العامة: اسم المستخدم والاسم وصورة الحساب وعدد المتابعين والمنشورات.',
+              'المنشورات المنشورة للعامة: الصور والفيديوهات والنصوص وروابطها وعدد الإعجابات والتعليقات، لعرضها في صفحة المتجر وصفحة ريلز مع ربطها بالمنتجات.',
+              'رمز وصول (Access Token) نحفظه مشفّراً، ونستخدمه فقط لجلب المنشورات، وللنشر على إنستغرام عندما يطلب البائع ذلك.',
+            ],
+          },
+          'النشر على إنستغرام: لا ننشر أي شيء تلقائياً. ينشر البائع صور منتجاته على حسابه فقط عندما يختار المنتج والصور والنص ويؤكد النشر بنفسه، أو يحدد موعداً لذلك ويمكنه إلغاؤه قبل حلوله.',
+          'لا نطّلع على الرسائل الخاصة أو كلمة المرور، ولا نبيع هذه البيانات ولا نشاركها مع أي طرف، ولا نستخدمها للإعلانات.',
+          'الحذف: عند إلغاء الربط من صفحة «ربط حسابات التواصل» نحذف رمز الوصول والمنشورات المحفوظة فوراً. ويمكن أيضاً إزالة التطبيق من إعدادات إنستغرام (التطبيقات والمواقع) فتصلنا رسالة من Meta ونوقف الوصول، أو طلب حذف البيانات من هناك فنحذفها خلال 30 يوماً كحد أقصى.',
+          'In English: Sellers may connect their Instagram professional or TikTok account. We store the public profile, published media (to display it on the seller’s store page) and an encrypted access token. We publish to Instagram only when the seller explicitly selects a product, its images and caption and confirms. We never read messages or passwords and never sell or share this data. Disconnecting deletes the token and stored media immediately; data deletion requests sent through Instagram are honored within 30 days.',
+        ],
+      },
+      {
         id: 'cookies',
         title: 'ملفات تعريف الارتباط',
         content: [

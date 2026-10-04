@@ -1,5 +1,6 @@
 using ecommerce.Core.DTO.Social;
 using ecommerce.Repositories;
+using ecommerce.Services.FacebookService;
 using ecommerce.Services.InstagramService;
 using ecommerce.Services.TikTokService;
 
@@ -23,17 +24,23 @@ namespace ecommerce.Services.SocialFeedService
         private readonly ITikTokRepository _tikTokRepository;
         private readonly IInstagramService _instagram;
         private readonly IInstagramRepository _instagramRepository;
+        private readonly IFacebookService _facebook;
+        private readonly IFacebookRepository _facebookRepository;
 
         public SocialFeedService(
             ITikTokService tikTok,
             ITikTokRepository tikTokRepository,
             IInstagramService instagram,
-            IInstagramRepository instagramRepository)
+            IInstagramRepository instagramRepository,
+            IFacebookService facebook,
+            IFacebookRepository facebookRepository)
         {
             _tikTok = tikTok;
             _tikTokRepository = tikTokRepository;
             _instagram = instagram;
             _instagramRepository = instagramRepository;
+            _facebook = facebook;
+            _facebookRepository = facebookRepository;
         }
 
         public async Task<SocialStoreFeedDto> GetStoreFeedAsync(Guid vendorId, CancellationToken ct = default)
@@ -69,6 +76,20 @@ namespace ecommerce.Services.SocialFeedService
                 items.AddRange(instagram.Media.Select(SocialMapping.FromInstagram));
             }
 
+            var facebook = await _facebookRepository.GetPublicConnectionAsync(vendorId, ct);
+            if (facebook != null)
+            {
+                feed.Accounts.Add(new SocialAccountDto
+                {
+                    Platform = SocialPlatforms.Facebook,
+                    DisplayName = facebook.PageName,
+                    Username = facebook.PageUsername,
+                    AvatarUrl = facebook.PagePictureUrl,
+                    ProfileUrl = SocialMapping.FacebookPageUrl(facebook)
+                });
+                items.AddRange(facebook.Media.Select(SocialMapping.FromFacebook));
+            }
+
             feed.Items = Newest(items).ToList();
             return feed;
         }
@@ -78,6 +99,7 @@ namespace ecommerce.Services.SocialFeedService
         {
             await _tikTok.RefreshStoreFeedAsync(vendorId, ct);
             await _instagram.RefreshStoreAsync(vendorId, ct);
+            await _facebook.RefreshStoreAsync(vendorId, ct);
             return await GetStoreFeedAsync(vendorId, ct);
         }
 
@@ -93,10 +115,12 @@ namespace ecommerce.Services.SocialFeedService
 
             var tiktok = await _tikTokRepository.GetPublicReelsAsync(0, window, ct);
             var instagram = await _instagramRepository.GetPublicReelsAsync(0, window, ct);
+            var facebook = await _facebookRepository.GetPublicReelsAsync(0, window, ct);
 
             var merged = Newest(
                     tiktok.Select(v => WithStore(SocialMapping.FromTikTok(v), SocialMapping.FromVendor(v.Connection.Vendor)))
-                    .Concat(instagram.Select(m => WithStore(SocialMapping.FromInstagram(m), SocialMapping.FromVendor(m.Connection.Vendor)))))
+                    .Concat(instagram.Select(m => WithStore(SocialMapping.FromInstagram(m), SocialMapping.FromVendor(m.Connection.Vendor))))
+                    .Concat(facebook.Select(m => WithStore(SocialMapping.FromFacebook(m), SocialMapping.FromVendor(m.Connection.Vendor)))))
                 .Skip(skip)
                 .Take(pageSize + 1)
                 .ToList();
@@ -113,6 +137,7 @@ namespace ecommerce.Services.SocialFeedService
         {
             await _tikTok.RefreshReelsAsync(pageSize, ct);
             await _instagram.RefreshVisibleAsync(ct);
+            await _facebook.RefreshVisibleAsync(ct);
             return await GetReelsAsync(1, pageSize, ct);
         }
 

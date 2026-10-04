@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Plus, Search, MoreVertical, Edit, Trash2, Eye, EyeOff, Package, RefreshCw, AlertCircle,
-  Minus, Check, X, ArrowUpDown, CheckSquare,
+  Minus, Check, X, ArrowUpDown, CheckSquare, Send,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Button from '../../components/common/Button'
@@ -268,6 +268,7 @@ const VendorProducts = () => {
   const actionsFor = (p) => [
     { label: 'تعديل', icon: Edit, onClick: () => navigate(`/vendor/products/${p.id}/edit`) },
     { label: 'عرض في المتجر', icon: Eye, onClick: () => window.open(`/products/${p.id}`, '_blank') },
+    { label: 'نشر', icon: Send, onClick: () => navigate(`/vendor/products/${p.id}/publish`) },
     { divider: true },
     { label: 'حذف', icon: Trash2, danger: true, onClick: () => setToDelete(p) },
   ]

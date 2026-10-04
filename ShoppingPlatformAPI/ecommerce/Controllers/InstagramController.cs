@@ -24,15 +24,47 @@ namespace ecommerce.Controllers
         private const string CookiePath = "/api/integrations/instagram";
 
         private readonly IInstagramService _instagramService;
+        private readonly IInstagramPublishService _publishService;
         private readonly ICurrentUserService _currentUser;
         private readonly InstagramOptions _options;
 
-        public InstagramController(IInstagramService instagramService, ICurrentUserService currentUser, IOptions<InstagramOptions> options)
+        public InstagramController(IInstagramService instagramService, IInstagramPublishService publishService,
+            ICurrentUserService currentUser, IOptions<InstagramOptions> options)
         {
             _instagramService = instagramService;
+            _publishService = publishService;
             _currentUser = currentUser;
             _options = options.Value;
         }
+
+        // ===================================
+        // النشر من المنصة على حساب التاجر
+        // ===================================
+
+        // GET: api/integrations/instagram/publish/options?productId= — الحساب، صور المنتج، نص مقترح، الحصة
+        [HttpGet("publish/options")]
+        public async Task<ActionResult<ApiResponse<InstagramPublishOptionsDto>>> GetPublishOptions([FromQuery] Guid productId, CancellationToken ct)
+            => Ok(ApiResponse<InstagramPublishOptionsDto>.Ok(await _publishService.GetOptionsAsync(_currentUser.UserId, productId, ct)));
+
+        // GET: api/integrations/instagram/posts — آخر 50 منشوراً من المنصة
+        [HttpGet("posts")]
+        public async Task<ActionResult<ApiResponse<List<InstagramPostDto>>>> GetPosts(CancellationToken ct)
+            => Ok(ApiResponse<List<InstagramPostDto>>.Ok(await _publishService.ListAsync(_currentUser.UserId, ct)));
+
+        // POST: api/integrations/instagram/posts — { productId, images[], caption, scheduledAt? }
+        [HttpPost("posts")]
+        public async Task<ActionResult<ApiResponse<InstagramPostDto>>> CreatePost(CreateInstagramPostDto dto, CancellationToken ct)
+            => Ok(ApiResponse<InstagramPostDto>.Ok(await _publishService.CreateAsync(_currentUser.UserId, dto, ct)));
+
+        // POST: api/integrations/instagram/posts/{id}/retry
+        [HttpPost("posts/{id:guid}/retry")]
+        public async Task<ActionResult<ApiResponse<InstagramPostDto>>> RetryPost(Guid id, CancellationToken ct)
+            => Ok(ApiResponse<InstagramPostDto>.Ok(await _publishService.RetryAsync(_currentUser.UserId, id, ct)));
+
+        // POST: api/integrations/instagram/posts/{id}/cancel — للمجدولة فقط
+        [HttpPost("posts/{id:guid}/cancel")]
+        public async Task<ActionResult<ApiResponse<InstagramPostDto>>> CancelPost(Guid id, CancellationToken ct)
+            => Ok(ApiResponse<InstagramPostDto>.Ok(await _publishService.CancelAsync(_currentUser.UserId, id, ct)));
 
         // GET: api/integrations/instagram/status
         [HttpGet("status")]

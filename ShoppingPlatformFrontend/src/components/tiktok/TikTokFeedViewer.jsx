@@ -2,11 +2,12 @@ import { memo, useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { X, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ShoppingBag, Volume2, VolumeX, RefreshCw, Play, ExternalLink } from 'lucide-react'
 import { getImageUrl } from '../../utils/imageHelper'
-import InstagramLogo from '../social/InstagramLogo'
+import PlatformLogo, { PLATFORM_NAMES } from '../social/PlatformLogo'
 
-// عناصر العارض من تيك توك (مشغّل iframe) أو إنستغرام (فيديو mp4 مباشر، صورة، أو ألبوم).
+// عناصر العارض من تيك توك (مشغّل iframe) أو إنستغرام/فيسبوك (فيديو mp4 مباشر، صورة، أو ألبوم).
 // "المشغّل" = iframe تيك توك أو عنصر <video>؛ الصور والألبومات بلا مشغّل وبلا صوت
-const hasPlayer = (item) => !!item && (item.platform !== 'instagram' || (item.mediaType === 'video' && !!item.videoUrl))
+const isNative = (item) => item.platform !== 'tiktok'
+const hasPlayer = (item) => !!item && (!isNative(item) || (item.mediaType === 'video' && !!item.videoUrl))
 
 // مشغّل تيك توك الرسمي بلا أدواته — أدوات التحكم موحّدة لكل المنصات (ProgressBar أدناه)
 const playerUrl = (video) => {
@@ -139,7 +140,9 @@ const TIKTOK_ACTIONS_CUTOUT = 'polygon(0 0, 100% 0, 100% 66%, calc(100% - 64px) 
  * near: الشرائح القريبة فقط ترسم الغلاف والبطاقات (الصور والتأثيرات مكلفة على الهاتف).
  */
 const Slide = memo(({ video, index, active, near, loadPlayer, paused, onTap, setSlideRef, setFrameRef, setHostRef }) => {
-  const isInstagram = video.platform === 'instagram'
+  // إنستغرام وفيسبوك: وسائط مباشرة نعرضها بأنفسنا (بعكس مشغّل تيك توك)
+  const isInstagram = isNative(video)
+  const platformName = PLATFORM_NAMES[video.platform] || video.platform
   const player = hasPlayer(video)
   return (
   <section ref={setSlideRef} data-index={index}
@@ -191,8 +194,8 @@ const Slide = memo(({ video, index, active, near, loadPlayer, paused, onTap, set
           {video.shareUrl && (
             <a href={video.shareUrl} target="_blank" rel="noopener noreferrer"
               className="pointer-events-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-full bg-white/15 text-xs font-bold">
-              <InstagramLogo className="w-4 h-4" />
-              {player || video.mediaType !== 'video' ? 'عرض على Instagram' : 'شاهد الفيديو على Instagram'}
+              <PlatformLogo platform={video.platform} className="w-4 h-4" />
+              {player || video.mediaType !== 'video' ? `عرض على ${platformName}` : `شاهد الفيديو على ${platformName}`}
               <ExternalLink size={12} />
             </a>
           )}
@@ -422,7 +425,7 @@ const TikTokFeedViewer = ({ videos, startIndex = 0, onClose, standalone = false,
     const used = new Set()
     for (const i of [active, active + 1, active - 1]) {
       const item = videos[i]
-      if (!item || item.platform !== 'instagram' || !hasPlayer(item)) continue
+      if (!item || !isNative(item) || !hasPlayer(item)) continue
       if (i !== active && !neighborsOn) continue
       const host = hostsRef.current[i]
       if (!host) continue

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
-  Save, X, ImagePlus, Star, Trash2, Info, ArrowRight, Minus, Plus, ChevronDown, RefreshCw, CheckCircle2,
+  Save, X, ImagePlus, Star, Trash2, Info, ArrowRight, Minus, Plus, ChevronDown, RefreshCw, CheckCircle2, Send,
 } from 'lucide-react'
 import { Toggle } from '../../components/common/FormControls'
 import { Skeleton } from '../../components/common/Loading'
@@ -354,7 +354,13 @@ const VendorProductForm = () => {
             </div>
           </Section>
           {isEditing && (
-            <Link to={`/products/${id}`} target="_blank" className="block text-center text-sm text-gray-500 hover:text-primary">عرض المنتج كما يراه الزبون ↗</Link>
+            <>
+              <Link to={`/vendor/products/${id}/publish`}
+                className="flex items-center justify-center gap-2 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-800 hover:bg-gray-50">
+                <Send size={16} />نشر المنتج على حساباتك
+              </Link>
+              <Link to={`/products/${id}`} target="_blank" className="block text-center text-sm text-gray-500 hover:text-primary">عرض المنتج كما يراه الزبون ↗</Link>
+            </>
           )}
         </div>
       </div>

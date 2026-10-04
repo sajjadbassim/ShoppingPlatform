@@ -17,7 +17,15 @@ namespace ecommerce.Core.Models
         // الصفحة التي يعود إليها التاجر بعد الربط (يُضاف لها ?instagram=connected|error)
         public string AfterConnectUrl { get; set; } = "/vendor/social";
 
-        public string Scopes { get; set; } = "instagram_business_basic";
+        // instagram_business_content_publish: نشر منتجات التاجر من المنصة على حسابه (يحتاج موافقة Meta)
+        public string Scopes { get; set; } = "instagram_business_basic,instagram_business_content_publish";
+
+        // الرابط العام للمنصة (HTTPS) — إنستغرام يجلب صور المنشور منه، مثل https://your-domain
+        // فارغ = النشر غير مفعّل (لا يمكن لإنستغرام الوصول لصور على localhost)
+        public string PublicBaseUrl { get; set; } = "";
+
+        // الفاصل بين فحوص جاهزية حاوية النشر (ثوانٍ)
+        public int PublishPollIntervalSeconds { get; set; } = 2;
 
         // فارغ = بدون رقم إصدار (إصدار التطبيق الافتراضي). مثال: v23.0
         public string ApiVersion { get; set; } = "";

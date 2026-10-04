@@ -1,4 +1,6 @@
-﻿using ecommerce.Core.DTO.Review;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.DTO.Review;
+using ecommerce.Services.VendorAccessService;
 using ecommerce.Repositories;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,12 +16,16 @@ namespace ecommerce.Controllers
         private readonly IReviewService _reviewService;
         private readonly IReviewRepository _reviewRepository;
 
+        private readonly IVendorAccessService _access;
+
         public ReviewsController(
             IReviewService reviewService,
-            IReviewRepository reviewRepository)
+            IReviewRepository reviewRepository,
+            IVendorAccessService access)
         {
             _reviewService = reviewService;
             _reviewRepository = reviewRepository;
+            _access = access;
         }
 
         // Helper لجلب ID المستخدم الحالي من الـ Token
@@ -29,7 +35,7 @@ namespace ecommerce.Controllers
             return claim != null ? Guid.Parse(claim) : null;
         }
 
-        private bool IsAdmin => User.IsInRole("Admin");
+        private bool IsAdmin => User.IsInRole("ADMIN");
 
         // ===================================
         // GET: api/reviews
@@ -201,6 +207,43 @@ namespace ecommerce.Controllers
             catch (UnauthorizedAccessException)
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية حذف هذه المراجعة" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ===================================
+        // PUT: api/reviews/{id}/reply — رد صاحب المتجر (أو الإدارة) على تقييم منتجه
+        // DELETE: api/reviews/{id}/reply — حذف الرد
+        // ===================================
+        [HttpPut("{id}/reply")]
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
+        public async Task<IActionResult> Reply(Guid id, [FromBody] VendorReplyDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto?.Reply))
+                return BadRequest(new { success = false, message = "اكتب الرد" });
+            return await SetReplyAsync(id, dto.Reply, "تم نشر ردك");
+        }
+
+        [HttpDelete("{id}/reply")]
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
+        public Task<IActionResult> DeleteReply(Guid id) => SetReplyAsync(id, null, "تم حذف الرد");
+
+        private async Task<IActionResult> SetReplyAsync(Guid id, string? reply, string message)
+        {
+            var productId = await _reviewRepository.GetProductIdAsync(id);
+            if (productId == null)
+                return NotFound(new { success = false, message = "المراجعة غير موجودة" });
+
+            // صاحب المتجر الذي يبيع المنتج فقط (أو الإدارة/العمليات)
+            await _access.EnsureCanManageProductAsync(productId.Value);
+
+            try
+            {
+                var review = await _reviewService.SetVendorReplyAsync(id, reply);
+                return Ok(new { success = true, data = review, message });
             }
             catch (Exception ex)
             {

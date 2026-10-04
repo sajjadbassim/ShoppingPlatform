@@ -1,6 +1,7 @@
 using ecommerce.Core.DTO.Social;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Services.FacebookService;
 using ecommerce.Services.InstagramService;
 using ecommerce.Services.SocialFeedService;
 using ecommerce.Services.TikTokService;
@@ -12,10 +13,12 @@ namespace ecommerce.Tests.Services
     {
         private readonly Mock<ITikTokRepository> _tikTokRepository = new();
         private readonly Mock<IInstagramRepository> _instagramRepository = new();
+        private readonly Mock<IFacebookRepository> _facebookRepository = new();
         private readonly Vendor _vendor = new() { Id = Guid.NewGuid(), Name = "Store" };
 
         private SocialFeedService CreateService() => new(
-            Mock.Of<ITikTokService>(), _tikTokRepository.Object, Mock.Of<IInstagramService>(), _instagramRepository.Object);
+            Mock.Of<ITikTokService>(), _tikTokRepository.Object, Mock.Of<IInstagramService>(), _instagramRepository.Object,
+            Mock.Of<IFacebookService>(), _facebookRepository.Object);
 
         private TikTokVideo TikTok(int day) => new()
         {
@@ -40,13 +43,16 @@ namespace ecommerce.Tests.Services
                 .ReturnsAsync(new List<TikTokVideo> { TikTok(9), TikTok(5), TikTok(1) });
             _instagramRepository.Setup(r => r.GetPublicReelsAsync(0, It.IsAny<int>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<InstagramMedia> { Instagram(8), Instagram(4) });
+            _facebookRepository.Setup(r => r.GetPublicReelsAsync(0, It.IsAny<int>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<FacebookMedia> { new() { ExternalId = "f6", MediaType = FacebookMedia.TypeVideo, MediaUrl = "https://v.mp4",
+                    PublishedAt = new DateTime(2026, 9, 6), Connection = new FacebookConnection { Vendor = _vendor } } });
 
             var first = await CreateService().GetReelsAsync(1, 3);
             var second = await CreateService().GetReelsAsync(2, 3);
 
-            Assert.Equal(new[] { "t9", "i8", "t5" }, first.Items.Select(i => i.ExternalId));
+            Assert.Equal(new[] { "t9", "i8", "f6" }, first.Items.Select(i => i.ExternalId));
             Assert.True(first.HasMore);
-            Assert.Equal(new[] { "i4", "t1" }, second.Items.Select(i => i.ExternalId));
+            Assert.Equal(new[] { "t5", "i4", "t1" }, second.Items.Select(i => i.ExternalId));
             Assert.False(second.HasMore);
             Assert.All(first.Items, i => Assert.Equal(_vendor.Id, i.Store!.Id));
             Assert.Equal(SocialPlatforms.Instagram, first.Items[1].Platform);

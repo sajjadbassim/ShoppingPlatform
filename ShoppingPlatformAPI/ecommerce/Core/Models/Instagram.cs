@@ -94,6 +94,46 @@ namespace ecommerce.Core.Models
         public string? ThumbnailUrl { get; set; }
     }
 
+    // منشور ينشره التاجر من المنصة على حسابه (صورة أو ألبوم من صور منتج) — فوراً أو بموعد.
+    // التسلسل: Scheduled ← Publishing ← Published | Failed. الصور تُحوَّل إلى JPEG مربع (شرط إنستغرام)
+    // وتُرفع إلى رابط عام يجلبه إنستغرام، ثم تُحذف بعد النشر
+    public class InstagramPost : IAuditableEntity
+    {
+        public const string StatusScheduled = "SCHEDULED";
+        public const string StatusPublishing = "PUBLISHING";
+        public const string StatusPublished = "PUBLISHED";
+        public const string StatusFailed = "FAILED";
+        public const string StatusCancelled = "CANCELLED";
+
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid VendorId { get; set; }
+        public Guid? ProductId { get; set; }
+        public Guid CreatedByUserId { get; set; }
+
+        public string Caption { get; set; } = "";
+        // روابط صور المنتج المختارة بالترتيب (JSON لقائمة نصوص) — من مجلد uploads في المنصة
+        public string SourceImagesJson { get; set; } = "[]";
+        // صور JPEG المجهزة لإنستغرام (JSON) — تُحذف بعد النشر
+        public string? PreparedImagesJson { get; set; }
+
+        public string Status { get; set; } = StatusScheduled;
+        public DateTime ScheduledAt { get; set; }
+        public int Attempts { get; set; }
+        public DateTime? NextAttemptAt { get; set; }
+        public string? Error { get; set; }
+
+        public string? ContainerId { get; set; }
+        public string? ExternalMediaId { get; set; }
+        public string? Permalink { get; set; }
+        public DateTime? PublishedAt { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+
+        public virtual Vendor Vendor { get; set; } = null!;
+        public virtual Product? Product { get; set; }
+    }
+
     // طلب ربط قيد التنفيذ: يربط state المرسَل لإنستغرام بالمتجر، صالح لمرة واحدة ولمدة قصيرة
     public class InstagramOAuthState
     {

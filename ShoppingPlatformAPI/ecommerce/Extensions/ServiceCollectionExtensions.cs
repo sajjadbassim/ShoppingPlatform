@@ -21,6 +21,7 @@ using ecommerce.Services.ProductService.ProductService;
 using ecommerce.Services.SmsService;
 using ecommerce.Services.TikTokService;
 using ecommerce.Services.InstagramService;
+using ecommerce.Services.FacebookService;
 using ecommerce.Services.SocialFeedService;
 using ecommerce.Core.Models;
 using ecommerce.Services.UserPreferencesService;
@@ -221,8 +222,39 @@ namespace ecommerce.Extensions
             services.AddScoped<IInstagramRepository, InstagramRepository>();
             services.AddScoped<IInstagramService, InstagramService>();
             services.AddHostedService<InstagramSyncBackgroundService>();
+            // النشر من المنصة على حساب التاجر
+            services.AddSingleton<IInstagramImagePreparer, InstagramImagePreparer>();
+            services.AddScoped<IInstagramPublishService, InstagramPublishService>();
+            services.AddScoped<ecommerce.Services.SocialPublishService.ISocialMediaStore, ecommerce.Services.SocialPublishService.SocialMediaStore>();
+            services.AddHostedService<InstagramPublishBackgroundService>();
 
             services.AddScoped<ISocialFeedService, SocialFeedService>();
+
+            return services;
+        }
+
+        // ربط متاجر التجار بصفحات فيسبوك (تسجيل دخول فيسبوك للأعمال) — يُستدعى بعد AddAppDataProtection
+        public static IServiceCollection AddFacebookIntegration(this IServiceCollection services, IConfiguration config)
+        {
+            services.Configure<FacebookOptions>(config.GetSection(FacebookOptions.SectionName));
+
+            services.AddHttpClient(FacebookApiClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(20))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+                {
+                    ConnectTimeout = TimeSpan.FromSeconds(6),
+                    ConnectCallback = TikTokConnectionHelper.ConnectToFastestAsync,
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+                })
+                // التوكنات ومفتاح التطبيق في رابط الطلب — سجلات HttpClient تطبع الروابط
+                .RemoveAllLoggers();
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddMemoryCache();
+
+            services.AddSingleton<IFacebookTokenProtector, FacebookTokenProtector>();
+            services.AddScoped<IFacebookApiClient, FacebookApiClient>();
+            services.AddScoped<IFacebookRepository, FacebookRepository>();
+            services.AddScoped<IFacebookService, FacebookService>();
+            services.AddHostedService<FacebookSyncBackgroundService>();
 
             return services;
         }

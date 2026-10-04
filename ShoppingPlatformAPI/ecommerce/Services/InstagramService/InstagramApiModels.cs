@@ -104,6 +104,43 @@ namespace ecommerce.Services.InstagramService
         [JsonPropertyName("fbtrace_id")] public string? TraceId { get; set; }
     }
 
+    // ===================================
+    // النشر (Content Publishing)
+    // ===================================
+    public class InstagramIdResponse
+    {
+        [JsonPropertyName("id")][JsonConverter(typeof(FlexibleStringConverter))] public string? Id { get; set; }
+    }
+
+    // حالة حاوية الوسائط: FINISHED | IN_PROGRESS | ERROR | EXPIRED | PUBLISHED
+    public class InstagramContainerStatus
+    {
+        [JsonPropertyName("status_code")] public string? StatusCode { get; set; }
+        [JsonPropertyName("status")] public string? Status { get; set; }
+    }
+
+    public class InstagramPublishingLimitResponse
+    {
+        [JsonPropertyName("data")] public List<InstagramPublishingLimit>? Data { get; set; }
+    }
+
+    public class InstagramPublishingLimit
+    {
+        [JsonPropertyName("quota_usage")] public int QuotaUsage { get; set; }
+        [JsonPropertyName("config")] public InstagramPublishingLimitConfig? Config { get; set; }
+    }
+
+    public class InstagramPublishingLimitConfig
+    {
+        [JsonPropertyName("quota_total")] public int QuotaTotal { get; set; }
+        [JsonPropertyName("quota_duration")] public int QuotaDuration { get; set; }
+    }
+
+    public class InstagramPermalinkResponse
+    {
+        [JsonPropertyName("permalink")] public string? Permalink { get; set; }
+    }
+
     // المعرّفات تصل أحياناً كنص وأحياناً كرقم
     public class FlexibleStringConverter : JsonConverter<string?>
     {
@@ -126,6 +163,9 @@ namespace ecommerce.Services.InstagramService
     public class InstagramApiException : Exception
     {
         public string? Code { get; }
+
+        // رسالة إنستغرام الأصلية (للتسجيل ولعرض سبب رفض المنشور للتاجر)
+        public string? Detail { get; init; }
 
         // التوكن غير صالح أو أُلغي الإذن — لا فائدة من إعادة المحاولة، يلزم إعادة الربط
         public bool RequiresReconnect { get; }

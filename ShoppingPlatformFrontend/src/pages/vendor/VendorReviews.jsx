@@ -2,13 +2,14 @@
 import { useState } from 'react'
 import {
   Star, ThumbsUp, RefreshCw, BarChart2,
-  Package, ChevronDown, ChevronUp,
+  Package, ChevronDown, ChevronUp, Reply, Pencil, Trash2,
 } from 'lucide-react'
 import { Skeleton } from '../../components/common/Loading'
 import EmptyState from '../../components/common/EmptyState'
 import Pagination from '../../components/common/Pagination'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost, apiDelete } from '../../api/axios'
+import { apiGet, apiPost, apiPut, apiDelete } from '../../api/axios'
+import { useToast } from '../../components/common/Toast'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useAuthStore } from '../../stores/authStore'
 import { getImageUrl } from '../../utils/imageHelper'
@@ -139,6 +140,76 @@ const SummaryCard = ({ summary, isLoading }) => {
 // Product Reviews Row
 // ===========================
 
+// ===========================
+// رد البائع على تقييم: كتابة، تعديل، حذف
+// ===========================
+const VendorReplyBox = ({ review, productId }) => {
+  const queryClient = useQueryClient()
+  const { success, error: showError } = useToast()
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(review.vendorReply || '')
+
+  const { mutate: save, isPending: saving } = useMutation({
+    mutationFn: (reply) => reply
+      ? apiPut(API_ENDPOINTS.REVIEWS.REPLY(review.id), { reply })
+      : apiDelete(API_ENDPOINTS.REVIEWS.REPLY(review.id)),
+    onSuccess: (_, reply) => {
+      queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] })
+      setEditing(false)
+      success(reply ? 'تم نشر ردك — يظهر للزبائن تحت التقييم' : 'تم حذف الرد')
+    },
+    onError: (err) => showError(err.message || 'تعذّر حفظ الرد'),
+  })
+
+  if (editing) {
+    return (
+      <div className="mt-3" onClick={e => e.stopPropagation()}>
+        <textarea value={text} onChange={e => setText(e.target.value)} maxLength={1000} rows={3} autoFocus
+          placeholder="اكتب رداً لطيفاً — يراه كل الزبائن تحت التقييم"
+          className="w-full p-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[11px] text-gray-400">{text.length}/1000</span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setEditing(false); setText(review.vendorReply || '') }}
+              className="h-9 px-4 rounded-xl text-sm text-gray-600 hover:bg-gray-100">إلغاء</button>
+            <button type="button" disabled={saving || !text.trim()} onClick={() => save(text.trim())}
+              className="h-9 px-4 rounded-xl bg-primary text-white text-sm font-medium disabled:opacity-50">
+              {saving ? 'جارٍ الحفظ...' : 'نشر الرد'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (review.vendorReply) {
+    return (
+      <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-1">
+          <p className="text-xs font-semibold text-blue-700">
+            ردك{review.vendorReplyAt ? ` · ${new Date(review.vendorReplyAt).toLocaleDateString('ar-IQ')}` : ''}
+          </p>
+          <div className="flex gap-1">
+            <button type="button" aria-label="تعديل الرد" onClick={() => { setText(review.vendorReply); setEditing(true) }}
+              className="w-7 h-7 rounded-lg text-blue-600 hover:bg-blue-100 flex items-center justify-center"><Pencil size={13} /></button>
+            <button type="button" aria-label="حذف الرد" disabled={saving}
+              onClick={() => { if (window.confirm('حذف ردك على هذا التقييم؟')) save(null) }}
+              className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 flex items-center justify-center"><Trash2 size={13} /></button>
+          </div>
+        </div>
+        <p className="text-sm text-blue-800 whitespace-pre-line">{review.vendorReply}</p>
+      </div>
+    )
+  }
+
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); setEditing(true) }}
+      className="mt-3 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-primary/30 text-primary text-xs font-medium hover:bg-primary/5">
+      <Reply size={14} /> ردّ على التقييم
+    </button>
+  )
+}
+
 const ProductReviewsRow = ({ product }) => {
   const [expanded, setExpanded] = useState(false)
   const [page, setPage]         = useState(1)
@@ -247,13 +318,8 @@ const ProductReviewsRow = ({ product }) => {
                     <span>مفيد ({review.helpfulCount ?? 0})</span>
                   </button>
 
-                  {/* Vendor Reply */}
-                  {review.vendorReply && (
-                    <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-semibold text-blue-700 mb-1">ردك:</p>
-                      <p className="text-sm text-blue-800">{review.vendorReply}</p>
-                    </div>
-                  )}
+                  {/* رد البائع */}
+                  <VendorReplyBox review={review} productId={product.id} />
                 </div>
               ))}
 

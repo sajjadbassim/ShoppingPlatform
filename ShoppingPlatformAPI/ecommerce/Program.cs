@@ -259,6 +259,7 @@ builder.Services.AddAppServices();
 builder.Services.AddAppDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddTikTokIntegration(builder.Configuration);
 builder.Services.AddInstagramIntegration(builder.Configuration);
+builder.Services.AddFacebookIntegration(builder.Configuration);
 
 //builder.WebHost.UseUrls("http://0.0.0.0:5000");
 

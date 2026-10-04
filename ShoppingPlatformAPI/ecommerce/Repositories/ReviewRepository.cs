@@ -17,6 +17,9 @@ namespace ecommerce.Repositories
         // ===================================
         // GetByIdAsync
         // ===================================
+        public Task<Guid?> GetProductIdAsync(Guid reviewId) =>
+            _context.Reviews.Where(r => r.Id == reviewId).Select(r => (Guid?)r.ProductId).FirstOrDefaultAsync();
+
         public async Task<Review?> GetByIdAsync(Guid id)
         {
             return await _context.Reviews.FindAsync(id);

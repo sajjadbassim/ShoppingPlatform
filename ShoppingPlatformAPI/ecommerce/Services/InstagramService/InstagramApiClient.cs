@@ -14,6 +14,16 @@ namespace ecommerce.Services.InstagramService
         Task<InstagramTokenResponse> RefreshTokenAsync(string accessToken, CancellationToken ct = default);
         Task<InstagramProfile?> GetProfileAsync(string accessToken, CancellationToken ct = default);
         Task<InstagramMediaPage> ListMediaAsync(string accessToken, string? after, int limit, CancellationToken ct = default);
+
+        // النشر: حاوية صورة (أو عنصر ألبوم) ← حاوية ألبوم ← انتظار الجاهزية ← نشر
+        Task<string> CreateImageContainerAsync(string accessToken, string igUserId, string imageUrl, string? caption, bool isCarouselItem, CancellationToken ct = default);
+        // فيديو منفرد يُنشر ريلز (REELS)، وداخل الألبوم عنصر VIDEO
+        Task<string> CreateVideoContainerAsync(string accessToken, string igUserId, string videoUrl, string? caption, bool isCarouselItem, CancellationToken ct = default);
+        Task<string> CreateCarouselContainerAsync(string accessToken, string igUserId, IReadOnlyList<string> childIds, string caption, CancellationToken ct = default);
+        Task<string?> GetContainerStatusAsync(string accessToken, string containerId, CancellationToken ct = default);
+        Task<string> PublishContainerAsync(string accessToken, string igUserId, string containerId, CancellationToken ct = default);
+        Task<InstagramPublishingLimit?> GetPublishingLimitAsync(string accessToken, string igUserId, CancellationToken ct = default);
+        Task<string?> GetPermalinkAsync(string accessToken, string mediaId, CancellationToken ct = default);
     }
 
     public static class InstagramLimits
@@ -116,6 +126,80 @@ namespace ecommerce.Services.InstagramService
         }
 
         // ===================================
+        // النشر — طلبات POST لا تُعاد تلقائياً (إعادة media_publish قد تنشر المنشور مرتين)
+        // ===================================
+        public Task<string> CreateImageContainerAsync(string accessToken, string igUserId, string imageUrl, string? caption, bool isCarouselItem, CancellationToken ct = default)
+        {
+            var form = new Dictionary<string, string> { ["image_url"] = imageUrl };
+            if (isCarouselItem) form["is_carousel_item"] = "true";
+            else if (!string.IsNullOrEmpty(caption)) form["caption"] = caption;
+            return PostForIdAsync($"{GraphBase}/{Uri.EscapeDataString(igUserId)}/media", form, accessToken, "create container", ct);
+        }
+
+        public Task<string> CreateVideoContainerAsync(string accessToken, string igUserId, string videoUrl, string? caption, bool isCarouselItem, CancellationToken ct = default)
+        {
+            var form = new Dictionary<string, string> { ["video_url"] = videoUrl };
+            if (isCarouselItem)
+            {
+                form["media_type"] = "VIDEO";
+                form["is_carousel_item"] = "true";
+            }
+            else
+            {
+                form["media_type"] = "REELS";
+                form["share_to_feed"] = "true";   // يظهر في شبكة الحساب لا في تبويب الريلز فقط
+                if (!string.IsNullOrEmpty(caption)) form["caption"] = caption;
+            }
+            return PostForIdAsync($"{GraphBase}/{Uri.EscapeDataString(igUserId)}/media", form, accessToken, "create video container", ct);
+        }
+
+        public Task<string> CreateCarouselContainerAsync(string accessToken, string igUserId, IReadOnlyList<string> childIds, string caption, CancellationToken ct = default) =>
+            PostForIdAsync($"{GraphBase}/{Uri.EscapeDataString(igUserId)}/media", new Dictionary<string, string>
+            {
+                ["media_type"] = "CAROUSEL",
+                ["children"] = string.Join(',', childIds),
+                ["caption"] = caption
+            }, accessToken, "create carousel", ct);
+
+        public async Task<string?> GetContainerStatusAsync(string accessToken, string containerId, CancellationToken ct = default)
+        {
+            var url = $"{GraphBase}/{Uri.EscapeDataString(containerId)}?fields=status_code,status&access_token={Uri.EscapeDataString(accessToken)}";
+            using var response = await SendWithRetryAsync(url, "container status", ct);
+            return (await ReadOrThrowAsync<InstagramContainerStatus>(response, "container status", ct))?.StatusCode;
+        }
+
+        public Task<string> PublishContainerAsync(string accessToken, string igUserId, string containerId, CancellationToken ct = default) =>
+            PostForIdAsync($"{GraphBase}/{Uri.EscapeDataString(igUserId)}/media_publish",
+                new Dictionary<string, string> { ["creation_id"] = containerId }, accessToken, "publish", ct);
+
+        public async Task<InstagramPublishingLimit?> GetPublishingLimitAsync(string accessToken, string igUserId, CancellationToken ct = default)
+        {
+            var url = $"{GraphBase}/{Uri.EscapeDataString(igUserId)}/content_publishing_limit?fields=quota_usage,config&access_token={Uri.EscapeDataString(accessToken)}";
+            using var response = await SendWithRetryAsync(url, "publishing limit", ct);
+            return (await ReadOrThrowAsync<InstagramPublishingLimitResponse>(response, "publishing limit", ct))?.Data?.FirstOrDefault();
+        }
+
+        public async Task<string?> GetPermalinkAsync(string accessToken, string mediaId, CancellationToken ct = default)
+        {
+            var url = $"{GraphBase}/{Uri.EscapeDataString(mediaId)}?fields=permalink&access_token={Uri.EscapeDataString(accessToken)}";
+            using var response = await SendWithRetryAsync(url, "permalink", ct);
+            return (await ReadOrThrowAsync<InstagramPermalinkResponse>(response, "permalink", ct))?.Permalink;
+        }
+
+        // التوكن في جسم الطلب لا في الرابط
+        private async Task<string> PostForIdAsync(string url, Dictionary<string, string> form, string accessToken, string operation, CancellationToken ct)
+        {
+            form["access_token"] = accessToken;
+            var client = _httpClientFactory.CreateClient(HttpClientName);
+            using var content = new FormUrlEncodedContent(form);
+            using var response = await client.PostAsync(url, content, ct);
+            var result = await ReadOrThrowAsync<InstagramIdResponse>(response, operation, ct);
+            return string.IsNullOrEmpty(result?.Id)
+                ? throw new InstagramApiException($"رد غير صالح من إنستغرام ({operation})", "empty_id")
+                : result.Id;
+        }
+
+        // ===================================
         // Helpers
         // ===================================
         private async Task<InstagramTokenResponse> GetTokenAsync(string url, string operation, CancellationToken ct)
@@ -175,7 +259,10 @@ namespace ecommerce.Services.InstagramService
             var requiresReconnect = error?.Code is 190 or 10 or >= 200 and <= 299
                                     || response.StatusCode == System.Net.HttpStatusCode.Unauthorized;
             var code = error?.Code is { } c ? c.ToString() : ((int)response.StatusCode).ToString();
-            return new InstagramApiException($"فشل طلب إنستغرام ({operation})", code, requiresReconnect);
+            return new InstagramApiException($"فشل طلب إنستغرام ({operation})", code, requiresReconnect)
+            {
+                Detail = error?.Message
+            };
         }
 
         // الرد بإحدى صيغتين: { data: [ { access_token, user_id, permissions } ] } أو الحقول مباشرة.

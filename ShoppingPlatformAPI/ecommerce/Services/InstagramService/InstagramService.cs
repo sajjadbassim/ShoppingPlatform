@@ -24,6 +24,14 @@ namespace ecommerce.Services.InstagramService
     // بداية الربط: الرابط الذي يُفتح في المتصفح + قيمة الكوكي التي تُثبت أن العودة من نفس المتصفح
     public record InstagramConnectStart(string AuthorizeUrl, string Nonce);
 
+    // للنشر: معرّف الحساب الاحترافي وتوكن صالح، وهل منح التاجر صلاحية النشر
+    public record InstagramPublishSession(string IgUserId, string AccessToken, string? Username, bool CanPublish);
+
+    public static class InstagramScopes
+    {
+        public const string ContentPublish = "instagram_business_content_publish";
+    }
+
     public interface IInstagramService
     {
         Task<InstagramStatusDto> GetStatusAsync(Guid userId, CancellationToken ct = default);
@@ -45,6 +53,11 @@ namespace ecommerce.Services.InstagramService
         // طلبات Meta الموقّعة (signed_request): إلغاء التفويض من إنستغرام، وطلب حذف البيانات
         Task<bool> HandleDeauthorizeAsync(string? signedRequest, CancellationToken ct = default);
         Task<string?> HandleDataDeletionAsync(string? signedRequest, CancellationToken ct = default);
+
+        // النشر من المنصة (InstagramPublishService)
+        Task<InstagramPublishSession> GetPublishSessionAsync(Guid vendorId, CancellationToken ct = default);
+        Task RecordPublishedMediaAsync(Guid vendorId, string externalId, Guid? productId, string? caption,
+            string? previewMediaUrl, string mediaType, CancellationToken ct = default);
     }
 
     public class InstagramService : IInstagramService
@@ -656,6 +669,86 @@ namespace ecommerce.Services.InstagramService
         }
 
         // ===================================
+        // النشر
+        // ===================================
+        public async Task<InstagramPublishSession> GetPublishSessionAsync(Guid vendorId, CancellationToken ct = default)
+        {
+            EnsureConfigured();
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(LockWaitLimit, ct))
+                throw new BusinessRuleException("مزامنة جارية حالياً، حاول بعد لحظات");
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeMedia: false, ct)
+                    ?? throw new NotFoundException("لا يوجد حساب إنستغرام مربوط بمتجرك");
+                if (connection.NeedsReconnect)
+                    throw new InstagramApiException("انتهت صلاحية الربط", "needs_reconnect", requiresReconnect: true);
+
+                try
+                {
+                    var token = await GetValidAccessTokenAsync(connection, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);   // التوكن ربما جُدِّد
+                    return new InstagramPublishSession(connection.AccountId ?? connection.InstagramUserId, token,
+                        connection.Username, HasScope(connection, InstagramScopes.ContentPublish));
+                }
+                catch (InstagramApiException ex) when (ex.RequiresReconnect)
+                {
+                    connection.NeedsReconnect = true;
+                    await _unitOfWork.SaveChangesAsync(ct);
+                    throw;
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        // المنشور الجديد يُسجَّل مربوطاً بالمنتج وظاهراً في المتجر، ثم مزامنة سريعة تملأ روابطه من إنستغرام
+        public async Task RecordPublishedMediaAsync(Guid vendorId, string externalId, Guid? productId, string? caption,
+            string? previewMediaUrl, string mediaType, CancellationToken ct = default)
+        {
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(LockWaitLimit, ct)) return;   // المزامنة الدورية ستجلبه
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeMedia: true, ct);
+                if (connection == null) return;
+
+                var media = connection.Media.FirstOrDefault(m => m.ExternalId == externalId);
+                if (media == null)
+                {
+                    media = new InstagramMedia
+                    {
+                        ConnectionId = connection.Id,
+                        ExternalId = externalId,
+                        MediaType = mediaType,
+                        MediaProductType = mediaType == InstagramMedia.TypeVideo ? "REELS" : "FEED",
+                        Caption = Truncate(caption, 2200),
+                        MediaUrl = previewMediaUrl,
+                        PublishedAt = Now,
+                        IsHidden = false
+                    };
+                    connection.Media.Add(media);
+                    _repository.AddMedia(media);
+                }
+                media.ProductId = productId ?? media.ProductId;
+                media.IsHidden = false;
+
+                await SyncConnectionAsync(connection, showAllNewMedia: false, ct, fullList: false);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private static bool HasScope(InstagramConnection connection, string scope) =>
+            connection.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Contains(scope, StringComparer.OrdinalIgnoreCase);
+
+        // ===================================
         // Helpers
         // ===================================
         private void EnsureConfigured()
@@ -706,6 +799,8 @@ namespace ecommerce.Services.InstagramService
             ConnectedAt = c?.ConnectedAt,
             LastSyncedAt = c?.LastSyncedAt,
             LastSyncError = c?.LastSyncError,
+            PublishingEnabled = _options.IsConfigured && !string.IsNullOrWhiteSpace(_options.PublicBaseUrl),
+            CanPublish = c != null && HasScope(c, InstagramScopes.ContentPublish),
             Scopes = c?.Scopes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new()
         };
 

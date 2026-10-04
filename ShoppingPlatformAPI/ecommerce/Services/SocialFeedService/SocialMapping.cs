@@ -72,6 +72,40 @@ namespace ecommerce.Services.SocialFeedService
             };
         }
 
+        public static SocialFeedItemDto FromFacebook(FacebookMedia m)
+        {
+            var children = ReadChildren(m.ChildrenJson)
+                .Select(c => new SocialMediaChildDto { MediaType = SocialMediaTypes.Image, Url = c.Url, ThumbnailUrl = c.ThumbnailUrl })
+                .ToList();
+            var type = m.MediaType switch
+            {
+                FacebookMedia.TypeVideo => SocialMediaTypes.Video,
+                FacebookMedia.TypeCarousel => SocialMediaTypes.Carousel,
+                _ => SocialMediaTypes.Image
+            };
+
+            return new SocialFeedItemDto
+            {
+                Id = m.Id,
+                Platform = SocialPlatforms.Facebook,
+                ExternalId = m.ExternalId,
+                MediaType = type,
+                Title = m.Caption,
+                // الغلاف: صورة الفيديو المصغّرة، أو أول صورة في الألبوم، أو الصورة نفسها
+                CoverImageUrl = type == SocialMediaTypes.Video ? m.ThumbnailUrl : children.FirstOrDefault()?.Url ?? m.MediaUrl,
+                ShareUrl = m.Permalink,
+                VideoUrl = type == SocialMediaTypes.Video ? m.MediaUrl : null,
+                Children = children,
+                DurationSeconds = m.DurationSeconds,
+                PublishedAt = m.PublishedAt,
+                IsHidden = m.IsHidden,
+                Product = MapProduct(m.Product)
+            };
+        }
+
+        public static string? FacebookPageUrl(FacebookConnection c) =>
+            c.PageLink ?? (string.IsNullOrEmpty(c.PageId) ? null : "https://www.facebook.com/" + Uri.EscapeDataString(c.PageId));
+
         public static SocialStoreDto FromVendor(Vendor v) => new()
         {
             Id = v.Id,

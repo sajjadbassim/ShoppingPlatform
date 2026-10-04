@@ -35,5 +35,8 @@ namespace ecommerce.Services
         // Report (الإبلاغ)
         // ===================================
         Task<bool> ReportAsync(Guid userId, Guid reviewId, ReportReviewDto dto);
+
+        // رد البائع (الصلاحية يتحقق منها المتحكم): نص فارغ = حذف الرد
+        Task<ReviewDto> SetVendorReplyAsync(Guid reviewId, string? reply);
     }
 }

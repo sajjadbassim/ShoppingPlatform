@@ -55,6 +55,7 @@ const VendorReports = lazy(() => import('./pages/vendor/VendorReports'))
 const VendorEarnings = lazy(() => import('./pages/vendor/VendorEarnings'))
 const VendorSettings = lazy(() => import('./pages/vendor/VendorSettings'))
 const VendorSocialAccounts = lazy(() => import('./pages/vendor/VendorSocialAccounts'))
+const VendorPublish = lazy(() => import('./pages/vendor/VendorPublish'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
 const AdminStores = lazy(() => import('./pages/admin/AdminStores'))
@@ -149,6 +150,7 @@ function App() {
               <Route path="products" element={<VendorProducts />} />
               <Route path="products/new" element={<VendorProductForm />} />
               <Route path="products/:id/edit" element={<VendorProductForm />} />
+              <Route path="products/:id/publish" element={<VendorPublish />} />
               <Route path="orders" element={<VendorOrders />} />
               <Route path="reviews" element={<VendorReviews />} />
               <Route path="reports" element={<VendorReports />} />

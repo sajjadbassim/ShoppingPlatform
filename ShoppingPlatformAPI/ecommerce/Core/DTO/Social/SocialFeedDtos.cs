@@ -8,6 +8,7 @@ namespace ecommerce.Core.DTO.Social
     {
         public const string TikTok = "tiktok";
         public const string Instagram = "instagram";
+        public const string Facebook = "facebook";
     }
 
     public static class SocialMediaTypes

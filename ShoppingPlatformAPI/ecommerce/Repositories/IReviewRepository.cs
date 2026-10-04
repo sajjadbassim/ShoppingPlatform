@@ -9,6 +9,7 @@ namespace ecommerce.Repositories
         // CRUD الأساسي
         // ===================================
         Task<Review?> GetByIdAsync(Guid id);
+        Task<Guid?> GetProductIdAsync(Guid reviewId);
         Task<Review?> GetByIdWithDetailsAsync(Guid id);
         Task<Review> CreateAsync(Review review);
         Task<Review> UpdateAsync(Review review);

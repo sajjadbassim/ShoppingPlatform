@@ -7,7 +7,8 @@ import PlatformLogo from '../social/PlatformLogo'
 // العنصر من تيك توك أو إنستغرام (platform)، وقد يكون فيديو أو صورة أو ألبوم (mediaType)
 export const ReelTile = ({ video, onClick, dimmed = false }) => {
   const [failed, setFailed] = useState(false)
-  const isInstagram = video.platform === 'instagram'
+  // إنستغرام وفيسبوك: صور وألبومات وفيديو، بلا عدد مشاهدات
+  const isInstagram = video.platform !== 'tiktok'
   // إنستغرام لا يعطي عدد المشاهدات بالصلاحية الأساسية — نعرض الإعجابات
   const showLikes = isInstagram || video.viewCount == null
   return (
@@ -23,11 +24,14 @@ export const ReelTile = ({ video, onClick, dimmed = false }) => {
       {/* تظليل خفيف في الأسفل ليظهر العدد على أي غلاف */}
       <span className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/55 to-transparent" />
 
-      <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 text-[12px] sm:text-sm text-white font-semibold drop-shadow" dir="ltr">
-        {showLikes
-          ? <><Heart size={13} strokeWidth={2.5} />{compactCount(video.likeCount)}</>
-          : <><Play size={13} strokeWidth={2.5} />{compactCount(video.viewCount)}</>}
-      </span>
+      {/* فيسبوك لا يعطي الإعجابات بصلاحياتنا — لا نعرض عدداً فارغاً */}
+      {(video.likeCount != null || video.viewCount != null) && (
+        <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 text-[12px] sm:text-sm text-white font-semibold drop-shadow" dir="ltr">
+          {showLikes
+            ? <><Heart size={13} strokeWidth={2.5} />{compactCount(video.likeCount)}</>
+            : <><Play size={13} strokeWidth={2.5} />{compactCount(video.viewCount)}</>}
+        </span>
+      )}
 
       <span className="absolute bottom-1.5 right-1.5 drop-shadow">
         <PlatformLogo platform={video.platform} className="w-4 h-4" />

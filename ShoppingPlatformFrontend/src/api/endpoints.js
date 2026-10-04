@@ -93,14 +93,32 @@ export const API_ENDPOINTS = {
     MEDIA_ITEM: (id) => `/api/integrations/instagram/media/${id}`,
     SETTINGS: '/api/integrations/instagram/settings',
     CONNECTION: '/api/integrations/instagram/connection',
+    PUBLISH_OPTIONS: '/api/integrations/instagram/publish/options',
+    POSTS: '/api/integrations/instagram/posts',
+    POST_RETRY: (id) => `/api/integrations/instagram/posts/${id}/retry`,
+    POST_CANCEL: (id) => `/api/integrations/instagram/posts/${id}/cancel`,
   },
 
-  // ============ محتوى حسابات التواصل للزوار (تيك توك + إنستغرام) ============
+  // ============ Facebook (المسار يطابق الروابط المسجّلة في تطبيق Meta) ============
+  FACEBOOK: {
+    STATUS: '/api/integrations/facebook/status',
+    CONNECT_URL: '/api/integrations/facebook/connect-url',
+    PAGES: '/api/integrations/facebook/pages',
+    SELECT_PAGE: '/api/integrations/facebook/pages/select',
+    SYNC: '/api/integrations/facebook/sync',
+    MEDIA: '/api/integrations/facebook/media',
+    MEDIA_ITEM: (id) => `/api/integrations/facebook/media/${id}`,
+    SETTINGS: '/api/integrations/facebook/settings',
+    CONNECTION: '/api/integrations/facebook/connection',
+  },
+
+  // ============ محتوى حسابات التواصل للزوار (تيك توك + إنستغرام + فيسبوك) ============
   SOCIAL: {
     STORE_FEED: (vendorId) => `/api/social/stores/${vendorId}/feed`,
     STORE_FEED_REFRESH: (vendorId) => `/api/social/stores/${vendorId}/feed/refresh`,
     REELS: '/api/social/reels',
     REELS_REFRESH: '/api/social/reels/refresh',
+    PUBLISH_UPLOAD: '/api/social/publish/uploads',   // صورة أو فيديو من الاستوديو للنشر
   },
 
   VENDORS: {
@@ -189,6 +207,7 @@ export const API_ENDPOINTS = {
     PRODUCT_SUMMARY: (productId) => `/api/Reviews/product/${productId}/summary`,
     VENDOR_SUMMARY: (vendorId) => `/api/Reviews/vendor/${vendorId}/summary`,
     HELPFUL: (id) => `/api/Reviews/${id}/helpful`,
+    REPLY: (id) => `/api/Reviews/${id}/reply`,       // رد صاحب المتجر
     REPORT: (id) => `/api/Reviews/${id}/report`,
     // Admin
     REPORTED: '/api/Reviews/reported',

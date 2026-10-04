@@ -1,4 +1,4 @@
-using ecommerce.Core.Models;
+﻿using ecommerce.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -107,6 +107,42 @@ namespace ecommerce.Data.Configurations
             builder.Property(s => s.ExpiresAt).HasColumnName("expires_at").HasColumnType("datetime2");
             builder.Property(s => s.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
             builder.HasIndex(s => s.ExpiresAt);
+        }
+    }
+
+    public class InstagramPostConfiguration : IEntityTypeConfiguration<InstagramPost>
+    {
+        public void Configure(EntityTypeBuilder<InstagramPost> builder)
+        {
+            builder.ToTable("instagram_posts");
+            builder.HasKey(p => p.Id);
+            builder.Property(p => p.Id).HasColumnName("id");
+
+            builder.Property(p => p.VendorId).HasColumnName("vendor_id");
+            builder.HasOne(p => p.Vendor).WithMany().HasForeignKey(p => p.VendorId).OnDelete(DeleteBehavior.Cascade);
+            builder.Property(p => p.ProductId).HasColumnName("product_id");
+            builder.HasOne(p => p.Product).WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.NoAction);
+            builder.Property(p => p.CreatedByUserId).HasColumnName("created_by_user_id");
+
+            builder.Property(p => p.Caption).HasColumnName("caption").HasMaxLength(2200).IsRequired();
+            builder.Property(p => p.SourceImagesJson).HasColumnName("source_images_json").IsRequired();
+            builder.Property(p => p.PreparedImagesJson).HasColumnName("prepared_images_json");
+
+            builder.Property(p => p.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            builder.Property(p => p.ScheduledAt).HasColumnName("scheduled_at").HasColumnType("datetime2");
+            builder.Property(p => p.Attempts).HasColumnName("attempts");
+            builder.Property(p => p.NextAttemptAt).HasColumnName("next_attempt_at").HasColumnType("datetime2");
+            builder.Property(p => p.Error).HasColumnName("error").HasMaxLength(500);
+            builder.HasIndex(p => new { p.Status, p.ScheduledAt });
+            builder.HasIndex(p => new { p.VendorId, p.CreatedAt });
+
+            builder.Property(p => p.ContainerId).HasColumnName("container_id").HasMaxLength(64);
+            builder.Property(p => p.ExternalMediaId).HasColumnName("external_media_id").HasMaxLength(64);
+            builder.Property(p => p.Permalink).HasColumnName("permalink").HasMaxLength(500);
+            builder.Property(p => p.PublishedAt).HasColumnName("published_at").HasColumnType("datetime2");
+
+            builder.Property(p => p.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
+            builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");
         }
     }
 }
