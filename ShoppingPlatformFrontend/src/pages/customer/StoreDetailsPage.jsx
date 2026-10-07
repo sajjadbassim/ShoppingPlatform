@@ -21,6 +21,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { StoreHoursList } from '../../components/vendor/StoreHoursEditor'
+import { isStoreClosed } from '../../components/common/StoreClosedBadge'
 
 const StoreDetailsPage = () => {
   const { id } = useParams()
@@ -123,6 +124,8 @@ const StoreDetailsPage = () => {
     storeName: store.nameAr || store.name,
     vendorId: store.id,
     inStock: p.isAvailable && p.stockQuantity > 0,
+    storeClosed: isStoreClosed(p) || store.isOpenNow === false,
+    storeStatus: p.vendorOpenStatus || store.openStatus,
     isWishlisted: isInWishlist(p.id),
   }))
 

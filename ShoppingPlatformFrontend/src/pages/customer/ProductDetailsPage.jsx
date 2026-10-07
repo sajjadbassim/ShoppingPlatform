@@ -26,6 +26,7 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 import { reviewsService } from '../../services/reviewsService'
 import StockAlertButton from '../../components/common/StockAlertButton'
 import { formatQuantity, formatPrice, isByWeight, pricePerKg, stepLabel } from '../../utils/weight'
+import { StoreClosedBadge, isStoreClosed } from '../../components/common/StoreClosedBadge'
 
 
 // ===========================
@@ -223,6 +224,7 @@ const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) =>
           className="absolute top-2 left-2 w-9 h-9 rounded-full bg-white/90 shadow-sm flex items-center justify-center" aria-label="المفضلة">
           <Heart size={18} className={isWishlisted ? 'text-error fill-error' : 'text-gray-700'} />
         </button>
+        <StoreClosedBadge closed={isStoreClosed(p)} status={p.vendorOpenStatus} />
         {inStock && (
           <button onClick={e => { e.preventDefault(); e.stopPropagation(); onQuickAdd(p.id) }}
             className="absolute bottom-2 left-2 w-9 h-9 rounded-full bg-white/90 shadow-sm flex items-center justify-center" aria-label="إضافة للسلة">
@@ -802,6 +804,11 @@ const ProductDetailsPage = () => {
                 <Store size={14} />
                 {product.vendorName || product.vendor?.name}
               </Link>
+            )}
+            {isStoreClosed(product) && (
+              <p className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-900/80 text-white text-xs font-bold">
+                المتجر مغلق{product.vendorOpenStatus ? ` · ${product.vendorOpenStatus.replace(/^مغلق الآن — /, '')}` : ''}
+              </p>
             )}
                   <h1 className="text-2xl font-bold text-gray-900">{product.nameAr || product.name}</h1>
                 </div>

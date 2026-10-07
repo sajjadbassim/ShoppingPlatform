@@ -7,6 +7,7 @@ import { getPrimaryImage } from '../../utils/imageHelper'
 import { useProductVariants, variantKeys } from '../../hooks/useVariants'
 import { variantsService } from '../../services/variantsService'
 import { formatPrice, pricePerKg } from '../../utils/weight'
+import { StoreClosedBadge } from './StoreClosedBadge'
 
 // أجهزة اللمس لا تدعم hover — تغيير محتوى الكرت عند "hover" يجعل iOS يحتاج ضغطتين لفتح المنتج
 const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
@@ -214,6 +215,8 @@ const ProductCard = ({
               <Heart size={16} fill={isWishlisted ? 'currentColor' : 'none'} />
             </button>
 
+            <StoreClosedBadge closed={product?.storeClosed} status={product?.storeStatus} />
+
             {!inStock && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                 <span className="bg-white text-gray-800 px-4 py-2 rounded-md font-medium">غير متوفر</span>
@@ -290,6 +293,7 @@ const ProductCard = ({
               {discountPercent}%
             </span>
           )}
+          <StoreClosedBadge closed={product?.storeClosed} status={product?.storeStatus} />
         </div>
         <div className="p-3">
           {/* ✅ اسم البائع */}
@@ -327,6 +331,7 @@ const ProductCard = ({
               {discountPercent}%
             </span>
           )}
+          <StoreClosedBadge closed={product?.storeClosed} status={product?.storeStatus} />
         </div>
         <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
           <div>

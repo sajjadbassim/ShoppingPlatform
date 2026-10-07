@@ -29,6 +29,9 @@
         // معلومات المتجر
         public Guid VendorId { get; set; }
         public string VendorName { get; set; }
+        // حالة المتجر الآن (أوقات العمل أو إيقاف الطلبات) — شارة «المتجر مغلق» على المنتج
+        public bool VendorIsOpen { get; set; } = true;
+        public string? VendorOpenStatus { get; set; }
 
         // معلومات التصنيف
         public Guid? CategoryId { get; set; }

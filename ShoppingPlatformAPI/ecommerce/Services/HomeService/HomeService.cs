@@ -732,6 +732,8 @@ namespace ecommerce.Services.HomeService
                 PrimaryImageUrl = primaryImage,
                 p.VendorId,
                 VendorName = p.Vendor?.Name,
+                VendorIsOpen = p.Vendor == null || StoreHours.IsOpen(p.Vendor, DateTime.UtcNow),
+                VendorOpenStatus = p.Vendor == null ? null : StoreHours.Status(p.Vendor, DateTime.UtcNow).Message,
                 AverageRating = hasRating ? Math.Round((decimal)rating.Average, 1) : (decimal?)null,
                 ReviewCount = hasRating ? rating.Count : 0,
                 IsAvailable = hasVariants ? stockFromVariants > 0 : p.IsAvailable,

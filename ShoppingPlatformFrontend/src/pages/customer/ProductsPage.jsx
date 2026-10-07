@@ -23,6 +23,7 @@ import { useAdvancedFilter } from '../../hooks/useProducts'
 import { useVendor } from '../../hooks/useVendors'
 import { SCOPE, searchLink } from '../../utils/shopScope'
 import { variantsService } from '../../services/variantsService'
+import { isStoreClosed } from '../../components/common/StoreClosedBadge'
 
 // ===========================
 // Filter Section Component
@@ -569,6 +570,8 @@ const ProductsPage = () => {
                       storeName:     product.vendor?.name || product.vendorName,
                       vendorId:      product.vendorId,
                       inStock:       product.isAvailable  && product.stockQuantity > 0,
+                      storeClosed:   isStoreClosed(product),
+                      storeStatus:   product.vendorOpenStatus,
                       weightStepKg:  product.weightStepKg,
                       isWishlisted:  isInWishlist(product.id),
                     }}

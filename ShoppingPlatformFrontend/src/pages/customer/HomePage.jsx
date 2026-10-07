@@ -17,6 +17,7 @@ import { useAdvancedFilter } from '../../hooks/useProducts'
 import { SCOPE, SUPERMARKET_PATH, isGroceryCategory } from '../../utils/shopScope'
 import { formatPrice, pricePerKg } from '../../utils/weight'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { StoreClosedBadge, isStoreClosed } from '../../components/common/StoreClosedBadge'
 
 // ===========================
 // Hooks
@@ -56,6 +57,8 @@ const formatProduct = (p) => ({
   reviewsCount: p.reviewCount || 0,
   storeName: p.vendorName,
   inStock: p.isAvailable && p.stockQuantity > 0,
+  storeClosed: isStoreClosed(p),
+  storeStatus: p.vendorOpenStatus,
   hasDiscount: p.hasDiscount,
   discountPercentage: p.discountPercentage,
   weightStepKg: p.weightStepKg,
@@ -253,6 +256,7 @@ const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = fal
             <Heart size={15} className={product.isWishlisted ? 'text-error fill-error' : 'text-gray-700'} />
           </button>
         )}
+        <StoreClosedBadge closed={product.storeClosed} status={product.storeStatus} />
         {onAddToCart && product.inStock !== false && (
           <button onClick={stop(() => onAddToCart({ id: product.id, quantity: 1 }))} aria-label="إضافة للسلة"
             className="absolute bottom-2 left-2 w-8 h-8 rounded-full bg-primary text-white shadow-md flex items-center justify-center active:scale-90 transition-transform">
