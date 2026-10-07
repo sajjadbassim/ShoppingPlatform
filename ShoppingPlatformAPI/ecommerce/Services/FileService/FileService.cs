@@ -1,4 +1,5 @@
-﻿namespace ecommerce.Services.FileService
+﻿using ecommerce.Core.Exceptions;
+namespace ecommerce.Services.FileService
 {
     public class FileService : IFileService
     {
@@ -14,20 +15,20 @@
         public async Task<string> SaveImageAsync(IFormFile file, string folder = "products")
         {
             if (file == null || file.Length == 0)
-                throw new ArgumentException("الملف غير صالح");
+                throw new BusinessRuleException("الملف غير صالح");
 
             // التحقق من الحجم
             if (file.Length > _maxFileSize)
-                throw new ArgumentException($"حجم الصورة يجب أن لا يتجاوز {_maxFileSize / 1024 / 1024}MB");
+                throw new BusinessRuleException($"حجم الصورة يجب أن لا يتجاوز {_maxFileSize / 1024 / 1024}MB");
 
             // التحقق من الامتداد
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (!_allowedExtensions.Contains(extension))
-                throw new ArgumentException("صيغة الصورة غير مدعومة. الصيغ المسموحة: jpg, jpeg, png, gif, webp");
+                throw new BusinessRuleException("صيغة الصورة غير مدعومة. الصيغ المسموحة: jpg, jpeg, png, gif, webp");
 
             // الامتداد وحده يمكن تزويره — نتحقق من توقيع الملف الفعلي
             if (!await HasImageSignatureAsync(file, extension))
-                throw new ArgumentException("الملف ليس صورة صالحة");
+                throw new BusinessRuleException("الملف ليس صورة صالحة");
 
             // إنشاء اسم فريد للملف
             var fileName = $"{Guid.NewGuid()}{extension}";
@@ -55,7 +56,7 @@
                 return new List<string>();
 
             if (files.Count > 5)
-                throw new ArgumentException("لا يمكن رفع أكثر من 5 صور");
+                throw new BusinessRuleException("لا يمكن رفع أكثر من 5 صور");
 
             var imageUrls = new List<string>();
 
@@ -70,11 +71,31 @@
                 {
                     // حذف الصور التي تم رفعها في حالة حدوث خطأ
                     await DeleteImagesAsync(imageUrls);
-                    throw new Exception($"فشل رفع الصورة: {ex.Message}");
+                    if (ex is AppException) throw new BusinessRuleException($"فشل رفع الصورة: {ex.Message}");
+                    throw;
                 }
             }
 
             return imageUrls;
+        }
+
+        public async Task<string?> CopyImageAsync(string? imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl)) return null;
+
+            var uploadsRoot = Path.GetFullPath(Path.Combine(_environment.WebRootPath, "uploads")) + Path.DirectorySeparatorChar;
+            var source = Path.GetFullPath(Path.Combine(_environment.WebRootPath, imageUrl.TrimStart('/')));
+            // النسخ داخل مجلد الرفع فقط
+            if (!source.StartsWith(uploadsRoot, StringComparison.OrdinalIgnoreCase) || !File.Exists(source))
+                return null;
+
+            var target = Path.Combine(Path.GetDirectoryName(source)!, $"{Guid.NewGuid()}{Path.GetExtension(source)}");
+            await using (var input = File.OpenRead(source))
+            await using (var output = File.Create(target))
+                await input.CopyToAsync(output);
+
+            var relative = Path.GetRelativePath(Path.GetFullPath(_environment.WebRootPath), target).Replace('\\', '/');
+            return "/" + relative;
         }
 
         public async Task<bool> DeleteImageAsync(string imageUrl)

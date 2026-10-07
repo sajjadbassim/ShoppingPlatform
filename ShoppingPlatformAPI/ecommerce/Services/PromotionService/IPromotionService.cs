@@ -29,5 +29,10 @@ namespace ecommerce.Services
         // لحساب السعر الفعلي عند جلب المنتجات
         // ===================================
         Task<decimal> CalculateFinalPriceAsync(Guid productId, Guid categoryId, Guid vendorId, decimal originalPrice);
+
+        // نفس القاعدة لعدة منتجات باستعلام واحد (السلة والطلب) — السعر بعد العرض لكل ProductId
+        Task<IReadOnlyDictionary<Guid, decimal>> CalculateFinalPricesAsync(IEnumerable<PriceQuery> items);
     }
+
+    public record PriceQuery(Guid ProductId, Guid? CategoryId, Guid VendorId, decimal Price);
 }

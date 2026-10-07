@@ -7,7 +7,8 @@ namespace ecommerce.Services
         // ===================================
         // للعميل
         // ===================================
-        Task<CouponValidationResultDto> ValidateAsync(Guid userId, ValidateCouponDto dto);
+        Task<CouponValidationResultDto> ValidateAsync(Guid userId, ValidateCouponDto dto,
+            IReadOnlyDictionary<Guid, decimal>? vendorSubtotals = null);
 
         // ===================================
         // Admin

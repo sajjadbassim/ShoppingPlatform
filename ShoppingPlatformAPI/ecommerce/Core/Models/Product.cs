@@ -46,6 +46,11 @@ namespace ecommerce.Core.Models
         [Column("is_available")]
         public bool IsAvailable { get; set; } = true;
 
+        // البيع بالوزن: وحدة البيع = هذا الوزن بالكيلو (0.25 / 0.5 / 1 ...)، وnull = بالقطعة.
+        // السعر والمخزون والكمية كلها بالوحدة (فلا يتغير حساب السلة والمخزون)، والعرض يحوّلها إلى «لكل كغم» و«1.5 كغم»
+        [Column("weight_step_kg", TypeName = "decimal(6,3)")]
+        public decimal? WeightStepKg { get; set; }
+
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 

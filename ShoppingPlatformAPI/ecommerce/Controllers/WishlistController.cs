@@ -3,6 +3,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -43,7 +44,7 @@ namespace ecommerce.Controllers
                     count = wishlist.Count()
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -59,7 +60,7 @@ namespace ecommerce.Controllers
                 var count = await _wishlistService.GetWishlistCountAsync(userId);
                 return Ok(new { success = true, count });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -75,7 +76,7 @@ namespace ecommerce.Controllers
                 var isInWishlist = await _wishlistService.IsInWishlistAsync(userId, productId);
                 return Ok(new { success = true, isInWishlist });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -96,7 +97,7 @@ namespace ecommerce.Controllers
                     data = wishlist
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -124,7 +125,7 @@ namespace ecommerce.Controllers
                         message = "المنتج غير موجود في المفضلة"
                     });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -148,7 +149,7 @@ namespace ecommerce.Controllers
                         : "تم حذف المنتج من المفضلة"
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -176,7 +177,7 @@ namespace ecommerce.Controllers
                         message = "قائمة المفضلة فارغة بالفعل"
                     });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

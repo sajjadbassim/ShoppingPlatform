@@ -10,6 +10,9 @@
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal { get; set; }
+        public decimal? WeightStepKg { get; set; }     // بالوزن: الكمية × هذا = كغم
+        public Guid? ReplacesItemId { get; set; }      // بديل عن قطعة غير متوفرة
+        public int UnavailableQuantity { get; set; }
 
         public Guid? VariantId { get; set; }
         public string? VariantSku { get; set; }

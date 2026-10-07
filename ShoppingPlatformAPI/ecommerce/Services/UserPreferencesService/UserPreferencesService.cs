@@ -47,6 +47,7 @@ namespace ecommerce.Services.UserPreferencesService
             if (dto.NotifyReturns.HasValue) preferences.NotifyReturns = dto.NotifyReturns.Value;
             if (dto.NotifyNewUsers.HasValue) preferences.NotifyNewUsers = dto.NotifyNewUsers.Value;
             if (dto.NotifyNewVendors.HasValue) preferences.NotifyNewVendors = dto.NotifyNewVendors.Value;
+            if (dto.NotifyReminders.HasValue) preferences.NotifyReminders = dto.NotifyReminders.Value;
 
             await _unitOfWork.SaveChangesAsync(ct);
 
@@ -65,7 +66,8 @@ namespace ecommerce.Services.UserPreferencesService
             NotifyReviews = p.NotifyReviews,
             NotifyReturns = p.NotifyReturns,
             NotifyNewUsers = p.NotifyNewUsers,
-            NotifyNewVendors = p.NotifyNewVendors
+            NotifyNewVendors = p.NotifyNewVendors,
+            NotifyReminders = p.NotifyReminders
         };
     }
 }

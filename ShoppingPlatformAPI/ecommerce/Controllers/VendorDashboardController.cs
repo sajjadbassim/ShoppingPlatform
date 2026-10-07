@@ -4,6 +4,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -39,7 +40,7 @@ namespace ecommerce.Controllers
                 var dashboard = await _dashboardService.GetDashboardAsync(vendorId);
                 return Ok(new { success = true, data = dashboard });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -52,18 +53,20 @@ namespace ecommerce.Controllers
         [HttpGet("sales")]
         public async Task<IActionResult> GetSalesStats(
             Guid vendorId,
-            [FromQuery] string period = "month")
+            [FromQuery] string period = "month",
+            [FromQuery] DateTime? from = null,
+            [FromQuery] DateTime? to = null)
         {
             try
             {
-                var validPeriods = new[] { "today", "week", "month", "year" };
+                var validPeriods = new[] { "today", "week", "month", "year", "custom" };
                 if (!validPeriods.Contains(period.ToLower()))
-                    return BadRequest(new { success = false, message = "الفترة يجب أن تكون: today / week / month / year" });
+                    return BadRequest(new { success = false, message = "الفترة يجب أن تكون: today / week / month / year / custom" });
 
-                var stats = await _dashboardService.GetSalesStatsAsync(vendorId, period);
+                var stats = await _dashboardService.GetSalesStatsAsync(vendorId, period, from, to);
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -78,11 +81,12 @@ namespace ecommerce.Controllers
             Guid vendorId,
             [FromQuery] string? status = null,
             [FromQuery] int pageNumber = 1,
-            [FromQuery] int pageSize = 20)
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string? search = null)
         {
             try
             {
-                var result = await _dashboardService.GetOrdersAsync(vendorId, status, pageNumber, pageSize);
+                var result = await _dashboardService.GetOrdersAsync(vendorId, status, pageNumber, Math.Clamp(pageSize, 1, 100), search);
                 return Ok(new
                 {
                     success = true,
@@ -90,11 +94,40 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        // ===================================
+        // GET: api/vendors/{vendorId}/dashboard/reviews?unanswered=true&rating=5
+        // كل تقييمات منتجات المتجر في قائمة واحدة
+        // ===================================
+        [HttpGet("reviews")]
+        public async Task<IActionResult> GetReviewsFeed(Guid vendorId,
+            [FromQuery] bool unanswered = false, [FromQuery] int? rating = null,
+            [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20)
+        {
+            var result = await _dashboardService.GetReviewsFeedAsync(vendorId, unanswered, rating, Math.Max(1, pageNumber), Math.Clamp(pageSize, 1, 50));
+            var unansweredCount = await _dashboardService.CountUnansweredReviewsAsync(vendorId);
+            return Ok(new { success = true, data = result.Data, pagination = result.Pagination, unansweredCount });
+        }
+
+        // ===================================
+        // GET: api/vendors/{vendorId}/dashboard/products/sales — المبيعات لكل منتج
+        // ===================================
+        [HttpGet("products/sales")]
+        public async Task<IActionResult> GetProductSales(Guid vendorId) =>
+            Ok(new { success = true, data = await _dashboardService.GetProductSalesAsync(vendorId) });
+
+        // ===================================
+        // GET: api/vendors/{vendorId}/dashboard/orders/counts
+        // أعداد الطلبات لكل حالة
+        // ===================================
+        [HttpGet("orders/counts")]
+        public async Task<IActionResult> GetOrderCounts(Guid vendorId) =>
+            Ok(new { success = true, data = await _dashboardService.GetOrderCountsAsync(vendorId) });
 
         // ===================================
         // GET: api/vendors/{vendorId}/dashboard/orders/{subOrderId}
@@ -108,7 +141,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.GetOrderByIdAsync(vendorId, subOrderId);
                 return Ok(new { success = true, data = order });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -118,16 +151,18 @@ namespace ecommerce.Controllers
         // POST: api/vendors/{vendorId}/dashboard/orders/{subOrderId}/confirm
         // تأكيد الطلب
         // ===================================
+        // الجسم اختياري: { unavailableItems: [{ itemId, quantity }] } للقبول الجزئي
         [HttpPost("orders/{subOrderId}/confirm")]
-        public async Task<IActionResult> ConfirmOrder(Guid vendorId, Guid subOrderId)
+        public async Task<IActionResult> ConfirmOrder(Guid vendorId, Guid subOrderId,
+            [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] VendorConfirmDto? dto)
         {
             try
             {
                 var opsUserId = GetCurrentUserId();
-                var order = await _dashboardService.ConfirmOrderAsync(vendorId, subOrderId, opsUserId);
+                var order = await _dashboardService.ConfirmOrderAsync(vendorId, subOrderId, opsUserId, dto?.UnavailableItems);
                 return Ok(new { success = true, data = order, message = "تم تأكيد الطلب بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -142,7 +177,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.StartPreparingAsync(vendorId, subOrderId, GetCurrentUserId());
                 return Ok(new { success = true, data = order, message = "بدأ تحضير الطلب" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -157,7 +192,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.MarkReadyAsync(vendorId, subOrderId, GetCurrentUserId());
                 return Ok(new { success = true, data = order, message = "الطلب جاهز للاستلام — تم إشعار فريق التوصيل" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -182,7 +217,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.RejectOrderAsync(vendorId, subOrderId, opsUserId, dto.Reason);
                 return Ok(new { success = true, data = order, message = "تم رفض الطلب" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -208,7 +243,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

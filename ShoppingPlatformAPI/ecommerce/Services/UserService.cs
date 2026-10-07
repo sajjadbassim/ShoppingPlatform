@@ -3,6 +3,7 @@ using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Users;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -21,17 +22,17 @@ namespace ecommerce.Services
             dto.Phone = PhoneNumber.Require(dto.Phone);
             if (await _userRepository.ExistsAsync(dto.Phone))
             {
-                throw new Exception("رقم الهاتف مسجل مسبقاً");
+                throw new BusinessRuleException("رقم الهاتف مسجل مسبقاً");
             }
             dto.Email = EmailAddress.Normalize(dto.Email);
             if (dto.Email.Length > 0 && await _userRepository.GetByEmailAsync(dto.Email) != null)
-                throw new Exception("البريد الإلكتروني مستخدم لحساب آخر");
+                throw new BusinessRuleException("البريد الإلكتروني مستخدم لحساب آخر");
 
             // تحقق من صحة Role
             var validRoles = new[] { UserRoles.Customer, UserRoles.Ops, UserRoles.Admin };
             if (!validRoles.Contains(dto.Role))
             {
-                throw new Exception("نوع المستخدم غير صحيح");
+                throw new BusinessRuleException("نوع المستخدم غير صحيح");
             }
 
             var user = new User
@@ -52,7 +53,7 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByIdAsync(id);
             if (user == null)
-                throw new Exception("المستخدم غير موجود");
+                throw new NotFoundException("المستخدم غير موجود");
 
             return MapToDto(user);
         }
@@ -61,7 +62,7 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByPhoneAsync(phone);
             if (user == null)
-                throw new Exception("المستخدم غير موجود");
+                throw new NotFoundException("المستخدم غير موجود");
 
             return MapToDto(user);
         }
@@ -82,7 +83,7 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByIdAsync(id);
             if (user == null)
-                throw new Exception("المستخدم غير موجود");
+                throw new NotFoundException("المستخدم غير موجود");
 
             // تحديث الحقول المسموح بها فقط
             if (!string.IsNullOrEmpty(dto.FullName))
@@ -92,9 +93,9 @@ namespace ecommerce.Services
             {
                 var email = EmailAddress.Normalize(dto.Email);
                 if (!EmailAddress.IsValid(email))
-                    throw new Exception("البريد الإلكتروني غير صحيح");
+                    throw new BusinessRuleException("البريد الإلكتروني غير صحيح");
                 if ((await _userRepository.GetByEmailAsync(email)) is { } other && other.Id != user.Id)
-                    throw new Exception("البريد الإلكتروني مستخدم لحساب آخر");
+                    throw new BusinessRuleException("البريد الإلكتروني مستخدم لحساب آخر");
                 user.Email = email;
             }
 

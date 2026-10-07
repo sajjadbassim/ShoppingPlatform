@@ -1,9 +1,12 @@
+using System.Security.Claims;
+using ecommerce.Services.EngagementService;
 using ecommerce.Core.DTO.Product;
 using ecommerce.Core.Constants;
 using ecommerce.Services.ProductService.ProductService;
 using ecommerce.Services.VendorAccessService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -13,12 +16,43 @@ namespace ecommerce.Controllers
     {
         private readonly IProductService _productService;
         private readonly IVendorAccessService _access;
+        private readonly ICustomerEngagementService _engagement;
 
-        public ProductsController(IProductService productService, IVendorAccessService access)
+        public ProductsController(IProductService productService, IVendorAccessService access, ICustomerEngagementService engagement)
         {
             _productService = productService;
             _access = access;
+            _engagement = engagement;
         }
+
+        private Guid CurrentUserId =>
+            Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("userId")?.Value, out var id) ? id : Guid.Empty;
+
+        // ===================================
+        // GET: api/products/buy-again?scope=grocery — ما طلبه الزبون سابقاً ومتوفر الآن
+        // ===================================
+        [HttpGet("buy-again")]
+        [Authorize]
+        public async Task<IActionResult> BuyAgain([FromQuery] string? scope = null, [FromQuery] int max = 20)
+            => Ok(new { success = true, data = await _productService.GetBuyAgainAsync(CurrentUserId, scope, max) });
+
+        // ===================================
+        // «أعلمني عند التوفر»: GET حالة الاشتراك، POST اشتراك، DELETE إلغاء
+        // ===================================
+        [HttpGet("{id:guid}/stock-alert")]
+        [Authorize]
+        public async Task<IActionResult> GetStockAlert(Guid id, [FromQuery] Guid? variantId = null, CancellationToken ct = default)
+            => Ok(new { success = true, data = await _engagement.GetStockAlertAsync(CurrentUserId, id, variantId, ct) });
+
+        [HttpPost("{id:guid}/stock-alert")]
+        [Authorize]
+        public async Task<IActionResult> SubscribeStockAlert(Guid id, [FromQuery] Guid? variantId = null, CancellationToken ct = default)
+            => Ok(new { success = true, message = "سنُعلمك فور توفره", data = await _engagement.SubscribeStockAlertAsync(CurrentUserId, id, variantId, ct) });
+
+        [HttpDelete("{id:guid}/stock-alert")]
+        [Authorize]
+        public async Task<IActionResult> UnsubscribeStockAlert(Guid id, [FromQuery] Guid? variantId = null, CancellationToken ct = default)
+            => Ok(new { success = true, message = "تم إلغاء التنبيه", data = await _engagement.UnsubscribeStockAlertAsync(CurrentUserId, id, variantId, ct) });
 
         // المنتجات المعطّلة لا تُعرض في القوائم العامة إلا للإدارة والعمليات
         private bool IsStaff => User.IsInRole("ADMIN") || User.IsInRole("OPS");
@@ -37,7 +71,7 @@ namespace ecommerce.Controllers
                 var products = (await _productService.GetAllAsync()).Take(Math.Clamp(limit, 1, 200));
                 return Ok(new { success = true, data = products });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -73,7 +107,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -97,7 +131,7 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, data = product });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -119,7 +153,7 @@ namespace ecommerce.Controllers
                     vendorId, includeInactiveVendor: canManage, includeHidden: canManage && includeHidden);
                 return Ok(new { success = true, data = products });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -137,7 +171,7 @@ namespace ecommerce.Controllers
                 var products = await _productService.GetByCategoryAsync(categoryId);
                 return Ok(new { success = true, data = products });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -155,31 +189,32 @@ namespace ecommerce.Controllers
                 var products = await _productService.SearchAsync(term);
                 return Ok(new { success = true, data = products });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
         // ===================================
-        // GET: api/products/unified-search?term=كلمة&maxResults=5
+        // GET: api/products/unified-search?term=كلمة&maxResults=5&scope=general|grocery
         // ✅ بحث موحد في المنتجات والمتاجر والتصنيفات
         // ===================================
         [HttpGet("unified-search")]
         [AllowAnonymous]
         public async Task<IActionResult> UnifiedSearch(
             [FromQuery] string term,
-            [FromQuery] int maxResults = 5)
+            [FromQuery] int maxResults = 5,
+            [FromQuery] string? scope = null)
         {
             try
             {
                 if (string.IsNullOrWhiteSpace(term))
                     return BadRequest(new { success = false, message = "كلمة البحث مطلوبة" });
 
-                var result = await _productService.UnifiedSearchAsync(term, Math.Clamp(maxResults, 1, 20));
+                var result = await _productService.UnifiedSearchAsync(term, Math.Clamp(maxResults, 1, 20), scope);
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -210,7 +245,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -236,7 +271,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -258,7 +293,7 @@ namespace ecommerce.Controllers
                 return CreatedAtAction(nameof(GetById), new { id = product.Id },
                     new { success = true, data = product });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -267,6 +302,16 @@ namespace ecommerce.Controllers
         // ===================================
         // PUT: api/products/{id} — مع صور جديدة
         // ===================================
+        // POST: api/products/{id}/duplicate — نسخة مخفية من المنتج (للتاجر صاحب المنتج)
+        [HttpPost("{id}/duplicate")]
+        [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
+        public async Task<IActionResult> Duplicate(Guid id)
+        {
+            await _access.EnsureCanManageProductAsync(id);
+            var copy = await _productService.DuplicateAsync(id);
+            return Ok(new { success = true, data = copy, message = "تم إنشاء نسخة مخفية من المنتج" });
+        }
+
         [HttpPut("{id}")]
         [Authorize(Policy = PolicyNames.OpsOrAdminOrVendor)]
         public async Task<IActionResult> Update(Guid id, [FromForm] UpdateProductDto dto)
@@ -278,7 +323,7 @@ namespace ecommerce.Controllers
                 var product = await _productService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = product });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -304,7 +349,7 @@ namespace ecommerce.Controllers
                 var productImage = await _productService.AddImageAsync(id, image);
                 return Ok(new { success = true, data = productImage, message = "تم إضافة الصورة بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -328,7 +373,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الصورة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -353,7 +398,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الصورة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -377,7 +422,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المنتج غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -401,7 +446,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المنتج غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

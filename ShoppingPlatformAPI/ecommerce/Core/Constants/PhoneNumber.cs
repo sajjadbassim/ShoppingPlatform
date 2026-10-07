@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Core.Constants
 {
@@ -22,7 +23,7 @@ namespace ecommerce.Core.Constants
 
         // للتسجيل وإنشاء الحسابات: الرقم الموحَّد أو رسالة واضحة
         public static string Require(string? input) =>
-            Normalize(input) ?? throw new Exception("رقم الهاتف غير صحيح (مثال: 07701234567)");
+            Normalize(input) ?? throw new BusinessRuleException("رقم الهاتف غير صحيح (مثال: 07701234567)");
 
         // للدخول والبحث: الرقم الموحَّد إن أمكن، وإلا كما كُتب (حسابات قديمة بصيغة مختلفة)
         public static string ForLookup(string? input) => Normalize(input) ?? (input ?? "").Trim();

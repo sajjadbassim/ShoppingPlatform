@@ -4,6 +4,7 @@ using ecommerce.Core.DTO.Drivers;
 using ecommerce.Core.DTO.Ops;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -39,7 +40,7 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(id);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             return MapToDto(driver);
         }
@@ -58,7 +59,7 @@ namespace ecommerce.Services
             // التحقق من عدم تكرار رقم الهاتف
             var existing = await _driverRepository.GetByPhoneAsync(dto.Phone);
             if (existing != null)
-                throw new Exception("رقم الهاتف مسجل مسبقاً");
+                throw new BusinessRuleException("رقم الهاتف مسجل مسبقاً");
 
             var driver = new Driver
             {
@@ -79,7 +80,7 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(id);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             // تحديث فقط الحقول المرسلة
             if (!string.IsNullOrEmpty(dto.FullName))
@@ -90,14 +91,14 @@ namespace ecommerce.Services
                 dto.Phone = PhoneNumber.Require(dto.Phone);
                 var existing = await _driverRepository.GetByPhoneAsync(dto.Phone);
                 if (existing != null && existing.Id != id)
-                    throw new Exception("رقم الهاتف مسجل مسبقاً");
+                    throw new BusinessRuleException("رقم الهاتف مسجل مسبقاً");
 
                 // رقم الدخول يتبع رقم السائق
                 if (driver.UserId.HasValue && dto.Phone != driver.Phone)
                 {
                     var owner = await _userRepository.GetByPhoneAsync(dto.Phone);
                     if (owner != null && owner.Id != driver.UserId)
-                        throw new Exception("رقم الهاتف مسجل بحساب آخر");
+                        throw new BusinessRuleException("رقم الهاتف مسجل بحساب آخر");
                     var user = await _userRepository.GetByIdAsync(driver.UserId.Value);
                     if (user != null) { user.Phone = dto.Phone; await _userRepository.UpdateAsync(user); }
                 }
@@ -121,7 +122,7 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(id);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             driver.Status = driver.Status == DriverStatus.Active
                 ? DriverStatus.Suspended
@@ -146,10 +147,10 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(id);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             if (driver.Status != DriverStatus.Active)
-                throw new Exception("السائق غير نشط");
+                throw new BusinessRuleException("السائق غير نشط");
 
             var allowedStatuses = new[]
             {
@@ -160,7 +161,7 @@ namespace ecommerce.Services
     };
 
             if (!allowedStatuses.Contains(dto.WorkStatus))
-                throw new Exception("حالة العمل غير صحيحة");
+                throw new BusinessRuleException("حالة العمل غير صحيحة");
 
             driver.WorkStatus = dto.WorkStatus;
             driver = await _driverRepository.UpdateAsync(driver);
@@ -188,7 +189,7 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(driverId);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             var (items, totalCount) = await _subOrderRepository.GetByDriverAsync(
                 driverId, pageNumber, pageSize, filter);
@@ -211,6 +212,8 @@ namespace ecommerce.Services
                         CustomerId = so.Order?.CustomerId ?? Guid.Empty,
                         CustomerName = so.Order?.Customer?.FullName,
                         CustomerPhone = so.Order?.Customer?.Phone,
+                        DeliverySlotStart = so.Order?.DeliverySlotStart,
+                        DeliverySlotEnd = so.Order?.DeliverySlotEnd,
                         DeliveryAddress = so.Order?.Address != null
                             ? $"{so.Order.Address.StreetAddress}, {so.Order.Address.Area}, {so.Order.Address.City}"
                             : "",
@@ -234,7 +237,8 @@ namespace ecommerce.Services
                             ProductImageUrl = i.ProductImageUrl,
                             UnitPrice = i.UnitPrice,
                             Quantity = i.Quantity,
-                            Subtotal = i.Subtotal
+                            Subtotal = i.Subtotal,
+                            WeightStepKg = i.WeightStepKg
                         }).ToList() ?? new()
                     };
                 }).ToList(),
@@ -248,7 +252,7 @@ namespace ecommerce.Services
         {
             var driver = await _driverRepository.GetByIdAsync(driverId);
             if (driver == null)
-                throw new Exception("السائق غير موجود");
+                throw new NotFoundException("السائق غير موجود");
 
             return await _subOrderRepository.GetDriverStatsAsync(driverId);
         }

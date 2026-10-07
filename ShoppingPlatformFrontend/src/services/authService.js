@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from '../api/axios';
 import { API_ENDPOINTS } from '../api/endpoints';
+import { clearSession, refreshSession, revokeSession, saveSession } from '../api/session';
 
 /**
  * Auth Service - خدمة المصادقة
@@ -16,9 +17,7 @@ login: async (credentials) => {
 
   const data = response.data.data; // ✅ مثل باقي الخدمات
 
-  if (data.token) {
-    localStorage.setItem('accessToken', data.token);
-  }
+  saveSession(data);
 
   localStorage.setItem('user', JSON.stringify(data));
 
@@ -39,9 +38,7 @@ register: async (userData) => {
 
   const data = response.data.data;
 
-  if (data.token) {
-    localStorage.setItem('accessToken', data.token);
-  }
+  saveSession(data);
 
   localStorage.setItem('user', JSON.stringify(data));
 
@@ -61,7 +58,10 @@ changePassword: async (passwords) => {
     passwords
   );
 
-  return response.data.data;
+  // الخادم ينهي جلسات الأجهزة الأخرى ويعيد جلسة جديدة لهذا الجهاز
+  const data = response.data.data;
+  saveSession(data);
+  return data;
 },
 
 
@@ -98,17 +98,7 @@ changePassword: async (passwords) => {
   /**
    * تجديد التوكن
    */
-refreshToken: async () => {
-  const response = await apiPost(API_ENDPOINTS.AUTH.REFRESH_TOKEN);
-
-  const data = response.data.data;
-
-  if (data.token) {
-    localStorage.setItem('accessToken', data.token);
-  }
-
-  return data;
-},
+refreshToken: () => refreshSession(),
 
 
   /**
@@ -124,7 +114,8 @@ getCurrentUser: async () => {
    * تسجيل الخروج
    */
   logout: () => {
-    localStorage.removeItem('accessToken');
+    revokeSession();
+    clearSession();
     localStorage.removeItem('user');
     window.location.href = '/login';
   },

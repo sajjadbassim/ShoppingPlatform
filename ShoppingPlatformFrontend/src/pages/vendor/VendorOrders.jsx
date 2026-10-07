@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Search, RefreshCw, AlertCircle, Package, CheckCircle, XCircle, MapPin, Phone, X,
-  MessageCircle, Clock, ChevronLeft,
+  MessageCircle, Clock, ChevronLeft, Printer, StickyNote, RotateCcw, Minus, Plus, Timer, Bell, BellOff,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import Button from '../../components/common/Button'
@@ -16,6 +16,11 @@ import { useAuthStore } from '../../stores/authStore'
 import { apiGet, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
+import { printOrder } from '../../utils/printOrder'
+import { RETURN_STATUS_AR, returnReasonAr } from '../../utils/returnText'
+import { isOrderSoundOn, setOrderSoundOn } from '../../utils/orderAlerts'
+import DeliverySlot from '../../components/common/DeliverySlot'
+import { formatQuantity } from '../../utils/weight'
 
 const PENDING = 'PENDING_CONFIRMATION'
 
@@ -39,6 +44,11 @@ const REJECT_REASONS = [
 ]
 
 const orderTotal = (o) => (o.subtotal ?? 0) + (o.deliveryFee ?? 0)
+// اسم القطعة مع المتغير الذي اختاره الزبون — «قميص (المقاس: L · اللون: أحمر)»
+const itemName = (it) => {
+  const name = it.productNameAr || it.productName
+  return it.variantLabel ? `${name} (${it.variantLabel})` : name
+}
 const money = (n) => `${(n ?? 0).toLocaleString()} د.ع`
 
 const timeAgo = (date) => {
@@ -71,6 +81,15 @@ const useVendorOrders = (vendorId, params = {}) => useQuery({
   enabled: !!vendorId,
   staleTime: 60 * 1000,
   refetchInterval: 60 * 1000, // الطلبات الجديدة تظهر وحدها
+})
+
+// أعداد كل حالة وقيمة ما ينتظر القرار — من الخادم بدل تحميل كل الطلبات
+const useVendorOrderCounts = (vendorId) => useQuery({
+  queryKey: ['vendor-orders', vendorId, 'counts'],
+  queryFn: async () => (await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.ORDER_COUNTS(vendorId))).data?.data,
+  enabled: !!vendorId,
+  staleTime: 60 * 1000,
+  refetchInterval: 60 * 1000,
 })
 
 // ===========================
@@ -115,20 +134,25 @@ const NextStepButton = ({ order, onAdvance, busy, big = false }) => {
 const OrderCard = ({ order, onOpen, onAccept, onReject, onAdvance, busy }) => {
   const pending = order.status === PENDING
   const count = order.items?.reduce((s, it) => s + (it.quantity || 0), 0) || 0
-  const names = order.items?.map(it => it.productNameAr || it.productName).join('، ')
+  const names = order.items?.map(itemName).join('، ')
   return (
     <div className={`bg-white rounded-2xl border overflow-hidden ${pending ? 'border-amber-300 shadow-sm shadow-amber-100' : 'border-gray-200'}`}>
       <button onClick={onOpen} className="w-full text-right p-4 hover:bg-gray-50/60">
         <div className="flex items-center gap-2">
           <span className="font-bold text-gray-900 text-sm" dir="ltr">#{order.subOrderNumber}</span>
           <span className="text-xs text-gray-400 flex items-center gap-1"><Clock size={12} />{timeAgo(order.createdAt)}</span>
-          <span className="mr-auto"><StatusBadge status={order.status} /></span>
+          <span className="mr-auto flex items-center gap-1.5">
+            {pending && <Countdown deadline={order.confirmationDeadline} />}
+            <StatusBadge status={order.status} />
+          </span>
         </div>
         <div className="flex items-center gap-3 mt-3">
           <ItemThumbs items={order.items} />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-gray-800 truncate">{names || '—'}</p>
             <p className="text-xs text-gray-500 mt-0.5">{count} قطعة · {order.customerName}</p>
+            {order.customerNotes && <p className="text-xs text-amber-700 mt-0.5 truncate flex items-center gap-1"><StickyNote size={11} />{order.customerNotes}</p>}
+            <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd} compact className="mt-1" />
           </div>
           <p className="font-bold text-gray-900 flex-shrink-0">{money(orderTotal(order))}</p>
         </div>
@@ -153,25 +177,116 @@ const OrderCard = ({ order, onOpen, onAccept, onReject, onAdvance, busy }) => {
 }
 
 // ===========================
+// الوقت المتبقي لقرار القبول — بعد انتهائه يظهر الطلب «متأخراً» لفريق العمليات (لا يُلغى تلقائياً).
+// طلب السوبرماركت بموعد لاحق لمتجر مغلق تبدأ مهلته من وقت فتح المتجر
+// ===========================
+const useNow = (ms = 1000) => {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t) }, [ms])
+  return now
+}
+
+const Countdown = ({ deadline, big = false }) => {
+  const now = useNow()
+  if (!deadline) return null
+  const left = Math.max(0, Math.floor((new Date(deadline).getTime() - now) / 1000))
+  const urgent = left < 60
+  const text = left === 0 ? 'انتهت المهلة'
+    : left >= 3600 ? `${Math.floor(left / 3600)}س ${Math.floor((left % 3600) / 60)}د`
+    : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full font-bold tabular-nums ${big ? 'h-8 px-3 text-sm' : 'h-6 px-2 text-xs'} ${
+      urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`} title="الوقت المتبقي لقبول الطلب — بعده يظهر متأخراً لفريق العمليات">
+      <Timer size={big ? 15 : 12} />{text}
+    </span>
+  )
+}
+
+// كميات خاصة لكل قطعة: مرفوضة عند الباب، مُرجعة، غير متوفرة عند القبول
+const ItemNotes = ({ it, items = [] }) => {
+  const replaced = it.replacesItemId && items.find(x => x.id === it.replacesItemId)
+  const notes = [
+    it.replacesItemId && { text: `بديل عن ${replaced ? itemName(replaced) : 'قطعة غير متوفرة'}`, cls: 'bg-emerald-50 text-emerald-700' },
+    it.unavailableQuantity > 0 && { text: `${formatQuantity(it.unavailableQuantity, it.weightStepKg)} غير متوفرة — أُزيلت`, cls: 'bg-gray-100 text-gray-600' },
+    it.refusedQuantity > 0 && { text: `${it.refusedQuantity} رفضها الزبون عند الباب`, cls: 'bg-orange-50 text-orange-700' },
+    it.returnedQuantity > 0 && { text: `${it.returnedQuantity} أُرجعت`, cls: 'bg-rose-50 text-rose-700' },
+  ].filter(Boolean)
+  if (notes.length === 0) return null
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {notes.map((n, i) => <span key={i} className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${n.cls}`}>{n.text}</span>)}
+    </div>
+  )
+}
+
+// ===========================
 // تفاصيل الطلب — نافذة من الأسفل (هاتف) أو جانبية (كمبيوتر)
 // ===========================
-const OrderSheet = ({ order, onClose, onAccept, onReject, onAdvance, busy }) => {
+const OrderSheet = ({ order, vendorId, storeName, onClose, onAccept, onReject, onAdvance, busy }) => {
   const pending = order.status === PENDING
   const wa = whatsappLink(order.customerPhone)
+  // القبول الجزئي: كم قطعة غير متوفرة من كل بند
+  const [partial, setPartial] = useState(false)
+  const [missing, setMissing] = useState({})
+  // الزبون اختار «استبدله بمشابه»: بديل من منتجات المتجر لكل بند ناقص (لا يدفع أكثر من سعر الأصلي)
+  const canReplace = order.substitutionPreference === 'SIMILAR'
+  const [replacements, setReplacements] = useState({})
+  const { data: storeProducts = [] } = useQuery({
+    queryKey: ['vendor-replacement-products', vendorId],
+    queryFn: async () => {
+      const r = await apiGet(API_ENDPOINTS.PRODUCTS.BY_VENDOR(vendorId))
+      const list = r.data.data || r.data || []
+      return list.filter(p => p.isActive !== false && p.isAvailable && p.stockQuantity > 0 && !p.hasVariants)
+    },
+    enabled: partial && canReplace && !!vendorId,
+    staleTime: 60 * 1000,
+  })
+  const items = order.items || []
+  const setMissingFor = (it, n) => setMissing(m => ({ ...m, [it.id]: Math.max(0, Math.min(it.quantity, n)) }))
+  const missingCount = Object.values(missing).reduce((s, n) => s + n, 0)
+  const allMissing = items.length > 0 && items.every(it => (missing[it.id] || 0) >= it.quantity)
+  const replacementPrice = (it) => {
+    const product = storeProducts.find(p => p.id === replacements[it.id])
+    return product ? Math.min(product.price, it.unitPrice) * (missing[it.id] || 0) : 0
+  }
+  const newSubtotal = items.reduce((s, it) => s + it.unitPrice * (it.quantity - (missing[it.id] || 0)) + replacementPrice(it), 0)
+  const acceptPartial = () => onAccept(Object.entries(missing).filter(([, q]) => q > 0).map(([itemId, quantity]) => ({
+    itemId, quantity, replacementProductId: canReplace && replacements[itemId] ? replacements[itemId] : undefined,
+  })))
+  const { error: showError } = useToast()
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-stretch sm:justify-start">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full sm:w-[28rem] max-h-[92dvh] sm:max-h-none sm:h-full bg-white rounded-t-3xl sm:rounded-none flex flex-col animate-slide-up">
-        <div className="flex items-center gap-3 p-4 border-b border-gray-100">
+        <div className="flex items-center gap-2 p-4 border-b border-gray-100">
           <div className="flex-1 min-w-0">
             <p className="font-bold text-gray-900" dir="ltr">#{order.subOrderNumber}</p>
             <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>
           </div>
-          <StatusBadge status={order.status} />
+          {pending ? <Countdown deadline={order.confirmationDeadline} big /> : <StatusBadge status={order.status} />}
+          <button onClick={() => { if (!printOrder(order, storeName)) showError('اسمح بالنوافذ المنبثقة لهذا الموقع لطباعة الإيصال') }}
+            className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center" aria-label="طباعة إيصال التجهيز" title="طباعة إيصال التجهيز">
+            <Printer size={17} />
+          </button>
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center" aria-label="إغلاق"><X size={18} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* موعد السوبرماركت وتفضيل الاستبدال */}
+          <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd} substitution={order.substitutionPreference} />
+
+          {/* ملاحظة الزبون */}
+          {order.customerNotes && (
+            <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 flex gap-2">
+              <StickyNote size={17} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-800">ملاحظة الزبون</p>
+                <p className="text-sm text-amber-900 mt-0.5 whitespace-pre-line">{order.customerNotes}</p>
+              </div>
+            </div>
+          )}
+
           {/* الزبون */}
           <div className="rounded-2xl bg-gray-50 p-4">
             <p className="font-bold text-gray-900">{order.customerName}</p>
@@ -193,25 +308,75 @@ const OrderSheet = ({ order, onClose, onAccept, onReject, onAdvance, busy }) => 
           </div>
 
           {/* المنتجات */}
+          {partial && (
+            <p className="text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-xl p-3">
+              حدّد عدد القطع <b>غير المتوفرة</b> من كل منتج — تُزال من الطلب ويُبلَّغ الزبون بالمبلغ الجديد.
+              {canReplace && <> الزبون يقبل <b>بديلاً مشابهاً</b>: اختره من منتجاتك، ويُحسب بسعر لا يزيد عن الأصلي.</>}
+            </p>
+          )}
           <div className="rounded-2xl border border-gray-200 divide-y divide-gray-100">
-            {(order.items || []).map((it, i) => (
-              <div key={i} className="flex items-center gap-3 p-3">
-                <span className="w-12 h-12 rounded-xl product-media overflow-hidden flex-shrink-0">
-                  {it.productImageUrl && <img src={getImageUrl(it.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{it.productNameAr || it.productName}</p>
-                  <p className="text-xs text-gray-500">× {it.quantity}</p>
+            {items.map((it, i) => {
+              const gone = it.quantity === 0
+              const m = missing[it.id] || 0
+              return (
+                <div key={it.id || i} className={`flex flex-wrap items-center gap-3 p-3 ${gone ? 'opacity-60' : ''}`}>
+                  <span className="w-12 h-12 rounded-xl product-media overflow-hidden flex-shrink-0">
+                    {it.productImageUrl && <img src={getImageUrl(it.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium text-gray-900 truncate ${gone ? 'line-through' : ''}`}>{it.productNameAr || it.productName}</p>
+                    {it.variantLabel && (
+                      <p className="text-xs font-bold text-primary mt-0.5">{it.variantLabel}{it.variantSku && <span className="font-mono font-normal text-gray-400" dir="ltr"> · {it.variantSku}</span>}</p>
+                    )}
+                    <p className="text-xs text-gray-500">× {formatQuantity(it.quantity, it.weightStepKg)}</p>
+                    <ItemNotes it={it} items={items} />
+                  </div>
+                  {partial ? (
+                    <span className="inline-flex items-center gap-1" aria-label="غير متوفر">
+                      <button onClick={() => setMissingFor(it, m - 1)} disabled={m === 0} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center disabled:opacity-40" aria-label="إنقاص"><Minus size={14} /></button>
+                      <span className={`w-7 text-center text-sm font-bold ${m > 0 ? 'text-red-600' : 'text-gray-400'}`}>{m}</span>
+                      <button onClick={() => setMissingFor(it, m + 1)} disabled={m >= it.quantity} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center disabled:opacity-40" aria-label="زيادة"><Plus size={14} /></button>
+                    </span>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-900">{money(it.subtotal)}</p>
+                  )}
+                  {partial && canReplace && m > 0 && (
+                    <select value={replacements[it.id] || ''} aria-label="البديل"
+                      onChange={e => setReplacements(r => ({ ...r, [it.id]: e.target.value }))}
+                      className="w-full h-10 px-3 border border-emerald-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500">
+                      <option value="">بلا بديل — احذفه وأعد المبلغ</option>
+                      {storeProducts.filter(p => p.id !== it.productId && p.stockQuantity >= m).map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.nameAr || p.name} — {Math.min(p.price, it.unitPrice).toLocaleString()} د.ع{p.price > it.unitPrice ? ' (بسعر الأصلي)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-                <p className="text-sm font-bold text-gray-900">{money(it.subtotal)}</p>
-              </div>
-            ))}
+              )
+            })}
             <div className="p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{money(order.subtotal)}</span></div>
+              <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{money(partial ? newSubtotal : order.subtotal)}</span></div>
               <div className="flex justify-between text-gray-600"><span>التوصيل</span><span>{money(order.deliveryFee)}</span></div>
-              <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-100"><span>الإجمالي</span><span className="text-primary">{money(orderTotal(order))}</span></div>
+              <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-100"><span>الإجمالي</span><span className="text-primary">{money((partial ? newSubtotal : order.subtotal ?? 0) + (order.deliveryFee ?? 0))}</span></div>
             </div>
           </div>
+
+          {/* الإرجاعات */}
+          {order.returns?.length > 0 && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-3 space-y-2">
+              <p className="text-xs font-bold text-rose-800 flex items-center gap-1.5"><RotateCcw size={14} />إرجاعات هذا الطلب</p>
+              {order.returns.map(r => (
+                <div key={r.id} className="text-sm bg-white rounded-xl border border-rose-100 p-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-900" dir="ltr">{r.returnNumber}</span>
+                    <span className="text-xs text-gray-500">{r.isDoorRefusal ? 'رفض عند الباب' : RETURN_STATUS_AR[r.status] || r.status}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">{returnReasonAr(r.reason)}{r.details ? ` — ${r.details}` : ''}</p>
+                </div>
+              ))}
+            </div>
+          )}
 
           {order.cancellationReason && (
             <div className="rounded-2xl bg-red-50 border border-red-200 p-3">
@@ -219,15 +384,32 @@ const OrderSheet = ({ order, onClose, onAccept, onReject, onAdvance, busy }) => 
               <p className="text-sm text-red-600 mt-0.5">{order.cancellationReason}</p>
             </div>
           )}
+
+          {pending && !partial && items.length > 0 && (
+            <button onClick={() => setPartial(true)} className="w-full text-sm font-medium text-gray-600 underline underline-offset-4">
+              بعض القطع غير متوفرة؟ اقبل المتوفر فقط
+            </button>
+          )}
         </div>
 
-        {pending && (
+        {pending && partial && (
+          <div className="grid grid-cols-2 gap-2 p-4 border-t border-gray-100 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <button onClick={() => { setPartial(false); setMissing({}); setReplacements({}) }} disabled={busy}
+              className="h-12 rounded-xl border border-gray-200 text-gray-700 font-bold disabled:opacity-50">تراجع</button>
+            <button onClick={acceptPartial} disabled={busy || missingCount === 0 || allMissing}
+              title={allMissing ? 'كل القطع غير متوفرة — ارفض الطلب بدلاً من ذلك' : undefined}
+              className="h-12 rounded-xl bg-green-600 text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-40">
+              {busy ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}قبول المتوفر
+            </button>
+          </div>
+        )}
+        {pending && !partial && (
           <div className="grid grid-cols-2 gap-2 p-4 border-t border-gray-100 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <button onClick={onReject} disabled={busy}
               className="h-12 rounded-xl border border-red-200 text-red-600 font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
               <XCircle size={18} />رفض
             </button>
-            <button onClick={onAccept} disabled={busy}
+            <button onClick={() => onAccept()} disabled={busy}
               className="h-12 rounded-xl bg-green-600 text-white font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50">
               {busy ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}قبول الطلب
             </button>
@@ -294,6 +476,11 @@ const VendorOrders = () => {
   const statusFilter = searchParams.get('status') || 'all'
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 350)
+    return () => clearTimeout(t)
+  }, [search])
   const [openOrder, setOpenOrder] = useState(null)
   // ?order=<subOrderId> (من الإشعارات): فتح الطلب مباشرة
   const orderParam = searchParams.get('order')
@@ -311,14 +498,24 @@ const VendorOrders = () => {
   }
   const [rejecting, setRejecting] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  const [soundOn, setSoundOn] = useState(isOrderSoundOn)
+  const toggleSound = () => { setOrderSoundOn(!soundOn); setSoundOn(!soundOn) }
+  // اسم المتجر لإيصال التجهيز (نفس استعلام صفحة الإعدادات — من الذاكرة غالباً)
+  const { data: vendorInfo } = useQuery({
+    queryKey: ['vendor-info', vendorId],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.VENDORS.BY_ID(vendorId)); return r.data.data || r.data },
+    enabled: !!vendorId,
+    staleTime: 5 * 60 * 1000,
+  })
+  const storeName = vendorInfo?.nameAr || vendorInfo?.name || ''
 
   const { data, isLoading, isError, refetch, isFetching } = useVendorOrders(vendorId, {
     pageNumber: currentPage,
     pageSize: 15,
     status: statusFilter !== 'all' ? statusFilter : undefined,
+    search: debouncedSearch || undefined,
   })
-  // كل الطلبات (بلا فلترة) لحساب أعداد الحالات
-  const { data: allData } = useVendorOrders(vendorId, { pageNumber: 1, pageSize: 500 })
+  const { data: counts } = useVendorOrderCounts(vendorId)
 
   const afterChange = () => {
     queryClient.invalidateQueries({ queryKey: ['vendor-orders', vendorId] })
@@ -327,9 +524,13 @@ const VendorOrders = () => {
   }
 
   const acceptMutation = useMutation({
-    mutationFn: (o) => apiPost(API_ENDPOINTS.VENDOR_DASHBOARD.CONFIRM_ORDER(vendorId, o.subOrderId)),
-    onMutate: (o) => setBusyId(o.subOrderId),
-    onSuccess: () => { success('تم قبول الطلب ✅'); afterChange() },
+    mutationFn: ({ order, unavailableItems }) => apiPost(API_ENDPOINTS.VENDOR_DASHBOARD.CONFIRM_ORDER(vendorId, order.subOrderId),
+      unavailableItems?.length ? { unavailableItems } : {}),
+    onMutate: ({ order }) => setBusyId(order.subOrderId),
+    onSuccess: (_, { unavailableItems }) => {
+      success(unavailableItems?.length ? 'تم قبول المتوفر وإبلاغ الزبون بالمبلغ الجديد ✅' : 'تم قبول الطلب ✅')
+      afterChange()
+    },
     onError: (err) => showError(err.message || 'فشل قبول الطلب'),
     onSettled: () => setBusyId(null),
   })
@@ -352,17 +553,12 @@ const VendorOrders = () => {
     onSettled: () => setBusyId(null),
   })
 
-  const all = allData?.items ?? []
-  const countOf = (s) => s === 'all' ? (allData?.totalCount ?? all.length) : all.filter(o => o.status === s).length
+  const countOf = (s) => s === 'all' ? (counts?.total ?? 0) : (counts?.byStatus?.[s] ?? 0)
   const pendingCount = countOf(PENDING)
-  const pendingValue = all.filter(o => o.status === PENDING).reduce((s, o) => s + orderTotal(o), 0)
+  const pendingValue = counts?.pendingValue ?? 0
 
-  const q = search.trim().toLowerCase()
-  const orders = (data?.items ?? []).filter(o => !q ||
-    (o.subOrderNumber || '').toLowerCase().includes(q) ||
-    (o.orderNumber || '').toLowerCase().includes(q) ||
-    (o.customerName || '').toLowerCase().includes(q) ||
-    (o.customerPhone || '').includes(q))
+  const q = debouncedSearch
+  const orders = data?.items ?? []
 
   const setStatus = (v) => {
     const p = new URLSearchParams(searchParams)
@@ -388,8 +584,13 @@ const VendorOrders = () => {
       <div className="flex items-center gap-3">
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">الطلبات</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{countOf('all')} طلب · يتحدث تلقائياً كل دقيقة</p>
+          <p className="text-sm text-gray-500 mt-0.5">{countOf('all')} طلب · يتحدث فوراً عند وصول طلب</p>
         </div>
+        <button onClick={toggleSound} aria-label={soundOn ? 'إيقاف صوت الطلبات الجديدة' : 'تشغيل صوت الطلبات الجديدة'}
+          title={soundOn ? 'صوت الطلبات الجديدة: مفعّل' : 'صوت الطلبات الجديدة: متوقف'}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${soundOn ? 'text-primary bg-primary/10' : 'text-gray-400 hover:bg-gray-100'}`}>
+          {soundOn ? <Bell size={18} /> : <BellOff size={18} />}
+        </button>
         <button onClick={() => refetch()} disabled={isFetching} aria-label="تحديث"
           className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center">
           <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
@@ -432,7 +633,10 @@ const VendorOrders = () => {
       {/* البحث */}
       <div className="relative">
         <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
+        <input value={search} onChange={e => {
+            setSearch(e.target.value)
+            if (currentPage > 1) { const p = new URLSearchParams(searchParams); p.delete('page'); setSearchParams(p, { replace: true }) }
+          }}
           placeholder="ابحث برقم الطلب أو اسم الزبون أو هاتفه..."
           className="w-full h-10 pr-9 pl-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary" />
       </div>
@@ -452,7 +656,7 @@ const VendorOrders = () => {
           {orders.map(o => (
             <OrderCard key={o.subOrderId} order={o}
               onOpen={() => setOpenOrder(o)}
-              onAccept={() => acceptMutation.mutate(o)}
+              onAccept={() => acceptMutation.mutate({ order: o })}
               onReject={() => setRejecting(o)}
               onAdvance={(step) => advanceMutation.mutate({ order: o, step })}
               busy={busyId === o.subOrderId} />
@@ -468,8 +672,8 @@ const VendorOrders = () => {
       )}
 
       {openOrder && (
-        <OrderSheet order={openOrder} onClose={closeOrder}
-          onAccept={() => acceptMutation.mutate(openOrder)}
+        <OrderSheet order={openOrder} vendorId={vendorId} storeName={storeName} onClose={closeOrder}
+          onAccept={(unavailableItems) => acceptMutation.mutate({ order: openOrder, unavailableItems })}
           onReject={() => setRejecting(openOrder)}
           onAdvance={(step) => advanceMutation.mutate({ order: openOrder, step })}
           busy={busyId === openOrder.subOrderId} />

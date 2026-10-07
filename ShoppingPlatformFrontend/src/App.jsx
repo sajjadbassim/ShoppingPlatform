@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route, Outlet } from 'react-router-dom'
 import { ToastProvider } from './components/common/Toast'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import PWAPrompt from './components/common/PWAPrompt'
@@ -56,6 +56,7 @@ const VendorEarnings = lazy(() => import('./pages/vendor/VendorEarnings'))
 const VendorSettings = lazy(() => import('./pages/vendor/VendorSettings'))
 const VendorSocialAccounts = lazy(() => import('./pages/vendor/VendorSocialAccounts'))
 const VendorPublish = lazy(() => import('./pages/vendor/VendorPublish'))
+const VendorPromotions = lazy(() => import('./pages/vendor/VendorPromotions'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
 const AdminStores = lazy(() => import('./pages/admin/AdminStores'))
@@ -78,6 +79,110 @@ const OperationsTracking = lazy(() => import('./pages/operations/OperationsTrack
 const OperationsReports = lazy(() => import('./pages/operations/OperationsReports'))
 const OperationsSettings = lazy(() => import('./pages/operations/OperationsSettings'))
 
+// الإطار المشترك لكل الصفحات داخل الموجّه
+const RootLayout = () => (
+  <>
+    <ScrollToTop />
+    <TopLoadingBar />
+    <Suspense fallback={<PageLoader fullScreen />}>
+      <Outlet />
+    </Suspense>
+  </>
+)
+
+// موجّه بيانات (data router) بنفس المسارات: يتيح useBlocker لتنبيه «تغييرات غير محفوظة» عند مغادرة الصفحة
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route element={<RootLayout />}>
+    <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+    <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+    <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
+    <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+    <Route path="/reels" element={<ReelsPage />} />
+    {/* رابط مشاركة موقع السائق — بلا تسجيل دخول */}
+    <Route path="/driver/track/:token" element={<DriverTrackPage />} />
+    <Route path="/driver" element={<ProtectedRoute allowedRoles={['DRIVER']}><DriverDashboard /></ProtectedRoute>} />
+
+    <Route path="/" element={<MainLayout />}>
+      <Route index element={<HomePage />} />
+      {/* السوبرماركت: صفحة مستقلة بنفس تصميم الرئيسية، والسلة مشتركة */}
+      <Route path="supermarket" element={<HomePage key="grocery" page="grocery" />} />
+      <Route path="products" element={<ProductsPage />} />
+      <Route path="products/:id" element={<ProductDetailsPage />} />
+      <Route path="categories" element={<CategoriesPage />} />
+      <Route path="stores" element={<StoresPage />} />
+      <Route path="stores/:id" element={<StoreDetailsPage />} />
+      <Route path="loyalty" element={<ProtectedRoute><LoyaltyPage /></ProtectedRoute>} />
+      <Route path="returns" element={<ProtectedRoute><ReturnsPage /></ProtectedRoute>} />
+      <Route path="cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
+      <Route path="checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+      <Route path="orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+      <Route path="orders/:id" element={<ProtectedRoute><OrderDetailsPage /></ProtectedRoute>} />
+      <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+      <Route path="wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+      <Route path="settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+      <Route path="terms" element={<LegalPage key="terms" doc="terms" />} />
+      <Route path="privacy" element={<LegalPage key="privacy" doc="privacy" />} />
+      <Route path="usage-policy" element={<LegalPage key="usage" doc="usage" />} />
+      <Route path="about" element={<AboutPage />} />
+      <Route path="contact" element={<ContactPage />} />
+      <Route path="careers" element={<CareersPage />} />
+      <Route path="blog" element={<BlogPage />} />
+      <Route path="blog/:slug" element={<BlogPostPage />} />
+      <Route path="help" element={<HelpCenterPage />} />
+      <Route path="shipping" element={<SupportPage key="shipping" doc="shipping" />} />
+      <Route path="return-policy" element={<SupportPage key="returnPolicy" doc="returnPolicy" />} />
+      <Route path="payment-methods" element={<SupportPage key="payment" doc="payment" />} />
+    </Route>
+
+    <Route path="/vendor" element={<ProtectedRoute allowedRoles={['VENDOR']}><DashboardLayout type="vendor" /></ProtectedRoute>}>
+      <Route index element={<VendorDashboard />} />
+      <Route path="products" element={<VendorProducts />} />
+      <Route path="products/new" element={<VendorProductForm />} />
+      <Route path="products/:id/edit" element={<VendorProductForm />} />
+      <Route path="products/:id/publish" element={<VendorPublish />} />
+      <Route path="orders" element={<VendorOrders />} />
+      <Route path="reviews" element={<VendorReviews />} />
+      <Route path="reports" element={<VendorReports />} />
+      <Route path="earnings" element={<VendorEarnings />} />
+      <Route path="settings" element={<VendorSettings />} />
+      <Route path="social" element={<VendorSocialAccounts />} />
+      <Route path="promotions" element={<VendorPromotions />} />
+    </Route>
+
+    <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><DashboardLayout type="admin" /></ProtectedRoute>}>
+      <Route index element={<AdminDashboard />} />
+      <Route path="users" element={<AdminUsers />} />
+      <Route path="stores" element={<AdminStores />} />
+      <Route path="categories" element={<AdminCategories />} />
+      <Route path="homepage" element={<AdminHomepage />} />
+      <Route path="reviews" element={<AdminReviews />} />
+      <Route path="coupons" element={<AdminCoupons />} />
+      <Route path="loyalty" element={<AdminLoyalty />} />
+      <Route path="returns" element={<AdminReturns />} />
+      <Route path="orders" element={<AdminOrders />} />
+      <Route path="orders/:id" element={<AdminOrderDetails />} />
+      <Route path="orders/:id" element={<AdminOrderDetails />} />
+      <Route path="reports" element={<AdminReports />} />
+      <Route path="finance" element={<AdminFinance />} />
+      <Route path="delivery-zones" element={<AdminDeliveryZones />} />
+      <Route path="settings" element={<AdminSettings />} />
+    </Route>
+
+    <Route path="/operations" element={<ProtectedRoute allowedRoles={['OPS']}><DashboardLayout type="operations" /></ProtectedRoute>}>
+      <Route index element={<OperationsDashboard />} />
+      <Route path="drivers" element={<OperationsDrivers />} />
+      <Route path="orders" element={<OperationsOrders />} />
+      <Route path="tracking" element={<OperationsTracking />} />
+      <Route path="reports" element={<OperationsReports />} />
+      <Route path="settings" element={<OperationsSettings />} />
+    </Route>
+
+    <Route path="*" element={<NotFoundPage />} />
+  </Route>
+))
+
 function App() {
   const { isAuthenticated } = useAuthStore()
   const fetchNotifications = useNotificationsStore((s) => s.fetchNotifications)
@@ -99,98 +204,7 @@ function App() {
     <ErrorBoundary>
       <ToastProvider position="bottom-left">
         <PWAPrompt />
-        <Router>
-          <ScrollToTop />
-          <TopLoadingBar />
-          <Suspense fallback={<PageLoader fullScreen />}>
-          <Routes>
-            <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
-            <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
-            <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
-
-            <Route path="/reels" element={<ReelsPage />} />
-            {/* رابط مشاركة موقع السائق — بلا تسجيل دخول */}
-            <Route path="/driver/track/:token" element={<DriverTrackPage />} />
-            <Route path="/driver" element={<ProtectedRoute allowedRoles={['DRIVER']}><DriverDashboard /></ProtectedRoute>} />
-
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<HomePage />} />
-              <Route path="products" element={<ProductsPage />} />
-              <Route path="products/:id" element={<ProductDetailsPage />} />
-              <Route path="categories" element={<CategoriesPage />} />
-              <Route path="stores" element={<StoresPage />} />
-              <Route path="stores/:id" element={<StoreDetailsPage />} />
-              <Route path="loyalty" element={<ProtectedRoute><LoyaltyPage /></ProtectedRoute>} />
-              <Route path="returns" element={<ProtectedRoute><ReturnsPage /></ProtectedRoute>} />
-              <Route path="cart" element={<ProtectedRoute><CartPage /></ProtectedRoute>} />
-              <Route path="checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-              <Route path="orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-              <Route path="orders/:id" element={<ProtectedRoute><OrderDetailsPage /></ProtectedRoute>} />
-              <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-              <Route path="wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-              <Route path="terms" element={<LegalPage key="terms" doc="terms" />} />
-              <Route path="privacy" element={<LegalPage key="privacy" doc="privacy" />} />
-              <Route path="usage-policy" element={<LegalPage key="usage" doc="usage" />} />
-              <Route path="about" element={<AboutPage />} />
-              <Route path="contact" element={<ContactPage />} />
-              <Route path="careers" element={<CareersPage />} />
-              <Route path="blog" element={<BlogPage />} />
-              <Route path="blog/:slug" element={<BlogPostPage />} />
-              <Route path="help" element={<HelpCenterPage />} />
-              <Route path="shipping" element={<SupportPage key="shipping" doc="shipping" />} />
-              <Route path="return-policy" element={<SupportPage key="returnPolicy" doc="returnPolicy" />} />
-              <Route path="payment-methods" element={<SupportPage key="payment" doc="payment" />} />
-            </Route>
-
-            <Route path="/vendor" element={<ProtectedRoute allowedRoles={['VENDOR']}><DashboardLayout type="vendor" /></ProtectedRoute>}>
-              <Route index element={<VendorDashboard />} />
-              <Route path="products" element={<VendorProducts />} />
-              <Route path="products/new" element={<VendorProductForm />} />
-              <Route path="products/:id/edit" element={<VendorProductForm />} />
-              <Route path="products/:id/publish" element={<VendorPublish />} />
-              <Route path="orders" element={<VendorOrders />} />
-              <Route path="reviews" element={<VendorReviews />} />
-              <Route path="reports" element={<VendorReports />} />
-              <Route path="earnings" element={<VendorEarnings />} />
-              <Route path="settings" element={<VendorSettings />} />
-              <Route path="social" element={<VendorSocialAccounts />} />
-            </Route>
-
-            <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><DashboardLayout type="admin" /></ProtectedRoute>}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="stores" element={<AdminStores />} />
-              <Route path="categories" element={<AdminCategories />} />
-              <Route path="homepage" element={<AdminHomepage />} />
-              <Route path="reviews" element={<AdminReviews />} />
-              <Route path="coupons" element={<AdminCoupons />} />
-              <Route path="loyalty" element={<AdminLoyalty />} />
-              <Route path="returns" element={<AdminReturns />} />
-              <Route path="orders" element={<AdminOrders />} />
-              <Route path="orders/:id" element={<AdminOrderDetails />} />
-              <Route path="orders/:id" element={<AdminOrderDetails />} />
-              <Route path="reports" element={<AdminReports />} />
-              <Route path="finance" element={<AdminFinance />} />
-              <Route path="delivery-zones" element={<AdminDeliveryZones />} />
-              <Route path="settings" element={<AdminSettings />} />
-            </Route>
-
-            <Route path="/operations" element={<ProtectedRoute allowedRoles={['OPS']}><DashboardLayout type="operations" /></ProtectedRoute>}>
-              <Route index element={<OperationsDashboard />} />
-              <Route path="drivers" element={<OperationsDrivers />} />
-              <Route path="orders" element={<OperationsOrders />} />
-              <Route path="tracking" element={<OperationsTracking />} />
-              <Route path="reports" element={<OperationsReports />} />
-              <Route path="settings" element={<OperationsSettings />} />
-            </Route>
-
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-          </Suspense>
-        </Router>
+        <RouterProvider router={router} />
       </ToastProvider>
     </ErrorBoundary>
   )

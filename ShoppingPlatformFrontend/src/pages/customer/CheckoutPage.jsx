@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapPin, CreditCard, Truck, Check, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, Tag, X, Star } from 'lucide-react'
+import { MapPin, CreditCard, Truck, Check, ChevronLeft, ChevronRight, ChevronDown, AlertCircle, Tag, X, Star, Clock, ShoppingBasket, RefreshCw } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import Breadcrumb from '../../components/common/Breadcrumb'
@@ -24,6 +24,13 @@ import { apiPost, apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { getImageUrl } from '../../utils/imageHelper'
+import { formatQuantity } from '../../utils/weight'
+
+// تفضيل الاستبدال عند نفاد منتج سوبرماركت
+const SUBSTITUTION_OPTIONS = [
+  { value: 'SIMILAR', title: 'استبدله بمنتج مشابه', desc: 'يختار المتجر بديلاً قريباً بنفس السعر أو أقل — لا تدفع أكثر' },
+  { value: 'REMOVE', title: 'احذفه وأعد المبلغ', desc: 'يُزال المنتج من الطلب وينقص المبلغ تلقائياً' },
+]
 
 // ✅ عرض الـ variant المختار
 const VariantBadges = ({ variantAttributes }) => {
@@ -89,6 +96,29 @@ const CheckoutPage = () => {
 
   const [errors, setErrors] = useState({})
   const [showItems, setShowItems] = useState(false)   // قائمة المنتجات في الملخص (الهاتف)
+
+  // منتجات السوبرماركت في السلة: موعد توصيل + ماذا نفعل إن نفد منتج
+  const hasGrocery = !!cartData?.hasGroceryItems
+  const [slotStart, setSlotStart] = useState(null)
+  const [substitution, setSubstitution] = useState('SIMILAR')
+  // المواعيد تُحسب حسب أوقات عمل متاجر السوبرماركت في السلة — تتغير بتغيّرها
+  const groceryStoresKey = [...new Set((cartData?.items || []).filter(i => i.isGrocery).map(i => i.vendorId))].sort().join(',')
+  const { data: slotsData, isLoading: slotsLoading, refetch: refetchSlots } = useQuery({
+    queryKey: ['delivery-slots', groceryStoresKey],
+    queryFn: async () => (await apiGet(API_ENDPOINTS.ORDERS.DELIVERY_SLOTS)).data.data,
+    enabled: hasGrocery,
+    refetchInterval: 5 * 60 * 1000,
+  })
+  const slotsEnabled = hasGrocery && slotsData?.enabled
+  const slots = slotsData?.slots || []
+  const selectedSlot = slots.find(s => s.start === slotStart) || null
+  // الفترة المختارة انتهت (مرّ وقتها) → يختار من جديد
+  useEffect(() => { if (slotStart && slotsData && !selectedSlot) setSlotStart(null) }, [slotsData, slotStart, selectedSlot])
+  const slotDays = slots.reduce((days, s) => {
+    const day = days.find(d => d.label === s.dayLabel)
+    if (day) day.slots.push(s); else days.push({ label: s.dayLabel, slots: [s] })
+    return days
+  }, [])
   const [showCoupon, setShowCoupon] = useState(false)
 
   // وقت دخول الخطوة الحالية — يمنع أن تتحول ضغطة مزدوجة على "التالي" إلى تأكيد للطلب
@@ -256,6 +286,10 @@ const CheckoutPage = () => {
 
   const handleNextStep = () => {
     if (step === 1 && !validateAddress()) return
+    if (step === 2 && slotsEnabled && !selectedSlot) {
+      setErrors(e => ({ ...e, slot: 'اختر موعد توصيل منتجات السوبرماركت' }))
+      return
+    }
     setStep(prev => prev + 1)
   }
 
@@ -299,6 +333,8 @@ const CheckoutPage = () => {
         addressId,
         customerNotes: formData.notes || '',
         couponCode: appliedCoupon?.code || undefined,
+        deliverySlotStart: slotsEnabled ? selectedSlot?.start : undefined,
+        substitutionPreference: hasGrocery ? substitution : undefined,
       }
 
       const response = await orderService.create(orderData)
@@ -316,6 +352,13 @@ const CheckoutPage = () => {
       clearSavedCoupon()
     } catch (err) {
       if (err.message?.includes('أضف رقم هاتفك')) setPhoneGate(true)
+      else if (err.message?.includes('موعد التوصيل')) {
+        // انتهت الفترة أثناء الدفع — نحدّث المواعيد ونعيده لاختيار غيرها
+        error(err.message)
+        setSlotStart(null)
+        refetchSlots()
+        setStep(2)
+      }
       else error(err.message || 'فشل إنشاء الطلب')
     } finally {
       setLoading(false)
@@ -324,7 +367,7 @@ const CheckoutPage = () => {
 
   const steps = [
     { num: 1, label: 'العنوان', icon: MapPin },
-    { num: 2, label: 'الدفع',   icon: CreditCard },
+    { num: 2, label: hasGrocery ? 'الموعد والدفع' : 'الدفع', icon: CreditCard },
     { num: 3, label: 'التأكيد', icon: Check },
   ]
 
@@ -522,6 +565,57 @@ const CheckoutPage = () => {
               </div>
             )}
 
+            {/* الخطوة 2: موعد السوبرماركت والاستبدال (إن وُجدت منتجاته) */}
+            {step === 2 && hasGrocery && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-4 lg:p-6 mb-4">
+                <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
+                  <ShoppingBasket size={20} className="text-emerald-600" />منتجات السوبرماركت
+                </h2>
+                {slotsEnabled !== false && (
+                  <>
+                    <p className="text-sm text-gray-500 mb-3 flex items-center gap-1.5"><Clock size={14} />اختر موعد التوصيل المناسب لك</p>
+                    {slotsLoading ? (
+                      <div className="flex justify-center py-4"><Spinner /></div>
+                    ) : slots.length === 0 ? (
+                      <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">لا توجد مواعيد متاحة الآن — حاول لاحقاً</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {slotDays.map(day => (
+                          <div key={day.label}>
+                            <p className="text-xs font-bold text-gray-500 mb-1.5">{day.label}</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {day.slots.map(s => {
+                                const active = s.start === slotStart
+                                return (
+                                  <button key={s.start} type="button" aria-pressed={active}
+                                    onClick={() => { setSlotStart(s.start); setErrors(e => ({ ...e, slot: null })) }}
+                                    className={`h-11 rounded-xl border-2 text-sm font-medium transition-colors ${
+                                      active ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+                                    {s.timeLabel}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {errors.slot && <p className="text-red-500 text-sm mt-2">{errors.slot}</p>}
+                  </>
+                )}
+
+                <p className="text-sm font-bold text-gray-800 mt-5 mb-2 flex items-center gap-1.5"><RefreshCw size={14} />إذا نفد منتج من طلبك</p>
+                <div className="space-y-2">
+                  {SUBSTITUTION_OPTIONS.map(o => (
+                    <OptionCard key={o.value} selected={substitution === o.value} onClick={() => setSubstitution(o.value)}>
+                      <span className="block font-bold text-gray-900">{o.title}</span>
+                      <span className="block text-sm text-gray-500 mt-0.5">{o.desc}</span>
+                    </OptionCard>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* الخطوة 2: الدفع */}
             {step === 2 && (
               <div className="bg-white rounded-2xl border border-gray-200 p-4 lg:p-6">
@@ -576,9 +670,19 @@ const CheckoutPage = () => {
                     </div>
                     <button type="button" onClick={() => setStep(2)} className="text-sm text-primary font-medium">تعديل</button>
                   </div>
+                  {hasGrocery && (
+                    <div className="p-3 lg:p-4 bg-emerald-50 rounded-xl flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold flex items-center gap-2 mb-1"><ShoppingBasket size={15} className="text-emerald-600" />منتجات السوبرماركت</h3>
+                        {selectedSlot && <p className="text-sm text-gray-700">الموعد: <b>{selectedSlot.dayLabel} {selectedSlot.timeLabel}</b></p>}
+                        <p className="text-sm text-gray-600">إن نفد منتج: {SUBSTITUTION_OPTIONS.find(o => o.value === substitution)?.title}</p>
+                      </div>
+                      <button type="button" onClick={() => setStep(2)} className="text-sm text-primary font-medium">تعديل</button>
+                    </div>
+                  )}
                   <div className="p-3 lg:p-4 bg-gray-50 rounded-xl">
                     <h3 className="text-sm font-bold flex items-center gap-2 mb-1"><Truck size={15} className="text-primary" />التوصيل المتوقع</h3>
-                    <p className="text-sm text-gray-600">خلال 2-3 أيام عمل</p>
+                    <p className="text-sm text-gray-600">{hasGrocery ? 'منتجات السوبرماركت في الموعد المختار، وبقية المنتجات خلال 2-3 أيام عمل' : 'خلال 2-3 أيام عمل'}</p>
                   </div>
                   {/* ملاحظات الطلب — متاحة لكل العناوين (كانت تظهر مع العنوان الجديد فقط) */}
                   <div>
@@ -624,7 +728,7 @@ const CheckoutPage = () => {
                       <p className="text-sm font-medium text-gray-900 line-clamp-1">{item.productNameAr || item.productName || item.name}</p>
                       <VariantBadges variantAttributes={item.variantAttributes} />
                       <p className="flex justify-between text-xs text-gray-500 mt-0.5">
-                        <span>الكمية: {item.quantity}</span>
+                        <span>الكمية: {formatQuantity(item.quantity, item.weightStepKg)}</span>
                         <span className="font-bold text-gray-900">{(item.subtotal || (item.price * item.quantity)).toLocaleString()} د.ع</span>
                       </p>
                     </div>

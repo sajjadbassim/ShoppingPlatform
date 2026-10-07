@@ -8,6 +8,7 @@ using ecommerce.Repositories;
 using ecommerce.Services.FileService;
 using ecommerce.Services.InventoryService;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services.ProductService.ProductService
 {
@@ -46,7 +47,7 @@ namespace ecommerce.Services.ProductService.ProductService
         {
             var product = await _productRepository.GetByIdWithDetailsAsync(id);
             if (product == null || product.IsDeleted)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             var images = await _imageRepository.GetByProductIdAsync(id);
 
@@ -65,6 +66,7 @@ namespace ecommerce.Services.ProductService.ProductService
                 Sku = product.Sku,
                 StockQuantity = product.StockQuantity,
                 IsAvailable = product.IsAvailable,
+                WeightStepKg = product.WeightStepKg,
                 RegularPrice = product.Price,
                 RegularOriginalPrice = product.OriginalPrice,
                 RegularStockQuantity = product.StockQuantity,
@@ -218,7 +220,8 @@ namespace ecommerce.Services.ProductService.ProductService
                 sortBy: filter.SortBy,
                 sortOrder: filter.SortOrder,
                 pageNumber: filter.PageNumber,
-                pageSize: filter.PageSize);
+                pageSize: filter.PageSize,
+                scope: filter.Scope);
 
             var dtos = pagedProducts.Items.Select(MapToDto).ToList();
             await FinalizeListAsync(dtos, pagedProducts.Items.ToList());
@@ -238,7 +241,7 @@ namespace ecommerce.Services.ProductService.ProductService
 
             var candidates = await _productRepository.GetAdvancedFilterCandidatesAsync(
                 filter.VendorId, filter.CategoryId, filter.SearchTerm, filter.IsAvailable, filter.IsActive,
-                filter.MinRating, filter.SortBy, filter.SortOrder);
+                filter.MinRating, filter.SortBy, filter.SortOrder, filter.Scope);
 
             var priced = candidates.Select(c =>
             {
@@ -268,12 +271,12 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         // ✅ جديد: UnifiedSearchAsync
         // ===================================
-        public async Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5)
+        public async Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
-                throw new Exception("كلمة البحث مطلوبة");
+                throw new BusinessRuleException("كلمة البحث مطلوبة");
 
-            var result = await _productRepository.UnifiedSearchAsync(searchTerm, maxResults);
+            var result = await _productRepository.UnifiedSearchAsync(searchTerm, maxResults, scope);
 
             // نفس تسعير العروض في بقية القوائم والسلة
             var activePromotions = (await _promotionRepository.GetActivePromotionsAsync()).ToList();
@@ -306,12 +309,13 @@ namespace ecommerce.Services.ProductService.ProductService
         public async Task<ProductDto> CreateAsync(CreateProductDto dto)
         {
             EnsureValidPrices(dto.Price, dto.OriginalPrice);
+            EnsureValidWeightStep(dto.WeightStepKg);
 
             if (dto.CategoryId.HasValue)
                 await EnsureCategoryAssignableAsync(dto.CategoryId.Value);
 
             if (dto.Images != null && dto.Images.Count > 5)
-                throw new Exception("لا يمكن رفع أكثر من 5 صور للمنتج");
+                throw new BusinessRuleException("لا يمكن رفع أكثر من 5 صور للمنتج");
 
             using var transaction = await _context.Database.BeginTransactionAsync();
 
@@ -329,7 +333,8 @@ namespace ecommerce.Services.ProductService.ProductService
                     Sku = dto.Sku,
                     StockQuantity = dto.StockQuantity,
                     IsAvailable = dto.IsAvailable,
-                    IsActive = dto.IsActive
+                    IsActive = dto.IsActive,
+                    WeightStepKg = dto.WeightStepKg
                 };
 
                 var createdProduct = await _productRepository.CreateAsync(product);
@@ -360,7 +365,8 @@ namespace ecommerce.Services.ProductService.ProductService
                     {
                         // التراجع عن المعاملة يتم مرة واحدة في catch الخارجي
                         await _fileService.DeleteImagesAsync(uploadedImages);
-                        throw new Exception($"فشل رفع الصور: {ex.Message}");
+                        if (ex is AppException) throw new BusinessRuleException($"فشل رفع الصور: {ex.Message}");
+                        throw;
                     }
                 }
 
@@ -381,7 +387,7 @@ namespace ecommerce.Services.ProductService.ProductService
         {
             var product = await _productRepository.GetByIdAsync(id);
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             var previousStock = product.StockQuantity;
 
@@ -414,7 +420,7 @@ namespace ecommerce.Services.ProductService.ProductService
                     .Where(v => v.ProductId == id)
                     .MinAsync(v => (decimal?)v.PriceAdjustment);
                 if (minAdjustment.HasValue && product.Price + minAdjustment.Value < 0)
-                    throw new Exception("السعر الجديد يجعل سعر أحد المتغيرات سالباً");
+                    throw new BusinessRuleException("السعر الجديد يجعل سعر أحد المتغيرات سالباً");
             }
             if (!string.IsNullOrWhiteSpace(dto.Sku)) product.Sku = dto.Sku;
             if (dto.StockQuantity.HasValue) product.StockQuantity = dto.StockQuantity.Value;
@@ -430,13 +436,20 @@ namespace ecommerce.Services.ProductService.ProductService
             }
             if (dto.IsActive.HasValue) product.IsActive = dto.IsActive.Value;
 
+            if (dto.ClearWeightStep) product.WeightStepKg = null;
+            else if (dto.WeightStepKg.HasValue)
+            {
+                EnsureValidWeightStep(dto.WeightStepKg);
+                product.WeightStepKg = dto.WeightStepKg;
+            }
+
             product.UpdatedAt = DateTime.UtcNow;
 
             if (dto.NewImages != null && dto.NewImages.Count > 0)
             {
                 var existingImages = await _imageRepository.GetByProductIdAsync(id);
                 if (existingImages.Count + dto.NewImages.Count > 5)
-                    throw new Exception("لا يمكن أن يحتوي المنتج على أكثر من 5 صور");
+                    throw new BusinessRuleException("لا يمكن أن يحتوي المنتج على أكثر من 5 صور");
 
                 var imageUrls = await _fileService.SaveImagesAsync(dto.NewImages);
                 var productImages = new List<ProductImage>();
@@ -467,7 +480,7 @@ namespace ecommerce.Services.ProductService.ProductService
         public async Task<bool> UpdateStockAsync(Guid id, int quantity)
         {
             if (quantity < 0)
-                throw new Exception("الكمية لا يمكن أن تكون سالبة");
+                throw new BusinessRuleException("الكمية لا يمكن أن تكون سالبة");
 
             var product = await _productRepository.GetByIdAsync(id);
             if (product == null)
@@ -511,11 +524,11 @@ namespace ecommerce.Services.ProductService.ProductService
         {
             var product = await _productRepository.GetByIdAsync(productId);
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             var existingImages = await _imageRepository.GetByProductIdAsync(productId);
             if (existingImages.Count >= 5)
-                throw new Exception("لا يمكن إضافة أكثر من 5 صور للمنتج");
+                throw new BusinessRuleException("لا يمكن إضافة أكثر من 5 صور للمنتج");
 
             var imageUrl = await _fileService.SaveImageAsync(image);
             var productImage = new ProductImage
@@ -586,22 +599,117 @@ namespace ecommerce.Services.ProductService.ProductService
         }
 
         // ===================================
+        // DuplicateAsync — نسخة مخفية بمخزون صفر: نفس البيانات والصور والخيارات والمتغيرات
+        // ===================================
+        public async Task<ProductDto> DuplicateAsync(Guid id)
+        {
+            var source = await _context.Products.AsNoTracking()
+                .Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted)
+                ?? throw new NotFoundException("المنتج غير موجود");
+            var attributes = await _context.ProductAttributes.AsNoTracking()
+                .Include(a => a.Values)
+                .Where(a => a.ProductId == id)
+                .ToListAsync();
+            var variants = await _context.ProductVariants.AsNoTracking()
+                .Include(v => v.AttributeValues)
+                .Where(v => v.ProductId == id)
+                .ToListAsync();
+
+            // مخفية حتى يراجعها التاجر، وبلا مخزون حتى لا تُباع قطع غير موجودة
+            var copy = new Product
+            {
+                VendorId = source.VendorId,
+                CategoryId = source.CategoryId,
+                Name = $"{source.Name} (copy)",
+                NameAr = $"{source.NameAr} (نسخة)",
+                Description = source.Description,
+                Price = source.Price,
+                OriginalPrice = source.OriginalPrice,
+                StockQuantity = 0,
+                IsAvailable = source.IsAvailable,
+                IsActive = false,
+            };
+
+            var copiedFiles = new List<string>();
+            async Task<string?> CopyFileAsync(string? url)
+            {
+                var newUrl = await _fileService.CopyImageAsync(url);
+                if (newUrl != null) copiedFiles.Add(newUrl);
+                return newUrl;
+            }
+
+            try
+            {
+                foreach (var img in source.Images.OrderBy(i => i.DisplayOrder))
+                {
+                    var url = await CopyFileAsync(img.ImageUrl);
+                    if (url != null)
+                        copy.Images.Add(new ProductImage { ImageUrl = url, IsPrimary = img.IsPrimary, DisplayOrder = img.DisplayOrder });
+                }
+                _context.Products.Add(copy);
+
+                // الخيارات وقيمها بمعرّفات جديدة، والمتغيرات تُربط بالقيم الجديدة
+                var valueMap = new Dictionary<Guid, Guid>();
+                foreach (var attr in attributes)
+                {
+                    var newAttr = new ProductAttribute { ProductId = copy.Id, Name = attr.Name, NameAr = attr.NameAr, DisplayOrder = attr.DisplayOrder };
+                    foreach (var value in attr.Values)
+                    {
+                        var newValue = new ProductAttributeValue { AttributeId = newAttr.Id, Value = value.Value, ValueAr = value.ValueAr, DisplayOrder = value.DisplayOrder };
+                        valueMap[value.Id] = newValue.Id;
+                        newAttr.Values.Add(newValue);
+                    }
+                    _context.ProductAttributes.Add(newAttr);
+                }
+                foreach (var variant in variants)
+                {
+                    var newVariant = new ProductVariant
+                    {
+                        ProductId = copy.Id,
+                        PriceAdjustment = variant.PriceAdjustment,
+                        StockQuantity = 0,
+                        IsAvailable = variant.IsAvailable,
+                        DisplayOrder = variant.DisplayOrder,
+                        ImageUrl = variant.ImageUrl != null && variant.ImageUrl.StartsWith("/uploads/") ? await CopyFileAsync(variant.ImageUrl) : variant.ImageUrl,
+                    };
+                    foreach (var av in variant.AttributeValues.Where(av => valueMap.ContainsKey(av.AttributeValueId)))
+                        newVariant.AttributeValues.Add(new ProductVariantAttributeValue { VariantId = newVariant.Id, AttributeValueId = valueMap[av.AttributeValueId] });
+                    _context.ProductVariants.Add(newVariant);
+                }
+
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                await _fileService.DeleteImagesAsync(copiedFiles);
+                throw;
+            }
+
+            return await GetByIdAsync(copy.Id);
+        }
+
+        // ===================================
         // Private: التحقق من الأسعار والفئة
         // ===================================
         private static void EnsureValidPrices(decimal price, decimal? originalPrice)
         {
+            // سعر صفر يعني بيع المنتج مجاناً — غالباً خطأ إدخال
+            if (price <= 0)
+                throw new BusinessRuleException("سعر البيع يجب أن يكون أكبر من صفر");
+
             // السعر الأصلي يُعرض مشطوباً كخصم، فلا معنى له إن لم يكن أعلى من سعر البيع
             if (originalPrice.HasValue && originalPrice.Value <= price)
-                throw new Exception("السعر الأصلي يجب أن يكون أعلى من سعر البيع");
+                throw new BusinessRuleException("السعر الأصلي يجب أن يكون أعلى من سعر البيع");
         }
 
         private async Task EnsureCategoryAssignableAsync(Guid categoryId)
         {
             if (!await _context.Categories.AnyAsync(c => c.Id == categoryId))
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             if ((await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).Contains(categoryId))
-                throw new Exception("التصنيف غير مفعّل");
+                throw new BusinessRuleException("التصنيف غير مفعّل");
         }
 
         // ===================================
@@ -693,6 +801,46 @@ namespace ecommerce.Services.ProductService.ProductService
         }
 
         // ===================================
+        // اشترِ مجدداً: ما طلبه الزبون سابقاً (الأكثر تكراراً ثم الأحدث)، الظاهر والمتوفر فقط، ضمن قسم السوبرماركت أو خارجه
+        // ===================================
+        public async Task<List<ProductDto>> GetBuyAgainAsync(Guid userId, string? scope = null, int max = 20)
+        {
+            max = Math.Clamp(max, 1, 30);
+            var history = await _context.SubOrderItems.AsNoTracking()
+                .Where(i => i.SubOrder.Order.CustomerId == userId && i.SubOrder.Order.Status != OrderStatus.CANCELLED && i.Quantity > 0)
+                .GroupBy(i => i.ProductId)
+                .Select(g => new { ProductId = g.Key, Times = g.Count(), Last = g.Max(i => i.CreatedAt) })
+                .OrderByDescending(x => x.Times).ThenByDescending(x => x.Last)
+                .Take(100)
+                .ToListAsync();
+            if (history.Count == 0) return new List<ProductDto>();
+
+            var ids = history.Select(h => h.ProductId).ToList();
+            var hidden = (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).ToList();
+            var query = _context.Products.AsNoTracking()
+                .Include(p => p.Images).Include(p => p.Vendor).Include(p => p.Category)
+                .Where(p => ids.Contains(p.Id) && p.IsActive && !p.IsDeleted && p.Vendor.IsActive &&
+                            (p.CategoryId == null || !hidden.Contains(p.CategoryId.Value)));
+            if (ShopScope.Parse(scope) is { } shopScope)
+                query = CategoryVisibility.ApplyScope(query, shopScope, await CategoryVisibility.GetGroceryCategoryIdsAsync(_context));
+
+            var rank = ids.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+            var products = (await query.ToListAsync()).OrderBy(p => rank[p.Id]).ToList();
+            var dtos = products.Select(MapToDto).ToList();
+            await FinalizeListAsync(dtos, products);
+            return dtos.Where(d => d.IsAvailable && d.StockQuantity > 0).Take(max).ToList();
+        }
+
+        // أوزان وحدة البيع المسموحة (كغم): 100غ، ربع، نصف، كيلو
+        public static readonly decimal[] AllowedWeightSteps = { 0.1m, 0.25m, 0.5m, 1m };
+
+        private static void EnsureValidWeightStep(decimal? step)
+        {
+            if (step.HasValue && !AllowedWeightSteps.Contains(step.Value))
+                throw new BusinessRuleException("وزن وحدة البيع يجب أن يكون 0.1 أو 0.25 أو 0.5 أو 1 كغم");
+        }
+
+        // ===================================
         // Private: MapToDto
         // ===================================
         private ProductDto MapToDto(Product product)
@@ -708,6 +856,7 @@ namespace ecommerce.Services.ProductService.ProductService
                 Sku = product.Sku,
                 StockQuantity = product.StockQuantity,
                 IsAvailable = product.IsAvailable,
+                WeightStepKg = product.WeightStepKg,
                 RegularPrice = product.Price,
                 RegularOriginalPrice = product.OriginalPrice,
                 RegularStockQuantity = product.StockQuantity,

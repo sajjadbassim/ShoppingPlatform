@@ -1,8 +1,10 @@
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Category;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
 using ecommerce.Services.FileService;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -28,7 +30,7 @@ namespace ecommerce.Services
             {
                 var parent = await _categoryRepository.GetByIdAsync(dto.ParentId.Value);
                 if (parent == null)
-                    throw new Exception("التصنيف الأب غير موجود");
+                    throw new NotFoundException("التصنيف الأب غير موجود");
             }
 
             string iconUrl = "";
@@ -42,7 +44,8 @@ namespace ecommerce.Services
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"فشل رفع الأيقونة: {ex.Message}");
+                    if (ex is AppException) throw new BusinessRuleException($"فشل رفع الأيقونة: {ex.Message}");
+                    throw;
                 }
             }
 
@@ -54,7 +57,8 @@ namespace ecommerce.Services
                 IconUrl = iconUrl, // ✅ حفظ مسار الأيقونة
                 ParentId = dto.ParentId,
                 DisplayOrder = dto.DisplayOrder,
-                IsActive = dto.IsActive
+                IsActive = dto.IsActive,
+                IsGrocery = dto.IsGrocery
             };
 
             var created = await _categoryRepository.CreateAsync(category);
@@ -64,19 +68,23 @@ namespace ecommerce.Services
         {
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null)
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             return MapToDto(category);
         }
 
         public async Task<IEnumerable<CategoryResponseDto>> GetAllAsync(bool onlyActive = true)
         {
-            var categories = await _categoryRepository.GetAllAsync(onlyActive);
+            var categories = (await _categoryRepository.GetAllAsync(onlyActive)).ToList();
             var counts = await _categoryRepository.GetProductCountsAsync();
+            // القسم الفعلي (سوبرماركت أو عام) يُورث من الأسلاف
+            var grocery = CategoryVisibility.ComputeGrocery(categories
+                .Select(c => new CategoryVisibility.CategoryNode(c.Id, c.ParentId, c.IsActive, c.IsGrocery)).ToList());
             return categories.Select(c =>
             {
                 var dto = MapToDto(c);
                 dto.ProductsCount = counts.GetValueOrDefault(c.Id);
+                dto.Section = grocery.Contains(c.Id) ? ShopScope.Grocery : ShopScope.General;
                 return dto;
             });
         }
@@ -87,7 +95,7 @@ namespace ecommerce.Services
             {
                 var parent = await _categoryRepository.GetByIdAsync(parentId.Value);
                 if (parent == null)
-                    throw new Exception("التصنيف الأب غير موجود");
+                    throw new NotFoundException("التصنيف الأب غير موجود");
             }
 
             var categories = await _categoryRepository.GetByParentIdAsync(parentId, onlyActive);
@@ -97,7 +105,7 @@ namespace ecommerce.Services
         {
             var category = await _categoryRepository.GetByNameAsync(name);
             if (category == null)
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             return MapToDto(category);
         }
@@ -105,7 +113,7 @@ namespace ecommerce.Services
         {
             var category = await _categoryRepository.GetByArbicNameAsync(name);
             if (category == null)
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             return MapToDto(category);
         }
@@ -115,7 +123,7 @@ namespace ecommerce.Services
         {
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null)
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             string? oldIconToDelete = null;
 
@@ -127,14 +135,14 @@ namespace ecommerce.Services
             else if (dto.ParentId.HasValue && dto.ParentId.Value != category.ParentId)
             {
                 if (dto.ParentId.Value == id)
-                    throw new Exception("لا يمكن جعل التصنيف أباً لنفسه");
+                    throw new BusinessRuleException("لا يمكن جعل التصنيف أباً لنفسه");
 
                 var parent = await _categoryRepository.GetByIdAsync(dto.ParentId.Value);
                 if (parent == null)
-                    throw new Exception("التصنيف الأب غير موجود");
+                    throw new NotFoundException("التصنيف الأب غير موجود");
 
                 if (await IsDescendantAsync(parent, id))
-                    throw new Exception("لا يمكن نقل التصنيف تحت أحد تصنيفاته الفرعية");
+                    throw new BusinessRuleException("لا يمكن نقل التصنيف تحت أحد تصنيفاته الفرعية");
 
                 category.ParentId = dto.ParentId.Value;
             }
@@ -156,7 +164,8 @@ namespace ecommerce.Services
                 }
                 catch (Exception ex)
                 {
-                    throw new Exception($"فشل تحديث الأيقونة: {ex.Message}");
+                    if (ex is AppException) throw new BusinessRuleException($"فشل تحديث الأيقونة: {ex.Message}");
+                    throw;
                 }
             }
 
@@ -174,6 +183,9 @@ namespace ecommerce.Services
 
             if (dto.IsActive.HasValue)
                 category.IsActive = dto.IsActive.Value;
+
+            if (dto.IsGrocery.HasValue)
+                category.IsGrocery = dto.IsGrocery.Value;
 
             var updated = await _categoryRepository.UpdateAsync(category);
 
@@ -203,10 +215,10 @@ namespace ecommerce.Services
         private async Task EnsureNamesUniqueAsync(string? name, string? nameAr, Guid? excludeId)
         {
             if (!string.IsNullOrWhiteSpace(name) && await _categoryRepository.ExistsByNameAsync(name, excludeId))
-                throw new Exception("اسم التصنيف موجود مسبقاً");
+                throw new BusinessRuleException("اسم التصنيف موجود مسبقاً");
 
             if (!string.IsNullOrWhiteSpace(nameAr) && await _categoryRepository.ExistsByArabicNameAsync(nameAr, excludeId))
-                throw new Exception("الاسم العربي للتصنيف موجود مسبقاً");
+                throw new BusinessRuleException("الاسم العربي للتصنيف موجود مسبقاً");
         }
 
         // هل الفئة المرشّحة أباً هي categoryId نفسها أو إحدى فئاته الفرعية؟ (الصعود من الأب الجديد للأعلى)
@@ -238,6 +250,8 @@ namespace ecommerce.Services
                 ParentId = category.ParentId,
                 DisplayOrder = category.DisplayOrder,
                 IsActive = category.IsActive,
+                IsGrocery = category.IsGrocery,
+                Section = category.IsGrocery ? ShopScope.Grocery : ShopScope.General,
                 CreatedAt = category.CreatedAt
             };
         }
@@ -270,10 +284,10 @@ namespace ecommerce.Services
         {
             var category = await _categoryRepository.GetByIdAsync(id);
             if (category == null)
-                throw new Exception("التصنيف غير موجود");
+                throw new NotFoundException("التصنيف غير موجود");
 
             if (icon == null)
-                throw new Exception("الأيقونة مطلوبة");
+                throw new BusinessRuleException("الأيقونة مطلوبة");
 
             // رفع الجديدة وحفظها أولاً، ثم حذف القديمة — فشل الرفع لا يترك رابطاً لملف محذوف
             var oldIcon = category.IconUrl;

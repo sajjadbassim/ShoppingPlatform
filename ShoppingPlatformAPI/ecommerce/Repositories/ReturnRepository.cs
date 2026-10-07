@@ -174,14 +174,8 @@ namespace ecommerce.Repositories
         // ===================================
         // GenerateReturnNumberAsync
         // ===================================
-        public async Task<string> GenerateReturnNumberAsync()
-        {
-            var today = DateTime.UtcNow.ToString("yyyyMMdd");
-            var count = await _context.Returns
-                .CountAsync(r => r.CreatedAt.Date == DateTime.UtcNow.Date);
-
-            return $"RET-{today}-{(count + 1):D4}";
-        }
+        public Task<string> GenerateReturnNumberAsync() =>
+            DailyNumberGenerator.NextAsync(_context, "RET", _context.Returns.Select(r => r.ReturnNumber));
 
         public Task<Return?> GetByIdWithItemsAsync(Guid id, CancellationToken ct = default) =>
             _context.Returns

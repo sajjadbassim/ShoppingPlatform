@@ -43,6 +43,18 @@ namespace ecommerce.Core.Models
         [Column("refused_quantity")]
         public int RefusedQuantity { get; set; } = 0;
 
+        // قطع لم تتوفر عند المتجر فأزالها عند القبول الجزئي (Quantity صار المقبول فقط) — للعرض والسجل
+        [Column("unavailable_quantity")]
+        public int UnavailableQuantity { get; set; } = 0;
+
+        // وزن وحدة البيع وقت الطلب (null = بالقطعة) — لعرض «1.5 كغم» حتى لو غيّر التاجر المنتج لاحقاً
+        [Column("weight_step_kg", TypeName = "decimal(6,3)")]
+        public decimal? WeightStepKg { get; set; }
+
+        // بديل اختاره المتجر عن قطعة غير متوفرة (حسب تفضيل الزبون) — يشير لسطر القطعة الأصلية
+        [Column("replaces_item_id")]
+        public Guid? ReplacesItemId { get; set; }
+
         [Required]
         [Column("subtotal", TypeName = "decimal(10,2)")]
         public decimal Subtotal { get; set; }

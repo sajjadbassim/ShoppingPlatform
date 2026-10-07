@@ -3,6 +3,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -35,7 +36,7 @@ namespace ecommerce.Controllers
                 var addresses = await _addressService.GetAllAsync();
                 return Ok(new { success = true, data = addresses });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -53,7 +54,7 @@ namespace ecommerce.Controllers
                 var address = await _addressService.CreateAsync(dto);
                 return Ok(new { success = true, data = address });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -71,7 +72,7 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, data = address });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -89,7 +90,7 @@ namespace ecommerce.Controllers
                 var addresses = await _addressService.GetByUserIdAsync(userId);
                 return Ok(new { success = true, data = addresses });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -108,7 +109,7 @@ namespace ecommerce.Controllers
                 var address = await _addressService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = address });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -130,7 +131,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "العنوان غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

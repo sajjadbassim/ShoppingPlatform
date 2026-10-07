@@ -10,6 +10,7 @@ import { useToast } from '../../components/common/Toast'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import ReferralCard from '../../components/common/ReferralCard'
 
 // ===========================
 // Hooks
@@ -225,6 +226,9 @@ const LoyaltyPage = () => {
                 </div>
               </div>
             )}
+
+            {/* ادعُ صديقاً */}
+            <ReferralCard />
 
             {/* كيف تكسب نقاط */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">

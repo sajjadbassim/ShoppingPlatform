@@ -40,7 +40,7 @@ namespace ecommerce.Services.AuthService
 
     public interface IGoogleAuthService
     {
-        Task<GoogleSignInResultDto> SignInAsync(string credential);
+        Task<GoogleSignInResultDto> SignInAsync(string credential, string? referralCode = null);
         Task<GoogleStatusDto> GetStatusAsync(Guid userId);
         Task<GoogleStatusDto> LinkAsync(Guid userId, string credential);
         Task<GoogleStatusDto> UnlinkAsync(Guid userId);
@@ -99,7 +99,7 @@ namespace ecommerce.Services.AuthService
         }
 
         // ===== الدخول =====
-        public async Task<GoogleSignInResultDto> SignInAsync(string credential)
+        public async Task<GoogleSignInResultDto> SignInAsync(string credential, string? referralCode = null)
         {
             var payload = await VerifyAsync(credential);
             var user = await _context.Users.FirstOrDefaultAsync(u => u.GoogleId == payload.Subject);
@@ -128,6 +128,9 @@ namespace ecommerce.Services.AuthService
                 GoogleEmail = email,
                 Role = UserRoles.Customer,
                 IsActive = true,
+                ReferredByUserId = string.IsNullOrWhiteSpace(referralCode) ? null : await _context.Users
+                    .Where(u => u.ReferralCode == referralCode.Trim().ToUpper() && u.IsActive)
+                    .Select(u => (Guid?)u.Id).FirstOrDefaultAsync(),
             };
             _context.Users.Add(created);
             try { await _context.SaveChangesAsync(); }

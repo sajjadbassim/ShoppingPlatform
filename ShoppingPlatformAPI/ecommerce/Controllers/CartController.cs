@@ -3,6 +3,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -28,7 +29,7 @@ namespace ecommerce.Controllers
                 var cart = await _cartService.GetCartAsync(userId);
                 return Ok(new { success = true, data = cart });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -44,7 +45,7 @@ namespace ecommerce.Controllers
                 var cart = await _cartService.AddToCartAsync(userId, dto);
                 return Ok(new { success = true, data = cart });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -60,7 +61,7 @@ namespace ecommerce.Controllers
                 var cart = await _cartService.UpdateQuantityAsync(userId, dto);
                 return Ok(new { success = true, data = cart, message = "تم تحديث الكمية" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -76,7 +77,7 @@ namespace ecommerce.Controllers
                 var cart = await _cartService.RemoveFromCartAsync(userId, productId, variantId);
                 return Ok(new { success = true, data = cart, message = "تم حذف المنتج من السلة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -95,7 +96,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "السلة فارغة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

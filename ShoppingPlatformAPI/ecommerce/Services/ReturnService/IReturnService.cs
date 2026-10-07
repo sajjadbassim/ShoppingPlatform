@@ -8,6 +8,8 @@ namespace ecommerce.Services
         // العميل
         // ===================================
         Task<ReturnResponseDto> GetByIdAsync(Guid id);
+        // للعرض عبر الـ API: الزبون يرى طلباته فقط، والعمليات/الإدارة ترى الكل
+        Task<ReturnResponseDto> GetForViewerAsync(Guid id, Guid viewerId, bool isStaff);
         Task<IEnumerable<ReturnResponseDto>> GetMyReturnsAsync(Guid customerId);
         Task<ReturnResponseDto> CreateAsync(Guid customerId, CreateReturnDto dto);
 

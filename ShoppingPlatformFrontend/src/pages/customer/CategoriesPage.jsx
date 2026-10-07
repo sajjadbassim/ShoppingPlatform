@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, AlertCircle, Grid, Star, ArrowLeft } from 'lucide-react'
+import { ChevronLeft, AlertCircle, Grid, Star, ArrowLeft, ShoppingBasket } from 'lucide-react'
 import CategoryIcon from '../../components/common/CategoryIcon'
 import { useProductsByCategory } from '../../hooks/useProducts'
 import { getPrimaryImage } from '../../utils/imageHelper'
 import Breadcrumb from '../../components/common/Breadcrumb'
 import { Skeleton } from '../../components/common/Loading'
 import { useCategories } from '../../hooks/useCategories'
+import { SUPERMARKET_PATH, isGroceryCategory } from '../../utils/shopScope'
 
 const GRADIENTS = [
   'from-blue-500 to-blue-600',
@@ -68,10 +69,18 @@ const MobileCategoryPanel = ({ category, index, subs }) => {
         </div>
         <h1 className="relative text-lg font-bold text-white">{category.nameAr || category.name}</h1>
         {category.description && <p className="relative text-xs text-white/85 mt-1 line-clamp-2 max-w-[70%]">{category.description}</p>}
-        <Link to={`/products?category=${category.id}`}
-          className="relative mt-3 inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white text-gray-900 text-xs font-bold">
-          تسوق الكل <ArrowLeft size={14} />
-        </Link>
+        <div className="relative mt-3 flex flex-wrap gap-2">
+          <Link to={`/products?category=${category.id}`}
+            className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white text-gray-900 text-xs font-bold">
+            تسوق الكل <ArrowLeft size={14} />
+          </Link>
+          {isGroceryCategory(category) && (
+            <Link to={SUPERMARKET_PATH}
+              className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-white/20 text-white text-xs font-bold border border-white/40">
+              <ShoppingBasket size={14} /> السوبرماركت
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* الأقسام الفرعية */}
@@ -119,9 +128,12 @@ const CategoriesPage = () => {
   const navigate = useNavigate()
   const { data: categoriesData, isLoading, isError, error } = useCategories(true)
 
-  // ✅ فصل الرئيسية عن الفرعية
+  // ✅ فصل الرئيسية عن الفرعية — وفئات السوبرماركت في مجموعة مستقلة آخر القائمة
   const all        = categoriesData || []
-  const roots      = all.filter(c => !c.parentId)
+  const allRoots   = all.filter(c => !c.parentId)
+  const generalRoots = allRoots.filter(c => !isGroceryCategory(c))
+  const groceryRoots = allRoots.filter(isGroceryCategory)
+  const roots      = [...generalRoots, ...groceryRoots]
   const children   = all.filter(c => c.parentId)
   const getChildren = (parentId) => children.filter(c => c.parentId === parentId)
 
@@ -172,7 +184,13 @@ const CategoriesPage = () => {
             {roots.map((cat, i) => {
               const active = cat.id === selected.id
               return (
-                <button key={cat.id} onClick={() => selectCategory(cat.id)}
+                <div key={cat.id}>
+                {i === generalRoots.length && i > 0 && (
+                  <p className="flex flex-col lg:flex-row items-center gap-1 lg:gap-2 px-1.5 lg:px-4 pt-4 pb-1 mt-1 border-t border-gray-200 text-[11px] lg:text-xs font-bold text-emerald-600">
+                    <ShoppingBasket size={15} /> السوبرماركت
+                  </p>
+                )}
+                <button onClick={() => selectCategory(cat.id)}
                   className={`relative w-full flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 px-1.5 lg:px-4 py-3 lg:py-2.5 text-center lg:text-right transition-colors ${active ? 'bg-white' : 'lg:hover:bg-white/60'}`}>
                   {active && <span className="absolute right-0 top-3 bottom-3 w-1 rounded-l-full bg-primary" />}
                   <span className={`w-11 h-11 rounded-2xl flex items-center justify-center ${active ? 'bg-primary/10' : 'bg-white'}`}>
@@ -182,6 +200,7 @@ const CategoriesPage = () => {
                     {cat.nameAr || cat.name}
                   </span>
                 </button>
+                </div>
               )
             })}
           </nav>

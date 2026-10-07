@@ -25,6 +25,9 @@ namespace ecommerce.Core.DTO.Product
         // ===================================
         public bool? HasDiscount { get; set; }   // true = منتجات عليها خصم فقط
 
+        // grocery = السوبرماركت فقط | general = بدون السوبرماركت | فارغ = الكل (الإدارة والتاجر)
+        public string? Scope { get; set; }
+
         // ===================================
         // Pagination
         // ===================================

@@ -2,6 +2,7 @@
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -26,7 +27,7 @@ namespace ecommerce.Controllers
                 var subOrders = await _opsService.GetPendingSubOrdersAsync();
                 return Ok(new { success = true, data = subOrders });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -41,7 +42,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.GetSubOrderDetailsAsync(id);
                 return Ok(new { success = true, data = subOrder });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -56,7 +57,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.ConfirmSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تأكيد الطلب الفرعي بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -72,7 +73,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.CancelSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم إلغاء الطلب الفرعي بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -87,7 +88,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.UpdateSubOrderStatusAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تحديث حالة الطلب بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -106,7 +107,7 @@ namespace ecommerce.Controllers
                 var result = await _opsService.GetSubOrdersPagedAsync(pageNumber, pageSize, status);
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -121,7 +122,7 @@ namespace ecommerce.Controllers
                 var stats = await _opsService.GetDashboardStatsAsync();
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -136,7 +137,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.AssignDriverAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تعيين السائق بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -151,7 +152,7 @@ namespace ecommerce.Controllers
                 var result = await _opsService.AssignDriverToOrderAsync(orderId, dto);
                 return Ok(new { success = true, data = result, message = "تم تعيين السائق لكامل الطلب بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

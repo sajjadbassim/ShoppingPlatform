@@ -20,6 +20,7 @@ import { getVendorLogo, getVendorCover, getPrimaryImage } from '../../utils/imag
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
+import { StoreHoursList } from '../../components/vendor/StoreHoursEditor'
 
 const StoreDetailsPage = () => {
   const { id } = useParams()
@@ -78,8 +79,9 @@ const StoreDetailsPage = () => {
     catch { showError('فشلت العملية') }
   }
 
+  // رابط المشاركة بمعاينة (غلاف المتجر واسمه) ثم يفتح صفحة المتجر
   const handleShare = async () => {
-    const url = window.location.href
+    const url = `${window.location.origin}${API_ENDPOINTS.SHARE.STORE(id)}`
     if (navigator.share) { try { await navigator.share({ title: store?.nameAr || store?.name, url }) } catch {} }
     else { navigator.clipboard.writeText(url); success('تم نسخ الرابط') }
   }
@@ -147,6 +149,9 @@ const StoreDetailsPage = () => {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">{store.nameAr || store.name}</h1>
+                  {store.isOpenNow === false && store.openStatus && (
+                    <p className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 text-red-700 text-xs font-bold">{store.openStatus}</p>
+                  )}
                   {store.ratingsCount > 0 ? (
                     <div className="flex items-center gap-1.5 mt-1.5" aria-label={`تقييم المتجر ${store.rating} من 5`}>
                       <span className="flex">
@@ -197,6 +202,10 @@ const StoreDetailsPage = () => {
 
           {store.description && !store.description.includes('?') && (
             <p className="text-gray-600 mt-4 pt-4 border-t border-gray-200">{store.description}</p>
+          )}
+
+          {store.workingHours?.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-200"><StoreHoursList hours={store.workingHours} /></div>
           )}
 
           {/* Policies */}

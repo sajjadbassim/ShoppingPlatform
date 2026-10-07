@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService } from '../services';
 import { detachPush } from '../utils/push';
+import { clearSession, revokeSession, saveSession, SESSION_EVENT } from '../api/session';
 
 /**
  * Auth Store - إدارة حالة المصادقة
@@ -21,7 +22,7 @@ login: async (credentials) => {
   set({ isLoading: true, error: null });
   try {
     const data = await authService.login(credentials);
-    localStorage.setItem('accessToken', data.token) // ← تأكد موجود
+    saveSession(data)
 
     // ✅ الحل: data نفسه يحتوي على بيانات المستخدم
     const user = {
@@ -54,7 +55,7 @@ login: async (credentials) => {
         set({ isLoading: true, error: null });
         try {
           const data = await authService.register(userData);
-          localStorage.setItem('accessToken', data.token) // ← أضف هذا
+          saveSession(data)
                     
           // ✅ data يحتوي على بيانات المستخدم مباشرة (مثل login)
           const user = {
@@ -82,7 +83,7 @@ login: async (credentials) => {
 
       // جلسة جاهزة من الخادم (الدخول بـ Google) — نفس شكل login
       setSession: (data) => {
-        localStorage.setItem('accessToken', data.token);
+        saveSession(data);
         const user = {
           id: data.userId,
           userId: data.userId,
@@ -100,7 +101,8 @@ login: async (credentials) => {
       // تسجيل الخروج
       logout: () => {
         detachPush(localStorage.getItem('accessToken'));
-        localStorage.removeItem('accessToken');
+        revokeSession();
+        clearSession();
         set({
           user: null,
           token: null,
@@ -131,8 +133,8 @@ login: async (credentials) => {
       changePassword: async (passwords) => {
         set({ isLoading: true, error: null });
         try {
-          await authService.changePassword(passwords);
-          set({ isLoading: false });
+          const session = await authService.changePassword(passwords);
+          set({ isLoading: false, ...(session?.token ? { token: session.token } : {}) });
         } catch (error) {
           set({ isLoading: false, error: error.message });
           throw error;
@@ -176,6 +178,29 @@ const tokenUserId = (token) => {
 };
 
 if (typeof window !== 'undefined') {
+  // تجديد الجلسة في هذا التبويب (axios/SignalR): التوكن وبيانات المستخدم تتبع ردّ الخادم —
+  // مثلاً زبون اعتُمد متجره يصبح VENDOR مع معرّف متجره دون خروج ودخول
+  window.addEventListener(SESSION_EVENT, (e) => {
+    const data = e.detail;
+    const { isAuthenticated, user } = useAuthStore.getState();
+    if (!isAuthenticated || !data?.token) return;
+    const sameUser = String(user?.id || '').toLowerCase() === String(data.userId || '').toLowerCase();
+    useAuthStore.setState({
+      token: data.token,
+      ...(sameUser && {
+        user: {
+          ...user,
+          role: data.role ?? user.role,
+          vendorId: data.vendorId ?? null,
+          fullName: data.fullName ?? user.fullName,
+          phone: data.phone ?? user.phone,
+          email: data.email ?? user.email,
+          avatarUrl: data.avatarUrl ?? user.avatarUrl ?? null,
+        },
+      }),
+    });
+  });
+
   window.addEventListener('storage', (e) => {
     if (e.key !== 'accessToken' || e.oldValue === e.newValue) return;
     const current = String(useAuthStore.getState().user?.id || '').toLowerCase() || null;

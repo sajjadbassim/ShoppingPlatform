@@ -7,12 +7,12 @@ namespace ecommerce.Services.HomeService
         // ===================================
         // الصفحة الرئيسية
         // ===================================
-        Task<HomePageDto> GetHomePageAsync();
+        Task<HomePageDto> GetHomePageAsync(string? page = null);
 
         // ===================================
         // Banners
         // ===================================
-        Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true, bool heroOnly = false);
+        Task<List<BannerDto>> GetBannersAsync(bool onlyActive = true, bool heroOnly = false, string? page = null);
         Task<BannerDto> GetBannerByIdAsync(Guid id);
         Task<BannerDto> CreateBannerAsync(CreateBannerDto dto);
         Task<BannerDto> UpdateBannerAsync(Guid id, UpdateBannerDto dto);
@@ -21,7 +21,7 @@ namespace ecommerce.Services.HomeService
         // ===================================
         // Sections
         // ===================================
-        Task<List<HomeSectionDto>> GetSectionsAsync(bool onlyActive = true);
+        Task<List<HomeSectionDto>> GetSectionsAsync(bool onlyActive = true, string? page = null);
         Task<HomeSectionDto> GetSectionByIdAsync(Guid id);
         Task<HomeSectionDto> CreateSectionAsync(CreateHomeSectionDto dto);
         Task<HomeSectionDto> UpdateSectionAsync(Guid id, UpdateHomeSectionDto dto);

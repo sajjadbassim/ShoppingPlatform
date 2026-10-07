@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using ecommerce.Core.Constants;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ecommerce.Core.Models
@@ -60,6 +61,12 @@ namespace ecommerce.Core.Models
         [Column("section_id")]
         public Guid? SectionId { get; set; }
 
+        // صفحة السلايدر العلوي: general (الرئيسية) | grocery (السوبرماركت) — بانرات البلوكات تتبع قسمها
+        [Required]
+        [MaxLength(20)]
+        [Column("page")]
+        public string Page { get; set; } = ShopScope.General;
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -115,11 +122,21 @@ namespace ecommerce.Core.Models
         [Column("banner_image_url")]
         public string? BannerImageUrl { get; set; }
 
+        // الصفحة التي يظهر فيها القسم: general (الرئيسية) | grocery (السوبرماركت)
+        [Required]
+        [MaxLength(20)]
+        [Column("page")]
+        public string Page { get; set; } = ShopScope.General;
+
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
         [Column("display_order")]
         public int DisplayOrder { get; set; } = 0;
+
+        // عروض محدودة (flash_deals): يختفي القسم تلقائياً بعد هذا الوقت ويظهر فوقه عدّاد تنازلي
+        [Column("ends_at")]
+        public DateTime? EndsAt { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -10,6 +10,7 @@ import {
 import DeliveryFeePolicy from '../../components/settings/DeliveryFeePolicy'
 import ConfirmationTimeoutSetting from '../../components/settings/ConfirmationTimeoutSetting'
 import DeliverySpeedThresholds from '../../components/settings/DeliverySpeedThresholds'
+import GrocerySlotsSetting from '../../components/settings/GrocerySlotsSetting'
 
 const ROLE_LABELS = {
   ADMIN: 'مدير النظام',
@@ -90,6 +91,7 @@ const AdminSettings = () => {
       <ConfirmationTimeoutSetting editable />
 
       <DeliverySpeedThresholds editable />
+      <GrocerySlotsSetting editable />
 
       <DeliveryFeePolicy />
 

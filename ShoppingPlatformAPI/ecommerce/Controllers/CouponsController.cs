@@ -3,6 +3,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -11,10 +12,12 @@ namespace ecommerce.Controllers
     public class CouponsController : Controller
     {
         private readonly ICouponService _couponService;
+        private readonly ICartService _cartService;
 
-        public CouponsController(ICouponService couponService)
+        public CouponsController(ICouponService couponService, ICartService cartService)
         {
             _couponService = couponService;
+            _cartService = cartService;
         }
 
         private Guid? GetCurrentUserId()
@@ -37,14 +40,16 @@ namespace ecommerce.Controllers
                 if (userId == null)
                     return Unauthorized(new { success = false, message = "يجب تسجيل الدخول" });
 
-                var result = await _couponService.ValidateAsync(userId.Value, dto);
+                var cart = await _cartService.GetCartAsync(userId.Value);
+                var vendorSubtotals = (cart.VendorsSummary ?? new()).ToDictionary(v => v.VendorId, v => v.Subtotal);
+                var result = await _couponService.ValidateAsync(userId.Value, dto, vendorSubtotals);
 
                 if (!result.IsValid)
                     return BadRequest(new { success = false, message = result.ErrorMessage });
 
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -62,7 +67,7 @@ namespace ecommerce.Controllers
                 var coupons = await _couponService.GetAllAsync();
                 return Ok(new { success = true, data = coupons });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -96,7 +101,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -114,7 +119,7 @@ namespace ecommerce.Controllers
                 var coupon = await _couponService.GetByIdAsync(id);
                 return Ok(new { success = true, data = coupon });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -133,7 +138,7 @@ namespace ecommerce.Controllers
                 return CreatedAtAction(nameof(GetById), new { id = coupon.Id },
                     new { success = true, data = coupon, message = "تم إنشاء الكوبون بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -151,7 +156,7 @@ namespace ecommerce.Controllers
                 var coupon = await _couponService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = coupon, message = "تم تعديل الكوبون بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -172,7 +177,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الكوبون غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

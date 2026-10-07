@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import {
   DollarSign, ShoppingCart, TrendingUp, Package,
-  RefreshCw, Calendar,
+  RefreshCw, Calendar, Download, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Skeleton } from '../../components/common/Loading'
@@ -13,23 +13,52 @@ import { getImageUrl } from '../../utils/imageHelper'
 
 const PERIODS = [
   { key: 'today', label: 'اليوم'       },
-  { key: 'week',  label: 'هذا الأسبوع' },
+  { key: 'week',  label: 'آخر 7 أيام' },
   { key: 'month', label: 'هذا الشهر'  },
   { key: 'year',  label: 'هذا العام'  },
+  { key: 'custom', label: 'مخصص' },
 ]
+
+const isoDay = (d) => d.toISOString().slice(0, 10)
+
+// نسبة التغيير عن الفترة السابقة (بنفس عدد الأيام)
+const Delta = ({ now, before }) => {
+  if (!before) return now > 0 ? <span className="text-[11px] text-green-600 font-bold">جديد</span> : null
+  const pct = Math.round(((now - before) / before) * 100)
+  if (pct === 0) return <span className="text-[11px] text-gray-400">بلا تغيير</span>
+  const up = pct > 0
+  return (
+    <span className={`inline-flex items-center text-[11px] font-bold ${up ? 'text-green-600' : 'text-red-500'}`} title="مقارنة بالفترة السابقة بنفس الطول">
+      {up ? <ArrowUp size={11} /> : <ArrowDown size={11} />}{Math.abs(pct)}%
+    </span>
+  )
+}
+
+// المبيعات اليومية كملف CSV (يفتح في Excel بالعربية)
+const downloadSalesCsv = (sales) => {
+  const rows = [['date', 'orders', 'revenue'], ...(sales.salesByDay || []).map(d => [String(d.date).slice(0, 10), d.orderCount, d.revenue])]
+  const blob = new Blob(['\uFEFF' + rows.map(r => r.join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = Object.assign(document.createElement('a'), { href: url, download: `sales-${String(sales.from).slice(0, 10)}-${String(sales.to).slice(0, 10)}.csv` })
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 const VendorReports = () => {
   const { user } = useAuthStore()
   const vendorId = user?.vendorId || user?.id
   const [period, setPeriod] = useState('month')
+  const [range, setRange] = useState(() => ({ from: isoDay(new Date(Date.now() - 29 * 86400000)), to: isoDay(new Date()) }))
+  const rangeValid = range.from && range.to && range.from <= range.to
 
   const { data: salesRaw, isLoading: salesLoading, refetch } = useQuery({
-    queryKey: ['vendor-sales', vendorId, period],
+    queryKey: ['vendor-sales', vendorId, period, period === 'custom' ? range : null],
     queryFn: async () => {
-      const r = await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.SALES(vendorId), { period })
+      const r = await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.SALES(vendorId),
+        period === 'custom' ? { period, from: range.from, to: range.to } : { period })
       return r.data.data || r.data
     },
-    enabled: !!vendorId,
+    enabled: !!vendorId && (period !== 'custom' || rangeValid),
     staleTime: 3 * 60 * 1000,
   })
 
@@ -47,17 +76,17 @@ const VendorReports = () => {
   const dash       = dashRaw  || {}
   const salesByDay = (sales.salesByDay || []).filter(d => d.revenue > 0 || sales.salesByDay?.length <= 7)
   // للفترات الطويلة فلتر الأيام التي فيها بيانات + أهم الأيام
-  const chartDays  = period === 'year'
+  const chartDays  = period === 'year' || (period === 'custom' && (sales.salesByDay?.length ?? 0) > 62)
     ? (sales.salesByDay || []).filter(d => d.revenue > 0)
     : sales.salesByDay || []
   const maxRevenue = chartDays.length ? Math.max(...chartDays.map(d => d.revenue), 1) : 1
-  const topProducts = (dash.topProducts || []).filter((p, i, arr) =>
-    arr.findIndex(x => x.productId === p.productId) === i
-  )
+  const topProducts = dash.topProducts || []
 
   const stats = [
-    { label: 'الإيرادات',         value: `${(sales.totalRevenue||0) > 1000000 ? ((sales.totalRevenue||0)/1000000).toFixed(1)+'M' : (sales.totalRevenue||0).toLocaleString()} د.ع`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'الطلبات',           value: (sales.totalOrders||0).toString(),                                                                                                          icon: ShoppingCart, color: 'text-blue-600',  bg: 'bg-blue-50'  },
+    { label: 'صافي المبيعات',     value: `${(sales.totalRevenue||0) > 1000000 ? ((sales.totalRevenue||0)/1000000).toFixed(1)+'M' : (sales.totalRevenue||0).toLocaleString()} د.ع`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50',
+      delta: <Delta now={sales.totalRevenue || 0} before={sales.previousRevenue || 0} /> },
+    { label: 'الطلبات',           value: (sales.totalOrders||0).toString(),                                                                                                          icon: ShoppingCart, color: 'text-blue-600',  bg: 'bg-blue-50',
+      delta: <Delta now={sales.totalOrders || 0} before={sales.previousOrders || 0} /> },
     { label: 'متوسط قيمة الطلب',  value: `${(sales.averageOrderValue||0).toLocaleString()} د.ع`,                                                                                    icon: TrendingUp,   color: 'text-purple-600',bg: 'bg-purple-50'},
     { label: 'المنتجات النشطة',   value: `${dash.activeProducts||0}/${dash.totalProducts||0}`,                                                                                       icon: Package,     color: 'text-yellow-600',bg: 'bg-yellow-50'},
   ]
@@ -70,7 +99,7 @@ const VendorReports = () => {
           <h1 className="text-2xl font-bold text-gray-900">التقارير</h1>
           <p className="text-gray-500 mt-1 text-sm">تحليل أداء متجرك</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {PERIODS.map(p => (
             <button key={p.key} onClick={() => setPeriod(p.key)}
               className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
@@ -79,11 +108,30 @@ const VendorReports = () => {
               {p.label}
             </button>
           ))}
+          <button onClick={() => downloadSalesCsv(sales)} disabled={!sales.salesByDay?.length}
+            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-40" title="تصدير المبيعات اليومية (CSV)" aria-label="تصدير CSV">
+            <Download size={15} className="text-gray-500" />
+          </button>
           <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg">
             <RefreshCw size={15} className="text-gray-400" />
           </button>
         </div>
       </div>
+
+      {period === 'custom' && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <label className="flex items-center gap-1.5">من
+            <input type="date" value={range.from} max={range.to} onChange={e => setRange(r => ({ ...r, from: e.target.value }))}
+              className="h-9 px-2 border border-gray-300 rounded-lg" />
+          </label>
+          <label className="flex items-center gap-1.5">إلى
+            <input type="date" value={range.to} min={range.from} max={isoDay(new Date())} onChange={e => setRange(r => ({ ...r, to: e.target.value }))}
+              className="h-9 px-2 border border-gray-300 rounded-lg" />
+          </label>
+          {!rangeValid && <span className="text-red-500 text-xs">تاريخ البداية بعد النهاية</span>}
+        </div>
+      )}
+      <p className="text-xs text-gray-400 -mt-3">الأسهم تقارن بالفترة السابقة بنفس عدد الأيام. صافي المبيعات = المسلَّم دون المرفوض ناقص المرتجعات، قبل عمولة المنصة.</p>
 
       {/* Stats */}
       {salesLoading ? (
@@ -99,7 +147,7 @@ const VendorReports = () => {
               </div>
               <div>
                 <p className="font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">{s.label}{s.delta}</p>
               </div>
             </div>
           ))}

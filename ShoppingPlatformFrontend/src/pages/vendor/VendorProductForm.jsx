@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import {
-  Save, X, ImagePlus, Star, Trash2, Info, ArrowRight, Minus, Plus, ChevronDown, RefreshCw, CheckCircle2, Send,
+  Save, X, ImagePlus, Star, Trash2, Info, Minus, Plus, ChevronDown, RefreshCw, CheckCircle2, Send,
 } from 'lucide-react'
 import { Toggle } from '../../components/common/FormControls'
 import { Skeleton } from '../../components/common/Loading'
@@ -16,6 +16,19 @@ import { apiPostForm, apiPutForm, apiDelete, apiPatch } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 import VendorVariantsManager from '../../components/vendor/VendorVariantsManager'
+import { ConfirmModal } from '../../components/common/Modal'
+import { useUnsavedChanges } from '../../hooks/useUnsavedChanges'
+import { compressImages } from '../../utils/compressImage'
+import { stepLabel } from '../../utils/weight'
+
+// البيع بالوزن: وحدة البيع (الخادم يخزّن السعر والمخزون بالوحدة، والتاجر يكتب سعر الكيلو والمخزون بالكيلو)
+const WEIGHT_STEPS = [
+  { value: '0.1', label: '100 غرام' },
+  { value: '0.25', label: 'ربع كيلو' },
+  { value: '0.5', label: 'نصف كيلو' },
+  { value: '1', label: 'كيلو' },
+]
+const round2 = (n) => Math.round(n * 100) / 100
 
 const MAX_IMAGES = 5
 
@@ -54,10 +67,14 @@ const VendorProductForm = () => {
   const { data: existing, isLoading: productLoading } = useProduct(id)
   const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
 
-  const [form, setForm] = useState({
+  const EMPTY_FORM = {
     Name: '', NameAr: '', Description: '', Price: '', OriginalPrice: '', Sku: '',
     StockQuantity: '1', CategoryId: '', IsActive: true, IsAvailable: true,
-  })
+    WeightStep: '',   // فارغ = بالقطعة
+  }
+  const [form, setForm] = useState(EMPTY_FORM)
+  // آخر نسخة محفوظة — المقارنة معها تحدد «تغييرات غير محفوظة»
+  const [baseline, setBaseline] = useState(EMPTY_FORM)
   const set = (patch) => setForm(f => ({ ...f, ...patch }))
   const [newImages, setNewImages] = useState([])          // { file, preview }
   const [existingImages, setExistingImages] = useState([]) // من الخادم
@@ -67,19 +84,25 @@ const VendorProductForm = () => {
 
   useEffect(() => {
     if (!existing || !isEditing) return
-    setForm({
+    // المنتج بالوزن: يُعرض سعر الكيلو والمخزون بالكيلو (المخزَّن بالوحدة)
+    const step = Number(existing.weightStepKg) || 0
+    const perKg = (v) => v == null ? '' : String(step ? round2(v / step) : v)
+    const loaded = {
+      WeightStep: step ? String(step) : '',
       Name: existing.name || '',
       NameAr: existing.nameAr || '',
       Description: existing.description && existing.description !== '-' ? existing.description : '',
       // القيم المخزّنة لا المعروضة للزبون (السعر بعد العرض) — وإلا ينقص السعر الحقيقي بقيمة العرض عند الحفظ
-      Price: (existing.regularPrice ?? existing.price)?.toString() || '',
-      OriginalPrice: (existing.regularOriginalPrice !== undefined ? existing.regularOriginalPrice : existing.originalPrice)?.toString() || '',
+      Price: perKg(existing.regularPrice ?? existing.price),
+      OriginalPrice: perKg(existing.regularOriginalPrice !== undefined ? existing.regularOriginalPrice : existing.originalPrice),
       Sku: existing.sku || '',
-      StockQuantity: (existing.regularStockQuantity ?? existing.stockQuantity)?.toString() || '0',
+      StockQuantity: String(round2((existing.regularStockQuantity ?? existing.stockQuantity ?? 0) * (step || 1))),
       CategoryId: existing.categoryId || '',
       IsActive: existing.isActive ?? true,
       IsAvailable: existing.regularIsAvailable ?? existing.isAvailable ?? true,
-    })
+    }
+    setForm(loaded)
+    setBaseline(loaded)
     setExistingImages([...(existing.images || [])].sort((a, b) =>
       a.isPrimary ? -1 : b.isPrimary ? 1 : (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
     if (existing.name || existing.sku) setShowMore(true)
@@ -92,13 +115,21 @@ const VendorProductForm = () => {
   const price = Number(form.Price) || 0
   const original = Number(form.OriginalPrice) || 0
   const discount = original > price && price > 0 ? Math.round((1 - price / original) * 100) : 0
+  // بالوزن: ما يكتبه التاجر لكل كغم، والمرسل للخادم لكل وحدة
+  const weightStep = Number(form.WeightStep) || 0
+  const toUnit = (perKg) => weightStep ? round2(perKg * weightStep) : perKg
+  const stockUnits = weightStep
+    ? Math.floor((Number(form.StockQuantity) || 0) / weightStep + 1e-9)
+    : Math.max(0, Number(form.StockQuantity) || 0)
 
-  const handleImageAdd = (e) => {
+  const handleImageAdd = async (e) => {
     const room = MAX_IMAGES - imageCount
     const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'))
-    if (files.length > room) showError(`الحد الأقصى ${MAX_IMAGES} صور للمنتج`)
-    setNewImages(prev => [...prev, ...files.slice(0, Math.max(0, room)).map(f => ({ file: f, preview: URL.createObjectURL(f) }))])
     e.target.value = ''
+    if (files.length > room) showError(`الحد الأقصى ${MAX_IMAGES} صور للمنتج`)
+    // صور الكاميرا تُصغَّر قبل الرفع (أسرع، وتبقى تحت حد 5MB)
+    const ready = await compressImages(files.slice(0, Math.max(0, room)))
+    setNewImages(prev => [...prev, ...ready.map(f => ({ file: f, preview: URL.createObjectURL(f) }))])
   }
 
   const removeNewImage = (i) => setNewImages(prev => {
@@ -133,11 +164,13 @@ const VendorProductForm = () => {
     fd.append('Name', form.Name.trim() || form.NameAr.trim())
     fd.append('NameAr', form.NameAr.trim())
     fd.append('Description', form.Description.trim() || '-')
-    fd.append('Price', String(price))
-    if (form.OriginalPrice) fd.append('OriginalPrice', String(original))
+    fd.append('Price', String(toUnit(price)))
+    if (form.OriginalPrice) fd.append('OriginalPrice', String(toUnit(original)))
     else if (isEditing) fd.append('ClearOriginalPrice', 'true') // مسح السعر قبل الخصم
     if (form.Sku.trim()) fd.append('Sku', form.Sku.trim())
-    fd.append('StockQuantity', String(Math.max(0, Number(form.StockQuantity) || 0)))
+    fd.append('StockQuantity', String(Math.max(0, stockUnits)))
+    if (weightStep) fd.append('WeightStepKg', String(weightStep))
+    else if (isEditing) fd.append('ClearWeightStep', 'true')
     if (form.CategoryId) fd.append('CategoryId', form.CategoryId)
     else if (isEditing) fd.append('ClearCategory', 'true')
     fd.append('IsActive', String(form.IsActive))
@@ -150,7 +183,7 @@ const VendorProductForm = () => {
   const validate = () => {
     const e = {}
     if (!form.NameAr.trim()) e.NameAr = 'اكتب اسم المنتج'
-    if (!price) e.Price = 'اكتب سعر البيع'
+    if (!(price > 0)) e.Price = form.Price ? 'سعر البيع يجب أن يكون أكبر من صفر' : 'اكتب سعر البيع'
     if (form.OriginalPrice && original <= price) e.OriginalPrice = 'يجب أن يكون أعلى من سعر البيع ليظهر كخصم'
     if (!isEditing && imageCount === 0) e.images = 'أضف صورة واحدة على الأقل — المنتجات بصور تُباع أكثر'
     setErrors(e)
@@ -170,11 +203,13 @@ const VendorProductForm = () => {
       if (isEditing) {
         queryClient.invalidateQueries({ queryKey: ['products'] })
         success('تم حفظ التغييرات ✅')
+        setBaseline(form)
         setNewImages([])
         if (saved?.images) setExistingImages([...saved.images].sort((a, b) => a.isPrimary ? -1 : b.isPrimary ? 1 : 0))
         return
       }
       // بعد الإنشاء ننتقل لوضع التعديل حتى لا يُنشئ الحفظ التالي نسخة مكررة، وتظهر المتغيرات
+      allowNext()
       if (saved?.id) navigate(`/vendor/products/${saved.id}/edit?new=1`, { replace: true })
       else { success('تمت إضافة المنتج ✅'); navigate('/vendor/products') }
     },
@@ -185,6 +220,9 @@ const VendorProductForm = () => {
     if (validate()) saveMutation.mutate()
   }
   const saving = saveMutation.isPending
+
+  const dirty = !saving && (newImages.length > 0 || JSON.stringify(form) !== JSON.stringify(baseline))
+  const { blocker, allowNext } = useUnsavedChanges(dirty)
 
   if (isEditing && productLoading) return (
     <div className="max-w-5xl mx-auto space-y-4">
@@ -200,9 +238,6 @@ const VendorProductForm = () => {
     <div className="max-w-5xl mx-auto pb-28 lg:pb-6">
       {/* العنوان */}
       <div className="flex items-center gap-3 mb-4">
-        <Link to="/vendor/products" aria-label="رجوع" className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
-          <ArrowRight size={20} />
-        </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl font-bold text-gray-900 truncate">{isEditing ? (form.NameAr || 'تعديل المنتج') : 'منتج جديد'}</h1>
           <p className="text-xs text-gray-500">{isEditing ? 'عدّل ما تريد ثم احفظ' : 'الحقول المطلوبة: الصورة، الاسم، السعر'}</p>
@@ -286,8 +321,27 @@ const VendorProductForm = () => {
 
           {/* السعر والكمية */}
           <Section title="السعر والكمية">
+            {/* طريقة البيع: بالقطعة أو بالوزن (خضار، لحوم، أجبان...) */}
+            <div className="mb-3.5">
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">طريقة البيع</span>
+              <div className="flex flex-wrap gap-2">
+                {[{ value: '', label: 'بالقطعة' }, ...WEIGHT_STEPS.map(s => ({ ...s, label: `بالوزن — ${s.label}` }))].map(o => (
+                  <button key={o.value || 'piece'} type="button" onClick={() => set({ WeightStep: o.value })} aria-pressed={form.WeightStep === o.value}
+                    className={`h-9 px-3 rounded-full border text-sm font-medium transition-colors ${
+                      form.WeightStep === o.value ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {weightStep > 0 && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  اكتب السعر لكل كيلو والمخزون بالكيلو — يطلب الزبون بخطوات {stepLabel(weightStep)}
+                  {price > 0 && <> (سعر الخطوة {toUnit(price).toLocaleString()} د.ع)</>}
+                </p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="سعر البيع (د.ع)" required error={errors.Price}>
+              <Field label={weightStep ? 'السعر لكل كيلو (د.ع)' : 'سعر البيع (د.ع)'} required error={errors.Price}>
                 <input type="number" inputMode="numeric" min="0" value={form.Price} onChange={e => set({ Price: e.target.value })} className={inputCls(errors.Price)} placeholder="0" />
               </Field>
               <Field label="السعر قبل الخصم" error={errors.OriginalPrice} hint={discount ? null : 'اختياري'}>
@@ -298,7 +352,7 @@ const VendorProductForm = () => {
               </Field>
             </div>
             <div className="mt-3.5">
-              <span className="block text-sm font-medium text-gray-700 mb-1.5">الكمية المتوفرة</span>
+              <span className="block text-sm font-medium text-gray-700 mb-1.5">{weightStep ? 'المتوفر (كيلو)' : 'الكمية المتوفرة'}</span>
               <div className="inline-flex items-center rounded-xl border border-gray-200 overflow-hidden">
                 <button type="button" onClick={() => set({ StockQuantity: String(Math.max(0, (Number(form.StockQuantity) || 0) - 1)) })} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50" aria-label="إنقاص"><Minus size={16} /></button>
                 <input type="number" inputMode="numeric" min="0" value={form.StockQuantity} onChange={e => set({ StockQuantity: e.target.value })}
@@ -326,7 +380,7 @@ const VendorProductForm = () => {
 
           {/* المتغيرات — بعد الحفظ */}
           {isEditing ? (
-            <VendorVariantsManager productId={id} basePrice={price} />
+            <VendorVariantsManager productId={id} basePrice={toUnit(price)} />
           ) : (
             <p className="flex items-start gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-2xl p-3.5">
               <Info size={16} className="flex-shrink-0 mt-0.5" />
@@ -364,6 +418,17 @@ const VendorProductForm = () => {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={blocker.state === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        onConfirm={() => blocker.proceed?.()}
+        title="تغييرات غير محفوظة"
+        message="عدّلت المنتج ولم تحفظ. هل تريد المغادرة وتجاهل التعديلات؟"
+        confirmText="مغادرة بدون حفظ"
+        cancelText="البقاء"
+        type="warning"
+      />
 
       {/* شريط الحفظ الثابت — الهاتف والأجهزة اللوحية */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-gray-200 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2">

@@ -4,6 +4,7 @@ using ecommerce.Core.DTO.Ops;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -35,7 +36,7 @@ namespace ecommerce.Controllers
                     pageNumber, pageSize, status, workStatus);
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -50,7 +51,7 @@ namespace ecommerce.Controllers
                 var drivers = await _driverService.GetAvailableDriversAsync();
                 return Ok(new { success = true, data = drivers });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -65,7 +66,7 @@ namespace ecommerce.Controllers
                 var driver = await _driverService.GetDriverByIdAsync(id);
                 return Ok(new { success = true, data = driver });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -82,7 +83,7 @@ namespace ecommerce.Controllers
                     driver = await _driverApp.SetAccountAsync(driver.Id, dto.Password);
                 return Ok(new { success = true, data = driver, message = "تم إضافة السائق بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -97,7 +98,7 @@ namespace ecommerce.Controllers
                 var driver = await _driverService.UpdateDriverAsync(id, dto);
                 return Ok(new { success = true, data = driver, message = "تم تعديل بيانات السائق بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -112,7 +113,7 @@ namespace ecommerce.Controllers
                 var driver = await _driverService.ToggleDriverStatusAsync(id);
                 return Ok(new { success = true, data = driver, message = "تم تغيير حالة السائق بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -127,7 +128,7 @@ namespace ecommerce.Controllers
                 var driver = await _driverService.UpdateDriverWorkStatusAsync(id, dto);
                 return Ok(new { success = true, data = driver, message = "تم تحديث حالة السائق بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -146,7 +147,7 @@ namespace ecommerce.Controllers
                 var result = await _driverService.GetDriverOrdersAsync(id, pageNumber, pageSize, filter);
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -161,7 +162,7 @@ namespace ecommerce.Controllers
                 var stats = await _driverService.GetDriverStatsAsync(id);
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

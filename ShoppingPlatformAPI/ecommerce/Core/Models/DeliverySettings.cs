@@ -46,6 +46,26 @@ namespace ecommerce.Core.Models
         [Column("zones_mode")]
         public string ZonesMode { get; set; } = "OFF";
 
+        // مواعيد توصيل السوبرماركت (بتوقيت بغداد): فترات بطول GrocerySlotMinutes من ساعة البداية حتى النهاية،
+        // لأيام GrocerySlotDays (اليوم = 1)، وأول فترة متاحة بعد مهلة GrocerySlotLeadMinutes من الآن
+        [Column("grocery_slots_enabled")]
+        public bool GrocerySlotsEnabled { get; set; } = true;
+
+        [Column("grocery_slot_start_hour")]
+        public int GrocerySlotStartHour { get; set; } = 10;
+
+        [Column("grocery_slot_end_hour")]
+        public int GrocerySlotEndHour { get; set; } = 22;
+
+        [Column("grocery_slot_minutes")]
+        public int GrocerySlotMinutes { get; set; } = 120;
+
+        [Column("grocery_slot_lead_minutes")]
+        public int GrocerySlotLeadMinutes { get; set; } = 60;
+
+        [Column("grocery_slot_days")]
+        public int GrocerySlotDays { get; set; } = 2;
+
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

@@ -5,6 +5,7 @@ import { SettingsSection, AppearanceSection } from '../../components/settings/Se
 import DeliveryFeePolicy from '../../components/settings/DeliveryFeePolicy'
 import ConfirmationTimeoutSetting from '../../components/settings/ConfirmationTimeoutSetting'
 import DeliverySpeedThresholds from '../../components/settings/DeliverySpeedThresholds'
+import GrocerySlotsSetting from '../../components/settings/GrocerySlotsSetting'
 
 const OperationsSettings = () => {
   const { user } = useAuthStore()
@@ -36,6 +37,7 @@ const OperationsSettings = () => {
       <ConfirmationTimeoutSetting />
 
       <DeliverySpeedThresholds />
+      <GrocerySlotsSetting />
 
       <DeliveryFeePolicy />
 

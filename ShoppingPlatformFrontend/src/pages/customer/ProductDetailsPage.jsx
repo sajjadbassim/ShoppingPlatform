@@ -24,6 +24,8 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { reviewsService } from '../../services/reviewsService'
+import StockAlertButton from '../../components/common/StockAlertButton'
+import { formatQuantity, formatPrice, isByWeight, pricePerKg, stepLabel } from '../../utils/weight'
 
 
 // ===========================
@@ -229,7 +231,7 @@ const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) =>
         )}
       </div>
       <p className="mt-2 text-[13px] leading-snug line-clamp-2 min-h-[2lh]">{p.nameAr || p.name}</p>
-      <p className="mt-1 font-bold">{p.price?.toLocaleString()} د.ع</p>
+      <p className="mt-1 font-bold">{formatPrice(p.price, p.weightStepKg)}</p>
     </Link>
   )
 }
@@ -701,8 +703,9 @@ const ProductDetailsPage = () => {
     }
   }
 
+  // رابط المشاركة يعرض صورة المنتج واسمه وسعره في واتساب وفيسبوك، ثم يفتح صفحة المنتج
   const handleShare = async () => {
-    const url = window.location.href
+    const url = `${window.location.origin}${API_ENDPOINTS.SHARE.PRODUCT(id)}`
     if (navigator.share) {
       try { await navigator.share({ title: product.nameAr || product.name, url }) } catch {}
     } else {
@@ -832,12 +835,12 @@ const ProductDetailsPage = () => {
               {/* Price */}
               <div className="flex items-baseline gap-3 mb-6">
                 <span className="text-3xl font-bold text-primary">
-                  {finalPrice.toLocaleString()} د.ع
+                  {formatPrice(finalPrice, product.weightStepKg)}
                 </span>
                 {discount > 0 && (
                   <>
                     <span className="text-lg text-gray-400 line-through">
-                      {product.originalPrice.toLocaleString()} د.ع
+                      {Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString()} د.ع
                     </span>
                     <span className="px-2 py-1 bg-red-500 text-white text-sm font-medium rounded">
                       -{discount}%
@@ -881,7 +884,7 @@ const ProductDetailsPage = () => {
                   <>
                     <span className="w-2 h-2 bg-green-500 rounded-full" />
                     <span className="text-green-600 text-sm">
-                      متوفر ({availableStock} قطعة)
+                      متوفر ({isByWeight(product) ? formatQuantity(availableStock, product.weightStepKg) : `${availableStock} قطعة`})
                     </span>
                   </>
                 ) : hasVariants && !isVariantFullySelected ? (
@@ -900,7 +903,7 @@ const ProductDetailsPage = () => {
               {/* Quantity */}
               {isAvailable && (
                 <div className="flex items-center gap-4 mb-6">
-                  <span className="text-gray-700">الكمية:</span>
+                  <span className="text-gray-700">{isByWeight(product) ? 'الوزن:' : 'الكمية:'}</span>
                   <div className="flex items-center border border-gray-300 rounded-lg">
                     <button
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
@@ -909,7 +912,7 @@ const ProductDetailsPage = () => {
                     >
                       <Minus size={18} />
                     </button>
-                    <span className="w-12 text-center font-medium">{quantity}</span>
+                    <span className={`${isByWeight(product) ? 'min-w-[4.5rem] px-2' : 'w-12'} text-center font-medium whitespace-nowrap`}>{formatQuantity(quantity, product.weightStepKg)}</span>
                     <button
                       onClick={() => setQuantity(q => Math.min(availableStock, q + 1))}
                       disabled={quantity >= availableStock}
@@ -918,6 +921,19 @@ const ProductDetailsPage = () => {
                       <Plus size={18} />
                     </button>
                   </div>
+                  {isByWeight(product) && (
+                    <span className="text-sm text-gray-500">المجموع: <b className="text-gray-900">{Math.round(finalPrice * quantity).toLocaleString()} د.ع</b></span>
+                  )}
+                </div>
+              )}
+              {isAvailable && isByWeight(product) && (
+                <p className="-mt-4 mb-6 text-xs text-gray-500">كل ضغطة تضيف {stepLabel(product.weightStepKg)}</p>
+              )}
+
+              {/* نافد: تنبيه عند عودته للمخزون */}
+              {!isAvailable && (!hasVariants || (isVariantFullySelected && selectedVariant)) && (
+                <div className="hidden lg:block mb-6">
+                  <StockAlertButton productId={product.id} variantId={selectedVariant?.id || null} className="w-full" />
                 </div>
               )}
 
@@ -1171,11 +1187,15 @@ const ProductDetailsPage = () => {
       {/* شريط الإضافة للسلة — الهاتف (مكان شريط التنقل السفلي) */}
       <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
         <div className="h-16 px-4 flex items-center gap-2">
+          {!isAvailable && (!hasVariants || (isVariantFullySelected && selectedVariant)) ? (
+            <StockAlertButton productId={product.id} variantId={selectedVariant?.id || null} className="flex-1" />
+          ) : (
           <button onClick={handleAddToCart} disabled={!isAvailable || cartLoading}
             className="flex-1 h-12 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:bg-gray-300 active:scale-[0.99] transition">
             <ShoppingCart size={20} />
             {isAvailable ? 'إضافة للسلة' : 'غير متوفر'}
           </button>
+          )}
           {isAvailable && (
             <button onClick={handleBuyNow}
               className="h-12 px-5 rounded-full border border-gray-300 text-gray-800 font-bold">

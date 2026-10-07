@@ -2,10 +2,10 @@
 // نشر منتج على حسابات التواصل المربوطة: التاجر يختار الحسابات والصور والنص، يرى شكل المنشور على كل منصة،
 // ثم يؤكد النشر بنفسه. حالياً النشر الفعلي على إنستغرام (API: /api/integrations/instagram/posts)، وتيك توك وفيسبوك قريباً
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowRight, Send, CalendarClock, Check, ExternalLink, AlertTriangle, RefreshCw, RotateCcw, Info, CheckCircle2, Clock,
+  Send, CalendarClock, Check, ExternalLink, AlertTriangle, RefreshCw, RotateCcw, Info, CheckCircle2, Clock,
   Heart, MessageCircle, Bookmark, Share2, Music, Globe, ThumbsUp, Plus, Image as ImageIcon, Play, X,
 } from 'lucide-react'
 import api, { apiGet } from '../../api/axios'
@@ -350,7 +350,6 @@ const ResultRow = ({ platform, post, onRetry, retrying }) => {
 // ===========================
 const VendorPublish = () => {
   const { id } = useParams()
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { error: showError } = useToast()
 
@@ -497,9 +496,6 @@ const VendorPublish = () => {
 
   const header = (
     <div className="flex items-center gap-3 mb-4">
-      <button onClick={() => navigate(-1)} aria-label="رجوع" className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center flex-shrink-0">
-        <ArrowRight size={20} />
-      </button>
       <div className="flex-1 min-w-0">
         <h1 className="text-xl font-bold text-gray-900">نشر المنتج</h1>
         {ig?.productName && <p className="text-xs text-gray-500 truncate">{ig.productName}</p>}

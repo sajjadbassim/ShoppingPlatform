@@ -1,7 +1,7 @@
 // src/pages/admin/AdminOrderDetails.jsx
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
-  ArrowRight, Package, User, MapPin, Phone, CreditCard,
+  Package, User, MapPin, Phone, CreditCard,
   Store, Truck, Clock, CheckCircle, XCircle, RefreshCw,
   ShoppingBag, Calendar, Hash, AlertCircle,
 } from 'lucide-react'
@@ -11,6 +11,8 @@ import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 import { OrderTimingCard } from '../../components/common/OrderTiming'
+import DeliverySlot from '../../components/common/DeliverySlot'
+import { formatQuantity } from '../../utils/weight'
 
 // ===========================
 // Helpers
@@ -56,7 +58,6 @@ const InfoRow = ({ icon: Icon, label, value, dir }) => (
 
 const AdminOrderDetails = () => {
   const { id } = useParams()
-  const navigate = useNavigate()
 
   const { data: order, isLoading, refetch } = useQuery({
     queryKey: ['admin-order-detail', id],
@@ -109,12 +110,6 @@ const AdminOrderDetails = () => {
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
-          <button onClick={() => navigate('/admin/orders')} aria-label="العودة للطلبات"
-            className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition-colors flex-shrink-0">
-            <ArrowRight size={18} />
-            <span className="text-sm hidden sm:inline">العودة للطلبات</span>
-          </button>
-          <div className="h-5 w-px bg-gray-300 hidden sm:block" />
           <div className="min-w-0">
             <h1 className="text-base sm:text-xl font-bold text-gray-900 whitespace-nowrap truncate" dir="ltr">#{order.orderNumber}</h1>
             <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
@@ -179,7 +174,7 @@ const AdminOrderDetails = () => {
                         </div>
                       )}
                       <p className="text-xs text-gray-400 mt-1">
-                        {item.unitPrice.toLocaleString()} د.ع × {item.quantity}
+                        {item.unitPrice.toLocaleString()} د.ع × {formatQuantity(item.quantity, item.weightStepKg)}
                       </p>
                     </div>
                     <p className="font-bold text-gray-900 text-sm flex-shrink-0">
@@ -208,6 +203,8 @@ const AdminOrderDetails = () => {
               </div>
             </div>
           ))}
+
+          <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd} substitution={order.substitutionPreference} />
 
           {/* ملاحظات */}
           {order.customerNotes && (

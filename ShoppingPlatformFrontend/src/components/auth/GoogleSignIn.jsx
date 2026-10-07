@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import AccountExistsHint, { isAccountExistsMessage } from './AccountExistsHint'
+import { getReferral } from '../../utils/referral'
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -122,7 +123,8 @@ export const GoogleSignInSection = ({ redirectTo = '/', text = 'continue_with' }
   const onCredential = async (credential) => {
     setExists(null)
     try {
-      const res = await apiPost(API_ENDPOINTS.AUTH.GOOGLE, { credential })
+      // رمز دعوة صديق (إن فتح الزائر رابط دعوة) — يُطبَّق على الحساب الجديد فقط
+      const res = await apiPost(API_ENDPOINTS.AUTH.GOOGLE, { credential, referralCode: getReferral() || undefined })
       const data = res.data?.data ?? res.data
       finish(data.login)
     } catch (err) {

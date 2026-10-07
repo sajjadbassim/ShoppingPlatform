@@ -28,6 +28,6 @@ namespace ecommerce.Repositories
         // Usage
         // ===================================
         Task RecordUsageAsync(CouponUsage usage);
-        Task IncrementUsageCountAsync(Guid couponId);
+        Task<bool> TryIncrementUsageCountAsync(Guid couponId);
     }
 }

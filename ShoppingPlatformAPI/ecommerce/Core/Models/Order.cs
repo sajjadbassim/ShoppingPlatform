@@ -115,5 +115,17 @@ namespace ecommerce.Core.Models
         [MaxLength(50)]
         [Column("coupon_code")]
         public string? CouponCode { get; set; }
+
+        // موعد التوصيل الذي اختاره الزبون لطلب فيه منتجات سوبرماركت (UTC) — فارغ = في أقرب وقت
+        [Column("delivery_slot_start")]
+        public DateTime? DeliverySlotStart { get; set; }
+
+        [Column("delivery_slot_end")]
+        public DateTime? DeliverySlotEnd { get; set; }
+
+        // عند نفاد منتج سوبرماركت: REMOVE (احذفه وأعد المبلغ) | SIMILAR (استبدله بمشابه بسعر لا يزيد)
+        [MaxLength(20)]
+        [Column("substitution_preference")]
+        public string? SubstitutionPreference { get; set; }
     }
 }

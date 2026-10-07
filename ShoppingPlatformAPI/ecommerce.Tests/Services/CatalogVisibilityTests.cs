@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -152,7 +153,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task AddToCart_ProductWithVariants_RequiresVariant()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => NewCartService().AddToCartAsync(
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => NewCartService().AddToCartAsync(
                 Guid.NewGuid(), new AddToCartDto { ProductId = _variantProduct.Id, Quantity = 1 }));
 
             Assert.Contains("خيارات", ex.Message);
@@ -161,7 +162,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task AddToCart_InactiveStore_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => NewCartService().AddToCartAsync(
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => NewCartService().AddToCartAsync(
                 Guid.NewGuid(), new AddToCartDto { ProductId = _inactiveStoreProduct.Id, Quantity = 1 }));
 
             Assert.Contains("المتجر", ex.Message);

@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.DTO.Product;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.DTO.Product;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Extensions;
@@ -280,7 +281,8 @@ namespace ecommerce.Repositories
             string sortBy = "created_at",
             string sortOrder = "desc",
             int pageNumber = 1,
-            int pageSize = 20)
+            int pageSize = 20,
+            string? scope = null)
         {
             // ✅ ضمان قيم صحيحة
             if (pageNumber < 1) pageNumber = 1;
@@ -289,7 +291,7 @@ namespace ecommerce.Repositories
 
             var query = await BuildAdvancedQueryAsync(
                 vendorId, categoryId, searchTerm, minPrice, maxPrice, isAvailable, isActive,
-                minRating, hasDiscount, sortBy, sortOrder);
+                minRating, hasDiscount, sortBy, sortOrder, scope);
 
             return await query
                 .Include(p => p.Vendor)
@@ -301,11 +303,11 @@ namespace ecommerce.Repositories
         // كل الفلاتر عدا السعر والخصم، بنفس الترتيب — للتسعير بالعروض في الذاكرة
         public async Task<List<ProductPriceInfo>> GetAdvancedFilterCandidatesAsync(
             Guid? vendorId, Guid? categoryId, string? searchTerm, bool? isAvailable, bool? isActive,
-            decimal? minRating, string sortBy, string sortOrder)
+            decimal? minRating, string sortBy, string sortOrder, string? scope = null)
         {
             var query = await BuildAdvancedQueryAsync(
                 vendorId, categoryId, searchTerm, null, null, isAvailable, isActive,
-                minRating, null, sortBy, sortOrder);
+                minRating, null, sortBy, sortOrder, scope);
 
             return await query
                 .Select(p => new ProductPriceInfo(p.Id, p.Price, p.OriginalPrice, p.CategoryId, p.VendorId))
@@ -328,9 +330,13 @@ namespace ecommerce.Repositories
 
         private async Task<IQueryable<Product>> BuildAdvancedQueryAsync(
             Guid? vendorId, Guid? categoryId, string? searchTerm, decimal? minPrice, decimal? maxPrice,
-            bool? isAvailable, bool? isActive, decimal? minRating, bool? hasDiscount, string sortBy, string sortOrder)
+            bool? isAvailable, bool? isActive, decimal? minRating, bool? hasDiscount, string sortBy, string sortOrder,
+            string? scope = null)
         {
             var query = _context.Products.AsQueryable();
+
+            if (ShopScope.Parse(scope) is { } shopScope)
+                query = CategoryVisibility.ApplyScope(query, shopScope, await CategoryVisibility.GetGroceryCategoryIdsAsync(_context));
 
             // الفلاتر الأساسية
             if (vendorId.HasValue && vendorId.Value != Guid.Empty)
@@ -395,15 +401,18 @@ namespace ecommerce.Repositories
         // ===================================
         // ✅ جديد: UnifiedSearchAsync
         // ===================================
-        public async Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5)
+        public async Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
                 return new UnifiedSearchResult { SearchTerm = searchTerm };
 
             var term = searchTerm.Trim().ToLower();
+            var shopScope = ShopScope.Parse(scope);
+            var groceryIds = shopScope == null ? new HashSet<Guid>() : await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
 
-            // بحث في المنتجات
-            var visibleProducts = await ApplyVisibilityAsync(_context.Products, isActive: null);
+            // بحث في المنتجات (ضمن قسم السوبرماركت أو خارجه عند تحديد scope)
+            var visibleProducts = CategoryVisibility.ApplyScope(
+                await ApplyVisibilityAsync(_context.Products, isActive: null), shopScope, groceryIds);
             var products = await visibleProducts
                 .Include(p => p.Vendor)
                 .Include(p => p.Category)
@@ -439,9 +448,11 @@ namespace ecommerce.Repositories
             // بحث في التصنيفات
             // الفئات الظاهرة فقط، والعدد يشمل الفئات الفرعية (نفس عدّ صفحة الفئات)
             var hiddenCategoryIds = (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).ToList();
+            var groceryList = groceryIds.ToList();
             var categories = await _context.Categories
                 .Where(c =>
                     !hiddenCategoryIds.Contains(c.Id) &&
+                    (shopScope == null || groceryList.Contains(c.Id) == (shopScope == ShopScope.Grocery)) &&
                     ((c.Name != null && c.Name.ToLower().Contains(term)) ||
                      (c.NameAr != null && c.NameAr.Contains(term))))
                 .Take(maxResults)

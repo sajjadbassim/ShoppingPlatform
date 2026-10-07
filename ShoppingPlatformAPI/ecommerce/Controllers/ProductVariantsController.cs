@@ -5,6 +5,7 @@ using ecommerce.Services.ProductService;
 using ecommerce.Services.VendorAccessService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -36,7 +37,7 @@ namespace ecommerce.Controllers
                 var attributes = await _variantService.GetAttributesAsync(productId);
                 return Ok(new { success = true, data = attributes });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -57,7 +58,7 @@ namespace ecommerce.Controllers
                 var attribute = await _variantService.CreateAttributeAsync(productId, dto);
                 return Ok(new { success = true, data = attribute, message = "تم إضافة الخاصية بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -78,7 +79,7 @@ namespace ecommerce.Controllers
                 var attribute = await _variantService.UpdateAttributeAsync(attributeId, dto);
                 return Ok(new { success = true, data = attribute, message = "تم تعديل الخاصية بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -102,7 +103,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الخاصية غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -123,7 +124,7 @@ namespace ecommerce.Controllers
                 var value = await _variantService.AddAttributeValueAsync(attributeId, dto);
                 return Ok(new { success = true, data = value, message = "تم إضافة القيمة بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -147,7 +148,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "القيمة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -166,7 +167,7 @@ namespace ecommerce.Controllers
                 var variants = await _variantService.GetVariantsAsync(productId);
                 return Ok(new { success = true, data = variants });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -185,7 +186,7 @@ namespace ecommerce.Controllers
                 var variant = await _variantService.GetVariantByIdAsync(variantId);
                 return Ok(new { success = true, data = variant });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -206,7 +207,7 @@ namespace ecommerce.Controllers
                 var variant = await _variantService.CreateVariantAsync(productId, dto);
                 return Ok(new { success = true, data = variant, message = "تم إنشاء المتغير بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -227,7 +228,7 @@ namespace ecommerce.Controllers
                 var variant = await _variantService.UpdateVariantAsync(variantId, dto);
                 return Ok(new { success = true, data = variant, message = "تم تعديل المتغير بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -251,7 +252,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المتغير غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

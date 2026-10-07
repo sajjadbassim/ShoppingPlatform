@@ -59,6 +59,24 @@ namespace ecommerce.Core.Models
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
+        // يزيد تلقائياً عند تغيير الدور أو التفعيل أو كلمة المرور (UserSessionInterceptor)،
+        // فتُرفض فوراً كل توكنات الدخول الصادرة قبله (claim "tv")
+        public int TokenVersion { get; set; }
+
+        // رموز التجديد الصادرة قبل هذا الوقت مرفوضة: تغيير كلمة المرور أو تعطيل الحساب ينهي كل الجلسات
+        public DateTime? SessionsRevokedAt { get; set; }
+
+        // ادعُ صديقاً: رمز دعوة المستخدم (يُنشأ عند أول طلب له)، ومن دعاه، ومتى صُرفت مكافأة الدعوة
+        [MaxLength(16)]
+        [Column("referral_code")]
+        public string? ReferralCode { get; set; }
+
+        [Column("referred_by_user_id")]
+        public Guid? ReferredByUserId { get; set; }
+
+        [Column("referral_rewarded_at")]
+        public DateTime? ReferralRewardedAt { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

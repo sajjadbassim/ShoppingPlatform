@@ -2,15 +2,16 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   DollarSign, ShoppingCart, Package, TrendingUp,
-  Eye, ArrowLeft, RefreshCw, AlertCircle, Star, AlertTriangle,
+  Eye, ArrowLeft, RefreshCw, AlertCircle, Star, AlertTriangle, Power,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useToast } from '../../components/common/Toast'
 import { StatCard } from '../../components/common/Card'
 import { StatusBadge } from '../../components/common/Badge'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useAuthStore } from '../../stores/authStore'
-import { apiGet } from '../../api/axios'
+import { apiGet, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 
@@ -33,6 +34,29 @@ const VendorDashboard = () => {
 
   const d = raw || {}
 
+  // حالة استقبال الطلبات — مفتاح سريع (التفاصيل وأوقات العمل في الإعدادات)
+  const queryClient = useQueryClient()
+  const { success, error: showError } = useToast()
+  const { data: vendorInfo } = useQuery({
+    queryKey: ['vendor-info', vendorId],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.VENDORS.BY_ID(vendorId)); return r.data.data || r.data },
+    enabled: !!vendorId,
+    staleTime: 60 * 1000,
+  })
+  const { mutate: setAccepting, isPending: switching } = useMutation({
+    mutationFn: (accepting) => { const fd = new FormData(); fd.append('IsAcceptingOrders', String(accepting)); return apiPutForm(API_ENDPOINTS.VENDORS.BY_ID(vendorId), fd) },
+    onSuccess: (_, accepting) => {
+      queryClient.invalidateQueries({ queryKey: ['vendor-info', vendorId] })
+      success(accepting ? 'المتجر يستقبل الطلبات الآن ✅' : 'أُوقف استقبال الطلبات — متجرك ظاهر لكن لا تصله طلبات')
+    },
+    onError: (err) => showError(err.message || 'تعذّر تغيير الحالة'),
+  })
+  const accepting = vendorInfo?.isAcceptingOrders ?? true
+  const storeState = !vendorInfo ? null
+    : !accepting ? { label: 'الطلبات متوقفة', cls: 'bg-red-50 text-red-700 border-red-200' }
+    : vendorInfo.isOpenNow === false ? { label: 'مغلق حسب أوقات العمل', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
+    : { label: 'يستقبل الطلبات', cls: 'bg-green-50 text-green-700 border-green-200' }
+
   // ✅ الإيرادات حسب الفترة المختارة
   const totalRevenue = dateRange === 'today' ? (d.revenueToday ?? 0)
     : dateRange === 'week'  ? (d.revenueThisWeek  ?? 0)
@@ -48,10 +72,7 @@ const VendorDashboard = () => {
   const totalReviews   = d.totalReviews        ?? 0
   // الخادم يرسل النشطة أولاً ثم آخر المكتملة (حتى 5)
   const recentOrders = d.recentOrders ?? []
-  // ✅ إزالة التكرار — الـ API قد يرجع نفس المنتج مرتين
-  const topProducts = [...new Map(
-    (d.topProducts ?? []).map(p => [p.productId, p])
-  ).values()]
+  const topProducts = d.topProducts ?? []
 
   const stats = [
     { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString()} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
@@ -69,6 +90,13 @@ const VendorDashboard = () => {
           <p className="text-gray-500 mt-1">{d.vendorName ? `مرحباً، ${d.vendorName}` : 'مرحباً بك'}</p>
         </div>
         <div className="flex items-center gap-2">
+          {storeState && (
+            <button onClick={() => setAccepting(!accepting)} disabled={switching}
+              title={accepting ? 'اضغط لإيقاف استقبال الطلبات مؤقتاً' : 'اضغط لاستئناف استقبال الطلبات'}
+              className={`h-10 px-3 rounded-lg border text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${storeState.cls}`}>
+              <Power size={15} />{storeState.label}
+            </button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw size={16} className={isLoading ? 'animate-spin' : ''} />
           </Button>

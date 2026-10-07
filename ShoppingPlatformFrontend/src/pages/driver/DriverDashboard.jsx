@@ -15,6 +15,7 @@ import { getImageUrl } from '../../utils/imageHelper'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useLocationSharing } from '../../hooks/useLocationSharing'
 import { useNotificationsStore } from '../../stores/notificationsStore'
+import DeliverySlot from '../../components/common/DeliverySlot'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useDriverProfile, useMyDriverOrders, useSetDriverWorkStatus, usePickUpStop, useDeliverOrder, useFailOrder,
@@ -99,6 +100,7 @@ const ActiveOrderCard = ({ order, onDeliver, onFail }) => {
               {order.zoneName && (
                 <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">المنطقة: {order.zoneName}</span>
               )}
+              <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd} compact />
               <p className="text-sm text-gray-900 flex items-start gap-2">
                 <MapPin size={16} className="text-primary mt-0.5 flex-shrink-0" />
                 <span>{order.address}{order.addressDetails ? ` — ${order.addressDetails}` : ''}</span>

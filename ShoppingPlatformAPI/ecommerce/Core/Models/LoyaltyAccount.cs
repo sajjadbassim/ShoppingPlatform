@@ -160,6 +160,10 @@ namespace ecommerce.Core.Models
         [Column("review_points")]
         public int ReviewPoints { get; set; } = 10;
 
+        // ادعُ صديقاً: نقاط لكل من الداعي والمدعو عند تسليم أول طلب للمدعو (0 = معطّل)
+        [Column("referral_points")]
+        public int ReferralPoints { get; set; } = 200;
+
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 

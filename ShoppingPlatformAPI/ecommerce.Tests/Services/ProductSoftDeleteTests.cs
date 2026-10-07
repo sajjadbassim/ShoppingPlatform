@@ -118,7 +118,7 @@ namespace ecommerce.Tests.Services
             await Products().DeleteAsync(_toDelete.Id);
             var access = OwnerAccess();
 
-            await Assert.ThrowsAsync<Exception>(() => Products().GetByIdAsync(_toDelete.Id));
+            await Assert.ThrowsAnyAsync<AppException>(() => Products().GetByIdAsync(_toDelete.Id));
             await Assert.ThrowsAsync<NotFoundException>(() => access.EnsureCanManageProductAsync(_toDelete.Id));
 
             // المخفي يبقى قابلاً للعرض والتعديل لصاحبه

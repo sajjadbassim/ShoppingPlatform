@@ -7,6 +7,7 @@ using ecommerce.Services.NotificationService;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -61,7 +62,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task TooLongReply_IsRejected()
         {
-            await Assert.ThrowsAsync<Exception>(() => Service().SetVendorReplyAsync(_review.Id, new string('x', 1001)));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().SetVendorReplyAsync(_review.Id, new string('x', 1001)));
         }
     }
 }

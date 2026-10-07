@@ -15,6 +15,7 @@ namespace ecommerce.Services.ProductService.ProductService
         Task<IEnumerable<ProductDto>> GetByCategoryAsync(Guid categoryId);
         Task<ProductDto> CreateAsync(CreateProductDto dto);
         Task<ProductDto> UpdateAsync(Guid id, UpdateProductDto dto);
+        Task<ProductDto> DuplicateAsync(Guid id);
         Task<bool> DeleteAsync(Guid id);
         Task<bool> UpdateStockAsync(Guid id, int quantity);
 
@@ -45,6 +46,7 @@ namespace ecommerce.Services.ProductService.ProductService
         // ✅ جديد: بحث متقدم + بحث موحد
         // ===================================
         Task<PagedResponse<ProductDto>> GetAdvancedFilteredAsync(ProductFilterDto filter);
-        Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5);
+        Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null);
+        Task<List<ProductDto>> GetBuyAgainAsync(Guid userId, string? scope = null, int max = 20);
     }
 }

@@ -84,30 +84,8 @@ namespace ecommerce.Repositories
             return await GetByIdAsync(order.Id);
         }
 
-        public async Task<string> GenerateOrderNumberAsync()
-        {
-            var today = DateTime.UtcNow;
-            var datePrefix = today.ToString("yyyyMMdd");
-
-            // البحث عن آخر رقم طلب اليوم
-            var lastOrder = await _context.Orders
-                .Where(o => o.OrderNumber.StartsWith($"ORD-{datePrefix}"))
-                .OrderByDescending(o => o.OrderNumber)
-                .FirstOrDefaultAsync();
-
-            int sequence = 1;
-            if (lastOrder != null)
-            {
-                // استخراج الرقم التسلسلي
-                var parts = lastOrder.OrderNumber.Split('-');
-                if (parts.Length == 3 && int.TryParse(parts[2], out int lastSequence))
-                {
-                    sequence = lastSequence + 1;
-                }
-            }
-
-            return $"ORD-{datePrefix}-{sequence:D4}";
-        }
+        public Task<string> GenerateOrderNumberAsync() =>
+            DailyNumberGenerator.NextAsync(_context, "ORD", _context.Orders.Select(o => o.OrderNumber));
 
         public async Task<PagedResult<Order>> GetPagedAsync(
         Guid? customerId,

@@ -6,6 +6,7 @@ using ecommerce.Services.FileService;
 using ecommerce.Services.HomeService;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -78,7 +79,7 @@ namespace ecommerce.Tests.Services
         public async Task Banner_CanOnlyTargetBannerSections()
         {
             var file = new Mock<Microsoft.AspNetCore.Http.IFormFile>().Object;
-            var ex = await Assert.ThrowsAsync<Exception>(() => Service().CreateBannerAsync(
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Service().CreateBannerAsync(
                 new ecommerce.Core.DTO.HomePage.CreateBannerDto { Title = "x", ImageFile = file, SectionId = _customSection.Id }));
 
             Assert.Contains("ليس قسم بانرات", ex.Message);
@@ -98,7 +99,7 @@ namespace ecommerce.Tests.Services
             var block = new HomeSection { Type = "banners", Title = "block" };
             _context.Add(block);
             await _context.SaveChangesAsync();
-            await Assert.ThrowsAsync<Exception>(() => service.SetSectionBannerAsync(block.Id, image));
+            await Assert.ThrowsAnyAsync<AppException>(() => service.SetSectionBannerAsync(block.Id, image));
         }
 
         [Fact]

@@ -69,7 +69,7 @@ export const NotificationBell = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 hover:bg-gray-100 rounded-full transition-colors relative"
+        className="p-2 [@media(hover:hover)]:hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors relative"
       >
         <Bell size={22} className="text-gray-600" />
         {unreadCount > 0 && (

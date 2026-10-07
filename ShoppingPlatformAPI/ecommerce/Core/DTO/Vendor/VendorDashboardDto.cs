@@ -85,10 +85,15 @@
     // ===================================
     public class VendorSalesStatsDto
     {
-        public string Period { get; set; }           // today | week | month | year
+        public string Period { get; set; }           // today | week | month | year | custom
+        public DateTime From { get; set; }           // أيام بغداد (شاملة)
+        public DateTime To { get; set; }
         public decimal TotalRevenue { get; set; }
         public int TotalOrders { get; set; }
         public decimal AverageOrderValue { get; set; }
+        // الفترة السابقة بنفس عدد الأيام — للمقارنة
+        public decimal PreviousRevenue { get; set; }
+        public int PreviousOrders { get; set; }
         public List<VendorSalesByDayDto> SalesByDay { get; set; } = new();
     }
 
@@ -105,6 +110,7 @@
     public class VendorOrderDto
     {
         public Guid SubOrderId { get; set; }
+        public Guid OrderId { get; set; }
         public string SubOrderNumber { get; set; }
         public string OrderNumber { get; set; }
         public string CustomerName { get; set; }
@@ -116,16 +122,32 @@
         public string? CancellationReason { get; set; }
         public DateTime? ConfirmationDeadline { get; set; }
         public int? MinutesRemaining { get; set; }
+        public string? CustomerNotes { get; set; }
+        public DateTime? DeliverySlotStart { get; set; }
+        public DateTime? DeliverySlotEnd { get; set; }
+        public string? SubstitutionPreference { get; set; }
         public List<VendorOrderItemDto> Items { get; set; } = new();
+        // إرجاعات الزبون التي تخص قطع هذا المتجر
+        public List<VendorOrderReturnDto> Returns { get; set; } = new();
         public DateTime CreatedAt { get; set; }
     }
 
     public class VendorOrderItemDto
     {
+        public Guid Id { get; set; }
         public Guid ProductId { get; set; }
         public string ProductName { get; set; }
         public string? ProductNameAr { get; set; }
         public string? ProductImageUrl { get; set; }
+        // المتغير الذي اختاره الزبون — بدونه لا يعرف التاجر أي مقاس/لون يجهّز
+        public Guid? VariantId { get; set; }
+        public string? VariantSku { get; set; }
+        public string? VariantLabel { get; set; }
+        public int RefusedQuantity { get; set; }       // رفضها الزبون عند الباب
+        public int ReturnedQuantity { get; set; }      // أُرجعت بعد الاستلام (إرجاع معتمد)
+        public int UnavailableQuantity { get; set; }   // أزالها المتجر عند القبول الجزئي
+        public decimal? WeightStepKg { get; set; }
+        public Guid? ReplacesItemId { get; set; }      // بديل اختاره المتجر عن قطعة غير متوفرة
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal { get; set; }
@@ -134,6 +156,62 @@
     // ===================================
     // تأكيد / رفض الطلب
     // ===================================
+    public class VendorOrderReturnDto
+    {
+        public Guid Id { get; set; }
+        public string ReturnNumber { get; set; } = "";
+        public string Status { get; set; } = "";
+        public string Reason { get; set; } = "";
+        public string? Details { get; set; }
+        public bool IsDoorRefusal { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    // القبول الجزئي: القطع غير المتوفرة (تُزال من الطلب ويُعاد مخزونها)
+    public class VendorConfirmDto
+    {
+        public List<UnavailableItemDto>? UnavailableItems { get; set; }
+    }
+
+    public class UnavailableItemDto
+    {
+        public Guid ItemId { get; set; }
+        public int Quantity { get; set; }
+        // إن اختار الزبون «استبدله بمشابه»: منتج من نفس المتجر بنفس الكمية، ولا يدفع الزبون أكثر من سعر الأصلي
+        public Guid? ReplacementProductId { get; set; }
+    }
+
+    public class VendorReviewFeedDto
+    {
+        public Guid Id { get; set; }
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; } = "";
+        public string? ProductImageUrl { get; set; }
+        public string? CustomerName { get; set; }
+        public int Rating { get; set; }
+        public string? Title { get; set; }
+        public string? Body { get; set; }
+        public bool IsVerifiedPurchase { get; set; }
+        public List<string> Images { get; set; } = new();
+        public string? VendorReply { get; set; }
+        public DateTime? VendorReplyAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class VendorProductSalesDto
+    {
+        public Guid ProductId { get; set; }
+        public int Sold { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    public class VendorOrderCountsDto
+    {
+        public int Total { get; set; }
+        public Dictionary<string, int> ByStatus { get; set; } = new();
+        public decimal PendingValue { get; set; }
+    }
+
     public class ConfirmSubOrderDto
     {
         public Guid OpsUserId { get; set; }

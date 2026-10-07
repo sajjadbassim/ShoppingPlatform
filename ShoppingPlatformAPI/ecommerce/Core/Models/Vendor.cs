@@ -51,6 +51,15 @@ namespace ecommerce.Core.Models
         [Column("estimated_prep_time")]
         public int? EstimatedPrepTime { get; set; }
 
+        // التاجر يوقف استقبال الطلبات مؤقتاً (إجازة، زحمة) دون أن يختفي متجره
+        [Column("is_accepting_orders")]
+        public bool IsAcceptingOrders { get; set; } = true;
+
+        // أوقات العمل الأسبوعية (JSON، انظر StoreHours) — فارغ = مفتوح دائماً
+        [Column("working_hours")]
+        [MaxLength(1000)]
+        public string? WorkingHours { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

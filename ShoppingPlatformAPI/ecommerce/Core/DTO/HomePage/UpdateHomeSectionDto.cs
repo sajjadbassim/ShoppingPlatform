@@ -21,5 +21,7 @@ namespace ecommerce.Core.DTO.HomePage
         public int? DisplayOrder { get; set; }
         public Guid? FilterCategoryId { get; set; }
         public Guid? FilterVendorId { get; set; }
+        public string? Page { get; set; }
+        public DateTime? EndsAt { get; set; }
     }
 }

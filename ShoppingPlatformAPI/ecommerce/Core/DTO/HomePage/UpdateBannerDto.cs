@@ -30,5 +30,6 @@ namespace ecommerce.Core.DTO.HomePage
         // نقل البانر إلى قسم بلوك بانرات، أو إلى السلايدر العلوي بـ MoveToHero
         public Guid? SectionId { get; set; }
         public bool MoveToHero { get; set; }
+        public string? Page { get; set; }
     }
 }

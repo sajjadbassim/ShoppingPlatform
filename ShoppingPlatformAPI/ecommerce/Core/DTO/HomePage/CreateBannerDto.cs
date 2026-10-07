@@ -30,5 +30,8 @@ namespace ecommerce.Core.DTO.HomePage
 
         // null = السلايدر العلوي، وإلا = قسم "بلوك بانرات"
         public Guid? SectionId { get; set; }
+
+        // صفحة السلايدر: general | grocery (يُتجاهل لبانرات البلوكات — تتبع قسمها)
+        public string? Page { get; set; }
     }
 }

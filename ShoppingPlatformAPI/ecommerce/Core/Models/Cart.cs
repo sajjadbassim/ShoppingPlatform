@@ -20,6 +20,10 @@ namespace ecommerce.Core.Models
         [Column("updated_at")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        // آخر تذكير «منتجاتك ما زالت في السلة» — يُرسل مجدداً فقط إن تغيّرت السلة بعده
+        [Column("reminder_sent_at")]
+        public DateTime? ReminderSentAt { get; set; }
+
         // Navigation Properties
         [ForeignKey("UserId")]
         public virtual User User { get; set; }

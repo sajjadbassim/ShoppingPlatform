@@ -91,6 +91,7 @@ const CategoryModal = ({ category, parentId, categories, onClose, onSaved }) => 
     DisplayOrder: category?.displayOrder ?? (categories.length + 1),
     IsActive:     category?.isActive     ?? true,
     ParentId:     category?.parentId     ?? parentId ?? '',
+    IsGrocery:    category?.isGrocery    ?? false,
   })
   const [iconFile, setIconFile]       = useState(null)
   const [iconPreview, setIconPreview] = useState(category?.iconUrl ? getImageUrl(category.iconUrl) : null)
@@ -114,6 +115,8 @@ const CategoryModal = ({ category, parentId, categories, onClose, onSaved }) => 
     fd.append('Description',  form.Description || form.NameAr || form.Name || '-')
     fd.append('DisplayOrder', String(Number(form.DisplayOrder) || 0))
     fd.append('IsActive',     String(form.IsActive))
+    // علامة السوبرماركت للفئات الرئيسية فقط — الفرعية ترث قسم أبيها
+    fd.append('IsGrocery',    String(!form.ParentId && form.IsGrocery))
     if (form.ParentId) fd.append('ParentId', form.ParentId)
     else if (isEdit) fd.append('MakeRoot', 'true') // اختيار "بدون أب" يجعلها فئة رئيسية
     // POST = 'Icon', PUT = 'NewIcon'
@@ -232,6 +235,19 @@ const CategoryModal = ({ category, parentId, categories, onClose, onSaved }) => 
             </div>
           </label>
 
+          {/* السوبرماركت: قسم منفصل له صفحته، ولا تظهر منتجاته في الرئيسية والبحث العام */}
+          {!form.ParentId && (
+            <label className="flex items-center gap-3 cursor-pointer p-3 bg-emerald-50 rounded-lg hover:bg-emerald-100/70 transition-colors">
+              <input type="checkbox" checked={form.IsGrocery}
+                onChange={e => setForm({...form, IsGrocery: e.target.checked})}
+                className="w-4 h-4 accent-emerald-600" />
+              <div>
+                <p className="text-sm font-medium text-gray-800">فئة سوبرماركت</p>
+                <p className="text-xs text-gray-500">منتجاتها وفئاتها الفرعية تظهر في صفحة السوبرماركت فقط، لا في الرئيسية والبحث العام</p>
+              </div>
+            </label>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button variant="ghost" fullWidth type="button" onClick={onClose}>إلغاء</Button>
             <Button variant="primary" fullWidth type="submit" loading={isPending}>
@@ -285,7 +301,12 @@ const CategoryRow = ({ category, categories, onEdit, onDelete, onToggle, isChild
             </div>
 
             <div>
-              <p className="font-medium text-gray-900 text-sm">{category.nameAr || category.name}</p>
+              <p className="font-medium text-gray-900 text-sm flex items-center gap-1.5">
+                {category.nameAr || category.name}
+                {category.isGrocery && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700 text-[10px] font-bold">سوبرماركت</span>
+                )}
+              </p>
               {category.nameAr && category.name && (
                 <p className="text-xs text-gray-400">{category.name}</p>
               )}

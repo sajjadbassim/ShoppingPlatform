@@ -6,6 +6,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -35,7 +36,7 @@ namespace ecommerce.Controllers
         }
 
         private bool IsOpsOrAdmin =>
-            User.IsInRole("Admin") || User.IsInRole("Ops");
+            User.IsInRole(UserRoles.Admin) || User.IsInRole(UserRoles.Ops);
 
         // ===================================
         // GET: api/returns/my
@@ -53,7 +54,7 @@ namespace ecommerce.Controllers
                 var returns = await _returnService.GetMyReturnsAsync(customerId.Value);
                 return Ok(new { success = true, data = returns });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -67,10 +68,14 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var returnRequest = await _returnService.GetByIdAsync(id);
+                var viewerId = GetCurrentUserId();
+                if (viewerId == null)
+                    return Unauthorized(new { success = false, message = "يجب تسجيل الدخول" });
+
+                var returnRequest = await _returnService.GetForViewerAsync(id, viewerId.Value, IsOpsOrAdmin);
                 return Ok(new { success = true, data = returnRequest });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -105,7 +110,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -132,12 +137,12 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لإرجاع هذا الطلب" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new
                 {
                     success = false,
-                    message = ex.InnerException?.Message ?? ex.Message
+                    message = ex.Message
                 });
             }
         }
@@ -176,7 +181,7 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, data = returnRequest, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

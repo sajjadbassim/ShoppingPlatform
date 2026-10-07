@@ -144,13 +144,16 @@ namespace ecommerce.Repositories
         }
 
         // ===================================
-        // IncrementUsageCountAsync
+        // TryIncrementUsageCountAsync
+        // زيادة مشروطة بالحد الكلي في جملة واحدة — false إن نفدت الاستخدامات.
+        // داخل معاملة تُبقي قفل صف الكوبون حتى نهايتها فتتتابع الطلبات المتزامنة على نفس الكوبون
         // ===================================
-        public async Task IncrementUsageCountAsync(Guid couponId)
+        public async Task<bool> TryIncrementUsageCountAsync(Guid couponId)
         {
-            await _context.Coupons
-                .Where(c => c.Id == couponId)
+            var updated = await _context.Coupons
+                .Where(c => c.Id == couponId && (c.UsageLimit == null || c.UsageCount < c.UsageLimit))
                 .ExecuteUpdateAsync(s => s.SetProperty(c => c.UsageCount, c => c.UsageCount + 1));
+            return updated == 1;
         }
     }
 }

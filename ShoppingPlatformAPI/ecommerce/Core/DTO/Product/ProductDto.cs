@@ -11,6 +11,8 @@
         public string Sku { get; set; }
         public int StockQuantity { get; set; }
         public bool IsAvailable { get; set; }
+        // البيع بالوزن: وزن وحدة البيع بالكيلو (السعر والمخزون بالوحدة)، null = بالقطعة
+        public decimal? WeightStepKg { get; set; }
 
         // للمنتج ذي المتغيرات: المخزون والتوفر محسوبان من المتغيرات المتوفرة
         public bool HasVariants { get; set; }

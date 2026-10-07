@@ -27,3 +27,8 @@ node_modules/
 
 # وسائط النشر على حسابات التواصل: صور مجهزة مؤقتة وصور/فيديو يرفعها التجار (تُحذف تلقائياً)
 ecommerce/wwwroot/uploads/social/
+
+# صور يرفعها الزبائن (صور شخصية، إثباتات الإرجاع، صور المراجعات) — بيانات خاصة لا تُرفع للمستودع
+ecommerce/wwwroot/uploads/avatars/
+ecommerce/wwwroot/uploads/returns/
+ecommerce/wwwroot/uploads/reviews/

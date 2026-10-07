@@ -4,6 +4,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import App from './App'
 import './styles/index.css'
+import { captureReferral } from './utils/referral'
+
+// رابط دعوة صديق (?ref=CODE) — يُحفظ ليُرسل عند التسجيل
+captureReferral()
 
 // إنشاء Query Client
 const queryClient = new QueryClient({

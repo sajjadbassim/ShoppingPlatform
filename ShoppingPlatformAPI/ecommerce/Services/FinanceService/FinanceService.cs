@@ -67,6 +67,7 @@ namespace ecommerce.Services.FinanceService
         public decimal RunningBalance { get; set; }
         public string? OrderNumber { get; set; }
         public Guid? OrderId { get; set; }
+        public Guid? SubOrderId { get; set; }
         public string? Description { get; set; }
         public string? Reference { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -354,7 +355,7 @@ namespace ecommerce.Services.FinanceService
                 return new LedgerEntryDto
                 {
                     Id = x.e.Id, Type = x.e.Type, TypeAr = LedgerType.Ar(x.e.Type), Amount = x.e.Amount,
-                    RunningBalance = running, OrderId = x.e.OrderId, OrderNumber = x.OrderNumber,
+                    RunningBalance = running, OrderId = x.e.OrderId, SubOrderId = x.e.SubOrderId, OrderNumber = x.OrderNumber,
                     Description = x.e.Description, Reference = x.e.Reference, CreatedAt = x.e.CreatedAt,
                 };
             }).ToList();

@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
 
   // ============ Products ============
   PRODUCTS: {
+    DUPLICATE: (id) => `/api/Products/${id}/duplicate`,
     BASE: '/api/Products',
     PAGED: '/api/Products/paged',
     BY_ID: (id) => `/api/Products/${id}`,
@@ -42,6 +43,14 @@ export const API_ENDPOINTS = {
     DELETE_IMAGE: (imageId) => `/api/Products/images/${imageId}`,
     SET_PRIMARY_IMAGE: (productId, imageId) => `/api/Products/${productId}/images/${imageId}/set-primary`,
     UPDATE_STOCK: (id) => `/api/Products/${id}/stock`,
+    BUY_AGAIN: '/api/Products/buy-again',                       // ما طلبه الزبون سابقاً
+    STOCK_ALERT: (id) => `/api/Products/${id}/stock-alert`,     // أعلمني عند التوفر
+  },
+
+  // روابط المشاركة بمعاينة (صورة/اسم/سعر) — تُحوّل الزائر لصفحة المنتج أو المتجر
+  SHARE: {
+    PRODUCT: (id) => `/api/share/products/${id}`,
+    STORE: (id) => `/api/share/stores/${id}`,
   },
 
   // ============ Product Variants ============  ✅ جديد كلياً
@@ -130,16 +139,24 @@ export const API_ENDPOINTS = {
   },
 
   // ============ Vendor Dashboard ============  ✅ جديد كلياً
+  VENDOR_MARKETING: {
+    PROMOTIONS: (vendorId) => `/api/vendors/${vendorId}/promotions`,
+    COUPONS: (vendorId) => `/api/vendors/${vendorId}/coupons`,
+  },
+
   VENDOR_DASHBOARD: {
     BASE: (vendorId) => `/api/vendors/${vendorId}/dashboard`,
     SALES: (vendorId) => `/api/vendors/${vendorId}/dashboard/sales`,
     ORDERS: (vendorId) => `/api/vendors/${vendorId}/dashboard/orders`,
+    ORDER_COUNTS: (vendorId) => `/api/vendors/${vendorId}/dashboard/orders/counts`,
     ORDER_BY_ID: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}`,
     CONFIRM_ORDER: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/confirm`,
     REJECT_ORDER: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/reject`,
     START_PREPARING: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/preparing`,
     MARK_READY: (vendorId, subOrderId) => `/api/vendors/${vendorId}/dashboard/orders/${subOrderId}/ready`,
     PRODUCTS: (vendorId) => `/api/vendors/${vendorId}/dashboard/products`,
+    PRODUCT_SALES: (vendorId) => `/api/vendors/${vendorId}/dashboard/products/sales`,
+    REVIEWS: (vendorId) => `/api/vendors/${vendorId}/dashboard/reviews`,
   },
 
   // ============ Cart ============
@@ -161,6 +178,7 @@ export const API_ENDPOINTS = {
     STATUS_COUNTS: '/api/Orders/status-counts',
     TRACKING: (id) => `/api/Orders/${id}/tracking`,         // ✅ جديد
     CANCEL: (id) => `/api/Orders/${id}/cancel`,             // ✅ جديد
+    DELIVERY_SLOTS: '/api/orders/delivery-slots',           // مواعيد توصيل السوبرماركت
   },
 
   // ============ Order Rating ============  ✅ جديد كلياً
@@ -254,6 +272,7 @@ export const API_ENDPOINTS = {
     TRANSACTIONS: '/api/Loyalty/transactions',
     ESTIMATE: '/api/Loyalty/estimate',
     REDEEM: '/api/Loyalty/redeem',
+    REFERRAL: '/api/Loyalty/referral',                      // ادعُ صديقاً
     // Admin
     SETTINGS: '/api/Loyalty/settings',
     ADMIN_ADJUST: '/api/Loyalty/admin/adjust',
@@ -348,6 +367,7 @@ export const API_ENDPOINTS = {
     TIMEOUT: '/api/order-settings/confirmation-timeout',
     OVERDUE: '/api/order-settings/overdue',
     THRESHOLDS: '/api/order-settings/delivery-thresholds',
+    GROCERY_SLOTS: '/api/order-settings/grocery-slots',
   },
 
   // كم استغرق الطلب للوصول

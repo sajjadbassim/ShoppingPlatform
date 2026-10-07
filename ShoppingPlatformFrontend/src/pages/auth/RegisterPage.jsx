@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { GoogleSignInSection } from '../../components/auth/GoogleSignIn'
+import { getReferral, clearReferral } from '../../utils/referral'
 import AccountExistsHint, { isAccountExistsMessage } from '../../components/auth/AccountExistsHint'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, User, Phone, Store, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
@@ -24,6 +25,7 @@ const RegisterPage = () => {
     storeName: '', storeNameAr: '', storeDesc: '', storePhone: '', storeAddress: '',
     deliveryFee: '3000', minOrder: '5000', prepTime: '30',
     agreeTerms: false,
+    referralCode: getReferral(),   // من رابط دعوة صديق، ويمكن كتابته يدوياً
   })
   const [errors, setErrors] = useState({})
 
@@ -79,7 +81,9 @@ const RegisterPage = () => {
         password: formData.password,
         fullName: formData.fullName.trim(),
         email: formData.email.trim().toLowerCase(),
+        referralCode: formData.referralCode.trim() || undefined,
       })
+      clearReferral()
       success('تم إنشاء الحساب بنجاح! 🎉')
       navigate('/', { replace: true })
     } catch (err) {
@@ -235,6 +239,13 @@ const RegisterPage = () => {
                 <Input label="البريد الإلكتروني" name="email" type="email"
                   value={formData.email} onChange={handleChange} error={errors.email}
                   placeholder="example@email.com" dir="ltr" required />
+
+                {formData.accountType === 'customer' && (
+                  <Input label="رمز دعوة صديق (اختياري)" name="referralCode"
+                    value={formData.referralCode} onChange={handleChange}
+                    placeholder="ABC2345" dir="ltr" maxLength={16}
+                    hint="تحصل أنت وصديقك على نقاط عند تسليم أول طلب لك" />
+                )}
 
                 {/* حقول المتجر — تظهر فقط للبائع */}
                 {formData.accountType === 'vendor' && (

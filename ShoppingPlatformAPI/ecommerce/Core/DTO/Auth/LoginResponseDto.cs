@@ -9,6 +9,9 @@
         public string Role { get; set; }
         public string Token { get; set; }
         public DateTime ExpiresAt { get; set; }
+        // رمز التجديد يُرسل مرة واحدة هنا ولا يُخزَّن في الخادم إلا مُجزّأً
+        public string RefreshToken { get; set; }
+        public DateTime RefreshTokenExpiresAt { get; set; }
         public Guid? VendorId { get; set; }
         public string? AvatarUrl { get; set; }
 

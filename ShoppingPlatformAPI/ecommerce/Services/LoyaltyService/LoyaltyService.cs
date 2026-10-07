@@ -1,19 +1,24 @@
-﻿using ecommerce.Core.Constants;
+﻿using ecommerce.Services.NotificationService;
+using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Loyalty;
 using ecommerce.Core.Models;
 using ecommerce.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services.LoyaltyService
 {
     public class LoyaltyService : ILoyaltyService
     {
         private readonly AppDbContext _context;
+        private readonly INotificationService? _notifications;
 
-        public LoyaltyService(AppDbContext context)
+        public LoyaltyService(AppDbContext context, INotificationService? notifications = null)
         {
             _context = context;
+            _notifications = notifications;
         }
 
         // ===================================
@@ -26,7 +31,7 @@ namespace ecommerce.Services.LoyaltyService
                 .FirstOrDefaultAsync(a => a.UserId == userId);
 
             if (account == null)
-                throw new Exception("حساب النقاط غير موجود");
+                throw new NotFoundException("حساب النقاط غير موجود");
 
             var settings = await GetSettingsEntityAsync();
             return MapToDto(account, settings);
@@ -100,20 +105,22 @@ namespace ecommerce.Services.LoyaltyService
         }
 
         // ===================================
-        // EarnPointsAsync — يُستدعى من OrderService
-        // عند تغيير حالة الطلب إلى DELIVERED
+        // EarnPointsAsync — يُستدعى عند تسليم كل طلب فرعي (OpsService)
+        // كل متجر في الطلب يمنح نقاط قيمته مرة واحدة
         // ===================================
-        public async Task EarnPointsAsync(Guid userId, Guid orderId, decimal orderAmount)
+        public async Task EarnPointsAsync(Guid userId, Guid orderId, Guid subOrderId, decimal orderAmount)
         {
             var settings = await GetSettingsEntityAsync();
             if (!settings.IsActive) return;
 
-            // التحقق أن الطلب لم يُكسب نقاطاً من قبل
-            var alreadyEarned = await _context.LoyaltyTransactions
-                .AnyAsync(t => t.OrderId == orderId && t.Type == LoyaltyTransactionType.Earned);
-            if (alreadyEarned) return;
-
             var account = await EnsureAccountAsync(userId);
+
+            var referenceKey = $"suborder:{subOrderId}";
+            // السجلات القديمة (بلا مفتاح) كانت تمنح نقاط الطلب مرة واحدة على مستوى الطلب كله
+            var alreadyEarned = await _context.LoyaltyTransactions
+                .AnyAsync(t => t.AccountId == account.Id && t.ReferenceKey == referenceKey
+                    || t.OrderId == orderId && t.Type == LoyaltyTransactionType.Earned && t.ReferenceKey == null);
+            if (alreadyEarned) return;
 
             // حساب النقاط مع مضاعف الـ Tier
             var multiplier = GetTierMultiplier(account.Tier, settings);
@@ -143,11 +150,139 @@ namespace ecommerce.Services.LoyaltyService
                 Description = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:F2}",
                 DescriptionAr = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:F2}",
                 OrderId = orderId,
+                ReferenceKey = referenceKey,
                 ExpiresAt = expiresAt
             };
 
-            await _context.LoyaltyTransactions.AddAsync(transaction);
+            await TrySaveEarnedAsync(account, transaction);
+
+            // أول طلب يُسلَّم لمستخدم مدعو: مكافأة الدعوة للطرفين (فشلها لا يُفشل التسليم)
+            try { await RewardReferralAsync(userId); }
+            catch (Exception) { /* تُعاد المحاولة مع تسليم الطلب التالي */ }
+        }
+
+        // ===================================
+        // ادعُ صديقاً
+        // ===================================
+        private const string ReferralAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+        public async Task<ReferralInfoDto> GetReferralAsync(Guid userId)
+        {
+            var settings = await GetSettingsEntityAsync();
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId)
+                ?? throw new NotFoundException("المستخدم غير موجود");
+
+            // الرمز يُنشأ عند أول طلب له، فريد (فهرس) — إعادة المحاولة عند تصادم نادر
+            for (var attempt = 0; user.ReferralCode == null && attempt < 5; attempt++)
+            {
+                user.ReferralCode = new string(Enumerable.Range(0, 7)
+                    .Select(_ => ReferralAlphabet[Random.Shared.Next(ReferralAlphabet.Length)]).ToArray());
+                try { await _context.SaveChangesAsync(); }
+                catch (DbUpdateException) { user.ReferralCode = null; }
+            }
+
+            var invited = await _context.Users.Where(u => u.ReferredByUserId == userId)
+                .GroupBy(_ => 1)
+                .Select(g => new { Total = g.Count(), Rewarded = g.Count(u => u.ReferralRewardedAt != null) })
+                .FirstOrDefaultAsync();
+
+            return new ReferralInfoDto
+            {
+                Code = user.ReferralCode ?? "",
+                RewardPoints = settings.ReferralPoints,
+                InvitedCount = invited?.Total ?? 0,
+                RewardedCount = invited?.Rewarded ?? 0,
+                Enabled = settings.IsActive && settings.ReferralPoints > 0,
+            };
+        }
+
+        public async Task<Guid?> ResolveReferrerAsync(string? code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return null;
+            var normalized = code.Trim().ToUpperInvariant();
+            return await _context.Users
+                .Where(u => u.ReferralCode == normalized && u.IsActive)
+                .Select(u => (Guid?)u.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<int> RewardReferralAsync(Guid inviteeId)
+        {
+            var settings = await GetSettingsEntityAsync();
+            if (!settings.IsActive || settings.ReferralPoints <= 0) return 0;
+
+            var invitee = await _context.Users.FirstOrDefaultAsync(u => u.Id == inviteeId);
+            if (invitee?.ReferredByUserId == null || invitee.ReferralRewardedAt != null) return 0;
+            var referrerId = invitee.ReferredByUserId.Value;
+            if (referrerId == inviteeId || !await _context.Users.AnyAsync(u => u.Id == referrerId && u.IsActive)) return 0;
+
+            // مفتاح لكل طرف مرتبط بالمدعو: الفهرس الفريد يمنع صرف المكافأة مرتين حتى مع تسليمين متزامنين
+            var points = settings.ReferralPoints;
+            var inviteeEarned = await CreditAsync(inviteeId, points, $"referral:{inviteeId}",
+                "Referral reward — welcome bonus", "مكافأة الانضمام بدعوة صديق", settings);
+            var referrerEarned = await CreditAsync(referrerId, points, $"referral-invite:{inviteeId}",
+                "Referral reward — friend's first order", "مكافأة دعوة صديق أكمل أول طلب", settings);
+
+            invitee.ReferralRewardedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            if (_notifications != null)
+            {
+                try
+                {
+                    if (referrerEarned)
+                        await _notifications.NotifyCustomerReminderAsync(referrerId,
+                            $"صديقك {invitee.FullName} أكمل أول طلب — أضفنا لك {points} نقطة 🎉", new { link = "/loyalty" });
+                    if (inviteeEarned)
+                        await _notifications.NotifyCustomerReminderAsync(inviteeId,
+                            $"أضفنا لك {points} نقطة مكافأة انضمامك بدعوة صديق 🎉", new { link = "/loyalty" });
+                }
+                catch { /* الإشعار لا يُفشل المكافأة */ }
+            }
+            return points;
+        }
+
+        private async Task<bool> CreditAsync(Guid userId, int points, string referenceKey, string description, string descriptionAr,
+            LoyaltySettings settings)
+        {
+            var account = await EnsureAccountAsync(userId);
+            if (await _context.LoyaltyTransactions.AnyAsync(t => t.AccountId == account.Id && t.ReferenceKey == referenceKey))
+                return false;
+
+            account.Balance += points;
+            account.TotalEarned += points;
+            account.UpdatedAt = DateTime.UtcNow;
+            account.Tier = CalculateTier(account.TotalEarned, settings);
+
+            return await TrySaveEarnedAsync(account, new LoyaltyTransaction
+            {
+                AccountId = account.Id,
+                Type = LoyaltyTransactionType.Earned,
+                Points = points,
+                BalanceAfter = account.Balance,
+                Description = description,
+                DescriptionAr = descriptionAr,
+                ReferenceKey = referenceKey,
+                ExpiresAt = settings.PointsExpiryDays > 0 ? DateTime.UtcNow.AddDays(settings.PointsExpiryDays) : null
+            });
+        }
+
+        // الفحص المسبق قد يمرّ لطلبين متزامنين لنفس الحدث؛ الفهرس الفريد (الحساب، المفتاح) يرفض الثاني
+        // فيُتجاهل بدل أن يُفشل العملية الأصلية (تسليم أو تقييم)
+        private async Task<bool> TrySaveEarnedAsync(LoyaltyAccount account, LoyaltyTransaction transaction)
+        {
+            await _context.LoyaltyTransactions.AddAsync(transaction);
+            try
+            {
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+            {
+                _context.Entry(transaction).State = EntityState.Detached;
+                await _context.Entry(account).ReloadAsync();
+                return false;
+            }
         }
 
         // ===================================
@@ -189,8 +324,7 @@ namespace ecommerce.Services.LoyaltyService
                 ExpiresAt = expiresAt
             };
 
-            await _context.LoyaltyTransactions.AddAsync(transaction);
-            await _context.SaveChangesAsync();
+            if (!await TrySaveEarnedAsync(account, transaction)) return 0;
 
             return points;
         }
@@ -237,29 +371,29 @@ namespace ecommerce.Services.LoyaltyService
         {
             var settings = await GetSettingsEntityAsync();
             if (!settings.IsActive)
-                throw new Exception("نظام النقاط غير مفعّل حالياً");
+                throw new BusinessRuleException("نظام النقاط غير مفعّل حالياً");
 
             var account = await EnsureAccountAsync(userId);
 
             // التحقق من الحد الأدنى
             if (dto.Points < settings.MinRedemptionPoints)
-                throw new Exception($"الحد الأدنى للاسترداد هو {settings.MinRedemptionPoints} نقطة");
+                throw new BusinessRuleException($"الحد الأدنى للاسترداد هو {settings.MinRedemptionPoints} نقطة");
 
             // التحقق من الرصيد
             if (dto.Points > account.Balance)
-                throw new Exception($"رصيد النقاط غير كافٍ. رصيدك الحالي: {account.Balance}");
+                throw new BusinessRuleException($"رصيد النقاط غير كافٍ. رصيدك الحالي: {account.Balance}");
 
             // التحقق من الطلب
             var order = await _context.Orders
                 .FirstOrDefaultAsync(o => o.Id == dto.OrderId && o.CustomerId == userId);
             if (order == null)
-                throw new Exception("الطلب غير موجود");
+                throw new NotFoundException("الطلب غير موجود");
 
             // التحقق أنه لم يتم استرداد نقاط لهذا الطلب من قبل
             var alreadyRedeemed = await _context.LoyaltyTransactions
                 .AnyAsync(t => t.OrderId == dto.OrderId && t.Type == LoyaltyTransactionType.Redeemed);
             if (alreadyRedeemed)
-                throw new Exception("تم استخدام نقاط لهذا الطلب مسبقاً");
+                throw new BusinessRuleException("تم استخدام نقاط لهذا الطلب مسبقاً");
 
             // التحقق من الحد الأقصى كنسبة من الطلب
             var maxDiscount = order.TotalAmount * (settings.MaxRedemptionPercentage / 100m);
@@ -359,7 +493,7 @@ namespace ecommerce.Services.LoyaltyService
 
             var newBalance = account.Balance + dto.Points;
             if (newBalance < 0)
-                throw new Exception("لا يمكن أن يصبح الرصيد سالباً");
+                throw new BusinessRuleException("لا يمكن أن يصبح الرصيد سالباً");
 
             account.Balance = newBalance;
             if (dto.Points > 0)
@@ -413,6 +547,7 @@ namespace ecommerce.Services.LoyaltyService
             if (dto.GoldMultiplier != null) settings.GoldMultiplier = dto.GoldMultiplier.Value;
             if (dto.PlatinumMultiplier != null) settings.PlatinumMultiplier = dto.PlatinumMultiplier.Value;
             if (dto.ReviewPoints != null) settings.ReviewPoints = dto.ReviewPoints.Value;
+            if (dto.ReferralPoints != null) settings.ReferralPoints = dto.ReferralPoints.Value;
             if (dto.IsActive != null) settings.IsActive = dto.IsActive.Value;
 
             settings.UpdatedAt = DateTime.UtcNow;
@@ -549,6 +684,7 @@ namespace ecommerce.Services.LoyaltyService
             GoldMultiplier = s.GoldMultiplier,
             PlatinumMultiplier = s.PlatinumMultiplier,
             ReviewPoints = s.ReviewPoints,
+            ReferralPoints = s.ReferralPoints,
             IsActive = s.IsActive
         };
     }

@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Plus, Search, MoreVertical, Edit, Trash2, Eye, EyeOff, Package, RefreshCw, AlertCircle,
-  Minus, Check, X, ArrowUpDown, CheckSquare, Send,
+  Minus, Check, X, ArrowUpDown, CheckSquare, Send, Copy, Percent, FileDown, FileUp, MoreHorizontal,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Button from '../../components/common/Button'
@@ -14,7 +14,9 @@ import Dropdown from '../../components/common/Dropdown'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
-import { apiGet } from '../../api/axios'
+import { apiGet, apiPost } from '../../api/axios'
+import { useCategories } from '../../hooks/useCategories'
+import { BulkPriceModal, CsvImportModal, downloadProductsCsv } from '../../components/vendor/ProductBulkTools'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import productService from '../../services/productService'
 import { getImageUrl } from '../../utils/imageHelper'
@@ -34,6 +36,17 @@ const useVendorProducts = (vendorId) => useQuery({
   staleTime: 2 * 60 * 1000,
 })
 
+// القطع المبيعة لكل منتج (الطلبات المسلّمة)
+const useProductSales = (vendorId) => useQuery({
+  queryKey: ['vendor-product-sales', vendorId],
+  queryFn: async () => {
+    const r = await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.PRODUCT_SALES(vendorId))
+    return Object.fromEntries((r.data?.data || []).map(s => [s.productId, s]))
+  },
+  enabled: !!vendorId,
+  staleTime: 5 * 60 * 1000,
+})
+
 const productImage = (p) => {
   if (p.primaryImageUrl) return getImageUrl(p.primaryImageUrl)
   const img = p.images?.find(i => i.isPrimary) || p.images?.[0]
@@ -45,6 +58,7 @@ const stockTone = (qty) =>
 
 const SORTS = [
   { key: 'newest', label: 'الأحدث' },
+  { key: 'best', label: 'الأكثر مبيعاً' },
   { key: 'name', label: 'الاسم' },
   { key: 'price_desc', label: 'الأعلى سعراً' },
   { key: 'price_asc', label: 'الأقل سعراً' },
@@ -105,7 +119,7 @@ const StockEditor = ({ product, onSave, saving }) => {
 // ===========================
 // صف منتج
 // ===========================
-const ProductRow = ({ product: p, selected, selecting, onSelect, onToggleActive, onStock, busy, actions }) => {
+const ProductRow = ({ product: p, sold, selected, selecting, onSelect, onToggleActive, onStock, busy, actions }) => {
   const img = productImage(p)
   const hidden = !p.isActive
   const discount = p.originalPrice > p.price ? Math.round((1 - p.price / p.originalPrice) * 100) : 0
@@ -128,6 +142,7 @@ const ProductRow = ({ product: p, selected, selecting, onSelect, onToggleActive,
           </Link>
           <p className="text-xs text-gray-400 truncate mt-0.5">
             {p.categoryNameAr || p.categoryName || 'بدون فئة'}{p.sku && <span className="font-mono"> · {p.sku}</span>}
+            {sold > 0 && <span className="text-green-700 font-medium"> · بيع {sold}</span>}
           </p>
         </div>
         <div className="flex items-center gap-2 mt-1.5 sm:mt-0 sm:block">
@@ -163,6 +178,11 @@ const VendorProducts = () => {
   const vendorId = user?.vendorId || user?.id
 
   const { data: products = [], isLoading, isError, error, refetch, isFetching } = useVendorProducts(vendorId)
+  const { data: sales = {} } = useProductSales(vendorId)
+  const { data: categoriesData } = useCategories()
+  const [priceModal, setPriceModal] = useState(false)
+  const [importModal, setImportModal] = useState(false)
+  const soldOf = (p) => sales[p.id]?.sold ?? 0
 
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -205,13 +225,14 @@ const VendorProducts = () => {
     const byName = (a, b) => (a.nameAr || a.name || '').localeCompare(b.nameAr || b.name || '', 'ar')
     const sorters = {
       newest: (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0),
+      best: (a, b) => soldOf(b) - soldOf(a),
       name: byName,
       price_desc: (a, b) => (b.price || 0) - (a.price || 0),
       price_asc: (a, b) => (a.price || 0) - (b.price || 0),
       stock_asc: (a, b) => (a.stockQuantity ?? 0) - (b.stockQuantity ?? 0),
     }
     return [...matches].sort(sorters[sort])
-  }, [products, search, filter, sort])
+  }, [products, search, filter, sort, sales]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = list.slice(0, limit)
 
@@ -265,8 +286,16 @@ const VendorProducts = () => {
     exitSelect()
   }
 
+  const duplicate = (p) => run(p.id, 'copy', async () => {
+    const r = await apiPost(API_ENDPOINTS.PRODUCTS.DUPLICATE(p.id))
+    const copy = r.data?.data
+    queryClient.invalidateQueries({ queryKey: ['vendor-products', vendorId] })
+    if (copy?.id) navigate(`/vendor/products/${copy.id}/edit`)
+  }, {}, 'أُنشئت نسخة مخفية بمخزون صفر — عدّلها ثم أظهرها')
+
   const actionsFor = (p) => [
     { label: 'تعديل', icon: Edit, onClick: () => navigate(`/vendor/products/${p.id}/edit`) },
+    { label: 'نسخ المنتج', icon: Copy, onClick: () => duplicate(p) },
     { label: 'عرض في المتجر', icon: Eye, onClick: () => window.open(`/products/${p.id}`, '_blank') },
     { label: 'نشر', icon: Send, onClick: () => navigate(`/vendor/products/${p.id}/publish`) },
     { divider: true },
@@ -299,6 +328,13 @@ const VendorProducts = () => {
           className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center">
           <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
         </button>
+        <Dropdown
+          trigger={<button className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center" aria-label="أدوات المنتجات"><MoreHorizontal size={20} /></button>}
+          items={[
+            { label: 'تصدير المنتجات (CSV)', icon: FileDown, onClick: () => downloadProductsCsv(products, 'products') },
+            { label: 'استيراد / تحديث من CSV', icon: FileUp, onClick: () => setImportModal(true) },
+          ]}
+          align="left" />
         <Link to="/vendor/products/new"
           className="hidden sm:inline-flex h-11 px-5 rounded-full bg-primary text-white font-bold items-center gap-2 shadow-md shadow-primary/25 hover:bg-primary/90">
           <Plus size={18} />إضافة منتج
@@ -384,7 +420,7 @@ const VendorProducts = () => {
             </div>
             <div className="divide-y divide-gray-100">
               {shown.map(p => (
-                <ProductRow key={p.id} product={p}
+                <ProductRow key={p.id} product={p} sold={soldOf(p)}
                   selecting={selecting} selected={selected.includes(p.id)}
                   onSelect={() => setSelected(s => s.includes(p.id) ? s.filter(i => i !== p.id) : [...s, p.id])}
                   onToggleActive={() => toggleActive(p)}
@@ -408,6 +444,7 @@ const VendorProducts = () => {
           <span className="flex-1 text-sm font-bold">{selected.length} محدد</span>
           <button onClick={() => bulkSetActive(true)} className="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-sm inline-flex items-center gap-1.5"><Eye size={15} />إظهار</button>
           <button onClick={() => bulkSetActive(false)} className="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-sm inline-flex items-center gap-1.5"><EyeOff size={15} />إخفاء</button>
+          <button onClick={() => setPriceModal(true)} className="h-9 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-sm inline-flex items-center gap-1.5"><Percent size={15} />الأسعار</button>
           <button onClick={() => setToDelete('bulk')} className="h-9 px-3 rounded-xl bg-red-500 hover:bg-red-600 text-sm inline-flex items-center gap-1.5"><Trash2 size={15} />حذف</button>
         </div>
       )}
@@ -418,6 +455,23 @@ const VendorProducts = () => {
           className="sm:hidden fixed bottom-5 left-5 z-30 h-14 pl-6 pr-5 rounded-full bg-gradient-to-l from-primary to-indigo-500 text-white font-bold inline-flex items-center gap-2 shadow-xl shadow-primary/40 active:scale-95 transition-transform">
           <Plus size={22} strokeWidth={2.5} />منتج جديد
         </Link>
+      )}
+
+      {priceModal && (
+        <BulkPriceModal isOpen onClose={() => setPriceModal(false)}
+          products={products.filter(p => selected.includes(p.id))}
+          onDone={({ ok, failed }) => {
+            setPriceModal(false)
+            queryClient.invalidateQueries({ queryKey: ['vendor-products', vendorId] })
+            if (failed) showError(`تعذّر تحديث ${failed} منتج`)
+            else success(`تم تحديث أسعار ${ok.length} منتج`)
+            exitSelect()
+          }} />
+      )}
+      {importModal && (
+        <CsvImportModal isOpen onClose={() => setImportModal(false)}
+          products={products} categories={categoriesData || []} vendorId={vendorId}
+          onDone={() => queryClient.invalidateQueries({ queryKey: ['vendor-products', vendorId] })} />
       )}
 
       <ConfirmModal

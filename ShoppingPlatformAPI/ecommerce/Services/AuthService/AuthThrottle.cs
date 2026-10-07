@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services.AuthService
 {
@@ -58,7 +59,7 @@ namespace ecommerce.Services.AuthService
             {
                 var c = Get($"login:{phone}");
                 if (c.Count >= MaxLoginFailures)
-                    throw new Exception($"محاولات دخول خاطئة كثيرة — حاول بعد {Wait(c)} أو استعد كلمة المرور");
+                    throw new BusinessRuleException($"محاولات دخول خاطئة كثيرة — حاول بعد {Wait(c)} أو استعد كلمة المرور");
             }
         }
 
@@ -75,7 +76,7 @@ namespace ecommerce.Services.AuthService
             {
                 var c = Get($"otp:{phone}");
                 if (c.Count >= MaxOtpRequests)
-                    throw new Exception($"طلبت رموزاً كثيرة — حاول بعد {Wait(c)}");
+                    throw new BusinessRuleException($"طلبت رموزاً كثيرة — حاول بعد {Wait(c)}");
                 c.Count++;
             }
         }

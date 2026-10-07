@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { productService } from '../../services'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate, Link } from 'react-router-dom'
 import {
   Grid, List, ChevronDown, ChevronUp, X, SlidersHorizontal,
-  AlertCircle, Star, Tag, Package, Search,
+  AlertCircle, Star, Tag, Package, Search, ShoppingBasket, ArrowLeft,
 } from 'lucide-react'
 import ProductCard from '../../components/common/ProductCard'
 import { ProductCardSkeleton } from '../../components/common/Loading'
@@ -19,8 +19,10 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useCategories } from '../../hooks/useCategories'
-import { useProductsPaged, useAdvancedFilter, useUnifiedSearch } from '../../hooks/useProducts'
+import { useAdvancedFilter } from '../../hooks/useProducts'
 import { useVendor } from '../../hooks/useVendors'
+import { SCOPE, searchLink } from '../../utils/shopScope'
+import { variantsService } from '../../services/variantsService'
 
 // ===========================
 // Filter Section Component
@@ -68,6 +70,12 @@ const ProductsPage = () => {
   const maxPrice    = searchParams.get('maxPrice') || ''
   const minRating   = searchParams.get('minRating') || ''
   const hasDiscount = searchParams.get('hasDiscount') === 'true'
+  const scopeParam  = searchParams.get('scope')    || ''  // grocery = السوبرماركت
+
+  // السوبرماركت منفصل: بدون فئة أو متجر محدد تُعرض منتجات قسم واحد (العام افتراضياً)
+  const scope = scopeParam === SCOPE.GROCERY ? SCOPE.GROCERY
+    : categoryId || vendorId ? undefined
+    : SCOPE.GENERAL
 
   const [filters, setFilters] = useState({
     categories:  categoryId ? [categoryId] : [],
@@ -79,7 +87,10 @@ const ProductsPage = () => {
 
   const { data: categoriesData, isLoading: categoriesLoading } = useCategories()
   const allCategories = categoriesData || []
-  const rootCategories = allCategories.filter(c => !c.parentId)
+  const selectedCategory = categoryId ? allCategories.find(c => c.id === categoryId) : null
+  // قائمة الفئات من قسم واحد: قسم الصفحة، أو قسم الفئة المختارة (صفحة متجر = الكل)
+  const sectionFilter = scope || selectedCategory?.section
+  const rootCategories = allCategories.filter(c => !c.parentId && (!sectionFilter || (c.section || SCOPE.GENERAL) === sectionFilter))
   const childCategories = allCategories.filter(c => c.parentId)
   const getChildren = (parentId) => childCategories.filter(c => c.parentId === parentId)
 
@@ -96,6 +107,8 @@ const ProductsPage = () => {
 
   const advancedFilterParams = {
     pageNumber: currentPage, pageSize: 12,
+    searchTerm: searchTerm || undefined,
+    scope,
     categoryId: categoryId || undefined,
     vendorId:   vendorId || undefined,
     minPrice:   minPrice || undefined,
@@ -108,12 +121,16 @@ const ProductsPage = () => {
     sortOrder:   apiSortOrder,
   }
 
-  const { data: searchData, isLoading: searchLoading, isError: searchError } =
-    useUnifiedSearch(searchTerm, { pageNumber: currentPage, pageSize: 12 })
-
-  // التصنيف (رئيسي أو فرعي) يُفلتر في الخادم مع كل فئاته الفرعية — نفس الفلاتر والترتيب والتقسيم
+  // البحث والتصنيف (رئيسي أو فرعي مع فئاته الفرعية) يُفلتران في الخادم — نفس الفلاتر والترتيب والتقسيم
   const { data: filterData, isLoading: filterLoading, isError: filterError, error: filterErrorMsg } =
-    useAdvancedFilter(advancedFilterParams, !searchTerm && !sectionId)
+    useAdvancedFilter(advancedFilterParams, !sectionId)
+
+  // عند البحث في قسم: كم نتيجة في القسم الآخر؟ (رابط سريع بدل خلط النتائج)
+  const otherScope = scope === SCOPE.GROCERY ? SCOPE.GENERAL : scope === SCOPE.GENERAL ? SCOPE.GROCERY : null
+  const { data: otherScopeData } = useAdvancedFilter(
+    { searchTerm, scope: otherScope, isActive: true, pageSize: 1 },
+    !!searchTerm && !!otherScope && !sectionId)
+  const otherScopeCount = otherScopeData?.totalCount || 0
 
   // القسم المختار يدوياً: نفس منتجات القسم في الصفحة الرئيسية
   const { data: sectionData, isLoading: sectionLoading, isError: sectionError } = useQuery({
@@ -124,10 +141,10 @@ const ProductsPage = () => {
   })
   const { data: vendorData } = useVendor(vendorId || null)
 
-  const data      = sectionId ? sectionData?.data : searchTerm ? searchData : filterData
-  const isLoading = sectionId ? sectionLoading : searchTerm ? searchLoading : filterLoading
-  const isError   = sectionId ? sectionError : searchTerm ? searchError : filterError
-  const error     = sectionId || searchTerm ? null : filterErrorMsg
+  const data      = sectionId ? sectionData?.data : filterData
+  const isLoading = sectionId ? sectionLoading : filterLoading
+  const isError   = sectionId ? sectionError : filterError
+  const error     = sectionId ? null : filterErrorMsg
 
   const rawData    = data?.data || data
   const products   = Array.isArray(rawData) ? rawData : (rawData?.items ?? rawData?.products ?? [])
@@ -135,11 +152,12 @@ const ProductsPage = () => {
   const totalCount = sectionId ? products.length : rawData?.totalCount ?? rawData?.totalResults ?? products.length
 
   // العنوان يوضح ما يُعرض فعلاً: القسم، أو البحث، أو الفئة، أو المتجر
-  const selectedCategory = categoryId ? allCategories.find(c => c.id === categoryId) : null
+  const grocery = scope === SCOPE.GROCERY
   const pageTitle = sectionId ? (sectionData?.titleAr || sectionData?.title || 'منتجات مختارة')
-    : searchTerm ? `نتائج: "${searchTerm}"`
+    : searchTerm ? (grocery ? `نتائج السوبرماركت: "${searchTerm}"` : `نتائج: "${searchTerm}"`)
     : selectedCategory ? (selectedCategory.nameAr || selectedCategory.name)
     : vendorId && vendorData ? `منتجات ${vendorData.nameAr || vendorData.name}`
+    : grocery ? (hasDiscount ? 'عروض السوبرماركت' : sortBy === 'sales' ? 'الأكثر مبيعاً في السوبرماركت' : 'السوبرماركت')
     : sortBy === 'sales' ? 'الأكثر مبيعاً'
     : 'جميع المنتجات'
 
@@ -176,12 +194,19 @@ const ProductsPage = () => {
 
   const clearFilters = () => {
     setFilters({ categories: [], priceRange: { min: '', max: '' }, inStock: false, minRating: '', hasDiscount: false })
-    setSearchParams({})
+    // مسح الفلاتر لا يُخرج المستخدم من السوبرماركت
+    setSearchParams(scopeParam === SCOPE.GROCERY ? { scope: SCOPE.GROCERY } : {})
   }
 
   const handleAddToCart = async ({ id, quantity = 1 }) => {
     if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
-    try { await addToCart(id, quantity); success('تمت الإضافة للسلة') }
+    try {
+      // المنتج ذو الخيارات (مقاس/لون) يُفتح لاختيارها بدل محاولة إضافته بلا خيار (نفس سلوك الرئيسية)
+      const variants = await variantsService.getVariants(id).catch(() => [])
+      if (variantsService.hasVariants(variants)) { navigate(`/products/${id}`); return }
+      await addToCart(id, quantity)
+      success('تمت الإضافة للسلة')
+    }
     catch (err) { showError(err.message || 'فشل إضافة المنتج') }
   }
 
@@ -489,6 +514,24 @@ const ProductsPage = () => {
               )}
             </div>
 
+            {/* نتائج البحث في القسم الآخر — رابط بدل خلطها */}
+            {searchTerm && otherScopeCount > 0 && (
+              <Link to={searchLink(searchTerm, otherScope)}
+                className={`flex items-center gap-3 rounded-xl border p-3 mb-3 sm:mb-4 transition-colors ${
+                  otherScope === SCOPE.GROCERY
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                    : 'border-primary/20 bg-primary/5 text-primary hover:bg-primary/10'
+                }`}>
+                {otherScope === SCOPE.GROCERY ? <ShoppingBasket size={20} className="flex-shrink-0" /> : <Package size={20} className="flex-shrink-0" />}
+                <span className="flex-1 text-sm">
+                  {otherScope === SCOPE.GROCERY
+                    ? <>وجدنا <b>{otherScopeCount}</b> نتيجة لـ "{searchTerm}" في <b>السوبرماركت</b></>
+                    : <>وجدنا <b>{otherScopeCount}</b> نتيجة لـ "{searchTerm}" في <b>باقي المنتجات</b></>}
+                </span>
+                <ArrowLeft size={16} className="flex-shrink-0" />
+              </Link>
+            )}
+
             {/* Error */}
             {isError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3">
@@ -526,6 +569,7 @@ const ProductsPage = () => {
                       storeName:     product.vendor?.name || product.vendorName,
                       vendorId:      product.vendorId,
                       inStock:       product.isAvailable  && product.stockQuantity > 0,
+                      weightStepKg:  product.weightStepKg,
                       isWishlisted:  isInWishlist(product.id),
                     }}
                     variant={viewMode === 'list' ? 'horizontal' : 'default'}

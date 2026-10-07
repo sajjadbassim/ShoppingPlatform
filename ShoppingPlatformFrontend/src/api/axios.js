@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearSession, refreshSession } from './session';
 
 // Base URL للـ API
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5010';
@@ -34,27 +35,17 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // إذا كان الخطأ 401 ولم يتم إعادة المحاولة من قبل
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // 401: التوكن انتهى أو أُبطل — نجدّد الجلسة برمز التجديد ثم نعيد الطلب مرة واحدة
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
-        // محاولة تجديد التوكن
-        const response = await axios.post(`${API_BASE_URL}/api/Auth/refresh-token`, {}, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-          },
-        });
-
-        const { token } = response.data;
-        localStorage.setItem('accessToken', token);
-
-        // إعادة الطلب الأصلي مع التوكن الجديد
+        const token = await refreshSession();
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // فشل تجديد التوكن - تسجيل الخروج
-        localStorage.removeItem('accessToken');
+        // انتهت الجلسة (أو أُنهيت: تعطيل الحساب، تغيير كلمة المرور) — تسجيل الخروج
+        clearSession();
         localStorage.removeItem('user');
         window.location.href = '/login';
         return Promise.reject(refreshError);

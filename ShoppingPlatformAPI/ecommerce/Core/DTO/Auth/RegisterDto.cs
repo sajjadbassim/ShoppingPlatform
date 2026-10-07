@@ -25,6 +25,10 @@ namespace ecommerce.Core.DTO.Auth
         [MaxLength(255)]
         public string Email { get; set; } = "";
 
+        // رمز دعوة صديق (اختياري) — رمز غير صحيح يُتجاهل ولا يمنع التسجيل
+        [MaxLength(16)]
+        public string? ReferralCode { get; set; }
+
 
 
     }

@@ -2,6 +2,7 @@
 using ecommerce.Core.DTO.CouponDto;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -17,7 +18,10 @@ namespace ecommerce.Services
         // ===================================
         // ValidateAsync - التحقق من الكوبون
         // ===================================
-        public async Task<CouponValidationResultDto> ValidateAsync(Guid userId, ValidateCouponDto dto)
+        // vendorSubtotals: مجموع كل متجر في السلة — كوبون المتجر (VendorId) يُحسب على حصة متجره فقط،
+        // وإلا كان يخصم من الطلب كله بينما يتحمّله متجر واحد في الحسابات
+        public async Task<CouponValidationResultDto> ValidateAsync(Guid userId, ValidateCouponDto dto,
+            IReadOnlyDictionary<Guid, decimal>? vendorSubtotals = null)
         {
             var coupon = await _couponRepository.GetByCodeAsync(dto.Code);
 
@@ -59,10 +63,20 @@ namespace ecommerce.Services
                 return InvalidResult("لقد استخدمت هذا الكوبون العدد المسموح به");
 
             // ===================================
-            // 7. هل الطلب يبلغ الحد الأدنى؟
+            // 7. المبلغ المشمول بالكوبون: الطلب كله، أو حصة متجر الكوبون فقط
             // ===================================
-            if (dto.OrderAmount < coupon.MinOrderAmount)
-                return InvalidResult($"الحد الأدنى للطلب لاستخدام هذا الكوبون هو {coupon.MinOrderAmount} دينار");
+            var eligibleAmount = dto.OrderAmount;
+            if (coupon.VendorId is Guid couponVendor)
+            {
+                eligibleAmount = vendorSubtotals?.GetValueOrDefault(couponVendor) ?? 0;
+                if (eligibleAmount <= 0)
+                    return InvalidResult($"هذا الكوبون خاص بمتجر «{coupon.Vendor?.NameAr ?? coupon.Vendor?.Name ?? "آخر"}» — أضف من منتجاته إلى السلة");
+            }
+
+            if (eligibleAmount < coupon.MinOrderAmount)
+                return InvalidResult(coupon.VendorId != null
+                    ? $"الحد الأدنى لمشتريات هذا المتجر لاستخدام الكوبون هو {coupon.MinOrderAmount} دينار"
+                    : $"الحد الأدنى للطلب لاستخدام هذا الكوبون هو {coupon.MinOrderAmount} دينار");
 
             // ===================================
             // 8. حساب مبلغ الخصم
@@ -71,7 +85,7 @@ namespace ecommerce.Services
 
             if (coupon.DiscountType == DiscountType.PERCENTAGE)
             {
-                discountAmount = dto.OrderAmount * (coupon.DiscountValue / 100);
+                discountAmount = eligibleAmount * (coupon.DiscountValue / 100);
 
                 // تطبيق السقف الأقصى إذا وجد
                 if (coupon.MaxDiscountAmount.HasValue)
@@ -79,7 +93,7 @@ namespace ecommerce.Services
             }
             else // FIXED
             {
-                discountAmount = Math.Min(coupon.DiscountValue, dto.OrderAmount);
+                discountAmount = Math.Min(coupon.DiscountValue, eligibleAmount);
             }
 
             discountAmount = Math.Round(discountAmount, 2);
@@ -103,7 +117,7 @@ namespace ecommerce.Services
         {
             var coupon = await _couponRepository.GetByIdAsync(id);
             if (coupon == null)
-                throw new Exception("الكوبون غير موجود");
+                throw new NotFoundException("الكوبون غير موجود");
 
             return MapToDto(coupon);
         }
@@ -137,13 +151,13 @@ namespace ecommerce.Services
             // التحقق من عدم تكرار الكود
             var codeExists = await _couponRepository.CodeExistsAsync(dto.Code);
             if (codeExists)
-                throw new Exception($"الكود '{dto.Code}' مستخدم مسبقاً");
+                throw new BusinessRuleException($"الكود '{dto.Code}' مستخدم مسبقاً");
 
             if (!DiscountType.All.Contains(dto.DiscountType))
-                throw new Exception("نوع الخصم يجب أن يكون percentage أو fixed");
+                throw new BusinessRuleException("نوع الخصم يجب أن يكون percentage أو fixed");
 
             if (dto.DiscountType == DiscountType.PERCENTAGE && dto.DiscountValue > 100)
-                throw new Exception("نسبة الخصم لا يمكن أن تتجاوز 100%");
+                throw new BusinessRuleException("نسبة الخصم لا يمكن أن تتجاوز 100%");
 
             var coupon = new Coupon
             {
@@ -173,7 +187,7 @@ namespace ecommerce.Services
         {
             var coupon = await _couponRepository.GetByIdAsync(id);
             if (coupon == null)
-                throw new Exception("الكوبون غير موجود");
+                throw new NotFoundException("الكوبون غير موجود");
 
             if (dto.Description != null) coupon.Description = dto.Description;
             if (dto.DiscountValue.HasValue) coupon.DiscountValue = dto.DiscountValue.Value;
@@ -196,7 +210,7 @@ namespace ecommerce.Services
         {
             var coupon = await _couponRepository.GetByIdAsync(id);
             if (coupon == null)
-                throw new Exception("الكوبون غير موجود");
+                throw new NotFoundException("الكوبون غير موجود");
 
             return await _couponRepository.DeleteAsync(id);
         }

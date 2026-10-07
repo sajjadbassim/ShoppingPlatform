@@ -17,6 +17,10 @@ namespace ecommerce.Core.DTO.Category
         public int DisplayOrder { get; set; }
 
         public bool IsActive { get; set; }
+        // العلامة على الفئة نفسها (تُعدَّل من الإدارة)
+        public bool IsGrocery { get; set; }
+        // القسم الفعلي: grocery إذا كانت الفئة أو أحد أسلافها سوبرماركت، وإلا general
+        public string Section { get; set; } = "general";
 
         public DateTime CreatedAt { get; set; }
 

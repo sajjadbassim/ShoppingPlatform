@@ -10,6 +10,8 @@
         public int ItemsCount { get; set; }
         public decimal Subtotal { get; set; }
         public bool MeetsMinimum { get; set; }
+        public bool IsOpen { get; set; } = true;
+        public string? ClosedMessage { get; set; }
         public List<CartItemDto> Items { get; set; }
     }
 }

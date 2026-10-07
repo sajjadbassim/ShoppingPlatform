@@ -21,6 +21,10 @@ namespace ecommerce.Services.NotificationService
 
         // الزبون
         Task NotifyCustomerAsync(Guid customerId, string message, object? data = null);
+
+        // تذكيرات الزبون (توفر منتج، سلة متروكة، مكافأة دعوة) — يحترم مفتاح «التذكيرات» في الإعدادات.
+        // data.link = الصفحة التي تُفتح عند الضغط (مسار داخلي مثل /cart)
+        Task NotifyCustomerReminderAsync(Guid customerId, string message, object? data = null);
         Task NotifyCustomerOrderStatusAsync(Guid customerId, Guid orderId, string orderNumber, string newStatus);
 
         // البائع

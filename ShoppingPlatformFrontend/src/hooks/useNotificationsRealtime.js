@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
 import { useAuthStore } from '../stores/authStore'
+import { getFreshAccessToken } from '../api/session'
 import { useNotificationsStore, formatNotification } from '../stores/notificationsStore'
 
 const HUB_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/notifications`
@@ -12,19 +13,20 @@ const HUB_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs
  * المخصص فقط للوحة العمليات.
  */
 export const useNotificationsRealtime = () => {
-  const { token } = useAuthStore()
+  // الاتصال يتبع حالة الدخول لا قيمة التوكن: التجديد كل ساعة لا يعيد الاتصال (accessTokenFactory يجلب الحالي)
+  const signedIn = useAuthStore((s) => !!s.token)
   const addNotification = useNotificationsStore((s) => s.addNotification)
   const connectionRef = useRef(null)
   const isMounted = useRef(false)
 
   useEffect(() => {
-    if (!token) return
+    if (!signedIn) return
     if (isMounted.current) return
     isMounted.current = true
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(HUB_URL, {
-        accessTokenFactory: () => token,
+        accessTokenFactory: getFreshAccessToken,
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000])
       .configureLogging(signalR.LogLevel.None)
@@ -66,7 +68,7 @@ export const useNotificationsRealtime = () => {
       isMounted.current = false
       connectionRef.current = null
     }
-  }, [token])
+  }, [signedIn])
 }
 
 export default useNotificationsRealtime

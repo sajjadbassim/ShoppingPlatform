@@ -36,6 +36,9 @@ export const useNotificationsStore = create(
           notifications: [notification, ...state.notifications].slice(0, 50),
           unreadCount: state.unreadCount + 1,
         }));
+        // للشاشات التي تتحدث فوراً عند وصول إشعار (مثل طلبات التاجر)
+        if (typeof window !== 'undefined')
+          window.dispatchEvent(new CustomEvent(NOTIFICATION_RECEIVED, { detail: notification }));
         return notification;
       },
 
@@ -112,6 +115,8 @@ export const useNotificationsStore = create(
 );
 
 // أنواع الإشعارات — مطابقة لثوابت NotificationType في الباك اند (Core/Constants/NotificationType.cs)
+export const NOTIFICATION_RECEIVED = 'notification-received';
+
 export const NotificationTypes = {
   ORDER_STATUS: 'order_status',
   NEW_ORDER: 'new_order',

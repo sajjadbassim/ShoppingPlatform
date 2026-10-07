@@ -13,6 +13,13 @@ namespace ecommerce.Core.DTO.Order
         // ✅ جديد: كوبون الخصم (اختياري)
         [MaxLength(50)]
         public string? CouponCode { get; set; }
+
+        // لطلب فيه منتجات سوبرماركت: بداية الفترة المختارة من /api/orders/delivery-slots (UTC)
+        public DateTime? DeliverySlotStart { get; set; }
+
+        // REMOVE | SIMILAR — ماذا يفعل المتجر إن نفد منتج سوبرماركت
+        [MaxLength(20)]
+        public string? SubstitutionPreference { get; set; }
     }
 
 }

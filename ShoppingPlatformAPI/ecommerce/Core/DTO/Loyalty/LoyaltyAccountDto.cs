@@ -123,6 +123,9 @@ namespace ecommerce.Core.DTO.Loyalty
         [Range(0, 10000)]
         public int? ReviewPoints { get; set; }
 
+        [Range(0, 100000)]
+        public int? ReferralPoints { get; set; }
+
         public bool? IsActive { get; set; }
     }
 
@@ -140,6 +143,17 @@ namespace ecommerce.Core.DTO.Loyalty
         public decimal GoldMultiplier { get; set; }
         public decimal PlatinumMultiplier { get; set; }
         public int ReviewPoints { get; set; }
+        public int ReferralPoints { get; set; }
         public bool IsActive { get; set; }
+    }
+
+    // ادعُ صديقاً: رمز المستخدم وإحصاءات دعواته
+    public class ReferralInfoDto
+    {
+        public string Code { get; set; } = "";
+        public int RewardPoints { get; set; }       // لكل طرف عند تسليم أول طلب للمدعو
+        public int InvitedCount { get; set; }       // سجّلوا برمزك
+        public int RewardedCount { get; set; }      // أكملوا أول طلب وحصلتما على النقاط
+        public bool Enabled { get; set; }
     }
 }

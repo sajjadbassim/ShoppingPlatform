@@ -3,6 +3,7 @@ import { MapPin, Package, Clock, Truck, ArrowLeft, Sparkles, Star } from 'lucide
 import { Skeleton } from './Loading'
 import { useProductsByVendor } from '../../hooks/useProducts'
 import { getVendorLogo, getVendorCover, getPrimaryImage } from '../../utils/imageHelper'
+import { ClosedBadge } from '../vendor/StoreHoursEditor'
 
 // بطاقات المتاجر المشتركة بين صفحة المتاجر والصفحة الرئيسية
 
@@ -108,6 +109,7 @@ export const FeaturedStore = ({ store }) => (
     className="group block bg-white rounded-3xl border border-gray-200 overflow-hidden hover:shadow-xl transition-shadow lg:flex">
     <div className="relative lg:w-1/2">
       <StoreCover store={store} index={0} className="h-44 sm:h-56 lg:h-full lg:min-h-[280px]" />
+      <ClosedBadge store={store} className="absolute top-3 left-3" />
       <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-400 text-amber-950 text-xs font-bold shadow">
         <Sparkles size={13} />متجر مميز
       </span>
@@ -142,6 +144,7 @@ export const StoreCard = ({ store, index, className = '' }) => (
     className={`${className} group flex flex-col bg-white rounded-3xl border border-gray-200 overflow-hidden hover:shadow-xl hover:-translate-y-0.5 transition-all`}>
     <div className="relative">
       <StoreCover store={store} index={index} className="h-32" />
+      <ClosedBadge store={store} className="absolute top-2 left-2" />
       <div className="absolute bottom-0 inset-x-0 p-3 flex items-end gap-3">
         <StoreLogo store={store} index={index} className="w-12 h-12" />
         <div className="min-w-0 pb-0.5">

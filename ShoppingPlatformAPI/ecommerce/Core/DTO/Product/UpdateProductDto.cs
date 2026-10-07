@@ -40,6 +40,10 @@ namespace ecommerce.Core.DTO.Product
 
         public bool ClearCategory { get; set; }
 
+        // البيع بالوزن: قيمة = وزن الوحدة، وClearWeightStep = العودة للبيع بالقطعة
+        public decimal? WeightStepKg { get; set; }
+        public bool ClearWeightStep { get; set; }
+
 
     }
 }

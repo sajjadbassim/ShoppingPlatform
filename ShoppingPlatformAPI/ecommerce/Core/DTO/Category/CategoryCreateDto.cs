@@ -20,5 +20,6 @@ namespace ecommerce.Core.DTO.Category
         public int DisplayOrder { get; set; } = 0;
 
         public bool IsActive { get; set; } = true;
+        public bool IsGrocery { get; set; } = false;
     }
 }

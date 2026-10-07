@@ -2,6 +2,7 @@
 using ecommerce.Services.HomeService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -16,17 +17,17 @@ namespace ecommerce.Controllers
             _homeService = homeService;
         }
 
-        // GET: api/home
+        // GET: api/home?page=general|grocery — الرئيسية (افتراضياً) أو صفحة السوبرماركت
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetHomePage()
+        public async Task<IActionResult> GetHomePage([FromQuery] string? page = null)
         {
             try
             {
-                var homePage = await _homeService.GetHomePageAsync();
+                var homePage = await _homeService.GetHomePageAsync(page);
                 return Ok(new { success = true, data = homePage });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -35,15 +36,16 @@ namespace ecommerce.Controllers
         // GET: api/home/banners
         [HttpGet("banners")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetBanners([FromQuery] bool onlyActive = true, [FromQuery] bool heroOnly = false)
+        public async Task<IActionResult> GetBanners([FromQuery] bool onlyActive = true, [FromQuery] bool heroOnly = false,
+            [FromQuery] string? page = null)
         {
             try
             {
-                // heroOnly: بانرات السلايدر العلوي فقط (بدون بانرات بلوكات الأقسام)
-                var banners = await _homeService.GetBannersAsync(onlyActive, heroOnly);
+                // heroOnly: بانرات السلايدر العلوي فقط (بدون بانرات بلوكات الأقسام)، page: صفحة محددة فقط
+                var banners = await _homeService.GetBannersAsync(onlyActive, heroOnly, page);
                 return Ok(new { success = true, data = banners });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -64,7 +66,7 @@ namespace ecommerce.Controllers
                 var banner = await _homeService.CreateBannerAsync(dto);
                 return Ok(new { success = true, data = banner, message = "تم إنشاء البانر بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -82,7 +84,7 @@ namespace ecommerce.Controllers
                 var banner = await _homeService.UpdateBannerAsync(id, dto);
                 return Ok(new { success = true, data = banner, message = "تم تعديل البانر بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -101,7 +103,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "البانر غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -120,7 +122,7 @@ namespace ecommerce.Controllers
                 var section = await _homeService.SetSectionBannerAsync(id, image);
                 return Ok(new { success = true, data = section, message = "تم تعيين بانر القسم" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -140,14 +142,14 @@ namespace ecommerce.Controllers
         // GET: api/home/sections
         [HttpGet("sections")]
         [AllowAnonymous]
-        public async Task<IActionResult> GetSections([FromQuery] bool onlyActive = true)
+        public async Task<IActionResult> GetSections([FromQuery] bool onlyActive = true, [FromQuery] string? page = null)
         {
             try
             {
-                var sections = await _homeService.GetSectionsAsync(onlyActive);
+                var sections = await _homeService.GetSectionsAsync(onlyActive, page);
                 return Ok(new { success = true, data = sections });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -163,7 +165,7 @@ namespace ecommerce.Controllers
                 var section = await _homeService.GetSectionByIdAsync(id);
                 return Ok(new { success = true, data = section });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -179,7 +181,7 @@ namespace ecommerce.Controllers
                 var section = await _homeService.CreateSectionAsync(dto);
                 return Ok(new { success = true, data = section, message = "تم إنشاء القسم بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -195,7 +197,7 @@ namespace ecommerce.Controllers
                 var section = await _homeService.UpdateSectionAsync(id, dto);
                 return Ok(new { success = true, data = section, message = "تم تعديل القسم بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -214,7 +216,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "القسم غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -230,7 +232,7 @@ namespace ecommerce.Controllers
                 var section = await _homeService.AddSectionItemAsync(id, dto);
                 return Ok(new { success = true, data = section, message = "تم إضافة المنتج للقسم بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -249,7 +251,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المنتج غير موجود في هذا القسم" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

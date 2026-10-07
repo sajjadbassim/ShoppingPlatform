@@ -1,6 +1,7 @@
 ﻿using ecommerce.Core.DTO.Wishlist;
 using ecommerce.Core.Models;
 using ecommerce.Repositories;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -50,12 +51,12 @@ namespace ecommerce.Services
             // التحقق من وجود المنتج
             var product = await _productRepository.GetByIdAsync(dto.ProductId);
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             // التحقق من عدم وجود المنتج مسبقاً في المفضلة
             var exists = await _wishlistRepository.ExistsAsync(userId, dto.ProductId);
             if (exists)
-                throw new Exception("المنتج موجود بالفعل في قائمة المفضلة");
+                throw new BusinessRuleException("المنتج موجود بالفعل في قائمة المفضلة");
 
             var wishlist = new Wishlist
             {
@@ -123,7 +124,7 @@ namespace ecommerce.Services
             {
                 var product = await _productRepository.GetByIdAsync(productId);
                 if (product == null)
-                    throw new Exception("المنتج غير موجود");
+                    throw new NotFoundException("المنتج غير موجود");
 
                 var wishlist = new Wishlist
                 {

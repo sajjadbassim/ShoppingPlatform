@@ -3,6 +3,7 @@ using ecommerce.Services.AuthService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -34,7 +35,7 @@ namespace ecommerce.Controllers
                     message = "تم التسجيل بنجاح"
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -43,6 +44,7 @@ namespace ecommerce.Controllers
 
         // POST: api/auth/login
         [HttpPost("login")]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login-ip")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
@@ -56,7 +58,7 @@ namespace ecommerce.Controllers
                     message = "تم تسجيل الدخول بنجاح"
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -75,14 +77,15 @@ namespace ecommerce.Controllers
                 var result = await _authService.AddPhoneAsync(userId, dto.Phone);
                 return Ok(new { success = true, data = result, message = "تم حفظ رقم الهاتف" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
         // POST: api/auth/change-password
-        [AllowAnonymous]
+        // ينهي جلسات الأجهزة الأخرى ويعيد جلسة جديدة لهذا الجهاز
+        [Authorize]
         [HttpPost("change-password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
@@ -94,10 +97,11 @@ namespace ecommerce.Controllers
                 return Ok(new
                 {
                     success = true,
+                    data = result,
                     message = "تم تغيير كلمة المرور بنجاح"
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -114,7 +118,7 @@ namespace ecommerce.Controllers
                 await _authService.ForgotPasswordAsync(dto);
                 return Ok(new { success = true, message = "إذا كان الرقم مسجلاً سيصلك رمز التحقق خلال لحظات" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -131,7 +135,7 @@ namespace ecommerce.Controllers
                 var resetToken = await _authService.VerifyResetOtpAsync(dto);
                 return Ok(new { success = true, data = new { resetToken }, message = "تم التحقق من الرمز بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -148,33 +152,36 @@ namespace ecommerce.Controllers
                 await _authService.ResetPasswordAsync(dto);
                 return Ok(new { success = true, message = "تم تغيير كلمة المرور بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
 
         // POST: api/auth/refresh-token
-        [Authorize]
+        // يجدّد الجلسة برمز التجديد — لا يحتاج توكن دخول صالحاً (قد يكون انتهى)
+        [AllowAnonymous]
         [HttpPost("refresh-token")]
-        public async Task<IActionResult> RefreshToken()
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto dto)
         {
             try
             {
-                var userId = GetCurrentUserId();
-                var result = await _authService.RefreshTokenAsync(userId);
-
-                return Ok(new
-                {
-                    success = true,
-                    data = result,
-                    message = "تم تجديد الـ Token بنجاح"
-                });
+                var result = await _authService.RefreshAsync(dto?.RefreshToken);
+                return Ok(new { success = true, data = result, message = "تم تجديد الجلسة" });
             }
-            catch (Exception ex)
+            catch (UnauthorizedException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return Unauthorized(new { success = false, message = ex.Message });
             }
+        }
+
+        // POST: api/auth/logout — إبطال رمز تجديد هذا الجهاز
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout([FromBody] RefreshTokenRequestDto dto)
+        {
+            await _authService.LogoutAsync(dto?.RefreshToken);
+            return Ok(new { success = true });
         }
 
         // GET: api/auth/me
@@ -203,7 +210,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -216,7 +223,7 @@ namespace ecommerce.Controllers
                 ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (string.IsNullOrEmpty(userIdClaim))
-                throw new Exception("غير مصرح");
+                throw new BusinessRuleException("غير مصرح");
 
             return Guid.Parse(userIdClaim);
         }

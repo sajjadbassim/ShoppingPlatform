@@ -54,7 +54,7 @@ namespace ecommerce.Tests.Services
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ecommerce.Services.AvatarService>.Instance);
             var auth = new AuthService(new UserRepository(_context), Options.Create(_jwt), new VendorRepository(_context),
                 Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<ISmsSender>(), Mock.Of<INotificationService>(),
-                new AuthThrottle(new MemoryCache(new MemoryCacheOptions())));
+                new AuthThrottle(new MemoryCache(new MemoryCacheOptions())), new RefreshTokenRepository(_context));
             return new GoogleAuthService(_context, auth, new FakeValidator(),
                 Options.Create(new GoogleOptions { ClientId = "client" }), Options.Create(_jwt), avatars: avatars);
         }

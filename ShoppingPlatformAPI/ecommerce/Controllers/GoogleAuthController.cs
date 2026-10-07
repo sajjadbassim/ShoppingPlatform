@@ -26,7 +26,7 @@ namespace ecommerce.Controllers
         [AllowAnonymous]
         [EnableRateLimiting("auth-ip")]
         public async Task<IActionResult> SignIn([FromBody] GoogleCredentialDto dto)
-            => Ok(new { success = true, data = await _google.SignInAsync(dto.Credential) });
+            => Ok(new { success = true, data = await _google.SignInAsync(dto.Credential, dto.ReferralCode) });
 
         // GET: api/auth/google/status
         [HttpGet("status")]
@@ -51,5 +51,9 @@ namespace ecommerce.Controllers
     {
         [Required(ErrorMessage = "بيانات Google مفقودة")]
         public string Credential { get; set; } = "";
+
+        // رمز دعوة صديق (للحساب الجديد فقط)
+        [MaxLength(16)]
+        public string? ReferralCode { get; set; }
     }
 }

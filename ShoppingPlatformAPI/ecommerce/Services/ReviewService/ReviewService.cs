@@ -4,6 +4,7 @@ using ecommerce.Data;
 using ecommerce.Repositories;
 using ecommerce.Services.FileService;
 using ecommerce.Services.NotificationService;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -39,7 +40,7 @@ namespace ecommerce.Services
         {
             var review = await _reviewRepository.GetByIdWithDetailsAsync(id);
             if (review == null)
-                throw new Exception("المراجعة غير موجودة");
+                throw new NotFoundException("المراجعة غير موجودة");
 
             return MapToDto(review, false);
         }
@@ -92,14 +93,14 @@ namespace ecommerce.Services
                     userId, dto.ProductId, dto.OrderId);
 
                 if (!hasPurchased)
-                    throw new Exception("يجب شراء المنتج أولاً قبل كتابة مراجعة");
+                    throw new BusinessRuleException("يجب شراء المنتج أولاً قبل كتابة مراجعة");
 
                 // 2️⃣ التحقق أنه لم يراجع المنتج من قبل
                 var alreadyReviewed = await _reviewRepository.HasUserReviewedProductAsync(
                     userId, dto.ProductId);
 
                 if (alreadyReviewed)
-                    throw new Exception("لقد كتبت مراجعة لهذا المنتج مسبقاً");
+                    throw new BusinessRuleException("لقد كتبت مراجعة لهذا المنتج مسبقاً");
 
                 // 3️⃣ إنشاء المراجعة
                 var review = new Review
@@ -119,13 +120,13 @@ namespace ecommerce.Services
                 if (dto.Images != null && dto.Images.Count > 0)
                 {
                     if (dto.Images.Count > 5)
-                        throw new Exception("لا يمكن رفع أكثر من 5 صور للمراجعة");
+                        throw new BusinessRuleException("لا يمكن رفع أكثر من 5 صور للمراجعة");
 
                     List<string> uploadedImages = new List<string>();
 
                     try
                     {
-                        uploadedImages = await _fileService.SaveImagesAsync(dto.Images);
+                        uploadedImages = await _fileService.SaveImagesAsync(dto.Images, "reviews");
 
                         var reviewImages = new List<ReviewImage>();
                         for (int i = 0; i < uploadedImages.Count; i++)
@@ -144,7 +145,8 @@ namespace ecommerce.Services
                     {
                         await _fileService.DeleteImagesAsync(uploadedImages);
                         await transaction.RollbackAsync();
-                        throw new Exception($"فشل رفع الصور: {ex.Message}");
+                        if (ex is AppException) throw new BusinessRuleException($"فشل رفع الصور: {ex.Message}");
+                        throw;
                     }
                 }
 
@@ -181,7 +183,7 @@ namespace ecommerce.Services
         {
             var review = await _reviewRepository.GetByIdWithDetailsAsync(reviewId);
             if (review == null)
-                throw new Exception("المراجعة غير موجودة");
+                throw new NotFoundException("المراجعة غير موجودة");
 
             if (review.UserId != userId)
                 throw new UnauthorizedAccessException("ليس لديك صلاحية تعديل هذه المراجعة");
@@ -215,9 +217,9 @@ namespace ecommerce.Services
             {
                 var currentImagesCount = review.Images?.Count ?? 0;
                 if (currentImagesCount + dto.NewImages.Count > 5)
-                    throw new Exception("لا يمكن أن تحتوي المراجعة على أكثر من 5 صور");
+                    throw new BusinessRuleException("لا يمكن أن تحتوي المراجعة على أكثر من 5 صور");
 
-                var imageUrls = await _fileService.SaveImagesAsync(dto.NewImages);
+                var imageUrls = await _fileService.SaveImagesAsync(dto.NewImages, "reviews");
                 var currentMaxOrder = review.Images?.Any() == true
                     ? review.Images.Max(i => i.DisplayOrder)
                     : -1;
@@ -247,7 +249,7 @@ namespace ecommerce.Services
         {
             var review = await _reviewRepository.GetByIdWithDetailsAsync(reviewId);
             if (review == null)
-                throw new Exception("المراجعة غير موجودة");
+                throw new NotFoundException("المراجعة غير موجودة");
 
             if (!isAdmin && review.UserId != userId)
                 throw new UnauthorizedAccessException("ليس لديك صلاحية حذف هذه المراجعة");
@@ -285,14 +287,14 @@ namespace ecommerce.Services
         {
             var review = await _reviewRepository.GetByIdAsync(reviewId);
             if (review == null)
-                throw new Exception("المراجعة غير موجودة");
+                throw new NotFoundException("المراجعة غير موجودة");
 
             if (review.UserId == userId)
-                throw new Exception("لا يمكنك التصويت على مراجعتك الخاصة");
+                throw new BusinessRuleException("لا يمكنك التصويت على مراجعتك الخاصة");
 
             var alreadyVoted = await _reviewRepository.HasUserVotedHelpfulAsync(userId, reviewId);
             if (alreadyVoted)
-                throw new Exception("لقد صوّت مسبقاً على هذه المراجعة");
+                throw new BusinessRuleException("لقد صوّت مسبقاً على هذه المراجعة");
 
             return await _reviewRepository.AddHelpfulVoteAsync(userId, reviewId);
         }
@@ -304,7 +306,7 @@ namespace ecommerce.Services
         {
             var hasVoted = await _reviewRepository.HasUserVotedHelpfulAsync(userId, reviewId);
             if (!hasVoted)
-                throw new Exception("لم تصوّت على هذه المراجعة");
+                throw new BusinessRuleException("لم تصوّت على هذه المراجعة");
 
             return await _reviewRepository.RemoveHelpfulVoteAsync(userId, reviewId);
         }
@@ -315,11 +317,11 @@ namespace ecommerce.Services
         public async Task<ReviewDto> SetVendorReplyAsync(Guid reviewId, string? reply)
         {
             var review = await _reviewRepository.GetByIdAsync(reviewId)
-                ?? throw new Exception("المراجعة غير موجودة");
+                ?? throw new NotFoundException("المراجعة غير موجودة");
 
             var text = reply?.Trim();
             if (text?.Length > 1000)
-                throw new Exception("الرد طويل جداً (الحد 1000 حرف)");
+                throw new BusinessRuleException("الرد طويل جداً (الحد 1000 حرف)");
 
             var isNew = string.IsNullOrEmpty(review.VendorReply) && !string.IsNullOrEmpty(text);
             review.VendorReply = string.IsNullOrEmpty(text) ? null : text;
@@ -344,18 +346,18 @@ namespace ecommerce.Services
         {
             var review = await _reviewRepository.GetByIdAsync(reviewId);
             if (review == null)
-                throw new Exception("المراجعة غير موجودة");
+                throw new NotFoundException("المراجعة غير موجودة");
 
             if (review.UserId == userId)
-                throw new Exception("لا يمكنك الإبلاغ عن مراجعتك الخاصة");
+                throw new BusinessRuleException("لا يمكنك الإبلاغ عن مراجعتك الخاصة");
 
             var alreadyReported = await _reviewRepository.HasUserReportedAsync(userId, reviewId);
             if (alreadyReported)
-                throw new Exception("لقد أبلغت عن هذه المراجعة مسبقاً");
+                throw new BusinessRuleException("لقد أبلغت عن هذه المراجعة مسبقاً");
 
             var validReasons = new[] { "spam", "offensive", "fake", "irrelevant" };
             if (!validReasons.Contains(dto.Reason.ToLower()))
-                throw new Exception("سبب الإبلاغ غير صالح");
+                throw new BusinessRuleException("سبب الإبلاغ غير صالح");
 
             var report = new ReviewReport
             {

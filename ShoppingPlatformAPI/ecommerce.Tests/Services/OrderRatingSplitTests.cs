@@ -5,6 +5,7 @@ using ecommerce.Data;
 using ecommerce.Services.OrderRatingService;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -72,10 +73,10 @@ namespace ecommerce.Tests.Services
         public async Task SameStoreTwice_IsRejected_AndExperienceTwice_IsRejected()
         {
             await Service().AddStoreRatingsAsync(_order.Id, _customer, new() { Store(_sub1.Id, 4) });
-            await Assert.ThrowsAsync<Exception>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new() { Store(_sub1.Id, 2) }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new() { Store(_sub1.Id, 2) }));
 
             await Service().CreateRatingAsync(_order.Id, _customer, new CreateOrderRatingDto { DeliveryRating = 5 });
-            await Assert.ThrowsAsync<Exception>(() => Service().CreateRatingAsync(_order.Id, _customer, new CreateOrderRatingDto { DeliveryRating = 1 }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().CreateRatingAsync(_order.Id, _customer, new CreateOrderRatingDto { DeliveryRating = 1 }));
         }
 
         [Fact]
@@ -107,7 +108,7 @@ namespace ecommerce.Tests.Services
             Assert.Empty(status.RatedSubOrderIds);
 
             // مرة ثانية مرفوضة من مسار المتاجر، ومتجاهَلة مع تقييم التجربة
-            await Assert.ThrowsAsync<Exception>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new() { Drv(_driver.Id, 1) }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new() { Drv(_driver.Id, 1) }));
             await Service().CreateRatingAsync(_order.Id, _customer, new CreateOrderRatingDto { DeliveryRating = 5, DriverRatings = { Drv(_driver.Id, 1) } });
             Assert.Equal(1, await _context.OrderDriverRatings.CountAsync());
             Assert.Equal(4m, (await _context.Drivers.AsNoTracking().SingleAsync()).Rating);
@@ -116,14 +117,14 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task DriverNotInOrder_IsRejected()
         {
-            await Assert.ThrowsAsync<Exception>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new() { Drv(Guid.NewGuid(), 5) }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new() { Drv(Guid.NewGuid(), 5) }));
             Assert.Empty(_context.OrderDriverRatings);
         }
 
         [Fact]
         public async Task NothingToRate_IsRejected()
         {
-            await Assert.ThrowsAsync<Exception>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new()));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().AddStoreRatingsAsync(_order.Id, _customer, new(), new()));
         }
     }
 }

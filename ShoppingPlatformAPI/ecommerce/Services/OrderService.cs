@@ -1,8 +1,10 @@
-﻿using ecommerce.Core;
+﻿using ecommerce.Services.DeliverySlotService;
+using ecommerce.Core;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.CouponDto;
 using ecommerce.Core.DTO.Order;
+using ecommerce.Core.Exceptions;
 using ecommerce.Core.Models;
 using ecommerce.Core.DTO.Inventory;
 using ecommerce.Data;
@@ -28,6 +30,9 @@ namespace ecommerce.Services
         private readonly ILoyaltyService _loyaltyService;
         private readonly IPromotionService _promotionService;
         private readonly IInventoryService _inventoryService;
+        private readonly ILogger<OrderService> _logger;
+        private readonly IDeliverySlotService _deliverySlots;
+        private readonly TimeProvider _time;
 
         public OrderService(
             IOrderRepository orderRepository,
@@ -42,8 +47,13 @@ namespace ecommerce.Services
             ICouponRepository couponRepository,
             ILoyaltyService loyaltyService,
             IPromotionService promotionService,
-            IInventoryService inventoryService)
+            IInventoryService inventoryService,
+            ILogger<OrderService> logger,
+            IDeliverySlotService? deliverySlots = null,
+            TimeProvider? time = null)
         {
+            _time = time ?? TimeProvider.System;
+            _deliverySlots = deliverySlots ?? new DeliverySlotService.DeliverySlotService(context, _time);
             _orderRepository = orderRepository;
             _subOrderRepository = subOrderRepository;
             _cartRepository = cartRepository;
@@ -57,27 +67,28 @@ namespace ecommerce.Services
             _loyaltyService = loyaltyService;
             _promotionService = promotionService;
             _inventoryService = inventoryService;
+            _logger = logger;
         }
 
         public async Task<OrderResponseDto> CreateOrderFromCartAsync(Guid userId, CreateOrderDto dto)
         {
             var user = await _userRepository.GetByIdAsync(userId);
-            if (user == null) throw new Exception("المستخدم غير موجود");
+            if (user == null) throw new NotFoundException("المستخدم غير موجود");
             // الشراء يتطلب رقم هاتف في الحساب (حسابات Google تُنشأ بلا هاتف)
             if (string.IsNullOrWhiteSpace(user.Phone))
-                throw new Exception("أضف رقم هاتفك لإكمال الطلب");
+                throw new BusinessRuleException("أضف رقم هاتفك لإكمال الطلب");
 
             // مهلة تأكيد المتجر من الإعدادات (الافتراضي 5 دقائق)
             var confirmationMinutes = await _context.DeliverySettings.AsNoTracking()
                 .Select(x => (int?)x.ConfirmationTimeoutMinutes).FirstOrDefaultAsync() is int m and >= 1 and <= 240 ? m : 5;
 
             var address = await _addressRepository.GetByIdAsync(dto.AddressId);
-            if (address == null) throw new Exception("العنوان غير موجود");
-            if (address.UserId != userId) throw new Exception("هذا العنوان غير مسجل باسمك");
+            if (address == null) throw new NotFoundException("العنوان غير موجود");
+            if (address.UserId != userId) throw new BusinessRuleException("هذا العنوان غير مسجل باسمك");
 
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null || cart.Items == null || !cart.Items.Any())
-                throw new Exception("السلة فارغة");
+                throw new BusinessRuleException("السلة فارغة");
 
             var errors = new List<string>();
 
@@ -119,17 +130,43 @@ namespace ecommerce.Services
                 }
             }
 
-            if (errors.Any()) throw new Exception(string.Join(", ", errors));
+            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
+
+            // منتجات السوبرماركت في السلة: موعد توصيل من الفترات المتاحة + ماذا نفعل إن نفد منتج
+            var groceryIds = await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
+            var groceryStores = cart.Items
+                .Where(i => i.Product.CategoryId.HasValue && groceryIds.Contains(i.Product.CategoryId.Value) && i.Product.Vendor != null)
+                .Select(i => i.Product.Vendor).DistinctBy(v => v.Id).ToList();
+            DeliverySlotDto? slot = null;
+            string? substitution = null;
+            if (groceryStores.Count > 0)
+            {
+                // الموعد يجب أن يقع ضمن أوقات عمل متاجر السوبرماركت في السلة
+                slot = await _deliverySlots.ResolveAsync(dto.DeliverySlotStart, groceryStores);
+                substitution = SubstitutionPreference.Parse(dto.SubstitutionPreference);
+            }
+
+            // المتجر المغلق: الطلب الفوري يحتاج متجراً مفتوحاً الآن؛ طلب السوبرماركت بموعد يكفيه أن يعمل المتجر في الموعد
+            // (تحقق منه ResolveAsync). إيقاف استقبال الطلبات يدوياً يمنع الحالتين
+            var checkoutTime = _time.GetUtcNow().UtcDateTime;
+            var scheduledStoreIds = slot != null ? groceryStores.Select(v => v.Id).ToHashSet() : new HashSet<Guid>();
+            foreach (var vendor in cart.Items.Select(i => i.Product.Vendor).Where(v => v != null).DistinctBy(v => v.Id))
+            {
+                if (!vendor.IsAcceptingOrders)
+                    errors.Add($"متجر '{vendor.NameAr ?? vendor.Name}': المتجر لا يستقبل طلبات حالياً");
+                else if (!scheduledStoreIds.Contains(vendor.Id) && StoreHours.Status(vendor, checkoutTime) is { IsOpen: false } closed)
+                    errors.Add($"متجر '{vendor.NameAr ?? vendor.Name}': {closed.Message}");
+            }
+
+            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
 
             // ✅ سعر الوحدة الفعلي بعد تطبيق أفضل عرض فعّال على كل منتج (يُحسب مرة واحدة ويُعاد استخدامه)
+            var promoPrices = await _promotionService.CalculateFinalPricesAsync(cart.Items.Select(i =>
+                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId, i.Product.Price)));
             var unitPrices = new Dictionary<Guid, decimal>();
             foreach (var item in cart.Items)
             {
-                var promoPrice = await _promotionService.CalculateFinalPriceAsync(
-                    item.ProductId,
-                    item.Product.CategoryId ?? Guid.Empty,
-                    item.Product.VendorId,
-                    item.Product.Price);
+                var promoPrice = promoPrices[item.ProductId];
 
                 unitPrices[item.Id] = item.Variant != null
                     ? promoPrice + item.Variant.PriceAdjustment
@@ -152,12 +189,13 @@ namespace ecommerce.Services
                     errors.Add($"الطلب من '{vendor.Name}' أقل من الحد الأدنى ({vendor.MinOrderAmount} دينار)");
             }
 
-            if (errors.Any()) throw new Exception(string.Join(", ", errors));
+            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
             var zoneUsed = vendorGroups.Any(g => feeRules.UsesZone(g.First().Product.Vendor));
 
             // إنشاء الطلب كاملاً في معاملة واحدة: إذا فشل أي جزء يُتراجع عن خصم المخزون أيضاً
             Order order;
             List<StockChange> stockChanges;
+            var createdSubOrders = new List<SubOrder>();
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -168,15 +206,16 @@ namespace ecommerce.Services
                     i.Variant != null ? $"{i.Product.Name} ({i.Variant.Sku})" : i.Product.Name)));
 
                 decimal discountAmount = 0;
-                Guid? appliedCouponId = null;
+                Coupon? appliedCoupon = null;
 
                 if (!string.IsNullOrWhiteSpace(dto.CouponCode))
                 {
-                    var couponValidation = await _couponService.ValidateAsync(userId, new ValidateCouponDto { Code = dto.CouponCode, OrderAmount = totalSubtotal });
-                    if (!couponValidation.IsValid) throw new Exception($"الكوبون غير صالح: {couponValidation.ErrorMessage}");
+                    var vendorSubtotals = vendorGroups.ToDictionary(g => g.Key, g => g.Sum(i => unitPrices[i.Id] * i.Quantity));
+                    var couponValidation = await _couponService.ValidateAsync(userId,
+                        new ValidateCouponDto { Code = dto.CouponCode, OrderAmount = totalSubtotal }, vendorSubtotals);
+                    if (!couponValidation.IsValid) throw new BusinessRuleException($"الكوبون غير صالح: {couponValidation.ErrorMessage}");
                     discountAmount = couponValidation.DiscountAmount;
-                    var coupon = await _couponRepository.GetByCodeAsync(dto.CouponCode);
-                    appliedCouponId = coupon?.Id;
+                    appliedCoupon = await _couponRepository.GetByCodeAsync(dto.CouponCode);
                 }
 
                 var orderNumber = await _orderRepository.GenerateOrderNumberAsync();
@@ -198,19 +237,29 @@ namespace ecommerce.Services
                     DeliveryLatitude = address.Latitude,
                     DeliveryLongitude = address.Longitude,
                     DeliveryZoneId = zoneUsed ? feeRules.Zone!.Id : null,
-                    DeliveryZoneName = zoneUsed ? feeRules.Zone!.Name : null
+                    DeliveryZoneName = zoneUsed ? feeRules.Zone!.Name : null,
+                    DeliverySlotStart = slot?.Start,
+                    DeliverySlotEnd = slot?.End,
+                    SubstitutionPreference = substitution
                 };
 
                 order = await _orderRepository.CreateAsync(order);
 
-                if (appliedCouponId.HasValue && discountAmount > 0)
+                if (appliedCoupon != null && discountAmount > 0)
                 {
-                    await _couponRepository.RecordUsageAsync(new CouponUsage { CouponId = appliedCouponId.Value, UserId = userId, OrderId = order.Id, DiscountAmount = discountAmount });
-                    await _couponRepository.IncrementUsageCountAsync(appliedCouponId.Value);
+                    // التحقق أعلاه قد يمرّ لطلبين متزامنين؛ الحجز الذري هنا يقفل صف الكوبون حتى نهاية المعاملة،
+                    // ثم يُعاد عدّ استخدامات الزبون تحت القفل فلا يُتجاوز الحد الكلي ولا حد المستخدم
+                    if (!await _couponRepository.TryIncrementUsageCountAsync(appliedCoupon.Id))
+                        throw new ConflictException("تم استنفاد استخدامات هذا الكوبون");
+                    if (await _couponRepository.GetUserUsageCountAsync(appliedCoupon.Id, userId) >= appliedCoupon.UserUsageLimit)
+                        throw new ConflictException("لقد استخدمت هذا الكوبون العدد المسموح به");
+
+                    await _couponRepository.RecordUsageAsync(new CouponUsage { CouponId = appliedCoupon.Id, UserId = userId, OrderId = order.Id, DiscountAmount = discountAmount });
                 }
 
-                await LogOrderStatusChangeAsync(order.Id, "", order.Status, userId, "إنشاء طلب جديد");
-                await _notificationService.NotifyNewOrderAsync(order.Id, order.OrderNumber);
+                await LogOrderStatusChangeAsync(order.Id, "", order.Status, userId, slot == null
+                    ? "إنشاء طلب جديد"
+                    : $"إنشاء طلب جديد — موعد التوصيل: {DeliverySlotService.DeliverySlotService.Describe(slot.Start, slot.End)}");
 
                 int vendorIndex = 1;
 
@@ -227,11 +276,13 @@ namespace ecommerce.Services
                         Status = SubOrderStatus.PendingConfirmation,
                         Subtotal = vendorSubtotal,
                         DeliveryFee = feeRules.FeeFor(vendor),
-                        ConfirmationDeadline = DateTime.UtcNow.AddMinutes(confirmationMinutes)
+                        // متجر مغلق الآن (طلب سوبرماركت بموعد لاحق): مهلة القبول تبدأ من فتحه، لا من الآن —
+                        // وإلا ظهر الطلب «متأخراً» للعمليات طوال الليل
+                        ConfirmationDeadline = (StoreHours.NextOpeningUtc(vendor, checkoutTime) ?? checkoutTime).AddMinutes(confirmationMinutes)
                     };
 
                     subOrder = await _subOrderRepository.CreateAsync(subOrder);
-                    await _notificationService.NotifyNewSubOrderAsync(subOrder.Id, subOrder.SubOrderNumber, vendor.Id);
+                    createdSubOrders.Add(subOrder);
                     await LogSubOrderStatusChangeAsync(subOrder.Id, "", subOrder.Status, userId, $"إنشاء طلب فرعي للمتجر {vendor.Name}");
 
                     foreach (var cartItem in group)
@@ -254,7 +305,8 @@ namespace ecommerce.Services
                             ProductImageUrl = image,
                             UnitPrice = unitPrice,          // ✅
                             Quantity = cartItem.Quantity,
-                            Subtotal = unitPrice * cartItem.Quantity
+                            Subtotal = unitPrice * cartItem.Quantity,
+                            WeightStepKg = cartItem.Product.WeightStepKg
                         });
                     }
 
@@ -262,7 +314,6 @@ namespace ecommerce.Services
                 }
 
                 await _cartRepository.ClearCartAsync(cart.Id);
-                await _notificationService.NotifyCustomerAsync(userId, "تم إنشاء طلبك بنجاح", new { orderId = order.Id, orderNumber = order.OrderNumber });
 
                 await transaction.CommitAsync();
             }
@@ -270,6 +321,20 @@ namespace ecommerce.Services
             {
                 await transaction.RollbackAsync();
                 throw;
+            }
+
+            // الإشعارات بعد الحفظ فقط: لا تصل العمليات والمتاجر إشعارات عن طلب تراجعت معاملته،
+            // وفشل الإشعار لا يُفشل طلباً حُفظ فعلاً
+            try
+            {
+                await _notificationService.NotifyNewOrderAsync(order.Id, order.OrderNumber);
+                foreach (var subOrder in createdSubOrders)
+                    await _notificationService.NotifyNewSubOrderAsync(subOrder.Id, subOrder.SubOrderNumber, subOrder.VendorId);
+                await _notificationService.NotifyCustomerAsync(userId, "تم إنشاء طلبك بنجاح", new { orderId = order.Id, orderNumber = order.OrderNumber });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Order {OrderNumber} saved but its notifications failed", order.OrderNumber);
             }
 
             await _inventoryService.NotifyLowStockAsync(stockChanges);
@@ -280,14 +345,14 @@ namespace ecommerce.Services
         public async Task<OrderResponseDto> GetOrderByIdAsync(Guid orderId)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
-            if (order == null) throw new Exception("الطلب غير موجود");
+            if (order == null) throw new NotFoundException("الطلب غير موجود");
             return MapToDto(order);
         }
 
         public async Task<OrderResponseDto> GetOrderByNumberAsync(string orderNumber)
         {
             var order = await _orderRepository.GetByOrderNumberAsync(orderNumber);
-            if (order == null) throw new Exception("الطلب غير موجود");
+            if (order == null) throw new NotFoundException("الطلب غير موجود");
             return MapToDto(order);
         }
 
@@ -318,7 +383,7 @@ namespace ecommerce.Services
                 .AsNoTracking()
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
-            if (order == null) throw new Exception("الطلب غير موجود");
+            if (order == null) throw new NotFoundException("الطلب غير موجود");
             if (!isAdmin && order.CustomerId != customerId) throw new UnauthorizedAccessException("ليس لديك صلاحية لعرض هذا الطلب");
 
             var allStatuses = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED };
@@ -363,12 +428,12 @@ namespace ecommerce.Services
             try
             {
                 var order = await _context.Orders.Include(o => o.SubOrders).FirstOrDefaultAsync(o => o.Id == orderId);
-                if (order == null) throw new Exception("الطلب غير موجود");
+                if (order == null) throw new NotFoundException("الطلب غير موجود");
                 if (order.CustomerId != customerId) throw new UnauthorizedAccessException("ليس لديك صلاحية لإلغاء هذا الطلب");
 
                 var cancellable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED };
                 if (!cancellable.Contains(order.Status))
-                    throw new Exception($"لا يمكن إلغاء الطلب وهو «{OrderStatusText.Ar(order.Status)}»، الإلغاء متاح فقط قبل بدء التحضير");
+                    throw new BusinessRuleException($"لا يمكن إلغاء الطلب وهو «{OrderStatusText.Ar(order.Status)}»، الإلغاء متاح فقط قبل بدء التحضير");
 
                 var oldStatus = order.Status;
                 order.Status = OrderStatus.CANCELLED;
@@ -453,6 +518,9 @@ namespace ecommerce.Services
                     UnitPrice = i.UnitPrice,
                     Quantity = i.Quantity,
                     Subtotal = i.Subtotal,
+                    WeightStepKg = i.WeightStepKg,
+                    ReplacesItemId = i.ReplacesItemId,
+                    UnavailableQuantity = i.UnavailableQuantity,
                     // ✅ Variant
                     VariantId = i.VariantId,
                     VariantSku = i.Variant?.Sku,
@@ -487,6 +555,9 @@ namespace ecommerce.Services
                 DiscountAmount = order.DiscountAmount,
                 TotalAmount = order.TotalAmount,
                 CouponCode = order.CouponCode,
+                DeliverySlotStart = order.DeliverySlotStart,
+                DeliverySlotEnd = order.DeliverySlotEnd,
+                SubstitutionPreference = order.SubstitutionPreference,
                 PaymentMethod = order.PaymentMethod,
                 PaymentStatus = order.PaymentStatus,
                 CustomerNotes = order.CustomerNotes,

@@ -3,6 +3,7 @@ using ecommerce.Services.InvoiceService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -49,7 +50,7 @@ namespace ecommerce.Controllers
             {
                 return Forbid(ex.Message);
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -76,7 +77,7 @@ namespace ecommerce.Controllers
             {
                 return Forbid(ex.Message);
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

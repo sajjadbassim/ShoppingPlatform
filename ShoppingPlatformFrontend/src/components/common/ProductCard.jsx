@@ -6,6 +6,7 @@ import { Heart, Star, ShoppingCart, Plus, Store } from 'lucide-react'
 import { getPrimaryImage } from '../../utils/imageHelper'
 import { useProductVariants, variantKeys } from '../../hooks/useVariants'
 import { variantsService } from '../../services/variantsService'
+import { formatPrice, pricePerKg } from '../../utils/weight'
 
 // أجهزة اللمس لا تدعم hover — تغيير محتوى الكرت عند "hover" يجعل iOS يحتاج ضغطتين لفتح المنتج
 const canHover = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
@@ -114,6 +115,7 @@ const ProductCard = ({
     inStock = true,
     storeName,
     vendorId,
+    weightStepKg,
   } = product || {}
 
   const hasDiscount = originalPrice && originalPrice > price
@@ -241,9 +243,9 @@ const ProductCard = ({
             {/* ✅ السعر والزر مثبّتان دائماً في أسفل الكرت بغض النظر عن طول الاسم */}
             <div className="mt-auto">
               <div className="flex flex-wrap items-baseline gap-x-2 mb-2 sm:mb-3">
-                <span className="text-sm sm:text-lg font-bold text-primary">{price?.toLocaleString()} د.ع</span>
+                <span className="text-sm sm:text-lg font-bold text-primary">{formatPrice(price, weightStepKg)}</span>
                 {hasDiscount && (
-                  <span className="text-[11px] sm:text-sm text-gray-400 line-through">{originalPrice?.toLocaleString()} د.ع</span>
+                  <span className="text-[11px] sm:text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString()} د.ع</span>
                 )}
               </div>
 
@@ -294,7 +296,7 @@ const ProductCard = ({
           <StoreLabel extraClass="mb-1" />
           <h3 className="text-sm font-medium text-gray-800 line-clamp-1 mb-1">{name}</h3>
           <div className="flex items-center justify-between">
-            <span className="font-bold text-primary">{price?.toLocaleString()} د.ع</span>
+            <span className="font-bold text-primary">{formatPrice(price, weightStepKg)}</span>
             {rating > 0 && (
               <div className="flex items-center gap-0.5">
                 <Star size={12} className="text-warning fill-warning" />
@@ -342,9 +344,9 @@ const ProductCard = ({
           </div>
           <div className="flex items-center justify-between mt-2">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-primary">{price?.toLocaleString()} د.ع</span>
+              <span className="font-bold text-primary">{formatPrice(price, weightStepKg)}</span>
               {hasDiscount && (
-                <span className="text-sm text-gray-400 line-through">{originalPrice?.toLocaleString()} د.ع</span>
+                <span className="text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString()} د.ع</span>
               )}
             </div>
             {inStock && (

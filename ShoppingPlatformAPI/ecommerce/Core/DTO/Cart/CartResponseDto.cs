@@ -14,5 +14,8 @@
 
         // تحذيرات
         public List<string> Warnings { get; set; }
+
+        // في السلة منتجات سوبرماركت: الدفع يطلب موعد توصيل وتفضيل الاستبدال
+        public bool HasGroceryItems { get; set; }
     }
 }

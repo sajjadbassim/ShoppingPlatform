@@ -6,6 +6,7 @@ import * as signalR from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '../components/common/Toast'
 import { useAuthStore } from '../stores/authStore'
+import { getFreshAccessToken } from '../api/session'
 
 // كل ما تعرضه شاشات العمليات من طلبات وسائقين وتتبع
 const LIVE_KEYS = [['ops'], ['orders'], ['orders-status-counts'], ['drivers'], ['ops-tracking'], ['admin']]
@@ -13,12 +14,13 @@ const LIVE_KEYS = [['ops'], ['orders'], ['orders-status-counts'], ['drivers'], [
 export const useOpsNotifications = (enabled = true) => {
   const queryClient = useQueryClient()
   const { success } = useToast()
-  const { token } = useAuthStore()
+  // الاتصال يتبع حالة الدخول لا قيمة التوكن: التجديد كل ساعة لا يعيد الاتصال (accessTokenFactory يجلب الحالي)
+  const signedIn = useAuthStore((s) => !!s.token)
   const connectionRef = useRef(null)
   const refreshTimer = useRef(null)
 
   useEffect(() => {
-    if (!enabled || !token || connectionRef.current) return
+    if (!enabled || !signedIn || connectionRef.current) return
 
     // عدة أحداث متتالية (تسليم ← حالة الطلب ← حالة السائق) = تحديث واحد
     const refresh = () => {
@@ -30,7 +32,7 @@ export const useOpsNotifications = (enabled = true) => {
 
     const connection = new signalR.HubConnectionBuilder()
       .withUrl(`${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/ops`, {
-        accessTokenFactory: () => useAuthStore.getState().token || token,
+        accessTokenFactory: getFreshAccessToken,
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
       .configureLogging(signalR.LogLevel.None)
@@ -59,5 +61,5 @@ export const useOpsNotifications = (enabled = true) => {
       connection.stop()
       connectionRef.current = null
     }
-  }, [enabled, token, queryClient, success])
+  }, [enabled, signedIn, queryClient, success])
 }

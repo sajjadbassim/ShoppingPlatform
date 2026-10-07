@@ -4,6 +4,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -34,7 +35,7 @@ namespace ecommerce.Controllers
                 var user = await _userService.GetByIdAsync(id);
                 return Ok(new { success = true, data = user });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -50,7 +51,7 @@ namespace ecommerce.Controllers
                 var user = await _userService.GetByPhoneAsync(phone);
                 return Ok(new { success = true, data = user });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -66,7 +67,7 @@ namespace ecommerce.Controllers
                 var users = await _userService.GetAllAsync();
                 return Ok(new { success = true, data = users });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -82,7 +83,7 @@ namespace ecommerce.Controllers
                 var users = await _userService.GetByRoleAsync(role);
                 return Ok(new { success = true, data = users });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -102,7 +103,7 @@ namespace ecommerce.Controllers
                 var user = await _userService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = user });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -121,7 +122,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المستخدم غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -154,7 +155,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new
                 {

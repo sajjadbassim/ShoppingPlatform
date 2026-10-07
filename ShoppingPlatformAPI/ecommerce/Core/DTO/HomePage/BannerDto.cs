@@ -18,5 +18,6 @@
 
         // null = السلايدر العلوي، وإلا = قسم بلوك البانرات
         public Guid? SectionId { get; set; }
+        public string Page { get; set; } = "general";
     }
 }

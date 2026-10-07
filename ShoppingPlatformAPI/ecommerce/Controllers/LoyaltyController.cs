@@ -5,6 +5,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -37,11 +38,18 @@ namespace ecommerce.Controllers
                 var account = await _loyaltyService.GetOrCreateAccountAsync(GetCurrentUserId());
                 return Ok(new { success = true, data = account });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        // ===================================
+        // GET: api/loyalty/referral — رمز الدعوة وإحصاءاته (يُنشأ الرمز عند أول طلب)
+        // ===================================
+        [HttpGet("referral")]
+        public async Task<IActionResult> GetReferral()
+            => Ok(new { success = true, data = await _loyaltyService.GetReferralAsync(GetCurrentUserId()) });
 
         // ===================================
         // GET: api/loyalty/transactions
@@ -55,7 +63,7 @@ namespace ecommerce.Controllers
                 var result = await _loyaltyService.GetTransactionsAsync(GetCurrentUserId(), pagination);
                 return Ok(new { success = true, data = result.Data, pagination = result.Pagination });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -76,7 +84,7 @@ namespace ecommerce.Controllers
                 var estimate = await _loyaltyService.GetEstimateAsync(GetCurrentUserId(), orderAmount);
                 return Ok(new { success = true, data = estimate });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -94,7 +102,7 @@ namespace ecommerce.Controllers
                 var result = await _loyaltyService.RedeemPointsAsync(GetCurrentUserId(), dto);
                 return Ok(new { success = true, data = result, message = result.Message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -113,7 +121,7 @@ namespace ecommerce.Controllers
                 var settings = await _loyaltyService.GetSettingsAsync();
                 return Ok(new { success = true, data = settings });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -132,7 +140,7 @@ namespace ecommerce.Controllers
                 var settings = await _loyaltyService.UpdateSettingsAsync(dto);
                 return Ok(new { success = true, data = settings, message = "تم تحديث الإعدادات بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -151,7 +159,7 @@ namespace ecommerce.Controllers
                 var account = await _loyaltyService.AdminAdjustPointsAsync(dto);
                 return Ok(new { success = true, data = account, message = "تم تعديل النقاط بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -193,7 +201,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

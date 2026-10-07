@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Children } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ArrowLeft, Truck, Shield, Headphones, CreditCard, Store, Star, Heart, Plus, Clock, LayoutGrid, BadgePercent } from 'lucide-react'
-import ProductCard from '../../components/common/ProductCard'
+import { ChevronLeft, ChevronRight, ArrowLeft, Truck, Shield, Headphones, CreditCard, Store, Star, Heart, Plus, Clock, LayoutGrid, BadgePercent, ShoppingBasket, Search, Zap, RotateCcw } from 'lucide-react'
 import AppPromoSection from '../../components/common/AppPromoSection'
 import CategoryIcon from '../../components/common/CategoryIcon'
 import { variantsService } from '../../services/variantsService'
-import { ProductCardSkeleton, Skeleton } from '../../components/common/Loading'
+import { Skeleton } from '../../components/common/Loading'
 import { useCategories } from '../../hooks/useCategories'
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
@@ -14,25 +13,30 @@ import { useToast } from '../../components/common/Toast'
 import { getImageUrl, getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
+import { useAdvancedFilter } from '../../hooks/useProducts'
+import { SCOPE, SUPERMARKET_PATH, isGroceryCategory } from '../../utils/shopScope'
+import { formatPrice, pricePerKg } from '../../utils/weight'
+import { API_ENDPOINTS } from '../../api/endpoints'
 
 // ===========================
 // Hooks
 // ===========================
 
-const useHomeData = () => useQuery({
-  queryKey: ['home'],
+// page: general (الرئيسية) | grocery (السوبرماركت) — لكل صفحة سلايدرها وأقسامها
+const useHomeData = (page) => useQuery({
+  queryKey: ['home', page],
   queryFn: async () => {
-    const r = await apiGet('/api/Home')
+    const r = await apiGet('/api/Home', { page })
     return r.data.data || r.data
   },
   staleTime: 5 * 60 * 1000,
 })
 
-const useHomeBanners = () => useQuery({
-  queryKey: ['home-banners'],
+const useHomeBanners = (page) => useQuery({
+  queryKey: ['home-banners', page],
   queryFn: async () => {
     // السلايدر العلوي فقط — بانرات البلوكات تأتي مع أقسامها
-    const r = await apiGet('/api/Home/banners', { onlyActive: true, heroOnly: true })
+    const r = await apiGet('/api/Home/banners', { onlyActive: true, heroOnly: true, page })
     return r.data.data || r.data
   },
   staleTime: 5 * 60 * 1000,
@@ -54,6 +58,7 @@ const formatProduct = (p) => ({
   inStock: p.isAvailable && p.stockQuantity > 0,
   hasDiscount: p.hasDiscount,
   discountPercentage: p.discountPercentage,
+  weightStepKg: p.weightStepKg,
 })
 
 // الوجهة تُحدَّد حسب نوع الرابط أولاً، حتى لا يبقى معرّف قديم يطغى على رابط مخصص
@@ -130,7 +135,8 @@ const HeroSlider = ({ banners, loading }) => {
   }
 
   // على الهاتف نعتمد نسبة أبعاد البنر (1600×656) حتى تظهر الصورة كاملة دون قص
-  const sizeClass = 'aspect-[1600/656]'
+  // على الشاشات الكبيرة: أقل ارتفاعاً قليلاً (قص بسيط من الأعلى والأسفل) حتى لا يملأ الشاشة
+  const sizeClass = 'aspect-[1600/656] lg:aspect-[2.8/1]'
 
   // على الهاتف: من الحافة للحافة بلا هوامش (مثل التطبيقات)، وعلى الشاشات الكبيرة: بطاقة بزوايا دائرية
   if (loading) return (
@@ -201,22 +207,42 @@ const HeroSlider = ({ banners, loading }) => {
   )
 }
 
+// رأس صفحة السوبرماركت حين لا توجد بانرات لها بعد
+const GroceryHero = () => (
+  <div className="lg:container-main lg:pt-6">
+    <section className="relative overflow-hidden bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 lg:rounded-3xl px-5 py-7 lg:px-12 lg:py-12 text-white">
+      <ShoppingBasket className="absolute -left-6 -bottom-8 w-40 h-40 lg:w-64 lg:h-64 text-white/10 -rotate-12" aria-hidden="true" />
+      <h1 className="relative text-2xl lg:text-4xl font-bold">السوبرماركت</h1>
+      <p className="relative mt-1 lg:mt-2 text-sm lg:text-lg text-white/85 max-w-xl">
+        خضار وفواكه، ألبان، لحوم ومشروبات — في نفس سلتك مع باقي طلباتك
+      </p>
+      <button onClick={() => window.dispatchEvent(new Event('open-global-search'))}
+        className="relative mt-4 lg:mt-6 w-full max-w-md h-11 rounded-full bg-white text-gray-500 flex items-center gap-2 px-4 text-sm shadow-sm">
+        <Search size={18} /> ابحث في السوبرماركت...
+      </button>
+    </section>
+  </div>
+)
+
 // ===========================
 // Section Renderer
 // ===========================
 
 // بطاقة منتج مصغّرة للتمرير الأفقي: صورة، مفضلة، إضافة سريعة، اسم، سعر، تقييم
-const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = false, className = 'w-[38%] min-w-[140px]' }) => {
+// العرض: 38% على الهاتف، و4/5/6 بطاقات في الصف على الشاشات الأكبر (مع فراغ 16px بينها)
+const RAIL_CARD_WIDTH = 'w-[38%] min-w-[140px] md:min-w-0 md:w-[calc((100%-48px)/4)] lg:w-[calc((100%-64px)/5)] xl:w-[calc((100%-80px)/6)]'
+
+const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = false, className = RAIL_CARD_WIDTH }) => {
   const img = getPrimaryImage(product)
   const hasDiscount = product.originalPrice && product.originalPrice > product.price
   const discount = hasDiscount ? Math.round((1 - product.price / product.originalPrice) * 100) : product.discountPercentage
   const stop = (fn) => (e) => { e.preventDefault(); e.stopPropagation(); fn?.() }
   return (
     <Link to={`/products/${product.id}`}
-      className={`block ${className} flex-shrink-0 snap-start text-gray-900 ${boxed ? 'bg-white rounded-2xl p-2 shadow-sm' : ''}`}>
-      <div className="relative aspect-square product-media rounded-2xl overflow-hidden">
+      className={`group block ${className} flex-shrink-0 snap-start text-gray-900 ${boxed ? 'bg-white rounded-2xl p-2 shadow-sm' : 'md:card md:rounded-2xl md:p-2.5 md:hover:shadow-card-hover'}`}>
+      <div className="relative aspect-square product-media rounded-2xl md:rounded-xl overflow-hidden">
         {img
-          ? <img src={img} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
+          ? <img src={img} alt={product.name} loading="lazy" className="w-full h-full object-cover md:group-hover:scale-105 transition-transform duration-300" />
           : <div className="w-full h-full flex items-center justify-center text-gray-300"><Store size={32} /></div>}
         {discount > 0 && (
           <span className="absolute top-2 right-2 bg-error text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md" dir="ltr">-{discount}%</span>
@@ -234,10 +260,10 @@ const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = fal
           </button>
         )}
       </div>
-      <p className="mt-2 text-[13px] font-medium leading-snug line-clamp-2 min-h-[2lh]">{product.name}</p>
+      <p className="mt-2 text-[13px] md:text-sm font-medium leading-snug line-clamp-2 min-h-[2lh] md:group-hover:text-primary transition-colors">{product.name}</p>
       <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
-        <span className="text-sm font-bold">{product.price?.toLocaleString()} د.ع</span>
-        {hasDiscount && <span className="text-[11px] text-gray-400 line-through">{product.originalPrice.toLocaleString()}</span>}
+        <span className="text-sm md:text-base font-bold">{formatPrice(product.price, product.weightStepKg)}</span>
+        {hasDiscount && <span className="text-[11px] text-gray-400 line-through">{Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString()}</span>}
       </div>
       {product.rating > 0 && (
         <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
@@ -269,21 +295,23 @@ const PromoTiles = () => (
 // "عرض الكل" يفتح نفس محتوى القسم:
 // - المختار يدوياً: منتجات القسم نفسها
 // - المميز: نفس فلتر الفئة/المتجر ونفس الترتيب (الأكثر مبيعاً)
+// - أقسام صفحة السوبرماركت تبقى داخل السوبرماركت
 const getSectionLink = (section) => {
-  if (section.type === 'custom_products') return `/products?section=${section.id}`
+  if (section.type === 'custom_products' || section.type === 'flash_deals') return `/products?section=${section.id}`
   const params = new URLSearchParams()
   if (section.filterCategoryId) params.set('category', section.filterCategoryId)
   if (section.filterVendorId) params.set('vendor', section.filterVendorId)
+  if (section.page === SCOPE.GROCERY) params.set('scope', SCOPE.GROCERY)
   params.set('sort', 'sales')
   return `/products?${params}`
 }
 
 // رأس القسم: العنوان و"عرض الكل"
 const SectionHeader = ({ title, subtitle, to }) => (
-  <div className="flex items-center justify-between mb-3 md:mb-6">
+  <div className="flex items-center justify-between mb-3 md:mb-4">
     <div>
-      <h2 className="text-lg md:text-2xl font-bold text-gray-900">{title}</h2>
-      {subtitle && <p className="text-xs md:text-base text-gray-500 mt-0.5 md:mt-1">{subtitle}</p>}
+      <h2 className="text-lg md:text-xl font-bold text-gray-900">{title}</h2>
+      {subtitle && <p className="text-xs md:text-sm text-gray-500 mt-0.5">{subtitle}</p>}
     </div>
     <Link to={to} className="text-primary hover:underline flex items-center gap-1 text-sm font-medium">
       عرض المزيد <ArrowLeft size={16} className="hidden md:block" />
@@ -296,13 +324,13 @@ const bannerSrc = (url) => (url?.startsWith('/') ? getImageUrl(url) : url)
 // رأس قسم بصورة بانر: العنوان والوصف وزر "عرض المزيد" فوق الصورة
 const BannerSectionHeader = ({ image, title, subtitle, to }) => (
   <div className="relative overflow-hidden -mx-4 md:mx-0 md:rounded-3xl bg-gray-100">
-    <img src={bannerSrc(image)} alt="" loading="lazy" className="w-full aspect-[2.3/1] md:aspect-[3.4/1] object-cover" />
+    <img src={bannerSrc(image)} alt="" loading="lazy" className="w-full aspect-[2.3/1] md:aspect-[3.4/1] lg:aspect-[4.2/1] object-cover" />
     {/* تدرّج من جهة النص (اليمين) ليبقى العنوان مقروءاً على أي صورة */}
     <div className="absolute inset-0 bg-gradient-to-l from-black/55 via-black/15 to-transparent" />
-    <div className="absolute inset-y-0 right-0 w-3/5 flex flex-col justify-center gap-1.5 md:gap-2 p-4 md:p-10 pb-14 md:pb-10">
-      <h2 className="text-white font-bold text-lg md:text-3xl leading-snug drop-shadow">{title}</h2>
-      {subtitle && <p className="text-white/85 text-xs md:text-base line-clamp-2">{subtitle}</p>}
-      <Link to={to} className="self-start mt-1 md:mt-3 px-4 md:px-6 py-1.5 md:py-2 rounded-xl border border-white/80 text-white text-sm md:text-base font-medium hover:bg-white/15 active:bg-white/25 transition-colors">
+    <div className="absolute inset-y-0 right-0 w-3/5 flex flex-col justify-center gap-1.5 md:gap-2 p-4 md:p-8 lg:px-10 pb-14 md:pb-8">
+      <h2 className="text-white font-bold text-lg md:text-2xl lg:text-3xl leading-snug drop-shadow">{title}</h2>
+      {subtitle && <p className="text-white/85 text-xs md:text-sm lg:text-base line-clamp-2">{subtitle}</p>}
+      <Link to={to} className="self-start mt-1 md:mt-2 px-4 md:px-5 py-1.5 rounded-xl border border-white/80 text-white text-sm font-medium hover:bg-white/15 active:bg-white/25 transition-colors">
         عرض المزيد
       </Link>
     </div>
@@ -310,9 +338,14 @@ const BannerSectionHeader = ({ image, title, subtitle, to }) => (
 )
 
 // بلوك بانرات: 1 → عريض، 2 → متجاوران، 3+ → الأول عريض والبقية شبكة من عمودين
-const BannerTile = ({ banner, wide }) => (
+// على الشاشات الكبيرة (3+): صف واحد — العريض بعرض عمودين والبقية مربعات بجانبه
+const tileClass = (wide, mosaic) => wide
+  ? (mosaic ? 'aspect-[2.15/1] md:aspect-[3/1] lg:aspect-auto lg:col-span-2' : 'aspect-[2.15/1] md:aspect-[3/1] lg:aspect-[4/1]')
+  : (mosaic ? 'aspect-square md:aspect-[16/10] lg:aspect-square' : 'aspect-square md:aspect-[16/10]')
+
+const BannerTile = ({ banner, wide, mosaic }) => (
   <BannerLink to={getBannerLink(banner)}
-    className={`block overflow-hidden rounded-2xl md:rounded-3xl bg-gray-100 active:scale-[0.99] transition-transform ${wide ? 'aspect-[2.15/1] md:aspect-[3/1]' : 'aspect-square md:aspect-[16/10]'}`}>
+    className={`block overflow-hidden rounded-2xl md:rounded-3xl bg-gray-100 active:scale-[0.99] transition-transform ${tileClass(wide, mosaic)}`}>
     <img src={bannerSrc(banner.imageUrl)} alt={banner.titleAr || banner.title || ''} loading="lazy" className="w-full h-full object-cover" />
   </BannerLink>
 )
@@ -321,16 +354,100 @@ const BannerBlockSection = ({ section }) => {
   const banners = (section.data || []).filter(b => b.imageUrl)
   if (banners.length === 0) return null
   const [wide, ...grid] = banners.length === 2 ? [null, ...banners] : banners
+  const mosaic = !!wide && grid.length >= 2
 
   return (
-    <section className="py-3 md:py-6">
-      <div className="container-main space-y-3 md:space-y-4">
-        {wide && <BannerTile banner={wide} wide />}
+    <section className="py-3 md:py-5">
+      <div className={`container-main space-y-3 md:space-y-4 ${mosaic ? 'lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-4' : ''}`}>
+        {wide && <BannerTile banner={wide} wide mosaic={mosaic} />}
         {grid.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
-            {grid.map(b => <BannerTile key={b.id} banner={b} />)}
+          <div className={`grid grid-cols-2 gap-3 md:gap-4 ${mosaic ? 'lg:contents' : ''}`}>
+            {grid.map(b => <BannerTile key={b.id} banner={b} mosaic={mosaic} />)}
           </div>
         )}
+      </div>
+    </section>
+  )
+}
+
+// العدّاد التنازلي للعروض المحدودة (ساعات:دقائق:ثوانٍ، أو «يومان و03:12:45»)
+const useCountdown = (endsAt) => {
+  const end = endsAt ? new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(endsAt) ? endsAt : `${endsAt}Z`).getTime() : 0
+  const [left, setLeft] = useState(() => Math.max(0, end - Date.now()))
+  useEffect(() => {
+    if (!end) return
+    const t = setInterval(() => setLeft(Math.max(0, end - Date.now())), 1000)
+    return () => clearInterval(t)
+  }, [end])
+  return left
+}
+
+const pad = (n) => String(n).padStart(2, '0')
+const CountdownText = ({ ms }) => {
+  const s = Math.floor(ms / 1000)
+  const days = Math.floor(s / 86400)
+  const clock = `${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`
+  return <span dir="ltr" className="tabular-nums">{days > 0 ? `${clock} + ${days}d` : clock}</span>
+}
+
+// عروض محدودة: رأس بعدّاد تنازلي، ويختفي القسم عند انتهاء الوقت
+const FlashDealsSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }) => {
+  const left = useCountdown(section.endsAt)
+  const products = (section.data || []).map(p => ({ ...formatProduct(p), isWishlisted: isInWishlist(p.id) }))
+  if (products.length === 0 || left <= 0) return null
+
+  return (
+    <section className="py-5 md:py-6">
+      <div className="container-main">
+        <div className="rounded-2xl md:rounded-3xl bg-gradient-to-l from-rose-600 via-red-500 to-orange-500 p-3 md:p-5 text-white">
+          <div className="flex items-center justify-between gap-3 mb-3 md:mb-4">
+            <div className="min-w-0">
+              <h2 className="text-lg md:text-xl font-bold flex items-center gap-2"><Zap size={20} className="fill-white" />{section.titleAr || section.title}</h2>
+              {(section.subtitleAr || section.subtitle) && <p className="text-xs md:text-sm text-white/85 mt-0.5 truncate">{section.subtitleAr || section.subtitle}</p>}
+            </div>
+            <div className="flex-shrink-0 text-center bg-white/15 rounded-xl px-3 py-1.5">
+              <p className="text-[10px] md:text-xs text-white/80">ينتهي خلال</p>
+              <p className="text-base md:text-xl font-bold"><CountdownText ms={left} /></p>
+            </div>
+          </div>
+          <ProductRail>
+            {products.map(product => (
+              <MobileProductCard key={product.id} product={product} boxed onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
+            ))}
+          </ProductRail>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// اشترِ مجدداً: ما طلبه الزبون سابقاً ومتوفر الآن (ضمن قسم الصفحة) — يظهر للمسجّل فقط
+const BuyAgainSection = ({ page, onAddToCart, onToggleWishlist, isInWishlist }) => {
+  const { isAuthenticated } = useAuthStore()
+  const { data: items = [] } = useQuery({
+    queryKey: ['buy-again', page],
+    queryFn: async () => (await apiGet(API_ENDPOINTS.PRODUCTS.BUY_AGAIN, { scope: page, max: 20 })).data.data || [],
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  })
+  if (!isAuthenticated || items.length < 2) return null
+  const products = items.map(p => ({ ...formatProduct(p), isWishlisted: isInWishlist(p.id) }))
+
+  return (
+    <section className="py-5 md:py-6">
+      <div className="container-main">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
+          <div>
+            <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2"><RotateCcw size={18} className="text-primary" />اشترِ مجدداً</h2>
+            <p className="text-xs md:text-sm text-gray-500 mt-0.5">منتجات طلبتها سابقاً — أضفها بضغطة</p>
+          </div>
+          <Link to="/orders" className="text-primary hover:underline text-sm font-medium">طلباتي</Link>
+        </div>
+        <ProductRail>
+          {products.map(product => (
+            <MobileProductCard key={product.id} product={product} onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
+          ))}
+        </ProductRail>
       </div>
     </section>
   )
@@ -346,7 +463,7 @@ const ProductSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }
   const hasBanner = !!section.bannerImageUrl
 
   return (
-    <section className="py-5 md:py-10">
+    <section className="py-5 md:py-6">
       <div className="container-main">
         {hasBanner ? (
           <BannerSectionHeader
@@ -361,22 +478,62 @@ const ProductSection = ({ section, onAddToCart, onToggleWishlist, isInWishlist }
             to={getSectionLink(section)} />
         )}
 
-        {/* الهاتف: تمرير أفقي — مع بانر الرأس تتداخل البطاقات مع أسفل البانر */}
-        <div className={`md:hidden flex gap-3 overflow-x-auto snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 ${hasBanner ? 'relative -mt-10' : ''}`}>
+        {/* صف واحد بتمرير أفقي — على الهاتف تتداخل البطاقات مع أسفل بانر الرأس */}
+        <ProductRail className={hasBanner ? 'relative -mt-10 md:mt-4' : ''}>
           {products.map(product => (
             <MobileProductCard key={product.id} product={product} onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
           ))}
-        </div>
-
-        {/* الشاشات الأكبر: شبكة */}
-        <div className={`product-grid hidden md:grid ${hasBanner ? 'mt-6' : ''}`}>
-          {products.map(product => (
-            <ProductCard key={product.id} product={product}
-              onAddToCart={onAddToCart} onToggleWishlist={onToggleWishlist} />
-          ))}
-        </div>
+        </ProductRail>
       </div>
     </section>
+  )
+}
+
+// شريط تمرير أفقي، مع أسهم على الشاشات الكبيرة تظهر فقط حين يوجد محتوى في ذلك الاتجاه
+const ProductRail = ({ children, className = '' }) => {
+  const ref = useRef(null)
+  const [edges, setEdges] = useState({ atStart: true, atEnd: true })
+
+  const update = () => {
+    const el = ref.current
+    if (!el) return
+    // في RTL تكون scrollLeft صفراً في البداية وسالبة كلما تقدّمنا يساراً
+    const x = Math.abs(el.scrollLeft)
+    const next = { atStart: x < 4, atEnd: x + el.clientWidth >= el.scrollWidth - 4 }
+    setEdges(prev => (prev.atStart === next.atStart && prev.atEnd === next.atEnd ? prev : next))
+  }
+
+  const count = Children.count(children)
+  useEffect(() => {
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [count])
+
+  const scrollPage = (dir) => {
+    const el = ref.current
+    if (el) el.scrollBy({ left: -dir * el.clientWidth * 0.9, behavior: 'smooth' })
+  }
+
+  const arrow = 'hidden md:flex absolute top-[38%] -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white border border-gray-200 shadow-md items-center justify-center text-gray-700 hover:text-primary hover:border-primary transition-colors'
+
+  return (
+    <div className={`relative ${className}`}>
+      <div ref={ref} onScroll={update}
+        className="flex gap-3 md:gap-4 overflow-x-auto snap-x scroll-px-4 md:scroll-px-0 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 md:py-1">
+        {children}
+      </div>
+      {!edges.atStart && (
+        <button onClick={() => scrollPage(-1)} aria-label="السابق" className={`${arrow} right-0 translate-x-1/2`}>
+          <ChevronRight size={20} />
+        </button>
+      )}
+      {!edges.atEnd && (
+        <button onClick={() => scrollPage(1)} aria-label="التالي" className={`${arrow} left-0 -translate-x-1/2`}>
+          <ChevronLeft size={20} />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -424,11 +581,11 @@ const VendorsSection = ({ section }) => {
   if (vendors.length === 0) return null
 
   return (
-    <section className="py-5 md:py-10">
+    <section className="py-5 md:py-6">
       <div className="container-main">
         <SectionHeader title={section.titleAr || section.title} subtitle={section.subtitleAr || section.subtitle}
           to={`/stores?section=${section.id}`} />
-        <div className="flex md:grid md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4 overflow-x-auto md:overflow-visible snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+        <div className="flex md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 lg:gap-4 overflow-x-auto md:overflow-visible snap-x scroll-px-4 hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1">
           {vendors.map(vendor => <StoreCardMini key={vendor.id} vendor={vendor} />)}
         </div>
       </div>
@@ -440,21 +597,37 @@ const VendorsSection = ({ section }) => {
 // Main Page
 // ===========================
 
-const HomePage = () => {
+const HomePage = ({ page = SCOPE.GENERAL }) => {
+  const grocery   = page === SCOPE.GROCERY
   const navigate  = useNavigate()
   const { success, error: showError } = useToast()
   const { isAuthenticated } = useAuthStore()
   const { addItem: addToCart } = useCartStore()
   const { toggleItem: toggleWishlist, isInWishlist } = useWishlistStore()
 
-  const { data: homeData, isLoading: homeLoading } = useHomeData()
-  const { data: bannersData, isLoading: bannersLoading } = useHomeBanners()
+  const { data: homeData, isLoading: homeLoading } = useHomeData(page)
+  const { data: bannersData, isLoading: bannersLoading } = useHomeBanners(page)
   const { data: categoriesData, isLoading: categoriesLoading } = useCategories(true)
 
   const banners  = bannersData || homeData?.banners || []
-  const sections = homeData?.sections?.filter(s => s.isActive).sort((a,b) => a.displayOrder - b.displayOrder) || []
-  // شريط الفئات: الرئيسية التي فيها منتجات فقط (فئة فارغة تفتح صفحة بلا نتائج)
-  const allRootCategories = (categoriesData || []).filter(c => !c.parentId && c.productsCount > 0)
+  const configuredSections = homeData?.sections?.filter(s => s.isActive).sort((a,b) => a.displayOrder - b.displayOrder) || []
+
+  // صفحة السوبرماركت قبل أن تُضاف لها أقسام: الأكثر مبيعاً فيه تلقائياً
+  const needsGroceryFallback = grocery && !homeLoading && configuredSections.length === 0
+  const { data: groceryTop } = useAdvancedFilter(
+    { scope: SCOPE.GROCERY, isActive: true, isAvailable: true, sortBy: 'sales', pageSize: 12 }, needsGroceryFallback)
+  const sections = needsGroceryFallback && groceryTop?.items?.length
+    ? [{ id: 'grocery-top', type: 'featured_products', page: SCOPE.GROCERY, isActive: true, titleAr: 'الأكثر مبيعاً في السوبرماركت', data: groceryTop.items }]
+    : configuredSections
+
+  // شريط الفئات (التي فيها منتجات فقط — فئة فارغة تفتح صفحة بلا نتائج):
+  // الرئيسية → الفئات الرئيسية خارج السوبرماركت | السوبرماركت → فئاته الفرعية (أو الرئيسية إن لم تكن لها فروع)
+  const withProducts = (categoriesData || []).filter(c => c.productsCount > 0)
+  const groceryRoots = withProducts.filter(c => !c.parentId && isGroceryCategory(c))
+  const groceryChildren = withProducts.filter(c => groceryRoots.some(r => r.id === c.parentId))
+  const barCategories = grocery
+    ? (groceryChildren.length > 0 ? groceryChildren : groceryRoots)
+    : withProducts.filter(c => !c.parentId && !isGroceryCategory(c))
 
 
   const features = [
@@ -486,13 +659,15 @@ const HomePage = () => {
     <div className="min-h-screen">
 
       {/* السلايدر العلوي — من الحافة للحافة على الهاتف */}
-      <HeroSlider banners={banners} loading={bannersLoading} />
+      {grocery && !bannersLoading && banners.length === 0
+        ? <GroceryHero />
+        : <HeroSlider banners={banners} loading={bannersLoading} />}
 
       {/* الفئات: دوائر بصورة واسم تحتها — تمرير أفقي على الهاتف */}
       <section className="pt-4 lg:pt-8">
         <div className="flex gap-3 lg:gap-6 overflow-x-auto hide-scrollbar px-4 pb-1 lg:container-main lg:flex-wrap lg:justify-center lg:overflow-visible">
           {/* العروض — بنفس روح زر العروض في الشريط السفلي: تدرّج، أيقونة تهتز، ونبض */}
-          <Link to="/products?hasDiscount=true" className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+          <Link to={`/products?hasDiscount=true${grocery ? '&scope=grocery' : ''}`} className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
             <span className="relative w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full overflow-hidden bg-gradient-to-br from-rose-500 via-red-500 to-orange-400 shadow-md shadow-rose-500/30 flex items-center justify-center group-active:scale-95 transition-transform">
               <span className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-white/15" aria-hidden="true" />
               <span className="relative w-11 h-11 lg:w-14 lg:h-14 rounded-full bg-white/20 flex items-center justify-center">
@@ -503,6 +678,17 @@ const HomePage = () => {
             <span className="mt-2 text-xs lg:text-sm font-bold text-rose-600 leading-tight">العروض</span>
           </Link>
 
+          {/* مدخل السوبرماركت — قسم منفصل عن بقية المنتجات */}
+          {!grocery && (
+            <Link to={SUPERMARKET_PATH} className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+              <span className="relative w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-600 shadow-md shadow-emerald-500/30 flex items-center justify-center group-active:scale-95 transition-transform">
+                <span className="absolute -top-3 -left-3 w-10 h-10 rounded-full bg-white/15" aria-hidden="true" />
+                <ShoppingBasket size={30} strokeWidth={2.1} className="relative text-white lg:w-9 lg:h-9" />
+              </span>
+              <span className="mt-2 text-xs lg:text-sm font-bold text-emerald-600 leading-tight">السوبرماركت</span>
+            </Link>
+          )}
+
           {categoriesLoading
             ? [...Array(5)].map((_, i) => (
               <div key={i} className="flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center gap-2">
@@ -510,7 +696,7 @@ const HomePage = () => {
                 <Skeleton className="h-3 w-14" />
               </div>
             ))
-            : allRootCategories.map((cat, i) => (
+            : barCategories.map((cat, i) => (
               <Link key={cat.id} to={`/products?category=${cat.id}`}
                 className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
                 <span className="w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full product-media overflow-hidden flex items-center justify-center group-active:scale-95 transition-transform">
@@ -520,26 +706,26 @@ const HomePage = () => {
               </Link>
             ))}
 
-          {/* عرض كل الفئات */}
-          <Link to="/categories" className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
+          {/* عرض كل الفئات — في السوبرماركت: كل منتجاته */}
+          <Link to={grocery ? '/products?scope=grocery' : '/categories'} className="group flex-shrink-0 w-[76px] lg:w-[104px] flex flex-col items-center text-center">
             <span className="w-[72px] h-[72px] lg:w-24 lg:h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-white group-active:scale-95 transition-all">
               <LayoutGrid size={28} fill="currentColor" />
             </span>
-            <span className="mt-2 text-xs lg:text-sm font-bold text-primary leading-tight">عرض الكل</span>
+            <span className="mt-2 text-xs lg:text-sm font-bold text-primary leading-tight">{grocery ? 'كل المنتجات' : 'عرض الكل'}</span>
           </Link>
         </div>
       </section>
 
+      {/* اشترِ مجدداً — للمسجّل الذي له طلبات سابقة */}
+      <BuyAgainSection page={page} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isInWishlist={isInWishlist} />
+
       {/* Dynamic Sections من الـ API */}
       {homeLoading ? (
-        <section className="py-5 md:py-10">
+        <section className="py-5 md:py-6">
           <div className="container-main">
-            <Skeleton className="h-8 w-48 mb-6" />
-            <div className="product-grid hidden md:grid">
-              {[...Array(5)].map((_, i) => <ProductCardSkeleton key={i} />)}
-            </div>
-            <div className="md:hidden flex gap-3 overflow-hidden">
-              {[...Array(3)].map((_, i) => <Skeleton key={i} className="w-[38%] min-w-[140px] flex-shrink-0 aspect-square rounded-2xl" />)}
+            <Skeleton className="h-7 w-48 mb-4" />
+            <div className="flex gap-3 md:gap-4 overflow-hidden">
+              {[...Array(6)].map((_, i) => <Skeleton key={i} className={`${RAIL_CARD_WIDTH} flex-shrink-0 aspect-square rounded-2xl`} />)}
             </div>
           </div>
         </section>
@@ -553,6 +739,15 @@ const HomePage = () => {
 
         if (section.type === 'banners') {
           return <div key={section.id} className={bg}><BannerBlockSection section={section} /></div>
+        }
+
+        if (section.type === 'flash_deals') {
+          return (
+            <div key={section.id} className={bg}>
+              <FlashDealsSection section={section} onAddToCart={handleAddToCart}
+                onToggleWishlist={handleToggleWishlist} isInWishlist={isInWishlist} />
+            </div>
+          )
         }
 
         // أنواع لا تعرضها الصفحة (مثل أفضل الفئات) بدل عرضها كبطاقات منتجات معطوبة
@@ -572,7 +767,7 @@ const HomePage = () => {
       })}
 
       {/* النقاط والمتاجر المحلية */}
-      <PromoTiles />
+      {!grocery && <PromoTiles />}
 
       {/* Features — على الهاتف: 3 في صف واحد بشكل مضغوط */}
       <section className="bg-white border-y border-gray-100 mt-2">
@@ -594,7 +789,7 @@ const HomePage = () => {
       </section>
 
       {/* تثبيت التطبيق + المساعدة (بديل النشرة البريدية) */}
-      <AppPromoSection />
+      {!grocery && <AppPromoSection />}
     </div>
   )
 }

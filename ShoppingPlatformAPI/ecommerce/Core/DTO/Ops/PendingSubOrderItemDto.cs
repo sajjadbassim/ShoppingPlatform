@@ -9,6 +9,7 @@
         public decimal UnitPrice { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal { get; set; }
+        public decimal? WeightStepKg { get; set; }
         // ✅ Variant
         public Guid? VariantId { get; set; }
         public string? VariantSku { get; set; }

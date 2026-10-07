@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Text.Json;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -53,7 +54,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -72,7 +73,7 @@ namespace ecommerce.Controllers
                 var count = await _notificationRepository.GetUnreadCountAsync(userId);
                 return Ok(new { success = true, data = new { unreadCount = count } });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -95,7 +96,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الإشعار غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -114,7 +115,7 @@ namespace ecommerce.Controllers
                 await _notificationRepository.MarkAllAsReadAsync(userId);
                 return Ok(new { success = true, message = "تم تحديد كل الإشعارات كمقروءة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -145,7 +146,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الإشعار غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -164,7 +165,7 @@ namespace ecommerce.Controllers
                 await _notificationRepository.DeleteAllReadAsync(userId);
                 return Ok(new { success = true, message = "تم حذف الإشعارات المقروءة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

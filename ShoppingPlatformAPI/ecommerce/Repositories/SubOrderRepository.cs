@@ -3,6 +3,7 @@ using ecommerce.Core.DTO.Ops;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Repositories
 {
@@ -173,7 +174,7 @@ namespace ecommerce.Repositories
         public async Task<DriverStatsDto> GetDriverStatsAsync(Guid driverId)
         {
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == driverId);
-            if (driver == null) throw new Exception("السائق غير موجود");
+            if (driver == null) throw new NotFoundException("السائق غير موجود");
 
             var today = DateTime.UtcNow.Date;
             var weekStart = today.AddDays(-(int)today.DayOfWeek);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Search, 
   ShoppingCart, 
@@ -12,8 +12,10 @@ import {
   LayoutDashboard,
   Store,
   Star,
-  Clapperboard
+  Clapperboard,
+  ShoppingBasket
 } from 'lucide-react'
+import BackButton from './BackButton'
 import { useAuthStore } from '../../stores/authStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
@@ -24,6 +26,7 @@ import { getDashboardLink } from '../../utils/dashboardLink'
 import { useCategories } from '../../hooks/useCategories'
 import CategoryIcon from './CategoryIcon'
 import UserAvatar from './UserAvatar'
+import { isGroceryCategory, SCOPE, SUPERMARKET_PATH, useShopScope } from '../../utils/shopScope'
 
 const Header = () => {
   const navigate = useNavigate()
@@ -35,11 +38,24 @@ const Header = () => {
   const { items: wishlistItems } = useWishlistStore()
     // ✅ جلب التصنيفات من الـ API
   const { data: categoriesData } = useCategories(true)
-  const categories = categoriesData?.slice(0, 5) || []  // أول 5 تصنيفات فقط
+  // أول 5 فئات رئيسية خارج السوبرماركت (للسوبرماركت رابطه الخاص)
+  const categories = (categoriesData || []).filter(c => !c.parentId && !isGroceryCategory(c)).slice(0, 5)
 
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [categoriesOpen, setCategoriesOpen] = useState(false)
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const shopScope = useShopScope()
+
+  // NavLink يقارن المسار فقط، فكانت «المنتجات» و«العروض» تُضاءان معاً على /products.
+  // هنا يُحسب القسم النشط من الرابط كاملاً: العروض = hasDiscount، السوبرماركت = صفحته أو scope=grocery
+  const { pathname, search } = useLocation()
+  const query = new URLSearchParams(search)
+  const onProducts = pathname === '/products'
+  const activeNav = pathname.startsWith(SUPERMARKET_PATH) ? 'grocery'
+    : onProducts && query.get('hasDiscount') === 'true' ? 'offers'
+    : onProducts && query.get('scope') === 'grocery' ? 'grocery'
+    : onProducts ? 'products'
+    : null
 
   // فتح البحث من أي مكان في الصفحة (مثل شريط البحث في الصفحة الرئيسية)
   useEffect(() => {
@@ -73,16 +89,19 @@ const Header = () => {
   return (
     <header className="fixed top-0 right-0 left-0 h-[70px] bg-white border-b border-gray-200 z-50">
       <div className="container-main h-full flex items-center justify-between gap-4">
-        {/* Logo */}
-        <Link to="/" className="flex items-center gap-3 flex-shrink-0">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">و</span>
-          </div>
-          <div className="hidden sm:block">
-            <h1 className="font-display font-bold text-lg text-gray-900 leading-tight">واسط</h1>
-            <p className="text-xs text-gray-500 -mt-1">التجارية</p>
-          </div>
-        </Link>
+        {/* رجوع + الشعار */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <BackButton className="-mr-2" />
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">و</span>
+            </div>
+            <div className="hidden sm:block">
+              <h1 className="font-display font-bold text-lg text-gray-900 leading-tight">واسط</h1>
+              <p className="text-xs text-gray-500 -mt-1">التجارية</p>
+            </div>
+          </Link>
+        </div>
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-1">
@@ -129,25 +148,30 @@ const Header = () => {
             المتاجر
           </NavLink>
 
-          <NavLink
+          <Link
             to="/products"
-            className={({ isActive }) => `
-              px-4 py-2 rounded-md transition-colors
-              ${isActive ? 'text-primary bg-primary/5' : 'text-gray-700 hover:text-primary hover:bg-gray-50'}
-            `}
+            aria-current={activeNav === 'products' ? 'page' : undefined}
+            className={`px-4 py-2 rounded-md transition-colors ${activeNav === 'products' ? 'text-primary bg-primary/5' : 'text-gray-700 hover:text-primary hover:bg-gray-50'}`}
           >
             المنتجات
-          </NavLink>
+          </Link>
 
-          <NavLink
+          <Link
+            to={SUPERMARKET_PATH}
+            aria-current={activeNav === 'grocery' ? 'page' : undefined}
+            className={`px-4 py-2 rounded-md transition-colors font-medium flex items-center gap-1.5 ${activeNav === 'grocery' ? 'text-emerald-700 bg-emerald-50' : 'text-emerald-600 hover:bg-emerald-50'}`}
+          >
+            <ShoppingBasket size={17} />
+            السوبرماركت
+          </Link>
+
+          <Link
             to="/products?hasDiscount=true"
-            className={({ isActive }) => `
-              px-4 py-2 rounded-md transition-colors font-medium
-              ${isActive ? 'text-error bg-error/5' : 'text-error hover:bg-error/5'}
-            `}
+            aria-current={activeNav === 'offers' ? 'page' : undefined}
+            className={`px-4 py-2 rounded-md transition-colors font-medium ${activeNav === 'offers' ? 'text-error bg-error/5' : 'text-error hover:bg-error/5'}`}
           >
             العروض
-          </NavLink>
+          </Link>
 
           {/* ريلز — على الهاتف في منتصف الشريط السفلي */}
           <NavLink
@@ -166,7 +190,7 @@ const Header = () => {
             className="w-full h-11 pr-11 pl-4 bg-gray-50 border border-gray-200 rounded-full text-gray-400 text-right hover:border-primary hover:bg-white transition-all flex items-center"
           >
             <Search className="mr-3 text-gray-400" size={20} />
-            <span>ابحث عن منتج، متجر...</span>
+            <span>{shopScope === SCOPE.GROCERY ? 'ابحث في السوبرماركت...' : 'ابحث عن منتج، متجر...'}</span>
           </button>
         </div>
 
@@ -174,7 +198,7 @@ const Header = () => {
         <div className="flex items-center gap-2">
           {/* Mobile Search Toggle */}
           <button 
-            className="md:hidden p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="md:hidden p-2 [@media(hover:hover)]:hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors"
             onClick={() => setGlobalSearchOpen(true)}
           >
             <Search size={22} className="text-gray-600" />

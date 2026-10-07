@@ -37,10 +37,15 @@ namespace ecommerce.Extensions
         public static IServiceCollection AddAppPersistence(this IServiceCollection services, IConfiguration config)
         {
             services.AddSingleton<AuditableEntityInterceptor>();
+            services.AddMemoryCache();
+            services.AddSingleton<ecommerce.Services.AuthService.IUserSessionValidator, ecommerce.Services.AuthService.UserSessionValidator>();
+            services.AddSingleton<UserSessionInterceptor>();
 
             services.AddDbContext<AppDbContext>((sp, options) =>
                 options.UseSqlServer(config.GetConnectionString("DefaultConnection"))
-                       .AddInterceptors(sp.GetRequiredService<AuditableEntityInterceptor>()));
+                       .AddInterceptors(
+                           sp.GetRequiredService<AuditableEntityInterceptor>(),
+                           sp.GetRequiredService<UserSessionInterceptor>()));
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             return services;
@@ -60,6 +65,11 @@ namespace ecommerce.Extensions
             services.AddScoped<ecommerce.Services.AuthService.IGoogleAuthService, ecommerce.Services.AuthService.GoogleAuthService>();
             services.AddScoped<ecommerce.Services.OrderSettingsService.IOrderSettingsService, ecommerce.Services.OrderSettingsService.OrderSettingsService>();
             services.AddScoped<ecommerce.Services.OrderTimingService.IOrderTimingService, ecommerce.Services.OrderTimingService.OrderTimingService>();
+            services.AddScoped<ecommerce.Services.DeliverySlotService.IDeliverySlotService, ecommerce.Services.DeliverySlotService.DeliverySlotService>();
+
+            // تنبيهات التوفر وتذكير السلة المتروكة (كل 5 دقائق)
+            services.AddScoped<ecommerce.Services.EngagementService.ICustomerEngagementService, ecommerce.Services.EngagementService.CustomerEngagementService>();
+            services.AddHostedService<ecommerce.Services.EngagementService.CustomerEngagementBackgroundService>();
 
             // إشعارات الدفع (Web Push): طابور + مرسل في الخلفية
             services.AddOptions<ecommerce.Services.PushService.PushOptions>().BindConfiguration(ecommerce.Services.PushService.PushOptions.Section);
@@ -71,6 +81,7 @@ namespace ecommerce.Extensions
             services.AddScoped<IOpsReportService, OpsReportService>();
 
             services.AddScoped<IUserRepository, UserRepository>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
             services.AddScoped<IUserService, UserService>();
 
             services.AddScoped<IAddressRepository, AddressRepository>();
@@ -132,6 +143,7 @@ namespace ecommerce.Extensions
             services.AddScoped<IPromotionService, PromotionService>();
 
             services.AddScoped<IVendorDashboardService, VendorDashboardService>();
+            services.AddScoped<IVendorMarketingService, VendorMarketingService>();
 
             services.AddScoped<IVariantService, VariantService>();
 

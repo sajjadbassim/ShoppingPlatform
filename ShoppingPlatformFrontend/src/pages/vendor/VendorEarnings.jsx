@@ -33,7 +33,7 @@ const VendorEarnings = () => {
 
       <div>
         <h2 className="font-bold text-gray-900 mb-2">الحركات</h2>
-        <LedgerList entries={st.entries} orderLink={(e) => `/vendor/orders`} />
+        <LedgerList entries={st.entries} orderLink={(e) => e.subOrderId ? `/vendor/orders?order=${e.subOrderId}` : '/vendor/orders'} />
       </div>
     </div>
   )

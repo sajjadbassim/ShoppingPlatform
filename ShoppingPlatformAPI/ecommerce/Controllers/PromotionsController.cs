@@ -2,6 +2,7 @@
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -29,7 +30,7 @@ namespace ecommerce.Controllers
                 var promotions = await _promotionService.GetActiveAsync();
                 return Ok(new { success = true, data = promotions });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -48,7 +49,7 @@ namespace ecommerce.Controllers
                 var result = await _promotionService.GetProductPriceAsync(productId);
                 return Ok(new { success = true, data = result });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -66,7 +67,7 @@ namespace ecommerce.Controllers
                 var promotions = await _promotionService.GetAllAsync();
                 return Ok(new { success = true, data = promotions });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -101,7 +102,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -119,7 +120,7 @@ namespace ecommerce.Controllers
                 var promotion = await _promotionService.GetByIdAsync(id);
                 return Ok(new { success = true, data = promotion });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -138,7 +139,7 @@ namespace ecommerce.Controllers
                 return CreatedAtAction(nameof(GetById), new { id = promotion.Id },
                     new { success = true, data = promotion, message = "تم إنشاء العرض بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -156,7 +157,7 @@ namespace ecommerce.Controllers
                 var promotion = await _promotionService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = promotion, message = "تم تعديل العرض بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -177,7 +178,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "العرض غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

@@ -174,6 +174,19 @@ builder.Services.AddAuthentication(options =>
             }
 
             return Task.CompletedTask;
+        },
+
+        // التوقيع وحده لا يكفي: الحساب يجب أن يكون مفعّلاً ونسخة الجلسة هي الحالية
+        // (تعطيل الحساب أو تغيير دوره أو كلمة مروره يُبطل التوكنات فوراً)
+        OnTokenValidated = async context =>
+        {
+            var principal = context.Principal!;
+            var valid = Guid.TryParse(principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var userId)
+                && int.TryParse(principal.FindFirst(UserSessionValidator.VersionClaim)?.Value, out var version)
+                && await context.HttpContext.RequestServices.GetRequiredService<IUserSessionValidator>()
+                    .IsCurrentAsync(userId, version, context.HttpContext.RequestAborted);
+            if (!valid)
+                context.Fail("Session revoked");
         }
     };
 });
@@ -227,6 +240,16 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(10),
             QueueLimit = 0,
         }));
+    // تسجيل الدخول: قفل الحساب بعد 5 أخطاء (AuthThrottle) لا يمنع تجربة كلمة مرور واحدة على حسابات كثيرة؛
+    // هذا الحد لكل عنوان IP. أوسع من auth-ip لأن مشتركي شبكات الموبايل قد يتشاركون عنواناً واحداً
+    options.AddPolicy("login-ip", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0,
+        }));
     // تحديث محتوى حسابات التواصل (طلب عام يتصل بتيك توك وإنستغرام): يكفي لفتح المتاجر والريلز بشكل طبيعي
     options.AddPolicy("social-refresh", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -241,11 +264,16 @@ builder.Services.AddRateLimiter(options =>
 // ===================================
 // إضافة CORS (مهم للـ SignalR)
 // ===================================
+// النطاقات المسموحة من الإعدادات (Cors:AllowedOrigins) — في الإنتاج: Cors__AllowedOrigins__0=https://...
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+if (allowedOrigins.Length == 0)
+    throw new InvalidOperationException("Cors:AllowedOrigins is empty — set the frontend origin(s) in configuration.");
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("Frontend", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:4200", "http://localhost:5173") // Frontend URLs
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();
@@ -304,7 +332,7 @@ else
     app.UseHsts();
 }
 
-app.UseCors("AllowAll");
+app.UseCors("Frontend");
 app.UseWebSockets();
 
 app.UseHttpsRedirection();

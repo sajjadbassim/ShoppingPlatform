@@ -1,22 +1,28 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X, Package, Store, Tag, Clock, TrendingUp, ArrowLeft } from 'lucide-react'
-import { useProductsPaged } from '../../hooks/useProducts'
+import { useAdvancedFilter } from '../../hooks/useProducts'
 import { useVendorsPaged } from '../../hooks/useVendors'
 import { useCategories } from '../../hooks/useCategories'
 import { getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
+import { SCOPE, isGroceryCategory, searchLink, useShopScope } from '../../utils/shopScope'
 
 const GlobalSearch = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
   const inputRef = useRef(null)
   const [query, setQuery] = useState('')
   const [recentSearches, setRecentSearches] = useState([])
+  // من صفحة السوبرماركت يبحث في السوبرماركت فقط، ومن غيرها في بقية المنتجات فقط
+  const scope = useShopScope()
+  const grocery = scope === SCOPE.GROCERY
 
   // جلب النتائج
-  const { data: productsData, isLoading: productsLoading } = useProductsPaged({
+  const { data: productsData, isLoading: productsLoading } = useAdvancedFilter({
     searchTerm: query,
     pageSize: 5,
-  }, { enabled: query.length >= 2 })
+    isActive: true,
+    scope,
+  }, query.length >= 2)
 
   const { data: vendorsData, isLoading: vendorsLoading } = useVendorsPaged({
     searchTerm: query,
@@ -27,8 +33,9 @@ const GlobalSearch = ({ isOpen, onClose }) => {
 
   const products = productsData?.items || productsData || []
   const vendors = vendorsData?.items || vendorsData || []
-  const categories = (categoriesData || []).filter(c => 
-    c.nameAr?.includes(query) || c.name?.toLowerCase().includes(query.toLowerCase())
+  const categories = (categoriesData || []).filter(c =>
+    isGroceryCategory(c) === grocery &&
+    (c.nameAr?.includes(query) || c.name?.toLowerCase().includes(query.toLowerCase()))
   ).slice(0, 3)
 
   const isLoading = productsLoading || vendorsLoading
@@ -73,7 +80,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     localStorage.setItem('recentSearches', JSON.stringify(newRecent))
 
     // الانتقال للنتائج
-    navigate(`/products?search=${encodeURIComponent(searchQuery)}`)
+    navigate(searchLink(searchQuery, scope))
     onClose()
   }
 
@@ -116,7 +123,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch(query)}
-                placeholder="ابحث عن منتجات، متاجر، فئات..."
+                placeholder={grocery ? 'ابحث في السوبرماركت...' : 'ابحث عن منتجات، متاجر، فئات...'}
                 className="w-full h-12 pr-12 pl-12 bg-gray-100 rounded-xl text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white"
               />
               {query && (

@@ -1,9 +1,11 @@
-﻿using ecommerce.Core;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core;
 using ecommerce.Core.DTO.Cart;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Repositories;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -37,7 +39,7 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
-                throw new Exception("المستخدم غير موجود");
+                throw new NotFoundException("المستخدم غير موجود");
 
             var cart = await GetOrCreateCartAsync(userId);
             return await BuildCartResponseAsync(cart);
@@ -51,33 +53,33 @@ namespace ecommerce.Services
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
-                throw new Exception("المستخدم غير موجود");
+                throw new NotFoundException("المستخدم غير موجود");
 
             var product = await _productRepository.GetByIdAsync(dto.ProductId);
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             if (product.IsDeleted)
-                throw new Exception("هذا المنتج لم يعد متوفراً");
+                throw new BusinessRuleException("هذا المنتج لم يعد متوفراً");
 
             if (!product.IsActive)
-                throw new Exception("المنتج غير مفعل");
+                throw new BusinessRuleException("المنتج غير مفعل");
 
             // المنتج ذو المتغيرات يُحكم عليه بتوفر المتغير المختار (يُتحقق منه أدناه)
             if (!dto.VariantId.HasValue && !product.IsAvailable)
-                throw new Exception("المنتج غير متوفر حالياً");
+                throw new BusinessRuleException("المنتج غير متوفر حالياً");
 
             if (!await _context.Vendors.AnyAsync(v => v.Id == product.VendorId && v.IsActive))
-                throw new Exception("المتجر غير متاح حالياً");
+                throw new BusinessRuleException("المتجر غير متاح حالياً");
 
             // فئة المنتج (أو أحد أسلافها) معطّلة
             if (!await _productRepository.IsPubliclyVisibleAsync(product.Id))
-                throw new Exception("المنتج غير متاح حالياً");
+                throw new BusinessRuleException("المنتج غير متاح حالياً");
 
             // المنتج ذو المتغيرات لا يُضاف بدون اختيار متغير (المخزون والسعر على مستوى المتغير)
             if (!dto.VariantId.HasValue &&
                 await _context.ProductVariants.AnyAsync(v => v.ProductId == product.Id))
-                throw new Exception("يرجى اختيار خيارات المنتج قبل إضافته للسلة");
+                throw new BusinessRuleException("يرجى اختيار خيارات المنتج قبل إضافته للسلة");
 
             // ─── التحقق من الـ Variant إذا أُرسل ───────────────────────────
             ProductVariant? variant = null;
@@ -92,18 +94,18 @@ namespace ecommerce.Services
                         v.ProductId == dto.ProductId);
 
                 if (variant == null)
-                    throw new Exception("المتغير غير موجود أو لا ينتمي لهذا المنتج");
+                    throw new NotFoundException("المتغير غير موجود أو لا ينتمي لهذا المنتج");
 
                 if (!variant.IsAvailable)
-                    throw new Exception("هذا المتغير غير متوفر حالياً");
+                    throw new BusinessRuleException("هذا المتغير غير متوفر حالياً");
 
                 if (variant.StockQuantity < dto.Quantity)
-                    throw new Exception($"الكمية المتوفرة من هذا المتغير فقط {variant.StockQuantity}");
+                    throw new BusinessRuleException($"الكمية المتوفرة من هذا المتغير فقط {variant.StockQuantity}");
             }
             else
             {
                 if (product.StockQuantity < dto.Quantity)
-                    throw new Exception($"الكمية المتوفرة فقط {product.StockQuantity}");
+                    throw new BusinessRuleException($"الكمية المتوفرة فقط {product.StockQuantity}");
             }
 
             var cart = await GetOrCreateCartAsync(userId);
@@ -117,7 +119,7 @@ namespace ecommerce.Services
                 var maxStock = variant?.StockQuantity ?? product.StockQuantity;
 
                 if (newQuantity > maxStock)
-                    throw new Exception($"الكمية الإجمالية تتجاوز المخزون المتوفر ({maxStock})");
+                    throw new BusinessRuleException($"الكمية الإجمالية تتجاوز المخزون المتوفر ({maxStock})");
 
                 existingItem.Quantity = newQuantity;
                 await _cartRepository.UpdateItemAsync(existingItem);
@@ -146,26 +148,26 @@ namespace ecommerce.Services
         {
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null)
-                throw new Exception("السلة فارغة");
+                throw new BusinessRuleException("السلة فارغة");
 
             var cartItem = await _cartRepository.GetCartItemAsync(cart.Id, dto.ProductId, dto.VariantId);
             if (cartItem == null)
-                throw new Exception("المنتج غير موجود في السلة");
+                throw new NotFoundException("المنتج غير موجود في السلة");
 
             var product = await _productRepository.GetByIdAsync(dto.ProductId);
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             // التحقق من المخزون — Variant أو Product
             if (dto.VariantId.HasValue && cartItem.Variant != null)
             {
                 if (dto.Quantity > cartItem.Variant.StockQuantity)
-                    throw new Exception($"الكمية المتوفرة من هذا المتغير فقط {cartItem.Variant.StockQuantity}");
+                    throw new BusinessRuleException($"الكمية المتوفرة من هذا المتغير فقط {cartItem.Variant.StockQuantity}");
             }
             else
             {
                 if (dto.Quantity > product.StockQuantity)
-                    throw new Exception($"الكمية المتوفرة فقط {product.StockQuantity}");
+                    throw new BusinessRuleException($"الكمية المتوفرة فقط {product.StockQuantity}");
             }
 
             cartItem.Quantity = dto.Quantity;
@@ -183,11 +185,11 @@ namespace ecommerce.Services
         {
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null)
-                throw new Exception("السلة فارغة");
+                throw new BusinessRuleException("السلة فارغة");
 
             var result = await _cartRepository.RemoveItemAsync(cart.Id, productId, variantId);
             if (!result)
-                throw new Exception("المنتج غير موجود في السلة");
+                throw new NotFoundException("المنتج غير موجود في السلة");
 
             cart = await _cartRepository.GetByIdAsync(cart.Id);
             return await BuildCartResponseAsync(cart);
@@ -256,15 +258,14 @@ namespace ecommerce.Services
                     .ToListAsync())
                 .ToHashSet();
             var hiddenCategoryIds = await CategoryVisibility.GetHiddenCategoryIdsAsync(_context);
+            var groceryIds = await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
+            var promoPrices = await _promotionService.CalculateFinalPricesAsync(cart.Items.Select(i =>
+                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId, i.Product.Price)));
 
             foreach (var item in cart.Items)
             {
                 // ─── السعر النهائي (بعد تطبيق أفضل عرض فعّال على المنتج) ─────
-                var promoPrice = await _promotionService.CalculateFinalPriceAsync(
-                    item.ProductId,
-                    item.Product.CategoryId ?? Guid.Empty,
-                    item.Product.VendorId,
-                    item.Product.Price);
+                var promoPrice = promoPrices[item.ProductId];
 
                 var originalUnitPrice = item.Variant != null
                     ? item.Product.Price + item.Variant.PriceAdjustment
@@ -311,6 +312,8 @@ namespace ecommerce.Services
                     Subtotal = finalPrice * item.Quantity,
                     IsAvailable = isAvailable,
                     StockQuantity = stockQty,
+                    WeightStepKg = item.Product.WeightStepKg,
+                    IsGrocery = item.Product.CategoryId.HasValue && groceryIds.Contains(item.Product.CategoryId.Value),
 
                     // ─── Variant ─────────────────────────────────────────────
                     VariantId = item.VariantId,
@@ -343,6 +346,10 @@ namespace ecommerce.Services
             var vendorGroups = items.GroupBy(i => i.VendorId);
             var vendorsSummary = new List<VendorCartSummary>();
             decimal totalDeliveryFees = 0;
+            var vendorsById = cart.Items.Select(i => i.Product.Vendor).Where(v => v != null).DistinctBy(v => v.Id).ToDictionary(v => v.Id);
+            var now = DateTime.UtcNow;
+            // متجر السوبرماركت المغلق الآن يقبل طلباً بموعد توصيل ضمن أوقات عمله (إن كانت المواعيد مفعّلة)
+            var slotsEnabled = await _context.DeliverySettings.AsNoTracking().Select(s => (bool?)s.GrocerySlotsEnabled).FirstOrDefaultAsync() ?? true;
 
             foreach (var group in vendorGroups)
             {
@@ -355,6 +362,13 @@ namespace ecommerce.Services
 
                 totalDeliveryFees += firstItem.VendorDeliveryFee;
 
+                var (isOpen, closedMessage) = vendorsById.TryGetValue(group.Key, out var vendor)
+                    ? StoreHours.Status(vendor, now) : (true, null);
+                if (!isOpen && vendor!.IsAcceptingOrders && slotsEnabled && group.Any(i => i.IsGrocery))
+                    closedMessage = $"{closedMessage} — اختر موعد توصيل ضمن أوقات عمله";
+                if (!isOpen)
+                    warnings.Add($"متجر '{firstItem.VendorNameAr ?? firstItem.VendorName}': {closedMessage}");
+
                 vendorsSummary.Add(new VendorCartSummary
                 {
                     VendorId = group.Key,
@@ -365,6 +379,8 @@ namespace ecommerce.Services
                     ItemsCount = group.Count(),
                     Subtotal = vendorSubtotal,
                     MeetsMinimum = meetsMinimum,
+                    IsOpen = isOpen,
+                    ClosedMessage = closedMessage,
                     Items = group.ToList()
                 });
             }
@@ -380,7 +396,8 @@ namespace ecommerce.Services
                 TotalDeliveryFees = totalDeliveryFees,
                 TotalAmount = subtotal + totalDeliveryFees,
                 VendorsSummary = vendorsSummary,
-                Warnings = warnings
+                Warnings = warnings,
+                HasGroceryItems = items.Any(i => i.IsGrocery)
             };
         }
     }

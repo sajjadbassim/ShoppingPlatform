@@ -129,6 +129,11 @@ const SettingsTab = () => {
               onChange={e => setForm({...form, reviewPoints: Number(e.target.value)})}
               className={inputCls} />
           </F>
+          <F label="نقاط دعوة صديق" hint="لكل من الداعي والمدعو عند تسليم أول طلب للمدعو — 0 = معطّل">
+            <input type="number" min="0" value={form.referralPoints ?? ''}
+              onChange={e => setForm({...form, referralPoints: Number(e.target.value)})}
+              className={inputCls} />
+          </F>
           <F label="حالة النظام">
             <label className="flex items-center gap-2 cursor-pointer mt-2">
               <input type="checkbox" checked={form.isActive ?? true}

@@ -4,6 +4,7 @@ using ecommerce.Core.DTO.Common;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -29,7 +30,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.CreateAsync(dto);
                 return Ok(new { success = true, data = category });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -45,7 +46,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.GetByIdAsync(id);
                 return Ok(new { success = true, data = category });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -61,7 +62,7 @@ namespace ecommerce.Controllers
                 var categories = await _categoryService.GetAllAsync(onlyActive);
                 return Ok(new { success = true, data = categories });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -79,7 +80,7 @@ namespace ecommerce.Controllers
                 var categories = await _categoryService.GetByParentIdAsync(parentId, onlyActive);
                 return Ok(new { success = true, data = categories });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -95,7 +96,7 @@ namespace ecommerce.Controllers
                 var categories = await _categoryService.GetByParentIdAsync(null, onlyActive);
                 return Ok(new { success = true, data = categories });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -111,7 +112,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.GetByNameAsync(name);
                 return Ok(new { success = true, data = category });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -127,7 +128,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.GetByArbicNameAsync(name);
                 return Ok(new { success = true, data = category });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -144,7 +145,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = category });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -164,7 +165,7 @@ namespace ecommerce.Controllers
                 var category = await _categoryService.UpdateIconAsync(id, icon);
                 return Ok(new { success = true, data = category, message = "تم تحديث الأيقونة بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -183,7 +184,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "الأيقونة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -213,7 +214,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -232,7 +233,7 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, message = "تم تعطيل التصنيف" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

@@ -6,7 +6,9 @@ import { PageLoader } from '../common/PageLoader'
 import { useMobileTableLabels } from '../../hooks/useMobileTableLabels'
 import PushPrompt from '../common/PushPrompt'
 import { useOpsNotifications } from '../../hooks/useOpsNotifications'
+import { useVendorLiveOrders } from '../../hooks/useVendorLiveOrders'
 import UserAvatar from '../common/UserAvatar'
+import BackButton from '../common/BackButton'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Store,
   BarChart3, Settings, LogOut, Menu, X, ChevronLeft, Wallet,
@@ -17,6 +19,8 @@ import {
 const DashboardLayout = ({ type = 'vendor' }) => {
   // تحديث لحظي لشاشات العمليات والإدارة (الطلبات والسائقون) — اتصال واحد لكل اللوحة
   useOpsNotifications(type === 'operations' || type === 'admin')
+  // لوحة التاجر: الطلبات تتحدث فوراً مع الإشعار، وصوت للطلب الجديد
+  useVendorLiveOrders(type === 'vendor')
   // القائمة مفتوحة افتراضياً على الشاشات الكبيرة فقط — على الهاتف كانت تغطي المحتوى عند فتح أي صفحة
   const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches
   const [sidebarOpen, setSidebarOpen] = useState(isDesktop)
@@ -36,6 +40,7 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         { icon: ShoppingCart,    label: 'الطلبات',   path: '/vendor/orders' },
       
         { icon: Star, label: 'التقييمات', path: '/vendor/reviews' },
+        { icon: Tag,             label: 'العروض والكوبونات', path: '/vendor/promotions' },
         { icon: BarChart3,       label: 'التقارير',  path: '/vendor/reports' },
         { icon: Wallet,          label: 'أرباحي',    path: '/vendor/earnings' },
         { icon: Link2,           label: 'ربط الحسابات', path: '/vendor/social' },
@@ -91,8 +96,9 @@ const DashboardLayout = ({ type = 'vendor' }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="fixed top-0 right-0 left-0 h-[70px] bg-white border-b border-gray-200 z-40 flex items-center justify-between px-4 lg:px-6">
-        <div className="flex items-center gap-4">
-          <button className="lg:hidden p-2 hover:bg-gray-100 rounded-md"
+        <div className="flex items-center gap-2 sm:gap-4">
+          <BackButton />
+          <button className="lg:hidden p-2 [@media(hover:hover)]:hover:bg-gray-100 active:bg-gray-200 rounded-md"
             onClick={() => setSidebarOpen(!sidebarOpen)}>
             {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
           </button>

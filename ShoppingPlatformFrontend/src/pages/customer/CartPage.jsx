@@ -14,6 +14,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
+import { formatQuantity, formatPrice, isByWeight, pricePerKg } from '../../utils/weight'
 
 // ✅ مكون عرض الـ variant المختار
 const VariantBadges = ({ variantAttributes, variantSku }) => {
@@ -392,9 +393,9 @@ const CartPage = () => {
                             <VariantBadges variantAttributes={item.variantAttributes} variantSku={item.variantSku} />
 
                             <div className="flex flex-wrap items-baseline gap-x-2 mt-1">
-                              <span className="font-bold text-primary text-sm lg:text-base">{(item.price || 0).toLocaleString()} د.ع</span>
+                              <span className="font-bold text-primary text-sm lg:text-base">{formatPrice(item.price || 0, item.weightStepKg)}</span>
                               {item.originalPrice > item.price && (
-                                <span className="text-xs text-gray-400 line-through">{item.originalPrice.toLocaleString()}</span>
+                                <span className="text-xs text-gray-400 line-through">{Math.round(pricePerKg(item.originalPrice, item.weightStepKg)).toLocaleString()}</span>
                               )}
                             </div>
 
@@ -408,8 +409,8 @@ const CartPage = () => {
                                   aria-label="زيادة الكمية">
                                   <Plus size={16} />
                                 </button>
-                                <span className="w-8 text-center text-sm font-bold">
-                                  {busy ? <Spinner size="sm" /> : item.quantity}
+                                <span className={`${isByWeight(item) ? 'min-w-[3.5rem] px-1' : 'w-8'} text-center text-sm font-bold whitespace-nowrap`}>
+                                  {busy ? <Spinner size="sm" /> : formatQuantity(item.quantity, item.weightStepKg)}
                                 </span>
                                 {item.quantity > 1 ? (
                                   <button onClick={() => handleUpdateQuantity(item, item.quantity - 1)} disabled={busy}

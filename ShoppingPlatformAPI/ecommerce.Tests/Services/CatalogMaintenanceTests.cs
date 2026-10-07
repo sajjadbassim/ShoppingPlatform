@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -115,7 +116,7 @@ namespace ecommerce.Tests.Services
             await _context.SaveChangesAsync();
 
             var service = new VariantService(_context, new Mock<IInventoryService>().Object, new Mock<IPromotionService>().Object);
-            var ex = await Assert.ThrowsAsync<Exception>(() => service.DeleteVariantAsync(variant.Id));
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => service.DeleteVariantAsync(variant.Id));
 
             Assert.Contains("طلبات سابقة", ex.Message);
         }
@@ -149,7 +150,7 @@ namespace ecommerce.Tests.Services
 
             try
             {
-                await Assert.ThrowsAsync<ArgumentException>(() =>
+                await Assert.ThrowsAsync<BusinessRuleException>(() =>
                     service.SaveImageAsync(FormFile("evil.png", "<script>alert(1)</script>"u8.ToArray())));
 
                 var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0 };

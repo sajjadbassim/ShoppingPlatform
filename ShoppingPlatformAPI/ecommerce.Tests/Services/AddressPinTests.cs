@@ -4,6 +4,7 @@ using ecommerce.Repositories;
 using ecommerce.Services;
 using Moq;
 using Xunit;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -45,7 +46,7 @@ namespace ecommerce.Tests.Services
         {
             var dto = new AddressCreateDto { StreetAddress = "x", City = "c", Area = "a", Phone = "0770",
                 Latitude = (decimal?)lat, Longitude = (decimal?)lng };
-            await Assert.ThrowsAsync<Exception>(() => Service().CreateAsync(dto));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().CreateAsync(dto));
             _repo.Verify(r => r.CreateAsync(It.IsAny<Address>()), Times.Never);
         }
     }

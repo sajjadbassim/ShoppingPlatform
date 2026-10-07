@@ -13,6 +13,8 @@
         public decimal Subtotal { get; set; }
         public bool IsAvailable { get; set; }
         public int StockQuantity { get; set; }
+        public decimal? WeightStepKg { get; set; }     // بالوزن: الكمية × هذا = كغم، والسعر لكل كغم = السعر ÷ هذا
+        public bool IsGrocery { get; set; }            // منتج سوبرماركت (يحدد موعد التوصيل وتفضيل الاستبدال)
 
         public Guid? VariantId { get; set; }
         public string? VariantSku { get; set; }

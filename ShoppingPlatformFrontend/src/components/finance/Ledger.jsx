@@ -1,4 +1,5 @@
 // مكوّنات مشتركة لصفحتي «المستحقات» و«أرباحي»: بطاقات الملخص وقائمة الحركات
+import { Link } from 'react-router-dom'
 import { TrendingUp, Percent, MinusCircle, Banknote, Wallet } from 'lucide-react'
 
 export const money = (n) => `${Math.round(n || 0).toLocaleString()} د.ع`
@@ -46,7 +47,7 @@ export const LedgerList = ({ entries, orderLink }) => {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-gray-900">{e.typeAr}</p>
             <p className="text-xs text-gray-500 truncate">
-              {e.orderId && orderLink ? <a href={orderLink(e)} className="hover:underline">{e.description}</a> : e.description}
+              {e.orderId && orderLink ? <Link to={orderLink(e)} className="hover:underline">{e.description}</Link> : e.description}
               {e.reference ? ` · ${e.reference}` : ''}
             </p>
             <p className="text-[11px] text-gray-400">{new Date(e.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>

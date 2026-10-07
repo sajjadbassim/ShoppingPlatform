@@ -11,6 +11,7 @@ using ecommerce.Services.ProductService.ProductService;
 using ecommerce.Services.VendorService;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -169,7 +170,7 @@ namespace ecommerce.Tests.Services
         {
             var (small, _) = SeedTwoAttributes(_cheap);
 
-            var ex = await Assert.ThrowsAsync<Exception>(() => Variants().CreateVariantAsync(_cheap.Id,
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Variants().CreateVariantAsync(_cheap.Id,
                 new CreateProductVariantDto { AttributeValueIds = new() { small.Id } }));
 
             Assert.Contains("لكل خاصية", ex.Message);
@@ -178,7 +179,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CreateAttribute_AfterVariantsExist_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Variants().CreateAttributeAsync(_variantProduct.Id,
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Variants().CreateAttributeAsync(_variantProduct.Id,
                 new CreateProductAttributeDto { Name = "Material", Values = new() { new CreateAttributeValueDto { Value = "Cotton" } } }));
 
             Assert.Contains("بعد إنشاء متغيرات", ex.Message);

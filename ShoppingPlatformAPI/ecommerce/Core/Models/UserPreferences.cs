@@ -23,6 +23,7 @@ namespace ecommerce.Core.Models
         public bool NotifyReturns { get; set; } = true;
         public bool NotifyNewUsers { get; set; } = false;
         public bool NotifyNewVendors { get; set; } = true;
+        public bool NotifyReminders { get; set; } = true;
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }
@@ -40,6 +41,7 @@ namespace ecommerce.Core.Models
             NotificationCategory.Returns => NotifyReturns,
             NotificationCategory.NewUsers => NotifyNewUsers,
             NotificationCategory.NewVendors => NotifyNewVendors,
+            NotificationCategory.Reminders => NotifyReminders,
             _ => true
         };
     }

@@ -19,6 +19,9 @@
         public string DeliveryAddress { get; set; }
         public string DeliveryPhone { get; set; }
         public string DeliveryNotes { get; set; }
+        // موعد التوصيل الذي اختاره الزبون (طلبات السوبرماركت) — UTC
+        public DateTime? DeliverySlotStart { get; set; }
+        public DateTime? DeliverySlotEnd { get; set; }
 
         // معلومات المتجر
         public Guid VendorId { get; set; }

@@ -3,9 +3,12 @@ using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Vendor;
 using ecommerce.Core.Models;
 using ecommerce.Data;
+using ecommerce.Services.FinanceService;
+using ecommerce.Core.DTO.Inventory;
 using ecommerce.Services.InventoryService;
 using ecommerce.Services.NotificationService;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -37,7 +40,7 @@ namespace ecommerce.Services
                 .FirstOrDefaultAsync(v => v.Id == vendorId);
 
             if (vendor == null)
-                throw new Exception("المتجر غير موجود");
+                throw new NotFoundException("المتجر غير موجود");
 
             // الفترات بتوقيت بغداد (UTC+3، بلا توقيت صيفي) ومتداولة: اليوم، آخر 7 أيام، آخر 30 يوماً —
             // الأسبوع التقويمي كان يتجاوز الشهر التقويمي في أول أيام الشهر
@@ -49,32 +52,27 @@ namespace ecommerce.Services
             // ===================================
             // إحصائيات الطلبات
             // ===================================
-            var subOrders = await _context.SubOrders
-                .Include(so => so.Order)
-                    .ThenInclude(o => o.Customer)
-                .Where(so => so.VendorId == vendorId)
-                .AsNoTracking()
+            var statusCounts = await CountByStatusAsync(vendorId);
+            int Count(string status) => statusCounts.GetValueOrDefault(status);
+
+            var totalOrders = statusCounts.Values.Sum();
+            var pendingOrders = Count(SubOrderStatus.PendingConfirmation);
+            var activeOrders = Count(SubOrderStatus.Confirmed) + Count(SubOrderStatus.Preparing)
+                + Count(SubOrderStatus.Ready) + Count(SubOrderStatus.OutForDelivery);
+            var completedOrders = Count(SubOrderStatus.Delivered);
+            var cancelledOrders = Count(SubOrderStatus.Cancelled);
+
+            // ===================================
+            // إحصائيات المبيعات — من دفتر المتجر (نفس أساس «أرباحي») وبتاريخ التسليم الفعلي
+            // ===================================
+            var totalRevenue = await SalesEntries(vendorId).SumAsync(e => e.Amount);
+            var recentSales = await SalesEntries(vendorId)
+                .Where(e => e.CreatedAt >= monthStart)
+                .Select(e => new { e.Amount, e.CreatedAt })
                 .ToListAsync();
-
-            var totalOrders = subOrders.Count;
-            var pendingOrders = subOrders.Count(so => so.Status == SubOrderStatus.PendingConfirmation);
-            var activeOrders = subOrders.Count(so =>
-                so.Status == SubOrderStatus.Confirmed ||
-                so.Status == SubOrderStatus.Preparing ||
-                so.Status == SubOrderStatus.Ready ||
-                so.Status == SubOrderStatus.OutForDelivery);
-            var completedOrders = subOrders.Count(so => so.Status == SubOrderStatus.Delivered);
-            var cancelledOrders = subOrders.Count(so => so.Status == SubOrderStatus.Cancelled);
-
-            // ===================================
-            // إحصائيات المبيعات
-            // ===================================
-            var completedSubOrders = subOrders.Where(so => so.Status == SubOrderStatus.Delivered).ToList();
-
-            var totalRevenue = completedSubOrders.Sum(so => so.Subtotal);
-            var revenueToday = completedSubOrders.Where(so => so.UpdatedAt >= todayStart).Sum(so => so.Subtotal);
-            var revenueThisWeek = completedSubOrders.Where(so => so.UpdatedAt >= weekStart).Sum(so => so.Subtotal);
-            var revenueThisMonth = completedSubOrders.Where(so => so.UpdatedAt >= monthStart).Sum(so => so.Subtotal);
+            var revenueToday = recentSales.Where(e => e.CreatedAt >= todayStart).Sum(e => e.Amount);
+            var revenueThisWeek = recentSales.Where(e => e.CreatedAt >= weekStart).Sum(e => e.Amount);
+            var revenueThisMonth = recentSales.Sum(e => e.Amount);
 
             // ===================================
             // إحصائيات المنتجات
@@ -84,10 +82,14 @@ namespace ecommerce.Services
                 .AsNoTracking()
                 .ToListAsync();
 
+            var variantStock = await VariantStockAsync(products.Select(p => p.Id));
+            int StockOf(Product p) => variantStock.TryGetValue(p.Id, out var s) ? s : p.StockQuantity;
+            bool AvailableOf(Product p) => variantStock.ContainsKey(p.Id) ? StockOf(p) > 0 : p.IsAvailable;
+
             var totalProducts = products.Count;
-            var activeProducts = products.Count(p => p.IsActive && p.IsAvailable);
-            var outOfStockProducts = products.Count(p => p.StockQuantity == 0);
-            var lowStockProducts = products.Count(p => p.StockQuantity > 0 && p.StockQuantity < StockThresholds.LowStock);
+            var activeProducts = products.Count(p => p.IsActive && AvailableOf(p));
+            var outOfStockProducts = products.Count(p => StockOf(p) == 0);
+            var lowStockProducts = products.Count(p => StockOf(p) > 0 && StockOf(p) < StockThresholds.LowStock);
 
             // ===================================
             // إحصائيات التقييمات
@@ -108,7 +110,8 @@ namespace ecommerce.Services
             // ===================================
             // النشطة أولاً (تحتاج متابعة) ثم الأحدث من المكتملة — حتى لا يختفي طلب نشط أقدم من آخر 5 طلبات
             var finalStatuses = new[] { SubOrderStatus.Delivered, SubOrderStatus.Cancelled, SubOrderStatus.DeliveryFailed };
-            var recentOrders = subOrders
+            var recentOrders = await _context.SubOrders.AsNoTracking()
+                .Where(so => so.VendorId == vendorId)
                 .OrderBy(so => finalStatuses.Contains(so.Status) ? 1 : 0)
                 .ThenByDescending(so => so.CreatedAt)
                 .Take(5)
@@ -116,55 +119,52 @@ namespace ecommerce.Services
                 {
                     SubOrderId = so.Id,
                     SubOrderNumber = so.SubOrderNumber,
-                    CustomerName = so.Order?.Customer?.FullName ?? string.Empty,
+                    CustomerName = so.Order.Customer.FullName ?? string.Empty,
                     Subtotal = so.Subtotal,
                     Status = so.Status,
                     CreatedAt = so.CreatedAt
-                }).ToList();
+                }).ToListAsync();
 
             // ===================================
             // أكثر 5 منتجات مبيعاً
             // ===================================
-            var topProducts = await _context.SubOrderItems
-                .Include(i => i.Product)
-                    .ThenInclude(p => p.Images)
+            // كان التجميع بالمنتج والسعر معاً، فالمنتج المبيع بسعرين (عرض، متغيرات) يتكرر ويتوزع مبيعه
+            var topProducts = await _context.SubOrderItems.AsNoTracking()
                 .Where(i => i.SubOrder.VendorId == vendorId &&
-                            i.SubOrder.Status == SubOrderStatus.Delivered)
-                .GroupBy(i => new { i.ProductId, i.ProductName, i.ProductNameAr, i.UnitPrice })
+                            i.SubOrder.Status == SubOrderStatus.Delivered &&
+                            i.Quantity > i.RefusedQuantity)
+                .GroupBy(i => i.ProductId)
                 .Select(g => new VendorTopProductDto
                 {
-                    ProductId = g.Key.ProductId,
-                    ProductName = g.Key.ProductName,
-                    ProductNameAr = g.Key.ProductNameAr,
-                    TotalSold = g.Sum(i => i.Quantity),
-                    TotalRevenue = g.Sum(i => i.Subtotal),
-                    Price = g.Key.UnitPrice
+                    ProductId = g.Key,
+                    ProductName = g.Max(i => i.ProductName),
+                    ProductNameAr = g.Max(i => i.ProductNameAr),
+                    TotalSold = g.Sum(i => i.Quantity - i.RefusedQuantity),
+                    TotalRevenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)),
                 })
                 .OrderByDescending(p => p.TotalSold)
                 .Take(5)
-                .AsNoTracking()
                 .ToListAsync();
 
-            // إضافة صورة المنتج
+            // السعر الحالي والصورة والمخزون (استعلام واحد للخمسة)
+            var topIds = topProducts.Select(p => p.ProductId).ToList();
+            var topInfo = await _context.Products.AsNoTracking()
+                .Where(p => topIds.Contains(p.Id))
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Price,
+                    p.StockQuantity,
+                    Image = p.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.DisplayOrder).Select(i => i.ImageUrl).FirstOrDefault()
+                })
+                .ToDictionaryAsync(p => p.Id);
+            var topVariantStock = await VariantStockAsync(topIds);
             foreach (var tp in topProducts)
             {
-                var img = await _context.Products
-                    .Include(p => p.Images)
-                    .Where(p => p.Id == tp.ProductId)
-                    .Select(p => new
-                    {
-                        Stock = p.StockQuantity,
-                        Image = p.Images.FirstOrDefault(i => i.IsPrimary) != null
-                            ? p.Images.FirstOrDefault(i => i.IsPrimary).ImageUrl
-                            : p.Images.FirstOrDefault() != null
-                                ? p.Images.FirstOrDefault().ImageUrl
-                                : null
-                    })
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync();
-
-                tp.ImageUrl = img?.Image;
-                tp.StockQuantity = img?.Stock ?? 0;
+                if (!topInfo.TryGetValue(tp.ProductId, out var info)) continue;
+                tp.Price = info.Price;
+                tp.ImageUrl = info.Image;
+                tp.StockQuantity = topVariantStock.TryGetValue(tp.ProductId, out var vs) ? vs : info.StockQuantity;
             }
 
             return new VendorDashboardDto
@@ -196,47 +196,55 @@ namespace ecommerce.Services
         // ===================================
         // GetSalesStatsAsync
         // ===================================
-        public async Task<VendorSalesStatsDto> GetSalesStatsAsync(Guid vendorId, string period = "month")
+        public async Task<VendorSalesStatsDto> GetSalesStatsAsync(Guid vendorId, string period = "month",
+            DateTime? from = null, DateTime? to = null)
         {
             var vendor = await _context.Vendors.AsNoTracking()
                 .FirstOrDefaultAsync(v => v.Id == vendorId);
             if (vendor == null)
-                throw new Exception("المتجر غير موجود");
+                throw new NotFoundException("المتجر غير موجود");
 
-            var now = DateTime.UtcNow;
-            DateTime startDate;
-            int days;
-
-            switch (period.ToLower())
+            // الأيام بتوقيت بغداد: اليوم، آخر 7 أيام، الشهر الحالي، السنة الحالية
+            var localToday = DateTime.UtcNow.AddHours(BaghdadOffsetHours).Date;
+            DateTime startDate, endDate = localToday;
+            if (period.ToLower() == "custom")
             {
-                case "today":
-                    startDate = now.Date;
-                    days = 1;
-                    break;
-                case "week":
-                    startDate = now.Date.AddDays(-6);
-                    days = 7;
-                    break;
-                case "year":
-                    startDate = new DateTime(now.Year, 1, 1);
-                    days = (int)(now.Date - startDate).TotalDays + 1;
-                    break;
-                default: // month
-                    startDate = new DateTime(now.Year, now.Month, 1);
-                    days = (int)(now.Date - startDate).TotalDays + 1;
-                    break;
+                if (from == null || to == null)
+                    throw new BusinessRuleException("اختر تاريخ البداية والنهاية");
+                startDate = from.Value.Date;
+                endDate = to.Value.Date;
+                if (startDate > endDate) throw new BusinessRuleException("تاريخ البداية بعد تاريخ النهاية");
+                if ((endDate - startDate).Days > 366) throw new BusinessRuleException("الفترة المخصصة سنة واحدة كحد أقصى");
             }
+            else
+            {
+                startDate = period.ToLower() switch
+                {
+                    "today" => localToday,
+                    "week" => localToday.AddDays(-6),
+                    "year" => new DateTime(localToday.Year, 1, 1),
+                    _ => new DateTime(localToday.Year, localToday.Month, 1),
+                };
+            }
+            var days = (endDate - startDate).Days + 1;
+            var startUtc = startDate.AddHours(-BaghdadOffsetHours);
+            var endUtc = endDate.AddDays(1).AddHours(-BaghdadOffsetHours);
 
-            var subOrders = await _context.SubOrders
-                .Where(so =>
-                    so.VendorId == vendorId &&
-                    so.Status == SubOrderStatus.Delivered &&
-                    so.UpdatedAt >= startDate)
-                .AsNoTracking()
+            // الفترة السابقة بنفس عدد الأيام — للمقارنة (+12% عن الفترة السابقة)
+            var previousStartUtc = startUtc.AddDays(-days);
+            var previous = await SalesEntries(vendorId)
+                .Where(e => e.CreatedAt >= previousStartUtc && e.CreatedAt < startUtc)
+                .Select(e => new { e.Type, e.Amount, e.SubOrderId })
                 .ToListAsync();
 
-            var totalRevenue = subOrders.Sum(so => so.Subtotal);
-            var totalOrders = subOrders.Count;
+            // صافي المبيعات من الدفتر: المسلَّم دون المرفوض عند الباب، ناقص المرتجعات — بتاريخ حدوثها
+            var entries = await SalesEntries(vendorId)
+                .Where(e => e.CreatedAt >= startUtc && e.CreatedAt < endUtc)
+                .Select(e => new { e.Type, e.Amount, e.SubOrderId, Day = e.CreatedAt.AddHours(BaghdadOffsetHours).Date })
+                .ToListAsync();
+
+            var totalRevenue = entries.Sum(e => e.Amount);
+            var totalOrders = entries.Where(e => e.Type == LedgerType.Sale).Select(e => e.SubOrderId).Distinct().Count();
             var avgOrderValue = totalOrders > 0 ? Math.Round(totalRevenue / totalOrders, 2) : 0;
 
             // مبيعات يومية
@@ -245,20 +253,21 @@ namespace ecommerce.Services
                 .Select(date => new VendorSalesByDayDto
                 {
                     Date = date,
-                    Revenue = subOrders
-                        .Where(so => so.UpdatedAt.Date == date)
-                        .Sum(so => so.Subtotal),
-                    OrderCount = subOrders
-                        .Count(so => so.UpdatedAt.Date == date)
+                    Revenue = entries.Where(e => e.Day == date).Sum(e => e.Amount),
+                    OrderCount = entries.Count(e => e.Day == date && e.Type == LedgerType.Sale)
                 })
                 .ToList();
 
             return new VendorSalesStatsDto
             {
                 Period = period,
+                From = startDate,
+                To = endDate,
                 TotalRevenue = totalRevenue,
                 TotalOrders = totalOrders,
                 AverageOrderValue = avgOrderValue,
+                PreviousRevenue = previous.Sum(e => e.Amount),
+                PreviousOrders = previous.Where(e => e.Type == LedgerType.Sale).Select(e => e.SubOrderId).Distinct().Count(),
                 SalesByDay = salesByDay
             };
         }
@@ -270,24 +279,30 @@ namespace ecommerce.Services
             Guid vendorId,
             string? status = null,
             int pageNumber = 1,
-            int pageSize = 20)
+            int pageSize = 20,
+            string? search = null)
         {
             var vendor = await _context.Vendors.AsNoTracking()
                 .FirstOrDefaultAsync(v => v.Id == vendorId);
             if (vendor == null)
-                throw new Exception("المتجر غير موجود");
+                throw new NotFoundException("المتجر غير موجود");
 
-            var query = _context.SubOrders
-                .Include(so => so.Order)
-                    .ThenInclude(o => o.Customer)
-                .Include(so => so.Order)
-                    .ThenInclude(o => o.Address)
-                .Include(so => so.Items)
-                .Where(so => so.VendorId == vendorId)
-                .AsQueryable();
+            var query = WithOrderDetails(_context.SubOrders)
+                .Where(so => so.VendorId == vendorId);
 
             if (!string.IsNullOrWhiteSpace(status))
                 query = query.Where(so => so.Status == status);
+
+            // البحث في كل الطلبات (لا الصفحة المعروضة فقط): رقم الطلب، اسم الزبون أو هاتفه
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.Trim();
+                query = query.Where(so =>
+                    so.SubOrderNumber.Contains(s) ||
+                    so.Order.OrderNumber.Contains(s) ||
+                    so.Order.Customer.FullName.Contains(s) ||
+                    (so.Order.Customer.Phone != null && so.Order.Customer.Phone.Contains(s)));
+            }
 
             var totalCount = await query.CountAsync();
 
@@ -296,9 +311,11 @@ namespace ecommerce.Services
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .AsNoTracking()
+                .AsSplitQuery()
                 .ToListAsync();
 
             var dtos = subOrders.Select(MapToVendorOrderDto).ToList();
+            await AttachReturnsAsync(vendorId, dtos);
 
             return new PagedResponse<VendorOrderDto>(dtos, totalCount, pageNumber, pageSize);
         }
@@ -308,37 +325,83 @@ namespace ecommerce.Services
         // ===================================
         public async Task<VendorOrderDto> GetOrderByIdAsync(Guid vendorId, Guid subOrderId)
         {
-            var subOrder = await _context.SubOrders
-                .Include(so => so.Order)
-                    .ThenInclude(o => o.Customer)
-                .Include(so => so.Order)
-                    .ThenInclude(o => o.Address)
-                .Include(so => so.Items)
+            var subOrder = await WithOrderDetails(_context.SubOrders)
                 .AsNoTracking()
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId);
 
             if (subOrder == null)
-                throw new Exception("الطلب غير موجود");
+                throw new NotFoundException("الطلب غير موجود");
 
-            return MapToVendorOrderDto(subOrder);
+            var dto = MapToVendorOrderDto(subOrder);
+            await AttachReturnsAsync(vendorId, new List<VendorOrderDto> { dto });
+            return dto;
+        }
+
+        // الإرجاعات بعد الاستلام لقطع هذا المتجر: الكمية لكل قطعة + ملخص كل إرجاع.
+        // (الرفض عند الباب يظهر في RefusedQuantity، وسجله هنا كإرجاع «عند الباب»)
+        private async Task AttachReturnsAsync(Guid vendorId, List<VendorOrderDto> orders)
+        {
+            if (orders.Count == 0) return;
+            var orderIds = orders.Select(o => o.OrderId).Distinct().ToList();
+
+            var returns = await _context.Returns.AsNoTracking()
+                .Where(r => orderIds.Contains(r.OrderId) && r.Items.Any(i => i.Product.VendorId == vendorId))
+                .Select(r => new
+                {
+                    r.Id, r.OrderId, r.ReturnNumber, r.Status, r.Reason, r.Details, r.IsDoorRefusal, r.CreatedAt,
+                    Items = r.Items.Where(i => i.Product.VendorId == vendorId)
+                        .Select(i => new { i.ProductId, i.VariantId, i.Quantity }).ToList()
+                })
+                .ToListAsync();
+            if (returns.Count == 0) return;
+
+            foreach (var order in orders)
+            {
+                var mine = returns.Where(r => r.OrderId == order.OrderId).OrderBy(r => r.CreatedAt).ToList();
+                order.Returns = mine.Select(r => new VendorOrderReturnDto
+                {
+                    Id = r.Id, ReturnNumber = r.ReturnNumber, Status = r.Status, Reason = r.Reason,
+                    Details = r.Details, IsDoorRefusal = r.IsDoorRefusal, CreatedAt = r.CreatedAt,
+                }).ToList();
+
+                var accepted = mine.Where(r => !r.IsDoorRefusal && (r.Status == ReturnStatus.APPROVED || r.Status == ReturnStatus.COMPLETED));
+                foreach (var item in order.Items)
+                    item.ReturnedQuantity = accepted.SelectMany(r => r.Items)
+                        .Where(i => i.ProductId == item.ProductId && i.VariantId == item.VariantId)
+                        .Sum(i => i.Quantity);
+            }
         }
 
         // ===================================
         // ConfirmOrderAsync
         // ===================================
-        public async Task<VendorOrderDto> ConfirmOrderAsync(Guid vendorId, Guid subOrderId, Guid opsUserId)
+        public async Task<VendorOrderDto> ConfirmOrderAsync(Guid vendorId, Guid subOrderId, Guid opsUserId,
+            IReadOnlyList<UnavailableItemDto>? unavailable = null)
         {
             var subOrder = await _context.SubOrders
                 .Include(so => so.Order)
+                .Include(so => so.Items)
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId);
 
             if (subOrder == null)
-                throw new Exception("الطلب غير موجود");
+                throw new NotFoundException("الطلب غير موجود");
 
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
-                throw new Exception($"لا يمكن تأكيد الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
+                throw new BusinessRuleException($"لا يمكن تأكيد الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
             var oldStatus = subOrder.Status;
+
+            // القبول الجزئي: تُزال القطع غير المتوفرة من الطلب ويُعاد مخزونها، ويُعاد حساب مبلغ الطلب.
+            // وإن اختار الزبون «استبدله بمشابه» يمكن للمتجر إضافة بديل من منتجاته (لا يدفع الزبون أكثر من الأصلي)
+            var removed = ApplyUnavailable(subOrder, unavailable);
+            var replacements = await ApplyReplacementsAsync(subOrder, removed, unavailable);
+            if (removed.Count > 0)
+            {
+                var siblings = await _context.SubOrders
+                    .Where(so => so.OrderId == subOrder.OrderId && so.Id != subOrder.Id).ToListAsync();
+                OrderTotals.Recalculate(subOrder.Order, siblings.Append(subOrder));
+            }
 
             subOrder.Status = SubOrderStatus.Confirmed;
             subOrder.ConfirmedBy = opsUserId;
@@ -352,16 +415,148 @@ namespace ecommerce.Services
                 OldStatus = oldStatus,
                 NewStatus = SubOrderStatus.Confirmed,
                 ChangedBy = opsUserId,
-                Notes = "تأكيد الطلب من لوحة البائع"
+                Notes = removed.Count == 0
+                    ? "تأكيد الطلب من لوحة البائع"
+                    : $"تأكيد جزئي من لوحة البائع — غير متوفر: {DescribeRemoved(removed)}" +
+                      (replacements.Count > 0 ? $" — البدائل: {DescribeReplacements(replacements)}" : "")
             };
 
             await _context.OrderStatusLogs.AddAsync(log);
 
             var parent = await RollUpOrderAsync(subOrder, opsUserId, "تأكيد المتجر");
-            await _context.SaveChangesAsync();
+
+            // مخزون البدائل يُحجز قبل الحفظ (يفشل التأكيد كله إن نفد)، ويُعاد إن فشل الحفظ
+            var replacementStock = replacements.Select(r => new StockLine(
+                r.Replacement.ProductId, null, r.Replacement.Quantity, r.Replacement.ProductNameAr ?? r.Replacement.ProductName)).ToList();
+            if (replacementStock.Count > 0) await _inventoryService.ReserveAsync(replacementStock);
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                if (replacementStock.Count > 0)
+                    await _inventoryService.RestockAsync(replacementStock.Select(l => new StockLineQuantity(l.ProductId, null, l.Quantity)));
+                throw;
+            }
+
+            if (removed.Count > 0)
+            {
+                await _inventoryService.RestockAsync(removed.Select(r =>
+                    new StockLineQuantity(r.Item.ProductId, r.Item.VariantId, r.Quantity)));
+                await NotifyPartialAsync(subOrder, removed, replacements);
+            }
             await NotifyAsync(subOrder, SubOrderStatus.Confirmed, parent, pushToOps: false);
 
             return await GetOrderByIdAsync(vendorId, subOrderId);
+        }
+
+        private static List<(SubOrderItem Item, int Quantity)> ApplyUnavailable(SubOrder subOrder, IReadOnlyList<UnavailableItemDto>? unavailable)
+        {
+            var removed = new List<(SubOrderItem Item, int Quantity)>();
+            foreach (var line in (unavailable ?? Array.Empty<UnavailableItemDto>()).Where(l => l.Quantity > 0)
+                         .GroupBy(l => l.ItemId).Select(g => new { ItemId = g.Key, Quantity = g.Sum(l => l.Quantity) }))
+            {
+                var item = subOrder.Items.FirstOrDefault(i => i.Id == line.ItemId)
+                    ?? throw new BusinessRuleException("قطعة غير موجودة في هذا الطلب");
+                if (line.Quantity > item.Quantity)
+                    throw new BusinessRuleException($"الكمية غير المتوفرة من «{item.ProductNameAr ?? item.ProductName}» أكبر من المطلوبة ({item.Quantity})");
+                removed.Add((item, line.Quantity));
+            }
+            if (removed.Count == 0) return removed;
+
+            if (subOrder.Items.Sum(i => i.Quantity) == removed.Sum(r => r.Quantity))
+                throw new BusinessRuleException("كل القطع غير متوفرة — ارفض الطلب بدلاً من قبوله");
+
+            foreach (var (item, qty) in removed)
+            {
+                item.Quantity -= qty;
+                item.UnavailableQuantity += qty;
+                item.Subtotal = item.UnitPrice * item.Quantity;
+            }
+            subOrder.Subtotal = subOrder.Items.Sum(i => i.Subtotal);
+            return removed;
+        }
+
+        private static string DescribeRemoved(List<(SubOrderItem Item, int Quantity)> removed) =>
+            string.Join("، ", removed.Select(r => $"{r.Item.ProductNameAr ?? r.Item.ProductName} ×{r.Quantity}"));
+
+        private static string DescribeReplacements(List<(SubOrderItem Original, SubOrderItem Replacement)> replacements) =>
+            string.Join("، ", replacements.Select(r =>
+                $"{r.Replacement.ProductNameAr ?? r.Replacement.ProductName} بدل {r.Original.ProductNameAr ?? r.Original.ProductName}"));
+
+        // البدائل: فقط إن اختار الزبون SIMILAR، منتج آخر من نفس المتجر بلا خيارات ومتوفر، بنفس الكمية،
+        // وسعر الوحدة = الأقل بين سعر البديل وسعر الأصلي (الزبون لا يدفع أكثر مما وافق عليه)
+        private async Task<List<(SubOrderItem Original, SubOrderItem Replacement)>> ApplyReplacementsAsync(
+            SubOrder subOrder, List<(SubOrderItem Item, int Quantity)> removed, IReadOnlyList<UnavailableItemDto>? lines)
+        {
+            var result = new List<(SubOrderItem Original, SubOrderItem Replacement)>();
+            var wanted = (lines ?? Array.Empty<UnavailableItemDto>())
+                .Where(l => l.ReplacementProductId.HasValue && l.Quantity > 0)
+                .GroupBy(l => l.ItemId)
+                .ToDictionary(g => g.Key, g => g.First().ReplacementProductId!.Value);
+            if (wanted.Count == 0) return result;
+
+            if (subOrder.Order.SubstitutionPreference != SubstitutionPreference.Similar)
+                throw new BusinessRuleException("الزبون اختار حذف المنتج غير المتوفر وإعادة المبلغ — لا يمكن إضافة بديل");
+
+            foreach (var (item, qty) in removed)
+            {
+                if (!wanted.TryGetValue(item.Id, out var productId)) continue;
+                var originalName = item.ProductNameAr ?? item.ProductName;
+                if (productId == item.ProductId)
+                    throw new BusinessRuleException($"البديل عن «{originalName}» يجب أن يكون منتجاً آخر");
+
+                var product = await _context.Products.Include(p => p.Images)
+                    .FirstOrDefaultAsync(p => p.Id == productId && p.VendorId == subOrder.VendorId && p.IsActive && !p.IsDeleted)
+                    ?? throw new BusinessRuleException($"البديل عن «{originalName}» ليس من منتجات متجرك");
+                var name = product.NameAr ?? product.Name;
+                if (await _context.ProductVariants.AnyAsync(v => v.ProductId == productId))
+                    throw new BusinessRuleException($"اختر بديلاً بلا خيارات (مقاس/لون) بدل «{name}»");
+                if (!product.IsAvailable || product.StockQuantity < qty)
+                    throw new BusinessRuleException($"لا يتوفر من «{name}» الكمية المطلوبة ({qty})");
+
+                var unitPrice = Math.Min(product.Price, item.UnitPrice);
+                var replacement = new SubOrderItem
+                {
+                    SubOrderId = subOrder.Id,
+                    ProductId = product.Id,
+                    ProductName = product.Name,
+                    ProductNameAr = product.NameAr,
+                    ProductImageUrl = product.Images?.FirstOrDefault(i => i.IsPrimary)?.ImageUrl ?? product.Images?.FirstOrDefault()?.ImageUrl ?? "",
+                    UnitPrice = unitPrice,
+                    Quantity = qty,
+                    Subtotal = unitPrice * qty,
+                    WeightStepKg = product.WeightStepKg,
+                    ReplacesItemId = item.Id,
+                };
+                subOrder.Items.Add(replacement);
+                _context.SubOrderItems.Add(replacement);
+                result.Add((item, replacement));
+            }
+
+            subOrder.Subtotal = subOrder.Items.Sum(i => i.Subtotal);
+            return result;
+        }
+
+        private async Task NotifyPartialAsync(SubOrder subOrder, List<(SubOrderItem Item, int Quantity)> removed,
+            List<(SubOrderItem Original, SubOrderItem Replacement)> replacements)
+        {
+            if (_notifications == null) return;
+            try
+            {
+                var order = subOrder.Order;
+                var replaced = replacements.Select(r => r.Original.Id).ToHashSet();
+                var removedOnly = removed.Where(r => !replaced.Contains(r.Item.Id)).ToList();
+                var message = replacements.Count == 0
+                    ? $"بعض منتجات طلبك {order.OrderNumber} غير متوفرة ({DescribeRemoved(removed)}) — أُزيلت من الطلب وأصبح المبلغ {order.TotalAmount:N0} د.ع"
+                    : $"بعض منتجات طلبك {order.OrderNumber} غير متوفرة — استُبدل {DescribeReplacements(replacements)}" +
+                      (removedOnly.Count > 0 ? $"، وأُزيل ({DescribeRemoved(removedOnly)})" : "") +
+                      $" — أصبح المبلغ {order.TotalAmount:N0} د.ع";
+                await _notifications.NotifyCustomerAsync(order.CustomerId, message,
+                    new { orderId = order.Id, orderNumber = order.OrderNumber });
+            }
+            catch { /* الإشعار لا يُفشل القبول */ }
         }
 
         // ===================================
@@ -378,11 +573,11 @@ namespace ecommerce.Services
             var subOrder = await _context.SubOrders
                 .Include(so => so.Order)
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId)
-                ?? throw new Exception("الطلب غير موجود");
+                ?? throw new NotFoundException("الطلب غير موجود");
 
             if (subOrder.Status == to) return await GetOrderByIdAsync(vendorId, subOrderId);   // ضغطة مكررة
             if (subOrder.Status != from)
-                throw new Exception($"لا يمكن تحويل الطلب إلى «{OrderStatusText.Ar(to)}» وهو «{OrderStatusText.Ar(subOrder.Status)}»");
+                throw new BusinessRuleException($"لا يمكن تحويل الطلب إلى «{OrderStatusText.Ar(to)}» وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
             subOrder.Status = to;
             subOrder.UpdatedAt = DateTime.UtcNow;
@@ -447,10 +642,10 @@ namespace ecommerce.Services
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId);
 
             if (subOrder == null)
-                throw new Exception("الطلب غير موجود");
+                throw new NotFoundException("الطلب غير موجود");
 
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
-                throw new Exception($"لا يمكن رفض الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
+                throw new BusinessRuleException($"لا يمكن رفض الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
             var oldStatus = subOrder.Status;
 
@@ -498,7 +693,7 @@ namespace ecommerce.Services
             var vendor = await _context.Vendors.AsNoTracking()
                 .FirstOrDefaultAsync(v => v.Id == vendorId);
             if (vendor == null)
-                throw new Exception("المتجر غير موجود");
+                throw new NotFoundException("المتجر غير موجود");
 
             var totalCount = await _context.Products
                 .CountAsync(p => p.VendorId == vendorId && !p.IsDeleted);
@@ -517,7 +712,7 @@ namespace ecommerce.Services
             var sales = await _context.SubOrderItems
                 .Where(i => ids.Contains(i.ProductId) && i.SubOrder.Status == SubOrderStatus.Delivered)
                 .GroupBy(i => i.ProductId)
-                .Select(g => new { ProductId = g.Key, Sold = g.Sum(i => i.Quantity), Revenue = g.Sum(i => i.Subtotal) })
+                .Select(g => new { ProductId = g.Key, Sold = g.Sum(i => i.Quantity - i.RefusedQuantity), Revenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)) })
                 .ToDictionaryAsync(x => x.ProductId);
             var ratings = await _context.Reviews
                 .Where(r => ids.Contains(r.ProductId) && r.IsApproved)
@@ -559,6 +754,118 @@ namespace ecommerce.Services
         }
 
         // ===================================
+        // GetReviewsFeedAsync — كل تقييمات منتجات المتجر في قائمة واحدة (الأحدث أولاً)، مع فلتر «بلا رد»
+        // ===================================
+        public async Task<PagedResponse<VendorReviewFeedDto>> GetReviewsFeedAsync(
+            Guid vendorId, bool unanswered = false, int? rating = null, int pageNumber = 1, int pageSize = 20)
+        {
+            var query = _context.Reviews.AsNoTracking()
+                .Where(r => r.Product.VendorId == vendorId && r.IsApproved);
+            if (unanswered) query = query.Where(r => r.VendorReply == null || r.VendorReply == "");
+            if (rating is >= 1 and <= 5) query = query.Where(r => r.Rating == rating);
+
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(r => r.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new VendorReviewFeedDto
+                {
+                    Id = r.Id,
+                    ProductId = r.ProductId,
+                    ProductName = r.Product.NameAr ?? r.Product.Name,
+                    ProductImageUrl = r.Product.Images.OrderByDescending(i => i.IsPrimary).ThenBy(i => i.DisplayOrder).Select(i => i.ImageUrl).FirstOrDefault(),
+                    CustomerName = r.User.FullName,
+                    Rating = r.Rating,
+                    Title = r.Title,
+                    Body = r.Body,
+                    IsVerifiedPurchase = r.IsVerifiedPurchase,
+                    Images = r.Images.OrderBy(i => i.DisplayOrder).Select(i => i.ImageUrl).ToList(),
+                    VendorReply = r.VendorReply,
+                    VendorReplyAt = r.VendorReplyAt,
+                    CreatedAt = r.CreatedAt,
+                })
+                .ToListAsync();
+            return new PagedResponse<VendorReviewFeedDto>(items, total, pageNumber, pageSize);
+        }
+
+        public Task<int> CountUnansweredReviewsAsync(Guid vendorId) =>
+            _context.Reviews.CountAsync(r => r.Product.VendorId == vendorId && r.IsApproved && (r.VendorReply == null || r.VendorReply == ""));
+
+        // ===================================
+        // GetProductSalesAsync — القطع المبيعة وقيمتها لكل منتج (دون المرفوض عند الباب)
+        // ===================================
+        public Task<List<VendorProductSalesDto>> GetProductSalesAsync(Guid vendorId) =>
+            _context.SubOrderItems.AsNoTracking()
+                .Where(i => i.SubOrder.VendorId == vendorId && i.SubOrder.Status == SubOrderStatus.Delivered)
+                .GroupBy(i => i.ProductId)
+                .Select(g => new VendorProductSalesDto
+                {
+                    ProductId = g.Key,
+                    Sold = g.Sum(i => i.Quantity - i.RefusedQuantity),
+                    Revenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)),
+                })
+                .ToListAsync();
+
+        // ===================================
+        // GetOrderCountsAsync — أعداد كل حالة وقيمة ما ينتظر القرار (بدل تحميل كل الطلبات في الواجهة)
+        // ===================================
+        public async Task<VendorOrderCountsDto> GetOrderCountsAsync(Guid vendorId)
+        {
+            var byStatus = await CountByStatusAsync(vendorId);
+            var pendingValue = await _context.SubOrders.AsNoTracking()
+                .Where(so => so.VendorId == vendorId && so.Status == SubOrderStatus.PendingConfirmation)
+                .SumAsync(so => so.Subtotal + so.DeliveryFee);
+
+            return new VendorOrderCountsDto
+            {
+                Total = byStatus.Values.Sum(),
+                ByStatus = byStatus,
+                PendingValue = pendingValue
+            };
+        }
+
+        private Task<Dictionary<string, int>> CountByStatusAsync(Guid vendorId) =>
+            _context.SubOrders.AsNoTracking()
+                .Where(so => so.VendorId == vendorId)
+                .GroupBy(so => so.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Status, x => x.Count);
+
+        // صافي المبيعات في دفتر المتجر: قيمة القطع المسلَّمة (دون المرفوضة عند الباب) والمرتجعات المعتمدة بالسالب
+        private IQueryable<VendorLedgerEntry> SalesEntries(Guid vendorId) =>
+            _context.VendorLedgerEntries.AsNoTracking()
+                .Where(e => e.VendorId == vendorId && (e.Type == LedgerType.Sale || e.Type == LedgerType.Return));
+
+        // مخزون المنتجات ذات المتغيرات = مجموع المتغيرات المتوفرة (نفس قاعدة صفحة المنتجات)
+        private Task<Dictionary<Guid, int>> VariantStockAsync(IEnumerable<Guid> productIds)
+        {
+            var ids = productIds.ToList();
+            return _context.ProductVariants.AsNoTracking()
+                .Where(v => ids.Contains(v.ProductId))
+                .GroupBy(v => v.ProductId)
+                .Select(g => new { ProductId = g.Key, Stock = g.Sum(v => v.IsAvailable ? v.StockQuantity : 0) })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Stock);
+        }
+
+        // الطلب مع الزبون والعنوان والقطع ومتغيراتها (المقاس/اللون)
+        private static IQueryable<SubOrder> WithOrderDetails(IQueryable<SubOrder> query) =>
+            query
+                .Include(so => so.Order).ThenInclude(o => o.Customer)
+                .Include(so => so.Order).ThenInclude(o => o.Address)
+                .Include(so => so.Items).ThenInclude(i => i.Variant)
+                    .ThenInclude(v => v!.AttributeValues).ThenInclude(av => av.AttributeValue).ThenInclude(av => av.Attribute);
+
+        // «المقاس: L · اللون: أحمر»
+        private static string? VariantLabel(ProductVariant? variant) =>
+            variant?.AttributeValues is { Count: > 0 } values
+                ? string.Join(" · ", values
+                    .Where(v => v.AttributeValue?.Attribute != null)
+                    .OrderBy(v => v.AttributeValue.Attribute.DisplayOrder)
+                    .Select(v => $"{v.AttributeValue.Attribute.NameAr ?? v.AttributeValue.Attribute.Name}: {v.AttributeValue.ValueAr ?? v.AttributeValue.Value}"))
+                : null;
+
+        // ===================================
         // Private: MapToVendorOrderDto
         // ===================================
         private static VendorOrderDto MapToVendorOrderDto(SubOrder so)
@@ -571,8 +878,13 @@ namespace ecommerce.Services
             return new VendorOrderDto
             {
                 SubOrderId = so.Id,
+                OrderId = so.OrderId,
                 SubOrderNumber = so.SubOrderNumber,
                 OrderNumber = so.Order?.OrderNumber ?? string.Empty,
+                CustomerNotes = string.IsNullOrWhiteSpace(so.Order?.CustomerNotes) ? null : so.Order.CustomerNotes.Trim(),
+                DeliverySlotStart = so.Order?.DeliverySlotStart,
+                DeliverySlotEnd = so.Order?.DeliverySlotEnd,
+                SubstitutionPreference = so.Order?.SubstitutionPreference,
                 CustomerName = so.Order?.Customer?.FullName ?? string.Empty,
                 CustomerPhone = so.Order?.Customer?.Phone ?? string.Empty,
                 DeliveryAddress = deliveryAddress,
@@ -586,10 +898,18 @@ namespace ecommerce.Services
                     : null,
                 Items = so.Items?.Select(i => new VendorOrderItemDto
                 {
+                    Id = i.Id,
                     ProductId = i.ProductId,
                     ProductName = i.ProductName,
                     ProductNameAr = i.ProductNameAr,
                     ProductImageUrl = i.ProductImageUrl,
+                    VariantId = i.VariantId,
+                    VariantSku = i.Variant?.Sku,
+                    VariantLabel = VariantLabel(i.Variant),
+                    RefusedQuantity = i.RefusedQuantity,
+                    UnavailableQuantity = i.UnavailableQuantity,
+                    WeightStepKg = i.WeightStepKg,
+                    ReplacesItemId = i.ReplacesItemId,
                     UnitPrice = i.UnitPrice,
                     Quantity = i.Quantity,
                     Subtotal = i.Subtotal

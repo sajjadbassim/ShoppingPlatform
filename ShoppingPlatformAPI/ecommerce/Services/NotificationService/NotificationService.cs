@@ -159,6 +159,12 @@ namespace ecommerce.Services.NotificationService
                 customerId, NotificationCategory.OrderUpdates, NotificationType.GENERAL, message, data);
         }
 
+        public async Task NotifyCustomerReminderAsync(Guid customerId, string message, object? data = null)
+        {
+            await SendToUserAsync(
+                customerId, NotificationCategory.Reminders, NotificationType.GENERAL, message, data);
+        }
+
         public async Task NotifyCustomerOrderStatusAsync(
             Guid customerId, Guid orderId, string orderNumber, string newStatus)
         {

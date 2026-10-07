@@ -11,6 +11,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
+import { compressImage } from '../../utils/compressImage'
+import { StoreHoursEditor, fullSchedule, scheduleToJson } from '../../components/vendor/StoreHoursEditor'
+import { Toggle as Switch } from '../../components/common/FormControls'
 import { usePreferencesDraft } from '../../hooks/usePreferences'
 import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
 import {
@@ -76,13 +79,40 @@ const VendorSettings = () => {
     e?.preventDefault()
     try {
       const fd = new FormData()
-      Object.entries(storeForm).forEach(([k, v]) => { if (v) fd.append(k, v) })
+      // الوصف والعنوان يُرسلان دائماً حتى يمكن مسحهما؛ البقية تُرسل إن كُتبت (الاسم والهاتف لا يُمسحان)
+      const CLEARABLE = ['Description', 'Address']
+      Object.entries(storeForm).forEach(([k, v]) => { if (v || CLEARABLE.includes(k)) fd.append(k, v ?? '') })
       if (logoFile) fd.append('NewLogo', logoFile)
       if (coverFile) fd.append('NewCover', coverFile)
       await updateVendor(fd)
       success('تم تحديث معلومات المتجر ✅')
     } catch (err) {
       showError(err.message || 'فشل التحديث')
+    }
+  }
+
+  // ===== أوقات العمل واستقبال الطلبات =====
+  const [accepting, setAccepting] = useState(true)
+  const [useSchedule, setUseSchedule] = useState(false)
+  const [schedule, setSchedule] = useState(fullSchedule(null))
+  useEffect(() => {
+    if (!vendor) return
+    setAccepting(vendor.isAcceptingOrders ?? true)
+    setUseSchedule(!!vendor.workingHours?.length)
+    setSchedule(fullSchedule(vendor.workingHours))
+  }, [vendor])
+
+  const handleSaveHours = async () => {
+    try {
+      const fd = new FormData()
+      fd.append('IsAcceptingOrders', String(accepting))
+      // بلا جدول = مفتوح دائماً (نص فارغ يمسح الجدول)
+      fd.append('WorkingHours', useSchedule ? scheduleToJson(schedule) : '')
+      await updateVendor(fd)
+      queryClient.invalidateQueries({ queryKey: ['vendor-dashboard', vendorId] })
+      success('تم حفظ أوقات العمل ✅')
+    } catch (err) {
+      showError(err.message || 'فشل حفظ أوقات العمل')
     }
   }
 
@@ -128,7 +158,7 @@ const VendorSettings = () => {
                 <label className="cursor-pointer flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                   <Upload size={14} />تغيير الشعار
                   <input type="file" accept="image/*" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if(f) { setLogoFile(f); setLogoPreview(URL.createObjectURL(f)) } }} />
+                    onChange={async e => { const raw = e.target.files?.[0]; if (raw) { const f = await compressImage(raw, { maxSide: 1024 }); setLogoFile(f); setLogoPreview(URL.createObjectURL(f)) } }} />
                 </label>
               </div>
               <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
@@ -147,7 +177,7 @@ const VendorSettings = () => {
                 <label className="absolute bottom-2 left-2 cursor-pointer flex items-center gap-2 px-3 py-1.5 bg-white/90 border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-white shadow-sm">
                   <Upload size={13} />تغيير الغلاف
                   <input type="file" accept="image/*" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if(f) { setCoverFile(f); setCoverPreview(URL.createObjectURL(f)) } }} />
+                    onChange={async e => { const raw = e.target.files?.[0]; if (raw) { const f = await compressImage(raw, { maxSide: 1800 }); setCoverFile(f); setCoverPreview(URL.createObjectURL(f)) } }} />
                 </label>
               </div>
               <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
@@ -214,6 +244,29 @@ const VendorSettings = () => {
       </Section>
 
       {/* الإشعارات */}
+      {/* أوقات العمل */}
+      <Section icon={Clock} title="أوقات العمل واستقبال الطلبات" onSave={handleSaveHours} saving={saving}>
+        {isLoading ? (
+          <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10" />)}</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4 p-3 rounded-xl bg-gray-50">
+              <div>
+                <p className="text-sm font-bold text-gray-900">استقبال الطلبات</p>
+                <p className="text-xs text-gray-500 mt-0.5">أوقفه مؤقتاً عند الإجازة أو الزحمة — يبقى متجرك ظاهراً لكن لا تصله طلبات جديدة</p>
+              </div>
+              <Switch checked={accepting} onChange={e => setAccepting(e.target.checked)} />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input type="checkbox" checked={useSchedule} onChange={e => setUseSchedule(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-primary" />
+              تحديد أوقات عمل أسبوعية (خارجها لا تُقبل الطلبات ويرى الزبون موعد الفتح)
+            </label>
+            {useSchedule && <StoreHoursEditor schedule={schedule} onChange={setSchedule} />}
+            {!useSchedule && <p className="text-xs text-gray-500">بلا جدول: المتجر يستقبل الطلبات طوال الوقت ما دام «استقبال الطلبات» مفعّلاً.</p>}
+          </div>
+        )}
+      </Section>
+
       <Section icon={Bell} title="إعدادات الإشعارات"
         onSave={savePreferences(NOTIFICATION_KEYS, 'تم حفظ إعدادات الإشعارات')}
         saving={prefs.isSaving} saveDisabled={!prefs.isDirty(NOTIFICATION_KEYS)}>

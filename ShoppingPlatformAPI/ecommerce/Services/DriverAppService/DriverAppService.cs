@@ -529,12 +529,8 @@ namespace ecommerce.Services.DriverAppService
         private Task Broadcast(Guid driverId, string workStatus, string reason) =>
             _notifications?.NotifyDriverUpdatedAsync(driverId, workStatus, reason) ?? Task.CompletedTask;
 
-        private async Task<string> NextReturnNumberAsync(CancellationToken ct)
-        {
-            var today = DateTime.UtcNow.Date;
-            var count = await _context.Returns.CountAsync(r => r.CreatedAt >= today, ct);
-            return $"RET-{today:yyyyMMdd}-{count + 1:D4}";
-        }
+        private Task<string> NextReturnNumberAsync(CancellationToken ct) =>
+            DailyNumberGenerator.NextAsync(_context, "RET", _context.Returns.Select(r => r.ReturnNumber), ct);
 
         private async Task NotifyRefusalAsync(Order order, List<(SubOrderItem Item, int Quantity)> refused, Return refusal)
         {
@@ -592,6 +588,8 @@ namespace ecommerce.Services.DriverAppService
                 Longitude = order.DeliveryLongitude ?? a?.Longitude,
                 ZoneName = order.DeliveryZoneName,
                 CustomerNotes = order.CustomerNotes,
+                DeliverySlotStart = order.DeliverySlotStart,
+                DeliverySlotEnd = order.DeliverySlotEnd,
                 PaymentMethod = order.PaymentMethod,
                 PaymentStatus = order.PaymentStatus,
                 AmountToCollect = pending.Count > 0 ? AmountToCollect(order, pending, carriesWholeOrder) : 0,

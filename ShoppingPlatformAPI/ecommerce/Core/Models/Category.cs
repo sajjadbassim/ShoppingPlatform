@@ -33,6 +33,10 @@ namespace ecommerce.Core.Models
         [Column("is_active")]
         public bool IsActive { get; set; } = true;
 
+        // فئة سوبرماركت: منتجاتها ومنتجات فئاتها الفرعية تظهر في صفحة السوبرماركت فقط (ShopScope)
+        [Column("is_grocery")]
+        public bool IsGrocery { get; set; } = false;
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

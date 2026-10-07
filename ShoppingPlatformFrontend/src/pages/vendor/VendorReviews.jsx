@@ -1,5 +1,5 @@
 // src/pages/vendor/VendorReviews.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Star, ThumbsUp, RefreshCw, BarChart2,
   Package, ChevronDown, ChevronUp, Reply, Pencil, Trash2,
@@ -155,6 +155,7 @@ const VendorReplyBox = ({ review, productId }) => {
       : apiDelete(API_ENDPOINTS.REVIEWS.REPLY(review.id)),
     onSuccess: (_, reply) => {
       queryClient.invalidateQueries({ queryKey: ['product-reviews', productId] })
+      queryClient.invalidateQueries({ queryKey: ['vendor-reviews-feed'] })
       setEditing(false)
       success(reply ? 'تم نشر ردك — يظهر للزبائن تحت التقييم' : 'تم حذف الرد')
     },
@@ -337,6 +338,76 @@ const ProductReviewsRow = ({ product }) => {
 }
 
 // ===========================
+// كل التقييمات في قائمة واحدة (الأحدث أولاً) — مع «بلا رد» حتى لا يفوت التاجر تقييماً
+// ===========================
+const useReviewsFeed = (vendorId, params) => useQuery({
+  queryKey: ['vendor-reviews-feed', vendorId, params],
+  queryFn: async () => {
+    const r = await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.REVIEWS(vendorId), params)
+    return { items: r.data?.data || [], totalPages: r.data?.pagination?.totalPages ?? 1, unanswered: r.data?.unansweredCount ?? 0 }
+  },
+  enabled: !!vendorId,
+  staleTime: 60 * 1000,
+  placeholderData: (prev) => prev,
+})
+
+const ReviewsFeed = ({ vendorId, unansweredOnly }) => {
+  const [rating, setRating] = useState(null)
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [unansweredOnly, rating])
+  const { data, isLoading } = useReviewsFeed(vendorId, { unanswered: unansweredOnly, rating: rating ?? undefined, pageNumber: page, pageSize: 15 })
+  const items = data?.items ?? []
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 overflow-x-auto hide-scrollbar">
+        {[null, 5, 4, 3, 2, 1].map(r => (
+          <button key={r ?? 'all'} onClick={() => setRating(r)}
+            className={`h-8 px-3 rounded-full text-sm border whitespace-nowrap ${rating === r ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200'}`}>
+            {r ? `${r} ⭐` : 'كل النجوم'}
+          </button>
+        ))}
+      </div>
+      {isLoading ? (
+        <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
+      ) : items.length === 0 ? (
+        <EmptyState title={unansweredOnly ? 'لا توجد تقييمات تنتظر ردك 👌' : 'لا توجد تقييمات'} description="" />
+      ) : (
+        <>
+          {items.map(review => (
+            <div key={review.id} className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-lg product-media overflow-hidden flex-shrink-0">
+                  {review.productImageUrl && <img src={getImageUrl(review.productImageUrl)} alt="" className="w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{review.productName}</p>
+                  <p className="text-xs text-gray-400">{review.customerName || 'زبون'} · {new Date(review.createdAt).toLocaleDateString('ar-IQ')}</p>
+                </div>
+                <StarDisplay value={review.rating} />
+              </div>
+              {review.title && <p className="font-medium text-gray-900 text-sm mt-3">{review.title}</p>}
+              {review.body && <p className="text-sm text-gray-700 mt-1 whitespace-pre-line">{review.body}</p>}
+              {review.images?.length > 0 && (
+                <div className="flex gap-2 mt-2">
+                  {review.images.map((img, i) => (
+                    <img key={i} src={getImageUrl(img)} alt="" className="w-14 h-14 object-cover rounded-lg border border-gray-200" onError={e => { e.target.style.display = 'none' }} />
+                  ))}
+                </div>
+              )}
+              <VendorReplyBox review={review} productId={review.productId} />
+            </div>
+          ))}
+          {(data?.totalPages ?? 1) > 1 && (
+            <div className="flex justify-center pt-2"><Pagination currentPage={page} totalPages={data.totalPages} onPageChange={setPage} /></div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ===========================
 // Main Component
 // ===========================
 
@@ -348,6 +419,11 @@ const VendorReviews = () => {
   const { data: productsData, isLoading: productsLoading }    = useVendorProducts(vendorId)
 
   const products = Array.isArray(productsData) ? productsData : []
+  // عدد التقييمات بلا رد — يحدد التبويب الافتراضي
+  const { data: unansweredData } = useReviewsFeed(vendorId, { unanswered: true, pageNumber: 1, pageSize: 1 })
+  const unanswered = unansweredData?.unanswered ?? 0
+  const [tab, setTab] = useState(null)
+  const activeTab = tab ?? (unanswered > 0 ? 'unanswered' : 'all')
 
   return (
     <div className="space-y-6">
@@ -364,9 +440,25 @@ const VendorReviews = () => {
       {/* Summary */}
       <SummaryCard summary={summary} isLoading={summaryLoading} />
 
+      {/* التبويبات */}
+      <div className="flex gap-2 border-b border-gray-200">
+        {[
+          { key: 'unanswered', label: 'بانتظار ردك', count: unanswered },
+          { key: 'all', label: 'كل التقييمات' },
+          { key: 'products', label: 'حسب المنتج' },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-3 py-2.5 text-sm font-medium border-b-2 -mb-px inline-flex items-center gap-1.5 ${activeTab === t.key ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+            {t.label}
+            {t.count > 0 && <span className="text-[11px] min-w-5 px-1.5 rounded-full bg-amber-400 text-white">{t.count}</span>}
+          </button>
+        ))}
+      </div>
+
+      {activeTab !== 'products' && <ReviewsFeed vendorId={vendorId} unansweredOnly={activeTab === 'unanswered'} />}
+
       {/* Products + Reviews */}
-      <div className="space-y-4">
-        <h2 className="font-bold text-gray-900">تقييمات المنتجات</h2>
+      {activeTab === 'products' && <div className="space-y-4">
         {productsLoading ? (
           <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
         ) : products.length === 0 ? (
@@ -376,7 +468,7 @@ const VendorReviews = () => {
             <ProductReviewsRow key={product.id} product={product} />
           ))
         )}
-      </div>
+      </div>}
     </div>
   )
 }

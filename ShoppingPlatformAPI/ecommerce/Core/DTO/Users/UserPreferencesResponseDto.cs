@@ -14,5 +14,6 @@ namespace ecommerce.Core.DTO.Users
         public bool NotifyReturns { get; set; }
         public bool NotifyNewUsers { get; set; }
         public bool NotifyNewVendors { get; set; }
+        public bool NotifyReminders { get; set; }
     }
 }

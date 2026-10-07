@@ -35,6 +35,8 @@ namespace ecommerce.Middleware
                     ConflictException => (StatusCodes.Status409Conflict, ex.Message),
                     UnauthorizedException => (StatusCodes.Status401Unauthorized, ex.Message),
                     ForbiddenException => (StatusCodes.Status403Forbidden, ex.Message),
+                    // بعض الخدمات ترفض الوصول لمورد غير مملوك بهذا النوع (رسالة عربية للمستخدم)
+                    UnauthorizedAccessException => (StatusCodes.Status403Forbidden, ex.Message),
                     _ => (StatusCodes.Status500InternalServerError,
                           $"حدث خطأ غير متوقع في الخادم. الرجاء ذكر الرقم التالي عند التواصل مع الدعم: {traceId}")
                 };

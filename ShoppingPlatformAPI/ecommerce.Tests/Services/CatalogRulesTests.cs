@@ -10,6 +10,7 @@ using ecommerce.Services.ProductService;
 using ecommerce.Services.ProductService.ProductService;
 using Microsoft.EntityFrameworkCore;
 using Moq;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -75,7 +76,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task UpdateCategory_MovingUnderOwnDescendant_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() =>
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() =>
                 Categories().UpdateAsync(_root.Id, new CategoryUpdateDto { ParentId = _child.Id }));
 
             Assert.Contains("الفرعية", ex.Message);
@@ -92,9 +93,9 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task UpdateCategory_DuplicateName_IsRejected()
         {
-            await Assert.ThrowsAsync<Exception>(() =>
+            await Assert.ThrowsAnyAsync<AppException>(() =>
                 Categories().UpdateAsync(_child.Id, new CategoryUpdateDto { Name = "Root" }));
-            await Assert.ThrowsAsync<Exception>(() =>
+            await Assert.ThrowsAnyAsync<AppException>(() =>
                 Categories().UpdateAsync(_child.Id, new CategoryUpdateDto { NameAr = "رئيسي" }));
         }
 
@@ -149,7 +150,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CreateProduct_UnknownCategory_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Products().CreateAsync(new CreateProductDto
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Products().CreateAsync(new CreateProductDto
             {
                 VendorId = _store.Id, Name = "x", Price = 10, CategoryId = Guid.NewGuid()
             }));
@@ -163,7 +164,7 @@ namespace ecommerce.Tests.Services
             _root.IsActive = false;
             await _context.SaveChangesAsync();
 
-            var ex = await Assert.ThrowsAsync<Exception>(() => Products().CreateAsync(new CreateProductDto
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Products().CreateAsync(new CreateProductDto
             {
                 VendorId = _store.Id, Name = "x", Price = 10, CategoryId = _child.Id
             }));
@@ -176,7 +177,7 @@ namespace ecommerce.Tests.Services
         [InlineData(8)]
         public async Task CreateProduct_OriginalPriceNotAbovePrice_IsRejected(decimal originalPrice)
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Products().CreateAsync(new CreateProductDto
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Products().CreateAsync(new CreateProductDto
             {
                 VendorId = _store.Id, Name = "x", Price = 10, OriginalPrice = originalPrice
             }));
@@ -203,7 +204,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CreateVariant_DuplicateCombination_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Variants().CreateVariantAsync(_variantProduct.Id,
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Variants().CreateVariantAsync(_variantProduct.Id,
                 new CreateProductVariantDto { AttributeValueIds = new() { _red.Id, _small.Id } }));
 
             Assert.Contains("مسبقاً", ex.Message);
@@ -212,7 +213,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CreateVariant_TwoValuesOfSameAttribute_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Variants().CreateVariantAsync(_variantProduct.Id,
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Variants().CreateVariantAsync(_variantProduct.Id,
                 new CreateProductVariantDto { AttributeValueIds = new() { _small.Id, _medium.Id } }));
 
             Assert.Contains("نفس الخاصية", ex.Message);
@@ -221,7 +222,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CreateVariant_NegativeFinalPrice_IsRejected()
         {
-            var ex = await Assert.ThrowsAsync<Exception>(() => Variants().CreateVariantAsync(_variantProduct.Id,
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Variants().CreateVariantAsync(_variantProduct.Id,
                 new CreateProductVariantDto { AttributeValueIds = new() { _medium.Id, _red.Id }, PriceAdjustment = -11 }));
 
             Assert.Contains("سالباً", ex.Message);

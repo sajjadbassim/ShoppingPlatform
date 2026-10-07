@@ -33,7 +33,8 @@ namespace ecommerce.Tests.Services
             Mock.Of<IPasswordResetOtpRepository>(),
             Mock.Of<ISmsSender>(),
             Mock.Of<INotificationService>(),
-            _throttle);
+            _throttle,
+            new RefreshTokenRepository(_context));
 
         private VendorService Vendors() => new(
             new VendorRepository(_context), Mock.Of<ecommerce.Services.FileService.IFileService>(),
@@ -68,15 +69,15 @@ namespace ecommerce.Tests.Services
             Assert.Equal("أحمد علي", r.FullName);
             Assert.Equal("ahmed@mail.com", (await _context.Users.SingleAsync()).Email);   // الإيميل بصيغة واحدة
 
-            var ex = await Assert.ThrowsAsync<Exception>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "other@mail.com", Password = "secret1", FullName = "آخر" }));
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "other@mail.com", Password = "secret1", FullName = "آخر" }));
             Assert.Equal(AuthService.PhoneUnavailable, ex.Message);
         }
 
         [Fact]
         public async Task Register_RejectsInvalidPhoneAndBlankName()
         {
-            await Assert.ThrowsAsync<Exception>(() => Auth().RegisterAsync(new RegisterDto { Phone = "12345", Email = "a@mail.com", Password = "secret1", FullName = "أحمد" }));
-            await Assert.ThrowsAsync<Exception>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "a@mail.com", Password = "secret1", FullName = "   " }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().RegisterAsync(new RegisterDto { Phone = "12345", Email = "a@mail.com", Password = "secret1", FullName = "أحمد" }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "a@mail.com", Password = "secret1", FullName = "   " }));
             Assert.Empty(_context.Users);
         }
 
@@ -87,10 +88,10 @@ namespace ecommerce.Tests.Services
             Assert.NotNull(await Auth().LoginAsync(new LoginDto { Phone = "+9647701234567", Password = "secret1" }));
 
             for (var i = 0; i < AuthThrottle.MaxLoginFailures; i++)
-                await Assert.ThrowsAsync<Exception>(() => Auth().LoginAsync(new LoginDto { Phone = "07701234567", Password = "wrong" }));
+                await Assert.ThrowsAnyAsync<AppException>(() => Auth().LoginAsync(new LoginDto { Phone = "07701234567", Password = "wrong" }));
 
             // حتى كلمة المرور الصحيحة مرفوضة أثناء الإيقاف
-            var locked = await Assert.ThrowsAsync<Exception>(() => Auth().LoginAsync(new LoginDto { Phone = "07701234567", Password = "secret1" }));
+            var locked = await Assert.ThrowsAnyAsync<AppException>(() => Auth().LoginAsync(new LoginDto { Phone = "07701234567", Password = "secret1" }));
             Assert.Contains("محاولات دخول خاطئة كثيرة", locked.Message);
         }
 
@@ -101,7 +102,7 @@ namespace ecommerce.Tests.Services
             await Auth().ForgotPasswordAsync(new ForgotPasswordDto { Phone = "07709999999" });
             await Auth().ForgotPasswordAsync(new ForgotPasswordDto { Phone = "07709999999" });
             await Auth().ForgotPasswordAsync(new ForgotPasswordDto { Phone = "07709999999" });
-            await Assert.ThrowsAsync<Exception>(() => Auth().ForgotPasswordAsync(new ForgotPasswordDto { Phone = "07709999999" }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().ForgotPasswordAsync(new ForgotPasswordDto { Phone = "07709999999" }));
         }
 
         // ===== المتجر =====
@@ -115,7 +116,7 @@ namespace ecommerce.Tests.Services
             var created = await Vendors().CreateAsync(Store("Shop A", active: true), customer.Id);
             Assert.False(created.IsActive);   // طلب التفعيل من المتصفح يُتجاهل
 
-            var second = await Assert.ThrowsAsync<Exception>(() => Vendors().CreateAsync(Store("Shop B"), customer.Id));
+            var second = await Assert.ThrowsAnyAsync<AppException>(() => Vendors().CreateAsync(Store("Shop B"), customer.Id));
             Assert.Contains("مسبقاً", second.Message);
         }
 
@@ -135,8 +136,8 @@ namespace ecommerce.Tests.Services
         {
             await Vendors().CreateAsync(Store("Elite Electronics"), null, byAdmin: true);
             var c1 = AddUser(UserRoles.Customer, "07801111112");
-            await Assert.ThrowsAsync<Exception>(() => Vendors().CreateAsync(Store("  elite electronics "), c1.Id));
-            await Assert.ThrowsAsync<Exception>(() => Vendors().CreateAsync(new VendorCreateDto { Name = "Other", NameAr = "Elite Electronics عربي" }, c1.Id));
+            await Assert.ThrowsAnyAsync<AppException>(() => Vendors().CreateAsync(Store("  elite electronics "), c1.Id));
+            await Assert.ThrowsAnyAsync<AppException>(() => Vendors().CreateAsync(new VendorCreateDto { Name = "Other", NameAr = "Elite Electronics عربي" }, c1.Id));
         }
 
         [Fact]
@@ -163,11 +164,11 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task Register_EmailRequired_AndUnique_WithNeutralMessage()
         {
-            await Assert.ThrowsAsync<Exception>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "", Password = "secret1", FullName = "أحمد علي" }));
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "", Password = "secret1", FullName = "أحمد علي" }));
             await Auth().RegisterAsync(new RegisterDto { Phone = "07701234567", Email = "sara@mail.com", Password = "secret1", FullName = "سارة" });
 
             // نفس الإيميل بأحرف مختلفة ورقم آخر: مرفوض بنفس الرسالة المحايدة
-            var ex = await Assert.ThrowsAsync<Exception>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234568", Email = "SARA@mail.com", Password = "secret1", FullName = "أخرى" }));
+            var ex = await Assert.ThrowsAnyAsync<AppException>(() => Auth().RegisterAsync(new RegisterDto { Phone = "07701234568", Email = "SARA@mail.com", Password = "secret1", FullName = "أخرى" }));
             Assert.Equal(AuthService.PhoneUnavailable, ex.Message);
         }
 
@@ -179,7 +180,7 @@ namespace ecommerce.Tests.Services
 
             Assert.Equal(u.Id, (await Auth().LoginAsync(new LoginDto { Identifier = " Sara@Mail.com ", Password = "secret1" })).UserId);
             Assert.Equal(u.Id, (await Auth().LoginAsync(new LoginDto { Identifier = "07701234567", Password = "secret1" })).UserId);
-            var bad = await Assert.ThrowsAsync<Exception>(() => Auth().LoginAsync(new LoginDto { Identifier = "sara@mail.com", Password = "wrong" }));
+            var bad = await Assert.ThrowsAnyAsync<AppException>(() => Auth().LoginAsync(new LoginDto { Identifier = "sara@mail.com", Password = "wrong" }));
             Assert.Equal("بيانات الدخول أو كلمة المرور غير صحيحة", bad.Message);
         }
 
@@ -191,13 +192,13 @@ namespace ecommerce.Tests.Services
             _context.Users.Add(noPhone); _context.SaveChanges();
             AddUser(UserRoles.Customer, "07701234567");
 
-            await Assert.ThrowsAsync<Exception>(() => Auth().AddPhoneAsync(noPhone.Id, "07701234567"));   // رقم مستخدم
-            await Assert.ThrowsAsync<Exception>(() => Auth().AddPhoneAsync(noPhone.Id, "123"));           // غير صالح
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().AddPhoneAsync(noPhone.Id, "07701234567"));   // رقم مستخدم
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().AddPhoneAsync(noPhone.Id, "123"));           // غير صالح
 
             var session = await Auth().AddPhoneAsync(noPhone.Id, "+964 780 111 2222");
             Assert.Equal("07801112222", session.Phone);
             Assert.False(string.IsNullOrEmpty(session.Token));
-            await Assert.ThrowsAsync<Exception>(() => Auth().AddPhoneAsync(noPhone.Id, "07801112223"));   // له رقم مسبقاً
+            await Assert.ThrowsAnyAsync<AppException>(() => Auth().AddPhoneAsync(noPhone.Id, "07801112223"));   // له رقم مسبقاً
         }
     }
 }

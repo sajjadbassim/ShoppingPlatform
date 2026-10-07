@@ -14,6 +14,8 @@
         public Guid? FilterVendorId { get; set; }
         public string? BannerImageUrl { get; set; }
         public bool IsActive { get; set; }
+        public string Page { get; set; } = "general";
+        public DateTime? EndsAt { get; set; }     // عروض محدودة: نهاية العدّاد (UTC)
         public object? Data { get; set; } // المنتجات / البائعين / التصنيفات المحملة
     }
 }

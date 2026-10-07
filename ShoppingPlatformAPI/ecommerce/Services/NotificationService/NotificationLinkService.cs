@@ -71,6 +71,10 @@ namespace ecommerce.Services.NotificationService
 
                 default: // CUSTOMER
                     if (hasReturn) return "/returns";
+                    // تذكيرات الزبون تحمل مسارها الداخلي (لا روابط خارجية)
+                    if (orderId == null && fields.TryGetValue("link", out var link) && link.ValueKind == JsonValueKind.String &&
+                        link.GetString() is { } path && path.StartsWith('/') && !path.StartsWith("//"))
+                        return path;
                     if (orderId == null) return null;
                     // صفحة الزبون تفتح الطلب برقمه (ORD-...) لا بمعرّفه
                     var number = await _context.Orders

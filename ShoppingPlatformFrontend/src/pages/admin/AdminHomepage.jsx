@@ -1,8 +1,8 @@
 // src/pages/admin/AdminHomepage.jsx
-import { useState } from 'react'
+import { useState, createContext, useContext } from 'react'
 import {
   Plus, Edit, Trash2, MoreVertical, Image as ImageIcon, Upload, X,
-  Info, RefreshCw, Eye, EyeOff, Search, Package, Store, LayoutGrid, Sparkles,
+  Info, RefreshCw, Eye, EyeOff, Search, Package, Store, LayoutGrid, Sparkles, Home, ShoppingBasket, Zap,
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
@@ -14,6 +14,7 @@ import { getImageUrl } from '../../utils/imageHelper'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useQuery } from '@tanstack/react-query'
+import { SCOPE } from '../../utils/shopScope'
 import { useCategories } from '../../hooks/useCategories'
 import { useVendors } from '../../hooks/useVendors'
 import {
@@ -22,17 +23,38 @@ import {
   useAddSectionItem, useRemoveSectionItem, useSetSectionBanner, useRemoveSectionBanner,
 } from '../../hooks/useHome'
 
+// الصفحة التي تُدار الآن: الرئيسية أو السوبرماركت — لكل منهما سلايدر وأقسام مستقلة
+const AdminPageContext = createContext(SCOPE.GENERAL)
+const PAGE_OPTIONS = [
+  { value: SCOPE.GENERAL, label: 'الصفحة الرئيسية', icon: Home },
+  { value: SCOPE.GROCERY, label: 'السوبرماركت', icon: ShoppingBasket },
+]
+const pageOf = (item) => item?.page || SCOPE.GENERAL
+
+// اختيار صفحة القسم أو بانر السلايدر (لنقله بين الرئيسية والسوبرماركت)
+const PageSelect = ({ value, onChange, hint }) => (
+  <div>
+    <label className="text-sm font-medium text-gray-700 block mb-1">الصفحة</label>
+    <select value={value} onChange={e => onChange(e.target.value)}
+      className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white">
+      {PAGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+    {hint && <p className="text-xs text-gray-400 mt-1.5">{hint}</p>}
+  </div>
+)
+
 // ===========================
 // Shared: Product Picker (بحث واختيار منتج)
 // ===========================
 
-const ProductPicker = ({ onSelect, excludeIds = [] }) => {
+// scope: منتجات صفحة القسم فقط (منتج سوبرماركت لا يظهر في أقسام الرئيسية والعكس)
+const ProductPicker = ({ onSelect, excludeIds = [], scope }) => {
   const [term, setTerm] = useState('')
 
   const { data: results = [], isFetching } = useQuery({
-    queryKey: ['product-picker-search', term],
+    queryKey: ['product-picker-search', term, scope],
     queryFn: async () => {
-      const r = await apiGet(API_ENDPOINTS.PRODUCTS.UNIFIED_SEARCH, { term, maxResults: 8 })
+      const r = await apiGet(API_ENDPOINTS.PRODUCTS.UNIFIED_SEARCH, { term, maxResults: 8, scope })
       const data = r.data.data || r.data
       return data?.products || []
     },
@@ -98,10 +120,13 @@ const IMAGE_HINTS = {
 const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
   const { success, error: showError } = useToast()
   const isEdit = !!banner?.id
+  const currentPage = useContext(AdminPageContext)
   const { data: categories = [] } = useCategories(true)
   const { data: vendors = [] } = useVendors(true)
   const { data: sectionsData } = useSectionsAdmin()
-  const blockSections = (Array.isArray(sectionsData) ? sectionsData : []).filter(s => s.type === 'banners')
+  const [page, setPage] = useState(banner ? pageOf(banner) : currentPage)
+  // بلوكات الصفحة نفسها فقط
+  const blockSections = (Array.isArray(sectionsData) ? sectionsData : []).filter(s => s.type === 'banners' && pageOf(s) === page)
 
   const [form, setForm] = useState({
     Title: banner?.title || '',
@@ -148,6 +173,7 @@ const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
     if (isEdit) fd.append('IsActive', String(form.IsActive))
     if (form.SectionId) fd.append('SectionId', form.SectionId)
     else if (isEdit && banner?.sectionId) fd.append('MoveToHero', 'true')
+    fd.append('Page', page) // يُطبَّق على السلايدر فقط؛ بانر البلوك يتبع صفحة قسمه
     if (imageFile) fd.append('ImageFile', imageFile)
     return fd
   }
@@ -187,6 +213,10 @@ const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {!defaultSectionId && (
+            <PageSelect value={page} onChange={v => { setPage(v); setForm(f => ({ ...f, SectionId: '' })) }} />
+          )}
+
           {/* مكان الظهور */}
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">مكان الظهور</label>
@@ -290,7 +320,7 @@ const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
                     className="text-gray-400 hover:text-red-500"><X size={14} /></button>
                 </div>
               ) : (
-                <ProductPicker onSelect={(p) => { setForm({...form, LinkEntityId: p.id}); setPickedEntityName(p.nameAr || p.name) }} />
+                <ProductPicker scope={page} onSelect={(p) => { setForm({...form, LinkEntityId: p.id}); setPickedEntityName(p.nameAr || p.name) }} />
               )}
             </div>
           )}
@@ -328,6 +358,7 @@ const BannerModal = ({ banner, onClose, defaultSectionId = '' }) => {
 
 const BannersTab = () => {
   const { success, error: showError } = useToast()
+  const page = useContext(AdminPageContext)
   const { data, isLoading, refetch } = useBannersAdmin()
   const { data: sectionsData } = useSectionsAdmin()
   const sectionName = (id) => {
@@ -340,7 +371,7 @@ const BannersTab = () => {
   const [modalBanner, setModalBanner] = useState(undefined) // undefined = closed, null = create, obj = edit
   const [deleteTarget, setDeleteTarget] = useState(null)
 
-  const banners = Array.isArray(data) ? [...data].sort((a, b) => a.displayOrder - b.displayOrder) : []
+  const banners = Array.isArray(data) ? data.filter(b => pageOf(b) === page).sort((a, b) => a.displayOrder - b.displayOrder) : []
 
   const handleToggleActive = async (banner) => {
     try {
@@ -475,16 +506,28 @@ const SECTION_TYPES = {
   top_vendors: { label: 'متاجر مميزة (تلقائي)', icon: Store },
   top_categories: { label: 'تصنيفات مميزة (تلقائي)', icon: LayoutGrid },
   custom_products: { label: 'منتجات مختارة يدوياً', icon: Package },
+  flash_deals: { label: 'عروض محدودة (بعدّاد تنازلي)', icon: Zap },
   banners: { label: 'بلوك بانرات (صور إعلانية)', icon: ImageIcon },
 }
 
 // أقسام المنتجات يمكن أن يكون لها بانر رأس
-const PRODUCT_SECTION_TYPES = ['featured_products', 'custom_products']
+const PRODUCT_SECTION_TYPES = ['featured_products', 'custom_products', 'flash_deals']
+// أقسام يختار الأدمن منتجاتها يدوياً
+const PICKED_SECTION_TYPES = ['custom_products', 'flash_deals']
+
+// datetime-local يعمل بالتوقيت المحلي، والخادم يخزّن UTC
+const toLocalInput = (iso) => {
+  if (!iso) return ''
+  const d = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : `${iso}Z`)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const SectionModal = ({ section, onClose }) => {
   const { success, error: showError } = useToast()
   const isEdit = !!section?.id
-  const { data: categories = [] } = useCategories(true)
+  const currentPage = useContext(AdminPageContext)
+  const { data: allCategories = [] } = useCategories(true)
   const { data: vendors = [] } = useVendors(true)
 
   const [form, setForm] = useState({
@@ -498,10 +541,14 @@ const SectionModal = ({ section, onClose }) => {
     FilterVendorId: section?.filterVendorId || '',
     DisplayOrder: section?.displayOrder ?? 0,
     IsActive: section?.isActive ?? true,
+    Page: section ? pageOf(section) : currentPage,
+    EndsAt: toLocalInput(section?.endsAt),
   })
+  // تصفية التصنيف من فئات صفحة القسم فقط (فئات السوبرماركت لأقسام السوبرماركت)
+  const categories = allCategories.filter(c => (c.section || SCOPE.GENERAL) === form.Page)
   // منتجات custom_products المختارة (عند الإنشاء فقط — عند التعديل تُدار عبر addSectionItem/removeSectionItem)
   const [pickedProducts, setPickedProducts] = useState(
-    isEdit && section?.type === 'custom_products' ? (section?.data || []) : []
+    isEdit && PICKED_SECTION_TYPES.includes(section?.type) ? (section?.data || []) : []
   )
 
   const createMutation = useCreateSection()
@@ -531,6 +578,8 @@ const SectionModal = ({ section, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.Title.trim()) { showError('يرجى إدخال العنوان بالإنجليزية'); return }
+    if (form.Type === 'flash_deals' && !form.EndsAt) { showError('حدد وقت انتهاء العرض'); return }
+    const endsAt = form.Type === 'flash_deals' && form.EndsAt ? new Date(form.EndsAt).toISOString() : null
     try {
       if (isEdit) {
         await updateMutation.mutateAsync({
@@ -545,6 +594,8 @@ const SectionModal = ({ section, onClose }) => {
             displayOrder: Number(form.DisplayOrder) || 0,
             filterCategoryId: form.FilterCategoryId || null,
             filterVendorId: form.FilterVendorId || null,
+            page: form.Page,
+            endsAt,
           },
         })
         await saveHeaderBanner(section.id)
@@ -560,7 +611,9 @@ const SectionModal = ({ section, onClose }) => {
           filterCategoryId: form.Type === 'featured_products' ? (form.FilterCategoryId || null) : null,
           filterVendorId: form.Type === 'featured_products' ? (form.FilterVendorId || null) : null,
           displayOrder: Number(form.DisplayOrder) || 0,
-          productIds: form.Type === 'custom_products' ? pickedProducts.map(p => p.id) : null,
+          productIds: PICKED_SECTION_TYPES.includes(form.Type) ? pickedProducts.map(p => p.id) : null,
+          page: form.Page,
+          endsAt,
         })
         if (created?.id) await saveHeaderBanner(created.id)
         success(form.Type === 'banners' ? 'تم إنشاء القسم — أضف بانراته من «تعديل» أو من تبويب البانرات' : 'تم إنشاء القسم بنجاح')
@@ -620,13 +673,19 @@ const SectionModal = ({ section, onClose }) => {
             </select>
             <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
               <Info size={12} />
-              {form.Type === 'custom_products'
+              {form.Type === 'flash_deals'
+                ? 'اختر المنتجات وحدد وقت الانتهاء — يظهر فوقها عدّاد تنازلي ويختفي القسم تلقائياً عند الانتهاء (أنشئ عرضاً في «العروض» ليظهر السعر المخفّض)'
+                : form.Type === 'custom_products'
                 ? 'تختار المنتجات يدوياً بنفسك أدناه'
                 : form.Type === 'banners'
                   ? 'صور إعلانية بين الأقسام: بانر واحد يظهر عريضاً، اثنان متجاوران، ثلاثة = عريض واثنان تحته'
                   : 'يُملأ تلقائياً بأحدث/أفضل البيانات المطابقة من قاعدة البيانات — لا حاجة لاختيار عناصر يدوياً'}
             </p>
           </div>
+
+          <PageSelect value={form.Page}
+            onChange={v => setForm(f => ({ ...f, Page: v, FilterCategoryId: '' }))}
+            hint={isEdit && form.Page !== pageOf(section) ? 'سيُنقل القسم (مع بانراته) إلى هذه الصفحة عند الحفظ' : null} />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -686,7 +745,16 @@ const SectionModal = ({ section, onClose }) => {
             </div>
           )}
 
-          {form.Type === 'custom_products' && (
+          {form.Type === 'flash_deals' && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 block mb-1">ينتهي العرض في *</label>
+              <input type="datetime-local" value={form.EndsAt} min={toLocalInput(new Date().toISOString())}
+                onChange={e => setForm({ ...form, EndsAt: e.target.value })}
+                className="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary bg-white" />
+            </div>
+          )}
+
+          {PICKED_SECTION_TYPES.includes(form.Type) && (
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-2">المنتجات المختارة ({pickedProducts.length})</label>
               {pickedProducts.length > 0 && (
@@ -701,7 +769,7 @@ const SectionModal = ({ section, onClose }) => {
                   ))}
                 </div>
               )}
-              <ProductPicker onSelect={handleAddProductLive} excludeIds={pickedProducts.map(p => p.id)} />
+              <ProductPicker scope={form.Page} onSelect={handleAddProductLive} excludeIds={pickedProducts.map(p => p.id)} />
             </div>
           )}
 
@@ -793,6 +861,7 @@ const SectionModal = ({ section, onClose }) => {
 
 const SectionsTab = () => {
   const { success, error: showError } = useToast()
+  const page = useContext(AdminPageContext)
   const { data, isLoading, refetch } = useSectionsAdmin()
   const updateMutation = useUpdateSection()
   const deleteMutation = useDeleteSection()
@@ -800,7 +869,7 @@ const SectionsTab = () => {
   const [modalSection, setModalSection] = useState(undefined)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
-  const sections = Array.isArray(data) ? [...data].sort((a, b) => a.displayOrder - b.displayOrder) : []
+  const sections = Array.isArray(data) ? data.filter(s => pageOf(s) === page).sort((a, b) => a.displayOrder - b.displayOrder) : []
 
   const handleToggleActive = async (section) => {
     try {
@@ -930,13 +999,35 @@ const SectionsTab = () => {
 
 const AdminHomepage = () => {
   const [tab, setTab] = useState('banners')
+  const [page, setPage] = useState(SCOPE.GENERAL)
 
   return (
+    <AdminPageContext.Provider value={page}>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">إدارة الصفحة الرئيسية</h1>
         <p className="text-gray-500 mt-1">التحكم بالبانرات وأقسام المحتوى المعروضة للزوار</p>
       </div>
+
+      {/* الرئيسية والسوبرماركت صفحتان مستقلتان: لكل منهما سلايدر وأقسام */}
+      <div className="flex gap-2">
+        {PAGE_OPTIONS.map(({ value, label, icon: Icon }) => (
+          <button key={value} type="button" onClick={() => setPage(value)} aria-pressed={page === value}
+            className={`flex items-center gap-2 h-10 px-4 rounded-xl border text-sm font-medium transition-colors ${
+              page === value
+                ? value === SCOPE.GROCERY ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-primary border-primary text-white'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+            }`}>
+            <Icon size={16} /> {label}
+          </button>
+        ))}
+      </div>
+      {page === SCOPE.GROCERY && (
+        <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-start gap-2">
+          <Info size={16} className="mt-0.5 flex-shrink-0" />
+          صفحة السوبرماركت تعرض منتجات الفئات المعلَّمة «سوبرماركت» فقط (من إدارة الفئات). بدون أقسام تعرض الأكثر مبيعاً فيه تلقائياً.
+        </p>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <div className="border-b border-gray-200">
@@ -949,6 +1040,7 @@ const AdminHomepage = () => {
 
       {tab === 'banners' ? <BannersTab /> : <SectionsTab />}
     </div>
+    </AdminPageContext.Provider>
   )
 }
 

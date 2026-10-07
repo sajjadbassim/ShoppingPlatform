@@ -5,6 +5,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -56,9 +57,9 @@ namespace ecommerce.Controllers
                     new { success = true, data = order, message = "تم إنشاء الطلب بنجاح" }
                 );
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
-                var innerMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                var innerMessage = ex.Message;
                 return BadRequest(new { success = false, message = innerMessage });
             }
         }
@@ -75,9 +76,9 @@ namespace ecommerce.Controllers
                 if (!CanView(order)) return OrderNotFound();
                 return Ok(new { success = true, data = order });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
-                var innerMessage = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                var innerMessage = ex.Message;
                 return BadRequest(new { success = false, message = innerMessage });
             }
         }
@@ -94,7 +95,7 @@ namespace ecommerce.Controllers
                 if (!CanView(order)) return OrderNotFound();
                 return Ok(new { success = true, data = order });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -114,7 +115,7 @@ namespace ecommerce.Controllers
                 var orders = await _orderService.GetCustomerOrdersAsync(customerId);
                 return Ok(new { success = true, data = orders });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -146,7 +147,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -184,7 +185,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لعرض هذا الطلب" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -210,7 +211,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لإلغاء هذا الطلب" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

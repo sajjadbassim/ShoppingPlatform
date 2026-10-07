@@ -20,6 +20,7 @@ import {
 } from '../../hooks/useOrders'
 import { DurationChip, OrderTimingCard } from '../../components/common/OrderTiming'
 import { useOrderTimings } from '../../hooks/useOrderTiming'
+import DeliverySlot from '../../components/common/DeliverySlot'
 
 // ===========================
 // الحالات
@@ -291,6 +292,7 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
           {order.customerNotes && (
             <p className="mt-2 text-sm text-amber-800 bg-amber-50 rounded-lg p-2 flex items-start gap-1.5"><FileText size={14} className="mt-0.5 flex-shrink-0" />{order.customerNotes}</p>
           )}
+          <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd} substitution={order.substitutionPreference} className="mt-2" />
           {phone && (
             <div className="grid grid-cols-2 gap-2 mt-3">
               <a href={`tel:${phone}`} className="h-10 rounded-xl border border-gray-200 text-sm font-medium inline-flex items-center justify-center gap-1.5"><Phone size={15} />اتصال</a>

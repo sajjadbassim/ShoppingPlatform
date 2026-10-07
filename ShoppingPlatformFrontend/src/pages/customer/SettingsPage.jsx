@@ -78,6 +78,17 @@ const SettingsPage = () => {
   const { installed, canPrompt, ios, promptInstall } = useInstallPrompt()
   const [clearing, setClearing] = useState(false)
 
+  // التذكيرات: توفر منتج طلبت تنبيهه، سلة متروكة، مكافأة دعوة صديق
+  const toggleReminders = async (e) => {
+    const value = e.target.checked
+    try {
+      await updatePrefs({ notifyReminders: value })
+      success(value ? 'سنُذكّرك بالمنتجات التي تنتظرها' : 'تم إيقاف التذكيرات')
+    } catch (err) {
+      showError(err.message || 'تعذّر حفظ الإعداد')
+    }
+  }
+
   // الحفظ فوري عند تبديل المفتاح — لا حاجة لزر "حفظ"
   const toggleOrderUpdates = async (e) => {
     const value = e.target.checked
@@ -188,6 +199,14 @@ const SettingsPage = () => {
                 subtitle="عند تأكيد طلبك وتحضيره وخروجه للتوصيل"
                 checked={prefs?.notifyOrderUpdates ?? true}
                 onChange={toggleOrderUpdates}
+                disabled={savingPrefs} />
+            )}
+            {!prefsLoading && (
+              <ToggleRow icon={Bell} color="bg-amber-50 text-amber-500"
+                title="التذكيرات"
+                subtitle="توفر منتج طلبت تنبيهه، ومنتجات تركتها في السلة"
+                checked={prefs?.notifyReminders ?? true}
+                onChange={toggleReminders}
                 disabled={savingPrefs} />
             )}
           </Group>

@@ -7,6 +7,7 @@ using ecommerce.Services.NotificationService;
 using Microsoft.EntityFrameworkCore;
 using Moq;
 using Xunit;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Tests.Services
 {
@@ -62,8 +63,8 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task CannotSkipPreparing_NorTouchAnotherStoresOrder()
         {
-            await Assert.ThrowsAsync<Exception>(() => Service().MarkReadyAsync(_vendorA, _a.Id, _user));
-            await Assert.ThrowsAsync<Exception>(() => Service().StartPreparingAsync(_vendorB, _a.Id, _user));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().MarkReadyAsync(_vendorA, _a.Id, _user));
+            await Assert.ThrowsAnyAsync<AppException>(() => Service().StartPreparingAsync(_vendorB, _a.Id, _user));
             Assert.Equal(OrderStatus.CONFIRMED, (await _context.SubOrders.AsNoTracking().FirstAsync(s => s.Id == _a.Id)).Status);
         }
 

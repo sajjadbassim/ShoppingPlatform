@@ -25,6 +25,12 @@ namespace ecommerce.Core.DTO.HomePage
         public Guid? FilterVendorId { get; set; }
         public int DisplayOrder { get; set; } = 0;
 
+        // general (الرئيسية) | grocery (السوبرماركت)
+        public string? Page { get; set; }
+
+        // flash_deals: وقت انتهاء العرض (مطلوب) — يختفي القسم بعده
+        public DateTime? EndsAt { get; set; }
+
         // للـ custom_products فقط
         public List<Guid>? ProductIds { get; set; }
     }

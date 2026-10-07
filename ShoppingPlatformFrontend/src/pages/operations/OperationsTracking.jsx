@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
+import { getFreshAccessToken } from '../../api/session'
 import { apiGet, apiPost, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 
@@ -150,7 +151,7 @@ const LinkSheet = ({ driver, onClose, onChanged }) => {
 // ===========================
 const OperationsTracking = () => {
   const queryClient = useQueryClient()
-  const { token } = useAuthStore()
+  const signedIn = useAuthStore((s) => !!s.token)
   const [tab, setTab] = useState('deliveries')
   const [flyTarget, setFlyTarget] = useState(null)
   const [linkDriver, setLinkDriver] = useState(null)
@@ -166,9 +167,9 @@ const OperationsTracking = () => {
 
   // المواقع لحظياً
   useEffect(() => {
-    if (!token) return
+    if (!signedIn) return
     const connection = new signalR.HubConnectionBuilder()
-      .withUrl(`${import.meta.env.VITE_API_URL ?? ''}/hubs/ops`, { accessTokenFactory: () => token })
+      .withUrl(`${import.meta.env.VITE_API_URL ?? ''}/hubs/ops`, { accessTokenFactory: getFreshAccessToken })
       .withAutomaticReconnect([0, 2000, 5000, 10000])
       .configureLogging(signalR.LogLevel.None)
       .build()
@@ -185,7 +186,7 @@ const OperationsTracking = () => {
     connection.onclose(() => setLive(false))
     connection.start().then(() => setLive(true)).catch(() => setLive(false))
     return () => { connection.stop() }
-  }, [token, queryClient])
+  }, [signedIn, queryClient])
 
   const drivers = board?.drivers || []
   const deliveries = board?.deliveries || []

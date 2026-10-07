@@ -3,7 +3,7 @@
 // الاستخدام: <VendorVariantsManager productId={savedProductId} />
 
 import { useState } from 'react'
-import { Plus, Trash2, Edit, ChevronDown, ChevronUp, Save, X, Package } from 'lucide-react'
+import { Plus, Trash2, Edit, ChevronDown, ChevronUp, Save, X, Package, Wand2 } from 'lucide-react'
 import Button from '../common/Button'
 import Input from '../common/Input'
 import { useToast } from '../common/Toast'
@@ -370,6 +370,89 @@ const VariantForm = ({ productId, attributes, onClose, existingVariant = null })
 // Variants List
 // ===========================
 
+// ===========================
+// توليد المتغيرات: كل التوليفات (المقاسات × الألوان...) دفعة واحدة، وتُتخطى الموجودة
+// ===========================
+const comboKey = (ids) => [...ids].sort().join('|')
+
+const buildCombos = (attributes, selected) => {
+  const lists = attributes.map(a => (a.values || []).filter(v => selected[v.id]))
+  if (lists.length === 0 || lists.some(l => l.length === 0)) return []
+  return lists.reduce((acc, list) => acc.flatMap(combo => list.map(v => [...combo, v])), [[]])
+}
+
+const VariantGenerator = ({ productId, attributes, variants, onClose }) => {
+  const { success, error: toastError } = useToast()
+  const { mutateAsync: createVariant } = useCreateVariant(productId)
+  const [selected, setSelected] = useState(() =>
+    Object.fromEntries(attributes.flatMap(a => (a.values || []).map(v => [v.id, true]))))
+  const [stock, setStock] = useState(0)
+  const [skuPrefix, setSkuPrefix] = useState('')
+  const [running, setRunning] = useState(false)
+  const [done, setDone] = useState(0)
+
+  const existing = new Set(variants.map(v =>
+    comboKey((v.attributes || v.attributeValues || []).map(av => av.valueId ?? av.id))))
+  const combos = buildCombos(attributes, selected)
+  const fresh = combos.filter(c => !existing.has(comboKey(c.map(v => v.id))))
+  const tooMany = fresh.length > 100
+
+  const generate = async () => {
+    setRunning(true)
+    let ok = 0
+    for (const combo of fresh) {
+      const sku = skuPrefix.trim()
+        ? [skuPrefix.trim(), ...combo.map(v => (v.value || v.valueAr || '').replace(/\s+/g, ''))].join('-').toUpperCase()
+        : ''
+      try {
+        await createVariant({ sku, priceAdjustment: 0, stockQuantity: Number(stock) || 0, isAvailable: true, imageUrl: '', attributeValueIds: combo.map(v => v.id) })
+        ok++
+      } catch { /* يُذكر في العدد */ }
+      setDone(d => d + 1)
+    }
+    setRunning(false)
+    if (ok === fresh.length) success(`أُنشئ ${ok} متغير — عدّل الكمية والسعر لكل واحد عند الحاجة`)
+    else toastError(`أُنشئ ${ok} من ${fresh.length} متغير`)
+    onClose()
+  }
+
+  if (attributes.length === 0)
+    return <p className="p-4 text-sm text-gray-500 border border-dashed border-gray-300 rounded-xl">أضف الصفات وقيمها أولاً (تبويب «الصفات»)</p>
+
+  return (
+    <div className="space-y-4 p-4 border border-dashed border-primary/40 rounded-xl bg-primary/5">
+      <p className="font-semibold text-gray-800">توليد المتغيرات تلقائياً</p>
+      {attributes.map(attr => (
+        <div key={attr.id}>
+          <p className="text-sm font-medium text-gray-600 mb-2">{attr.nameAr}</p>
+          <div className="flex flex-wrap gap-2">
+            {(attr.values || []).map(val => (
+              <button key={val.id} type="button" onClick={() => setSelected(s => ({ ...s, [val.id]: !s[val.id] }))}
+                className={`px-3 py-1.5 rounded-lg border text-sm ${selected[val.id] ? 'border-primary bg-primary text-white' : 'border-gray-300 text-gray-600'}`}>
+                {val.valueAr || val.value}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="الكمية لكل متغير" type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} />
+        <Input label="بادئة SKU (اختياري)" value={skuPrefix} onChange={e => setSkuPrefix(e.target.value)} placeholder="SHIRT" dir="ltr" />
+      </div>
+      <p className="text-sm text-gray-700">
+        {combos.length} توليفة — <b>{fresh.length} جديدة</b>{combos.length - fresh.length > 0 && ` (${combos.length - fresh.length} موجودة مسبقاً)`}
+      </p>
+      {tooMany && <p className="text-xs text-red-600">أكثر من 100 متغير — قلّل القيم المحددة</p>}
+      <div className="flex gap-2">
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={running}>إلغاء</Button>
+        <Button size="sm" onClick={generate} disabled={running || fresh.length === 0 || tooMany}>
+          {running ? `جارٍ الإنشاء ${done}/${fresh.length}` : `إنشاء ${fresh.length} متغير`}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 const VariantsList = ({ productId, basePrice }) => {
   const { success, error: toastError } = useToast()
   const { data: variants = [], isLoading } = useProductVariants(productId)
@@ -377,6 +460,7 @@ const VariantsList = ({ productId, basePrice }) => {
   const { mutateAsync: deleteVariant } = useDeleteVariant(productId)
 
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showGenerator, setShowGenerator] = useState(false)
   const [editingId, setEditingId] = useState(null)
 
   const attributeOptions = variantsService.buildAttributeOptions(variants)
@@ -393,11 +477,21 @@ const VariantsList = ({ productId, basePrice }) => {
         <h3 className="font-semibold text-gray-800">
           المتغيرات ({variants.length})
         </h3>
-        <Button variant="outline" size="sm" onClick={() => setShowAddForm(!showAddForm)}>
-          <Plus size={16} className="ml-1" />
-          متغير جديد
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={() => { setShowGenerator(!showGenerator); setShowAddForm(false) }}>
+            <Wand2 size={16} className="ml-1" />
+            توليد تلقائي
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setShowAddForm(!showAddForm); setShowGenerator(false) }}>
+            <Plus size={16} className="ml-1" />
+            متغير جديد
+          </Button>
+        </div>
       </div>
+
+      {showGenerator && (
+        <VariantGenerator productId={productId} attributes={attributes} variants={variants} onClose={() => setShowGenerator(false)} />
+      )}
 
       {showAddForm && (
         <VariantForm

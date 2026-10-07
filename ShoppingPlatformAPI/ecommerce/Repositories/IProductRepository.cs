@@ -75,17 +75,18 @@ namespace ecommerce.Repositories
             string sortBy = "created_at",
             string sortOrder = "desc",
             int pageNumber = 1,
-            int pageSize = 20);
+            int pageSize = 20,
+            string? scope = null);
 
         // ===================================
         // ✅ جديد: بحث موحد
         // ===================================
-        Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5);
+        Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null);
 
         // للفلترة/الترتيب بالسعر بعد العروض (يُحسب في الذاكرة)
         Task<List<ProductPriceInfo>> GetAdvancedFilterCandidatesAsync(
             Guid? vendorId, Guid? categoryId, string? searchTerm, bool? isAvailable, bool? isActive,
-            decimal? minRating, string sortBy, string sortOrder);
+            decimal? minRating, string sortBy, string sortOrder, string? scope = null);
         Task<List<Product>> GetByIdsWithDetailsAsync(IReadOnlyCollection<Guid> ids);
     }
 }

@@ -31,6 +31,7 @@ namespace ecommerce.Data.Configurations
             builder.Property(p => p.NotifyReturns).HasColumnName("notify_returns");
             builder.Property(p => p.NotifyNewUsers).HasColumnName("notify_new_users");
             builder.Property(p => p.NotifyNewVendors).HasColumnName("notify_new_vendors");
+            builder.Property(p => p.NotifyReminders).HasColumnName("notify_reminders").HasDefaultValue(true);
 
             builder.Property(p => p.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
             builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");

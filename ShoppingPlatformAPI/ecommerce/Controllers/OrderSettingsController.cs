@@ -1,3 +1,4 @@
+using ecommerce.Services.DeliverySlotService;
 using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Services.OrderSettingsService;
@@ -14,8 +15,13 @@ namespace ecommerce.Controllers
     public class OrderSettingsController : ControllerBase
     {
         private readonly IOrderSettingsService _settings;
+        private readonly IDeliverySlotService _slots;
 
-        public OrderSettingsController(IOrderSettingsService settings) => _settings = settings;
+        public OrderSettingsController(IOrderSettingsService settings, IDeliverySlotService slots)
+        {
+            _settings = settings;
+            _slots = slots;
+        }
 
         private Guid UserId =>
             Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("userId")?.Value, out var id) ? id : Guid.Empty;
@@ -36,6 +42,17 @@ namespace ecommerce.Controllers
         [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<ActionResult<ApiResponse<OrderSettingsDto>>> SetThresholds([FromBody] SetThresholdsDto dto, CancellationToken ct)
             => Ok(ApiResponse<OrderSettingsDto>.Ok(await _settings.SetDeliveryThresholdsAsync(dto.FastMinutes, dto.SlowMinutes, UserId, ct), "تم حفظ الحدود"));
+
+        // GET: api/order-settings/grocery-slots — مواعيد توصيل السوبرماركت
+        [HttpGet("grocery-slots")]
+        public async Task<ActionResult<ApiResponse<GrocerySlotSettingsDto>>> GetGrocerySlots(CancellationToken ct)
+            => Ok(ApiResponse<GrocerySlotSettingsDto>.Ok(await _slots.GetSettingsAsync(ct)));
+
+        // PUT: api/order-settings/grocery-slots — الأدمن فقط
+        [HttpPut("grocery-slots")]
+        [Authorize(Policy = PolicyNames.AdminOnly)]
+        public async Task<ActionResult<ApiResponse<GrocerySlotSettingsDto>>> SetGrocerySlots([FromBody] GrocerySlotSettingsDto dto, CancellationToken ct)
+            => Ok(ApiResponse<GrocerySlotSettingsDto>.Ok(await _slots.SaveSettingsAsync(dto, UserId, ct), "تم حفظ مواعيد التوصيل"));
 
         // GET: api/order-settings/overdue — طلبات تجاوزت مهلة التأكيد ولم يؤكدها المتجر
         [HttpGet("overdue")]

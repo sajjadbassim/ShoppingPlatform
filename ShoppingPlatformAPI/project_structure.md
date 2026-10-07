@@ -200,7 +200,7 @@ ShoppingPlatformAPI/
     │   ├── 20260717020248_FixVendorTextColumns.Designer.cs
     │   └── AppDbContextModelSnapshot.cs
     ├── Repositories/
-    │   ├── AddressRepository .cs
+    │   ├── AddressRepository.cs
     │   ├── CartRepository.cs
     │   ├── CategoryRepository.cs
     │   ├── CouponRepository.cs
@@ -233,9 +233,9 @@ ShoppingPlatformAPI/
     │   ├── SubOrderRepository.cs
     │   ├── UserRepository.cs
     │   ├── VendorRepository.cs
-    │   └── WishlistRepository.cs.cs
+    │   └── WishlistRepository.cs
     ├── Services/
-    │   ├── AddressService .cs
+    │   ├── AddressService.cs
     │   ├── IAddressService.cs
     │   ├── ICartService.cs
     │   ├── CartService.cs
@@ -246,10 +246,10 @@ ShoppingPlatformAPI/
     │   ├── IUserService.cs
     │   ├── UserService.cs
     │   ├── AdminService/
-    │   │   ├── AdminService .cs
+    │   │   ├── AdminService.cs
     │   │   └── IAdminService.cs
     │   ├── AuthService/
-    │   │   ├── AuthService .cs
+    │   │   ├── AuthService.cs
     │   │   └── IAuthService.cs
     │   ├── CouponService/
     │   │   ├── CouponService.cs
@@ -261,34 +261,34 @@ ShoppingPlatformAPI/
     │   │   ├── FileService.cs
     │   │   └── IFileService.cs
     │   ├── HomeService/
-    │   │   ├── HomeService .cs
+    │   │   ├── HomeService.cs
     │   │   └── IHomeService.cs
     │   ├── InvoiceService/
     │   │   ├── IInvoiceService.cs
-    │   │   └── InvoiceService .cs
+    │   │   └── InvoiceService.cs
     │   ├── LoyaltyService/
     │   │   ├── ILoyaltyService.cs
     │   │   └── LoyaltyService.cs
     │   ├── NotificationService/
     │   │   ├── INotificationService.cs
     │   │   └── NotificationService.cs
-    │   ├── Ops Service/
+    │   ├── OpsService/
     │   │   ├── IOpsService.cs
     │   │   └── OpsService.cs
     │   ├── OrderRatingService/
     │   │   ├── IOrderRatingService.cs
-    │   │   └── OrderRatingService .cs
+    │   │   └── OrderRatingService.cs
     │   ├── ProductService/
     │   │   ├── IProductService.cs
     │   │   ├── IVariantService.cs
     │   │   ├── ProductService.cs
-    │   │   └── VariantService .cs
+    │   │   └── VariantService.cs
     │   ├── PromotionService/
     │   │   ├── IPromotionService.cs
     │   │   └── PromotionService.cs
     │   ├── ReturnService/
     │   │   ├── IReturnService.cs
-    │   │   └── ReturnService .cs
+    │   │   └── ReturnService.cs
     │   ├── ReviewService/
     │   │   ├── IReviewService.cs
     │   │   └── ReviewService.cs
@@ -296,7 +296,7 @@ ShoppingPlatformAPI/
     │   │   ├── IVendorDashboardService.cs
     │   │   ├── IVendorService.cs
     │   │   ├── VendorDashboardService.cs
-    │   │   └── VendorService .cs
+    │   │   └── VendorService.cs
     │   └── WishlistService/
     │       ├── IWishlistService.cs
     │       └── WishlistService.cs

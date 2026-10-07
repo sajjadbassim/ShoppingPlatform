@@ -15,6 +15,8 @@ import { useCartStore } from '../../stores/cartStore'
 import { useState, useEffect } from 'react'
 import { orderService } from '../../services'
 import { CustomerDeliveredIn } from '../../components/common/OrderTiming'
+import DeliverySlot from '../../components/common/DeliverySlot'
+import { formatQuantity, formatPrice } from '../../utils/weight'
 
 
 // ===========================
@@ -481,6 +483,8 @@ const OrderDetailsPage = () => {
                     })}
                   </p>
                   {order.status === 'DELIVERED' && <CustomerDeliveredIn orderId={order.id} />}
+                  <DeliverySlot start={order.deliverySlotStart} end={order.deliverySlotEnd}
+                    substitution={order.substitutionPreference} className="mt-2" />
                 </div>
                 <StatusBadge status={order.status} />
               </div>
@@ -567,9 +571,17 @@ const OrderDetailsPage = () => {
                         >
                           {item.productNameAr || item.productName}
                         </Link>
-                        <p className="text-sm text-gray-500">الكمية: {item.quantity}</p>
+                        {item.replacesItemId && (
+                          <span className="inline-block mr-1 text-[11px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                            بديل عن {items.find(i => i.id === item.replacesItemId)?.productNameAr || 'منتج غير متوفر'}
+                          </span>
+                        )}
+                        <p className="text-sm text-gray-500">الكمية: {formatQuantity(item.quantity, item.weightStepKg)}</p>
+                        {item.unavailableQuantity > 0 && (
+                          <p className="text-xs text-amber-700">غير متوفر: {formatQuantity(item.unavailableQuantity, item.weightStepKg)} — أُزيل من الطلب</p>
+                        )}
                         <p className="font-bold text-primary mt-1">
-                          {(item.unitPrice || 0).toLocaleString()} د.ع
+                          {formatPrice(item.unitPrice || 0, item.weightStepKg)}
                         </p>
                       </div>
                       <div className="text-left">

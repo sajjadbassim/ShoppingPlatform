@@ -37,6 +37,9 @@ namespace ecommerce.Core.DTO.Product
 
         public bool IsActive { get; set; } = true;
 
+        // البيع بالوزن: وزن وحدة البيع بالكيلو (0.1 / 0.25 / 0.5 / 1)، فارغ = بالقطعة
+        public decimal? WeightStepKg { get; set; }
+
         public List<IFormFile>? Images { get; set; }
 
 

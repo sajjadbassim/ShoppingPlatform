@@ -6,6 +6,7 @@ using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -63,7 +64,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -81,7 +82,7 @@ namespace ecommerce.Controllers
                 var review = await _reviewService.GetByIdAsync(id);
                 return Ok(new { success = true, data = review });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -100,7 +101,7 @@ namespace ecommerce.Controllers
                 var summary = await _reviewService.GetProductSummaryAsync(productId);
                 return Ok(new { success = true, data = summary });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -119,7 +120,7 @@ namespace ecommerce.Controllers
                 var summary = await _reviewService.GetVendorSummaryAsync(vendorId);
                 return Ok(new { success = true, data = summary });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -147,12 +148,12 @@ namespace ecommerce.Controllers
             {
                 return Forbid();
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new
                 {
                     success = false,
-                    message = ex.InnerException?.Message ?? ex.Message
+                    message = ex.Message
                 });
             }
         }
@@ -178,7 +179,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية تعديل هذه المراجعة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -208,7 +209,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية حذف هذه المراجعة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -245,7 +246,7 @@ namespace ecommerce.Controllers
                 var review = await _reviewService.SetVendorReplyAsync(id, reply);
                 return Ok(new { success = true, data = review, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -271,7 +272,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المراجعة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -297,7 +298,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المراجعة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -323,7 +324,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المراجعة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -357,7 +358,7 @@ namespace ecommerce.Controllers
                     }
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -379,7 +380,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المراجعة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -401,7 +402,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المراجعة غير موجودة" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

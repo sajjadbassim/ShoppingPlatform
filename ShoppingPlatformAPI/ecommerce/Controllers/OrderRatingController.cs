@@ -4,6 +4,7 @@ using ecommerce.Services.OrderRatingService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -38,7 +39,7 @@ namespace ecommerce.Controllers
             {
                 return Forbid(ex.Message);
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -60,7 +61,7 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, data = rating });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -83,7 +84,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = ex.Message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -97,7 +98,7 @@ namespace ecommerce.Controllers
                 var status = await _ratingService.GetRatingStatusAsync(orderId, GetCurrentUserId());
                 return Ok(new { success = true, data = status });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -131,7 +132,7 @@ namespace ecommerce.Controllers
                 var stats = await _ratingService.GetOverallStatsAsync();
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -151,7 +152,7 @@ namespace ecommerce.Controllers
                 var ratings = await _ratingService.GetAllRatingsAsync(pageNumber, pageSize);
                 return Ok(new { success = true, data = ratings });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -169,7 +170,7 @@ namespace ecommerce.Controllers
                 var stats = await _ratingService.GetVendorStatsAsync(vendorId);
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -187,7 +188,7 @@ namespace ecommerce.Controllers
                 var stats = await _ratingService.GetDriverStatsAsync(driverId);
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

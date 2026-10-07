@@ -4,6 +4,7 @@ using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Repositories;
 using Microsoft.EntityFrameworkCore;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Services
 {
@@ -45,7 +46,7 @@ namespace ecommerce.Services
                 .FirstOrDefaultAsync(p => p.Id == productId);
 
             if (product == null)
-                throw new Exception("المنتج غير موجود");
+                throw new NotFoundException("المنتج غير موجود");
 
             var categoryId = product.CategoryId ?? Guid.Empty;
 
@@ -98,13 +99,30 @@ namespace ecommerce.Services
         }
 
         // ===================================
+        // CalculateFinalPricesAsync — العروض الفعّالة تُحمَّل مرة واحدة بدل استعلام لكل بند
+        // ===================================
+        public async Task<IReadOnlyDictionary<Guid, decimal>> CalculateFinalPricesAsync(IEnumerable<PriceQuery> items)
+        {
+            var products = items.DistinctBy(i => i.ProductId).ToList();
+            if (products.Count == 0)
+                return new Dictionary<Guid, decimal>();
+
+            var activePromotions = (await _promotionRepository.GetActivePromotionsAsync()).ToList();
+            return products.ToDictionary(i => i.ProductId, i =>
+            {
+                var promotion = PromotionPricing.SelectBest(activePromotions, i.ProductId, i.CategoryId, i.VendorId);
+                return promotion == null ? i.Price : PromotionPricing.CalculateDiscount(i.Price, promotion).FinalPrice;
+            });
+        }
+
+        // ===================================
         // GetByIdAsync
         // ===================================
         public async Task<PromotionDto> GetByIdAsync(Guid id)
         {
             var promotion = await _promotionRepository.GetByIdAsync(id);
             if (promotion == null)
-                throw new Exception("العرض غير موجود");
+                throw new NotFoundException("العرض غير موجود");
 
             return await MapToDtoAsync(promotion);
         }
@@ -151,19 +169,19 @@ namespace ecommerce.Services
         {
             // Validation
             if (!PromotionTargetType.All.Contains(dto.TargetType))
-                throw new Exception("نوع الهدف غير صالح");
+                throw new BusinessRuleException("نوع الهدف غير صالح");
 
             if (!DiscountType.All.Contains(dto.DiscountType))
-                throw new Exception("نوع الخصم يجب أن يكون percentage أو fixed");
+                throw new BusinessRuleException("نوع الخصم يجب أن يكون percentage أو fixed");
 
             if (dto.TargetType != PromotionTargetType.ALL && dto.TargetId == null)
-                throw new Exception("يجب تحديد الهدف (منتج / تصنيف / بائع)");
+                throw new BusinessRuleException("يجب تحديد الهدف (منتج / تصنيف / بائع)");
 
             if (dto.DiscountType == DiscountType.PERCENTAGE && dto.DiscountValue > 100)
-                throw new Exception("نسبة الخصم لا يمكن أن تتجاوز 100%");
+                throw new BusinessRuleException("نسبة الخصم لا يمكن أن تتجاوز 100%");
 
             if (dto.StartsAt.HasValue && dto.ExpiresAt.HasValue && dto.StartsAt >= dto.ExpiresAt)
-                throw new Exception("تاريخ البداية يجب أن يكون قبل تاريخ الانتهاء");
+                throw new BusinessRuleException("تاريخ البداية يجب أن يكون قبل تاريخ الانتهاء");
 
             var promotion = new Promotion
             {
@@ -191,7 +209,7 @@ namespace ecommerce.Services
         {
             var promotion = await _promotionRepository.GetByIdAsync(id);
             if (promotion == null)
-                throw new Exception("العرض غير موجود");
+                throw new NotFoundException("العرض غير موجود");
 
             if (dto.Name != null) promotion.Name = dto.Name;
             if (dto.NameAr != null) promotion.NameAr = dto.NameAr;
@@ -204,7 +222,7 @@ namespace ecommerce.Services
 
             if (promotion.StartsAt.HasValue && promotion.ExpiresAt.HasValue &&
                 promotion.StartsAt >= promotion.ExpiresAt)
-                throw new Exception("تاريخ البداية يجب أن يكون قبل تاريخ الانتهاء");
+                throw new BusinessRuleException("تاريخ البداية يجب أن يكون قبل تاريخ الانتهاء");
 
             await _promotionRepository.UpdateAsync(promotion);
             return await GetByIdAsync(id);
@@ -217,7 +235,7 @@ namespace ecommerce.Services
         {
             var promotion = await _promotionRepository.GetByIdAsync(id);
             if (promotion == null)
-                throw new Exception("العرض غير موجود");
+                throw new NotFoundException("العرض غير موجود");
 
             return await _promotionRepository.DeleteAsync(id);
         }

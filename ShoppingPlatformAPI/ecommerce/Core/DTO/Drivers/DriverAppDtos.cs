@@ -34,6 +34,8 @@ namespace ecommerce.Core.DTO.Drivers
         public decimal? Longitude { get; set; }
         public string? ZoneName { get; set; }             // منطقة التوصيل
         public string? CustomerNotes { get; set; }
+        public DateTime? DeliverySlotStart { get; set; }   // موعد التوصيل المختار (UTC)
+        public DateTime? DeliverySlotEnd { get; set; }
         public string PaymentMethod { get; set; }
         public string PaymentStatus { get; set; }
         public decimal AmountToCollect { get; set; } // 0 إن كان مدفوعاً

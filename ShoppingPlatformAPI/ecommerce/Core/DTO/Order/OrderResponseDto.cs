@@ -45,6 +45,10 @@
         public decimal DiscountAmount { get; set; }
         public string? CouponCode { get; set; }
 
+        public DateTime? DeliverySlotStart { get; set; }
+        public DateTime? DeliverySlotEnd { get; set; }
+        public string? SubstitutionPreference { get; set; }
+
 
     }
 }

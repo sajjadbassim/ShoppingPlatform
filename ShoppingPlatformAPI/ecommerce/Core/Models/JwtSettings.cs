@@ -6,5 +6,7 @@
         public string Issuer { get; set; }
         public string Audience { get; set; }
         public int ExpirationInMinutes { get; set; }
+        // عمر رمز التجديد؛ كل تجديد يصدر رمزاً جديداً بنفس المدة فلا يخرج المستخدم النشط
+        public int RefreshTokenDays { get; set; } = 30;
     }
 }

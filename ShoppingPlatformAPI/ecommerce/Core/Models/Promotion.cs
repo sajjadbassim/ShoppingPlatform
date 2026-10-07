@@ -59,6 +59,9 @@ namespace ecommerce.Core.Models
         [Column("expires_at")]
         public DateTime? ExpiresAt { get; set; }
 
+        // المتجر الذي أنشأ العرض من لوحته (null = عرض من المنصة) — التاجر يعدّل عروضه فقط
+        public Guid? OwnerVendorId { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

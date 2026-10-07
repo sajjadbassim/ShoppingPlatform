@@ -56,7 +56,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = ex.Message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -74,7 +74,7 @@ namespace ecommerce.Controllers
                     return NotFound(new { success = false, message = "المتجر غير موجود" });
                 return Ok(new { success = true, data = Public(vendor) });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -90,7 +90,7 @@ namespace ecommerce.Controllers
                 var vendors = await _vendorService.GetAllAsync(IsStaff ? onlyActive : true);
                 return Ok(new { success = true, data = vendors.Select(Public) });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -111,7 +111,7 @@ namespace ecommerce.Controllers
                 var vendor = await _vendorService.UpdateAsync(id, dto);
                 return Ok(new { success = true, data = vendor });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -132,7 +132,7 @@ namespace ecommerce.Controllers
                 var vendor = await _vendorService.UpdateLogoAsync(id, logo);
                 return Ok(new { success = true, data = vendor, message = "تم تحديث اللوجو بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -152,7 +152,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "اللوجو غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -172,7 +172,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "التاجر غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -190,7 +190,7 @@ namespace ecommerce.Controllers
                     return NotFound(new { success = false, message = "المتجر غير موجود" });
                 return Ok(new { success = true, data = Public(vendor) });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return NotFound(new { success = false, message = ex.Message });
             }
@@ -226,7 +226,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

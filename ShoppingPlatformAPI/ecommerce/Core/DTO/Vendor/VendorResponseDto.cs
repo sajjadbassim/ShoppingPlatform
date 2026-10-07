@@ -1,3 +1,4 @@
+using ecommerce.Core.Constants;
 using System.ComponentModel.DataAnnotations;
 
 namespace ecommerce.Core.DTO.Vendor
@@ -33,6 +34,11 @@ namespace ecommerce.Core.DTO.Vendor
         public int? EstimatedPrepTime { get; set; }
 
         public int ProductsCount { get; set; }
+
+        public bool IsAcceptingOrders { get; set; } = true;
+        public List<StoreHours.DayHours>? WorkingHours { get; set; }
+        public bool IsOpenNow { get; set; } = true;
+        public string? OpenStatus { get; set; }   // «مغلق الآن — يفتح غداً الساعة 9:00 ص»
 
         // تقييم المتجر من الزبائن بعد استلام طلباتهم (نجوم المتجر في تقييم الطلب)
         public double Rating { get; set; }

@@ -5,6 +5,7 @@ using ecommerce.Core.DTO.Common;
 using ecommerce.Services.AdminService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ecommerce.Core.Exceptions;
 
 namespace ecommerce.Controllers
 {
@@ -33,7 +34,7 @@ namespace ecommerce.Controllers
                 var stats = await _adminService.GetDashboardStatsAsync();
                 return Ok(new { success = true, data = stats });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -52,7 +53,7 @@ namespace ecommerce.Controllers
                 var users = await _adminService.GetAllUsersAsync(role);
                 return Ok(new { success = true, data = users });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -81,7 +82,7 @@ namespace ecommerce.Controllers
                 var user = await _adminService.CreateOpsUserAsync(dto);
                 return Ok(new { success = true, data = user, message = "تم إنشاء حساب Ops بنجاح" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -97,7 +98,7 @@ namespace ecommerce.Controllers
                 var message = isActive ? "تم تفعيل المستخدم" : "تم إيقاف المستخدم";
                 return Ok(new { success = true, isActive, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -115,7 +116,7 @@ namespace ecommerce.Controllers
                 else
                     return NotFound(new { success = false, message = "المستخدم غير موجود" });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -134,7 +135,7 @@ namespace ecommerce.Controllers
                 var vendors = await _adminService.GetAllVendorsAsync(isActive);
                 return Ok(new { success = true, data = vendors });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -152,7 +153,7 @@ namespace ecommerce.Controllers
                     : "تم إيقاف المتجر";
                 return Ok(new { success = true, isActive, ownerUpgraded, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -171,7 +172,7 @@ namespace ecommerce.Controllers
                 var products = await _adminService.GetAllProductsAsync(isActive);
                 return Ok(new { success = true, data = products });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -187,7 +188,7 @@ namespace ecommerce.Controllers
                 var message = isActive ? "تم تفعيل المنتج" : "تم إيقاف المنتج";
                 return Ok(new { success = true, isActive, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -203,7 +204,7 @@ namespace ecommerce.Controllers
                 var message = dto.IsActive ? "تم تفعيل المنتجات" : "تم إيقاف المنتجات";
                 return Ok(new { success = true, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -227,7 +228,7 @@ namespace ecommerce.Controllers
                 var report = await _adminService.GetSalesReportAsync(start, end);
                 return Ok(new { success = true, data = report });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -242,7 +243,7 @@ namespace ecommerce.Controllers
                 var topVendors = await _adminService.GetTopVendorsAsync(count);
                 return Ok(new { success = true, data = topVendors });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -257,7 +258,7 @@ namespace ecommerce.Controllers
                 var topProducts = await _adminService.GetTopProductsAsync(count);
                 return Ok(new { success = true, data = topProducts });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -273,7 +274,7 @@ namespace ecommerce.Controllers
                 var message = await _adminService.ChangeUserRoleAsync(id, dto.NewRole);
                 return Ok(new { success = true, message });
             }
-            catch (Exception ex)
+            catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
