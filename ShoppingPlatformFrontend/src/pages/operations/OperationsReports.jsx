@@ -24,7 +24,7 @@ const PRESETS = [
   { key: 'month', label: 'هذا الشهر', range: (t) => [new Date(t.getFullYear(), t.getMonth(), 1), t] },
 ]
 
-const money = (n) => `${Math.round(n || 0).toLocaleString()} د.ع`
+const money = (n) => `${Math.round(n || 0).toLocaleString('en-US')} د.ع`
 const compactMoney = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)} مليون` : n >= 1e3 ? `${Math.round(n / 1e3)} ألف` : String(Math.round(n || 0))
 const mins = (m) => m == null ? '—' : m < 1 ? 'أقل من دقيقة' : m < 60 ? `${Math.round(m)} د` : `${Math.floor(m / 60)} س ${Math.round(m % 60)} د`
 const pct = (r) => `${Math.round((r || 0) * 1000) / 10}%`
@@ -100,18 +100,18 @@ const OperationsReports = () => {
   const s = report?.summary
   const p = report?.previousSummary
   const kpis = s ? [
-    { label: 'الطلبات', value: s.orders.toLocaleString(), icon: Package, now: s.orders, prev: p.orders, tone: 'bg-blue-100 text-blue-700' },
+    { label: 'الطلبات', value: s.orders.toLocaleString('en-US'), icon: Package, now: s.orders, prev: p.orders, tone: 'bg-blue-100 text-blue-700' },
     { label: 'الإيرادات (المُسلّم)', value: compactMoney(s.revenue), full: money(s.revenue), icon: Wallet, now: s.revenue, prev: p.revenue, tone: 'bg-green-100 text-green-700' },
     { label: 'متوسط قيمة الطلب', value: compactMoney(s.averageOrderValue), full: money(s.averageOrderValue), icon: Receipt, now: s.averageOrderValue, prev: p.averageOrderValue, tone: 'bg-indigo-100 text-indigo-700' },
     { label: 'نسبة الإلغاء', value: pct(s.cancellationRate), sub: `${s.cancelled} من ${s.storeOrders}`, icon: XCircle, now: s.cancellationRate, prev: p.cancellationRate, lower: true, tone: 'bg-red-100 text-red-700' },
-    { label: 'تم التوصيل', value: s.delivered.toLocaleString(), sub: 'طلبات متاجر', icon: CheckCircle, now: s.delivered, prev: p.delivered, tone: 'bg-emerald-100 text-emerald-700' },
+    { label: 'تم التوصيل', value: s.delivered.toLocaleString('en-US'), sub: 'طلبات متاجر', icon: CheckCircle, now: s.delivered, prev: p.delivered, tone: 'bg-emerald-100 text-emerald-700' },
     { label: 'زمن تأكيد المتجر', value: mins(s.avgConfirmMinutes), icon: Timer, now: s.avgConfirmMinutes, prev: p.avgConfirmMinutes, lower: true, tone: 'bg-amber-100 text-amber-700' },
     { label: 'من الطلب للتسليم', value: mins(s.avgDeliveryMinutes), icon: Package, now: s.avgDeliveryMinutes, prev: p.avgDeliveryMinutes, lower: true, tone: 'bg-purple-100 text-purple-700' },
     { label: 'زمن رحلة السائق', value: mins(s.avgRideMinutes), icon: Truck, now: s.avgRideMinutes, prev: p.avgRideMinutes, lower: true, tone: 'bg-cyan-100 text-cyan-700' },
   ] : []
 
   const daily = report?.daily || []
-  const dayLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' })
+  const dayLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('ar-IQ-u-nu-latn', { day: 'numeric', month: 'short' })
   const peakHour = report ? report.hourly.indexOf(Math.max(...report.hourly)) : -1
   const hourLabel = (h) => `${h % 12 || 12} ${h < 12 ? 'ص' : 'م'}`
   const maxReason = Math.max(1, ...(report?.cancellationReasons || []).map(r => r.count))

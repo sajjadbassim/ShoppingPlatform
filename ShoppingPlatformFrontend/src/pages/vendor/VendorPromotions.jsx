@@ -11,11 +11,11 @@ import { useAuthStore } from '../../stores/authStore'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 
-const money = (n) => `${(n ?? 0).toLocaleString()} د.ع`
+const money = (n) => `${(n ?? 0).toLocaleString('en-US')} د.ع`
 const discountText = (x) => x.discountType === 'percentage'
   ? `${x.discountValue}%${x.maxDiscountAmount ? ` (حتى ${money(x.maxDiscountAmount)})` : ''}`
   : money(x.discountValue)
-const dateText = (d) => d ? new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short', year: 'numeric' }) : null
+const dateText = (d) => d ? new Date(d).toLocaleDateString('ar-IQ-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' }) : null
 // قيمة input[type=date] ← ISO بداية/نهاية اليوم بتوقيت الجهاز
 const toIso = (day, endOfDay = false) => day ? new Date(`${day}T${endOfDay ? '23:59:59' : '00:00:00'}`).toISOString() : null
 const toDay = (iso) => iso ? new Date(iso).toLocaleDateString('en-CA') : ''

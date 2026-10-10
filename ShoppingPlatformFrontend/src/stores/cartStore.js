@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { cartService } from '../services';
+import { countPieces } from '../utils/weight';
 import { useAuthStore } from './authStore';
 
 export const useCartStore = create(
@@ -93,7 +94,7 @@ export const useCartStore = create(
         get().items.reduce((total, item) => total + (item.price * item.quantity), 0),
 
       getItemsCount: () =>
-        get().items.reduce((count, item) => count + item.quantity, 0),
+        countPieces(get().items),   // منتج الوزن = قطعة واحدة
 
       isInCart: (productId) =>
         get().items.some(item => item.productId === productId),

@@ -77,7 +77,7 @@ const OrderDetailModal = ({ orderId, onClose }) => {
             {/* Status + Summary */}
             <div className="flex items-center justify-between">
               <span className={`text-sm px-3 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
-              <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ar-IQ')}</p>
+              <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
             </div>
 
             {/* Customer Info */}
@@ -126,7 +126,7 @@ const OrderDetailModal = ({ orderId, onClose }) => {
                         <p className="text-xs text-gray-400">الكمية: {item.quantity}</p>
                       </div>
                       <p className="font-medium text-sm text-gray-900 flex-shrink-0">
-                        {item.subtotal.toLocaleString()} د.ع
+                        {item.subtotal.toLocaleString('en-US')} د.ع
                       </p>
                     </div>
                   ))}
@@ -149,12 +149,12 @@ const OrderDetailModal = ({ orderId, onClose }) => {
               ].filter(r => !r.hide).map(row => (
                 <div key={row.label} className="flex justify-between text-sm text-gray-600">
                   <span>{row.label}</span>
-                  <span>{(row.value||0).toLocaleString()} د.ع</span>
+                  <span>{(row.value||0).toLocaleString('en-US')} د.ع</span>
                 </div>
               ))}
               <div className="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-200">
                 <span>الإجمالي</span>
-                <span className="text-primary">{order.totalAmount.toLocaleString()} د.ع</span>
+                <span className="text-primary">{order.totalAmount.toLocaleString('en-US')} د.ع</span>
               </div>
             </div>
 
@@ -216,7 +216,7 @@ const AdminOrders = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">الطلبات</h1>
-          <p className="text-gray-500 mt-1">{totalCount.toLocaleString()} طلب</p>
+          <p className="text-gray-500 mt-1">{totalCount.toLocaleString('en-US')} طلب</p>
         </div>
         <button onClick={() => refetch()} className="p-2 hover:bg-gray-100 rounded-lg">
           <RefreshCw size={16} className="text-gray-400" />
@@ -276,13 +276,13 @@ const AdminOrders = () => {
                       {order.customerName || order.customer?.fullName || '—'}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {(order.totalAmount ?? 0).toLocaleString()} د.ع
+                      {(order.totalAmount ?? 0).toLocaleString('en-US')} د.ع
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {order.paymentMethod === 'COD' ? 'عند الاستلام' : order.paymentMethod || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
+                      {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status} />

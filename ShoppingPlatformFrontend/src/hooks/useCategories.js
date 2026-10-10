@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { categoryService } from '../services';
 
 // مفاتيح الاستعلامات
@@ -29,7 +29,7 @@ export const useCategoriesPaged = (params = {}) => {
   return useQuery({
     queryKey: categoryKeys.list(params),
     queryFn: () => categoryService.getPaged(params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData, // v5: الخيار القديم keepPreviousData أُلغي ولم يعد يعمل
   });
 };
 

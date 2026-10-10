@@ -16,13 +16,13 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 // ===========================
 
 const fmt = {
-  date: (d) => d ? new Date(d).toLocaleDateString('ar-IQ') : '—',
-  price: (n) => n != null ? `${Number(n).toLocaleString()} د.ع` : '—',
+  date: (d) => d ? new Date(d).toLocaleDateString('ar-IQ-u-nu-latn') : '—',
+  price: (n) => n != null ? `${Number(n).toLocaleString('en-US')} د.ع` : '—',
 }
 
 const DiscountBadge = ({ type, value }) => (
   <span className="inline-flex items-center gap-1 text-xs font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-    {type === 'percentage' ? <><Percent size={11} />{value}%</> : <><DollarSign size={11} />{Number(value).toLocaleString()}</>}
+    {type === 'percentage' ? <><Percent size={11} />{value}%</> : <><DollarSign size={11} />{Number(value).toLocaleString('en-US')}</>}
   </span>
 )
 

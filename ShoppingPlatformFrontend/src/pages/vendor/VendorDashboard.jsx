@@ -75,7 +75,7 @@ const VendorDashboard = () => {
   const topProducts = d.topProducts ?? []
 
   const stats = [
-    { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString()} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
+    { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString('en-US')} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
     { title: 'الطلبات',  value: (d.totalOrders ?? 0).toString(), icon: ShoppingCart, iconBg: 'bg-blue-100',   iconColor: 'text-blue-600' },
     { title: 'المنتجات', value: `${activeProducts}/${totalProducts}`, icon: Package, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
     { title: 'معلقة',    value: pendingOrders.toString(), icon: TrendingUp, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
@@ -193,7 +193,7 @@ const VendorDashboard = () => {
                   ].map((r, i) => (
                     <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                       <p className="font-bold text-gray-900 text-sm">
-                        {r.value > 1000000 ? `${(r.value/1000000).toFixed(1)}M` : r.value.toLocaleString()} د.ع
+                        {r.value > 1000000 ? `${(r.value/1000000).toFixed(1)}M` : r.value.toLocaleString('en-US')} د.ع
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{r.label}</p>
                     </div>
@@ -236,7 +236,7 @@ const VendorDashboard = () => {
                   <p className="text-xs font-medium text-gray-700 flex-shrink-0">
                     {p.totalRevenue > 1000000
                       ? `${(p.totalRevenue/1000000).toFixed(1)}M`
-                      : (p.totalRevenue||0).toLocaleString()} د.ع
+                      : (p.totalRevenue||0).toLocaleString('en-US')} د.ع
                   </p>
                 </div>
               ))}
@@ -276,9 +276,9 @@ const VendorDashboard = () => {
                     <td className="px-4 py-3 font-medium text-primary text-xs">#{order.subOrderNumber}</td>
                     <td className="px-4 py-3 text-gray-700">{order.customerName || '—'}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
+                      {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
                     </td>
-                    <td className="px-4 py-3 font-medium">{(order.subtotal||0).toLocaleString()} د.ع</td>
+                    <td className="px-4 py-3 font-medium">{(order.subtotal||0).toLocaleString('en-US')} د.ع</td>
                     <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                     <td className="px-4 py-3">
                       <Link to="/vendor/orders" className="text-gray-400 hover:text-primary inline-flex">

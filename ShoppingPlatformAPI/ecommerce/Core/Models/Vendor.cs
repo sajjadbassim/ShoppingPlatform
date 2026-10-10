@@ -17,7 +17,11 @@ namespace ecommerce.Core.Models
         [MaxLength(255)]
         [Column("name_ar")]
         public string NameAr { get; set; }
-       
+
+        // الاسم الذي يراه الزبون: العربي، أو الإنجليزي إن لم يُكتب عربي (ليس عموداً في القاعدة)
+        [NotMapped]
+        public string DisplayName => !string.IsNullOrWhiteSpace(NameAr) ? NameAr : Name;
+
         [MaxLength(255)]
         [Column("description")]
         public string Description { get; set; }

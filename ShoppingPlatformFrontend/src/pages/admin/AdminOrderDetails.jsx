@@ -114,7 +114,7 @@ const AdminOrderDetails = () => {
             <h1 className="text-base sm:text-xl font-bold text-gray-900 whitespace-nowrap truncate" dir="ltr">#{order.orderNumber}</h1>
             <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
               <Calendar size={12} />
-              {new Date(order.createdAt).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })}
+              {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
         </div>
@@ -174,11 +174,11 @@ const AdminOrderDetails = () => {
                         </div>
                       )}
                       <p className="text-xs text-gray-400 mt-1">
-                        {item.unitPrice.toLocaleString()} د.ع × {formatQuantity(item.quantity, item.weightStepKg)}
+                        {item.unitPrice.toLocaleString('en-US')} د.ع × {formatQuantity(item.quantity, item.weightStepKg)}
                       </p>
                     </div>
                     <p className="font-bold text-gray-900 text-sm flex-shrink-0">
-                      {item.subtotal.toLocaleString()} د.ع
+                      {item.subtotal.toLocaleString('en-US')} د.ع
                     </p>
                   </div>
                 ))}
@@ -198,7 +198,7 @@ const AdminOrderDetails = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-xs text-gray-400">المجموع</p>
-                  <p className="font-bold text-gray-900">{sub.total.toLocaleString()} د.ع</p>
+                  <p className="font-bold text-gray-900">{sub.total.toLocaleString('en-US')} د.ع</p>
                 </div>
               </div>
             </div>
@@ -262,7 +262,7 @@ const AdminOrderDetails = () => {
                             </p>
                             {step.occurredAt && (
                               <span className="text-xs text-gray-400 flex-shrink-0">
-                                {new Date(step.occurredAt).toLocaleString('ar-IQ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                {new Date(step.occurredAt).toLocaleString('ar-IQ-u-nu-latn', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </div>
@@ -317,7 +317,7 @@ const AdminOrderDetails = () => {
                 {tracking.estimatedDelivery && (
                   <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 text-sm text-gray-600">
                     <Clock size={14} className="text-primary" />
-                    <span>التسليم المتوقع: {new Date(tracking.estimatedDelivery).toLocaleDateString('ar-IQ')}</span>
+                    <span>التسليم المتوقع: {new Date(tracking.estimatedDelivery).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
                   </div>
                 )}
               </div>
@@ -345,9 +345,9 @@ const AdminOrderDetails = () => {
               {[
                 { label: 'عدد المنتجات', value: `${totalItems} منتج` },
                 { label: 'عدد المتاجر',  value: `${order.subOrders?.length ?? 0} متجر` },
-                { label: 'المجموع الفرعي', value: `${(order.subtotal||0).toLocaleString()} د.ع` },
-                { label: 'رسوم التوصيل',  value: `${(order.deliveryFees||0).toLocaleString()} د.ع` },
-                ...(order.discountAmount > 0 ? [{ label: 'الخصم', value: `-${order.discountAmount.toLocaleString()} د.ع`, red: true }] : []),
+                { label: 'المجموع الفرعي', value: `${(order.subtotal||0).toLocaleString('en-US')} د.ع` },
+                { label: 'رسوم التوصيل',  value: `${(order.deliveryFees||0).toLocaleString('en-US')} د.ع` },
+                ...(order.discountAmount > 0 ? [{ label: 'الخصم', value: `-${order.discountAmount.toLocaleString('en-US')} د.ع`, red: true }] : []),
               ].map(row => (
                 <div key={row.label} className="flex justify-between text-sm">
                   <span className="text-gray-500">{row.label}</span>
@@ -356,7 +356,7 @@ const AdminOrderDetails = () => {
               ))}
               <div className="flex justify-between font-bold text-base pt-3 border-t border-gray-200">
                 <span>الإجمالي</span>
-                <span className="text-primary">{order.totalAmount.toLocaleString()} د.ع</span>
+                <span className="text-primary">{order.totalAmount.toLocaleString('en-US')} د.ع</span>
               </div>
             </div>
 

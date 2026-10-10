@@ -345,9 +345,9 @@ const AdjustPointsTab = () => {
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
-                  { label: 'الرصيد', value: (userLoyalty.balance ?? userLoyalty.points ?? 0).toLocaleString() },
-                  { label: 'المكتسبة', value: (userLoyalty.totalEarned ?? 0).toLocaleString() },
-                  { label: 'المستخدمة', value: (userLoyalty.totalRedeemed ?? 0).toLocaleString() },
+                  { label: 'الرصيد', value: (userLoyalty.balance ?? userLoyalty.points ?? 0).toLocaleString('en-US') },
+                  { label: 'المكتسبة', value: (userLoyalty.totalEarned ?? 0).toLocaleString('en-US') },
+                  { label: 'المستخدمة', value: (userLoyalty.totalRedeemed ?? 0).toLocaleString('en-US') },
                 ].map((item, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg p-2">
                     <p className="font-bold text-gray-900 text-lg">{item.value}</p>

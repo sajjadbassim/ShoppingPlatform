@@ -18,6 +18,7 @@ import { SCOPE, SUPERMARKET_PATH, isGroceryCategory } from '../../utils/shopScop
 import { formatPrice, pricePerKg } from '../../utils/weight'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { StoreClosedBadge, isStoreClosed } from '../../components/common/StoreClosedBadge'
+import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
 
 // ===========================
 // Hooks
@@ -267,7 +268,7 @@ const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = fal
       <p className="mt-2 text-[13px] md:text-sm font-medium leading-snug line-clamp-2 min-h-[2lh] md:group-hover:text-primary transition-colors">{product.name}</p>
       <div className="mt-1 flex items-baseline gap-1.5 flex-wrap">
         <span className="text-sm md:text-base font-bold">{formatPrice(product.price, product.weightStepKg)}</span>
-        {hasDiscount && <span className="text-[11px] text-gray-400 line-through">{Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString()}</span>}
+        {hasDiscount && <span className="text-[11px] text-gray-400 line-through">{Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString('en-US')}</span>}
       </div>
       {product.rating > 0 && (
         <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500">
@@ -543,6 +544,7 @@ const ProductRail = ({ children, className = '' }) => {
 
 // المتاجر المميزة: بطاقات أفقية بغلاف المتجر وشعاره، التقييم، وقت التحضير ورسوم التوصيل
 const StoreCardMini = ({ vendor }) => {
+  const { data: zonesCfg } = usePublicZones()
   const logo = getVendorLogo(vendor)
   const cover = vendor.coverImageUrl ? bannerSrc(vendor.coverImageUrl) : null
   const rating = vendor.rating ? Number(vendor.rating).toFixed(1) : null
@@ -573,7 +575,8 @@ const StoreCardMini = ({ vendor }) => {
         </div>
         <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
           <Truck size={12} />
-          {vendor.deliveryFee > 0 ? `توصيل ${Number(vendor.deliveryFee).toLocaleString()} د.ع` : 'توصيل مجاني'}
+          {vendorUsesZones(zonesCfg, vendor.id) ? 'توصيل حسب منطقتك'
+            : vendor.deliveryFee > 0 ? `توصيل ${Number(vendor.deliveryFee).toLocaleString('en-US')} د.ع` : 'توصيل مجاني'}
         </p>
       </div>
     </Link>
@@ -609,7 +612,7 @@ const HomePage = ({ page = SCOPE.GENERAL }) => {
   const { addItem: addToCart } = useCartStore()
   const { toggleItem: toggleWishlist, isInWishlist } = useWishlistStore()
 
-  const { data: homeData, isLoading: homeLoading } = useHomeData(page)
+  const { data: homeData, isLoading: homeLoading, isError: homeError, refetch: refetchHome } = useHomeData(page)
   const { data: bannersData, isLoading: bannersLoading } = useHomeBanners(page)
   const { data: categoriesData, isLoading: categoriesLoading } = useCategories(true)
 
@@ -722,6 +725,18 @@ const HomePage = ({ page = SCOPE.GENERAL }) => {
 
       {/* اشترِ مجدداً — للمسجّل الذي له طلبات سابقة */}
       <BuyAgainSection page={page} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isInWishlist={isInWishlist} />
+
+      {/* فشل تحميل الأقسام: رسالة وإعادة محاولة بدل صفحة تختفي أقسامها بصمت */}
+      {homeError && !homeData && (
+        <section className="container-main py-5">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
+            <p className="text-red-700 font-medium">تعذّر تحميل المنتجات — تحقق من الاتصال</p>
+            <button onClick={() => refetchHome()} className="mt-3 px-5 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-sm font-medium">
+              إعادة المحاولة
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Dynamic Sections من الـ API */}
       {homeLoading ? (

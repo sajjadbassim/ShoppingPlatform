@@ -126,9 +126,9 @@ const AdminDashboard = () => {
 
   const mainStats = [
     { title: 'إجمالي المبيعات', value: stats.totalRevenue ? `${(stats.totalRevenue / 1000000).toFixed(1)}M د.ع` : '0 د.ع', change: 0, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
-    { title: 'إجمالي الطلبات', value: (stats.totalOrders || 0).toLocaleString(), change: 0, icon: ShoppingCart, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
-    { title: 'المستخدمين', value: (stats.totalUsers || 0).toLocaleString(), change: 0, icon: Users, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
-    { title: 'المتاجر النشطة', value: (stats.activeVendors || 0).toLocaleString(), change: 0, icon: Store, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
+    { title: 'إجمالي الطلبات', value: (stats.totalOrders || 0).toLocaleString('en-US'), change: 0, icon: ShoppingCart, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
+    { title: 'المستخدمين', value: (stats.totalUsers || 0).toLocaleString('en-US'), change: 0, icon: Users, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
+    { title: 'المتاجر النشطة', value: (stats.activeVendors || 0).toLocaleString('en-US'), change: 0, icon: Store, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
   ]
 
   const quickStats = [
@@ -168,10 +168,10 @@ const AdminDashboard = () => {
               {[
                 { label: 'الهاتف',          value: store.phone,           dir: 'ltr' },
                 { label: 'العنوان',          value: store.address },
-                { label: 'الحد الأدنى',     value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString()} د.ع` : '—' },
-                { label: 'رسوم التوصيل',    value: store.deliveryFee     ? `${store.deliveryFee.toLocaleString()} د.ع`     : '—' },
+                { label: 'الحد الأدنى',     value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString('en-US')} د.ع` : '—' },
+                { label: 'رسوم التوصيل',    value: store.deliveryFee     ? `${store.deliveryFee.toLocaleString('en-US')} د.ع`     : '—' },
                 { label: 'وقت التحضير',     value: store.estimatedPrepTime ? `${store.estimatedPrepTime} دقيقة`            : '—' },
-                { label: 'تاريخ التسجيل',   value: store.createdAt ? new Date(store.createdAt).toLocaleDateString('ar-IQ') : '—' },
+                { label: 'تاريخ التسجيل',   value: store.createdAt ? new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—' },
               ].map(({ label, value, dir }) => (
                 <div key={label} className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">{label}</p>
@@ -270,7 +270,7 @@ const AdminDashboard = () => {
                       style={{ bottom: `${pct + 20}px` }}>
                       <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
                         <p className="font-medium">{label}</p>
-                        <p>{day.totalRevenue.toLocaleString()} د.ع</p>
+                        <p>{day.totalRevenue.toLocaleString('en-US')} د.ع</p>
                         <p className="text-gray-300">{day.totalOrders} طلب</p>
                       </div>
                     </div>
@@ -325,7 +325,7 @@ const AdminDashboard = () => {
                   </div>
                   <div className="text-left">
                     <p className="font-medium text-gray-900 text-sm">
-                      {(v.totalRevenue ?? 0) > 1000000 ? `${((v.totalRevenue)/1000000).toFixed(1)}M` : (v.totalRevenue ?? 0).toLocaleString()} د.ع
+                      {(v.totalRevenue ?? 0) > 1000000 ? `${((v.totalRevenue)/1000000).toFixed(1)}M` : (v.totalRevenue ?? 0).toLocaleString('en-US')} د.ع
                     </p>
                     {v.rating > 0 && <p className="text-xs text-yellow-500">⭐ {v.rating.toFixed(1)}</p>}
                   </div>
@@ -358,7 +358,7 @@ const AdminDashboard = () => {
                     <tr key={order.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-primary">#{order.orderNumber || order.id}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{order.customer?.fullName || order.customerName || 'عميل'}</td>
-                      <td className="px-4 py-3 text-sm font-medium">{(order.totalAmount || order.total || 0).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-sm font-medium">{(order.totalAmount || order.total || 0).toLocaleString('en-US')}</td>
                       <td className="px-4 py-3"><StatusBadge status={order.status} /></td>
                     </tr>
                   ))}
@@ -522,7 +522,7 @@ const AdminDashboard = () => {
             ].map((tier, i) => (
               <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                 <p className="text-sm font-medium text-gray-700">{tier.label}</p>
-                <p className="text-xs text-gray-500">{(tier.threshold ?? 0).toLocaleString()} نقطة</p>
+                <p className="text-xs text-gray-500">{(tier.threshold ?? 0).toLocaleString('en-US')} نقطة</p>
                 <p className="text-xs text-primary font-medium">×{tier.multiplier ?? 1}</p>
               </div>
             ))}

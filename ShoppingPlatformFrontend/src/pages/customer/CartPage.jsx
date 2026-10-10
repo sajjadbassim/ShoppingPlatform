@@ -9,12 +9,12 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useCouponStore } from '../../stores/couponStore'
 import { getImageUrl } from '../../utils/imageHelper'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { usePublicZones, vendorUsesZones } from '../../hooks/useDeliveryZones'
-import { formatQuantity, formatPrice, isByWeight, pricePerKg } from '../../utils/weight'
+import { formatQuantity, formatPrice, isByWeight, pricePerKg, countPieces } from '../../utils/weight'
 
 // ✅ مكون عرض الـ variant المختار
 const VariantBadges = ({ variantAttributes, variantSku }) => {
@@ -63,8 +63,8 @@ const SuggestedTile = ({ product: p }) => {
       </div>
       <div className="p-2.5">
         <p className="text-sm text-gray-800 line-clamp-2 min-h-[2.5rem]">{p.nameAr || p.name}</p>
-        <p className="mt-1 text-sm font-bold text-primary">{p.price?.toLocaleString()} د.ع</p>
-        {discount > 0 && <p className="text-[11px] text-gray-400 line-through">{p.originalPrice?.toLocaleString()} د.ع</p>}
+        <p className="mt-1 text-sm font-bold text-primary">{p.price?.toLocaleString('en-US')} د.ع</p>
+        {discount > 0 && <p className="text-[11px] text-gray-400 line-through">{p.originalPrice?.toLocaleString('en-US')} د.ع</p>}
       </div>
     </Link>
   )
@@ -164,6 +164,7 @@ const CartPage = () => {
   const [couponError, setCouponError] = useState('')
   const [updatingItems, setUpdatingItems] = useState({})
   const [showCoupon, setShowCoupon] = useState(false)
+  const validatedFor = useRef('')   // "الكود|المجموع" الذي تحققنا منه آخر مرة
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -185,12 +186,18 @@ const CartPage = () => {
     }
   }
 
-  const handleRemoveItem = async (productId) => {
+  // نفس علامة "مشغول" التي يستعملها تغيير الكمية — الضغطة الثانية كانت تُرسل حذفاً ثانياً يفشل
+  const handleRemoveItem = async (item) => {
+    const itemKey = item.variantId || item.productId
+    if (updatingItems[itemKey]) return
+    setUpdatingItems(prev => ({ ...prev, [itemKey]: true }))
     try {
-      await removeCartItem(productId)
+      await removeCartItem(item.productId, item.variantId || null)
       success('تم حذف المنتج من السلة')
     } catch (err) {
       error('فشل حذف المنتج')
+    } finally {
+      setUpdatingItems(prev => ({ ...prev, [itemKey]: false }))
     }
   }
 
@@ -205,16 +212,19 @@ const CartPage = () => {
     const code = (codeOverride ?? couponCode).trim()
     if (!code) return
     setCouponError('')
+    const wasApplied = !!appliedCoupon
     try {
       const result = await validateCoupon(code)
+      validatedFor.current = `${code}|${subtotal}`
       setAppliedCoupon({ ...result, code })
       setSavedCouponCode(code)
       if (!silent) success('تم تطبيق الكوبون بنجاح')
     } catch (err) {
       setAppliedCoupon(null)
       if (silent) {
-        // كوبون محفوظ من زيارة سابقة لم يعد صالحاً — احذفه بصمت
+        // كوبون محفوظ لم يعد صالحاً — يُحذف، ونخبر العميل إن كان ظاهراً أمامه (تغيّرت الكمية)
         clearSavedCoupon()
+        if (wasApplied) error(`أُزيل الكوبون ${code}: ${err.message || 'لم يعد صالحاً لهذه السلة'}`)
       } else {
         setCouponError(err.message || 'كود الخصم غير صحيح')
       }
@@ -238,11 +248,12 @@ const CartPage = () => {
   const fixedFees = vendorsSummary.filter(v => !byZone(v.vendorId)).reduce((s, v) => s + (v.deliveryFee || 0), 0)
   const totalDeliveryFees = anyByZone ? fixedFees : (cartData?.totalDeliveryFees || 0)
   const totalAmount = anyByZone ? subtotal + fixedFees : (cartData?.totalAmount || 0)
-  const feeText = (v) => byZone(v.vendorId) ? 'حسب منطقتك' : `${v.deliveryFee.toLocaleString()} د.ع`
+  const feeText = (v) => byZone(v.vendorId) ? 'حسب منطقتك' : `${v.deliveryFee.toLocaleString('en-US')} د.ع`
 
-  // ✅ استعادة الكوبون المحفوظ من صفحة إتمام الشراء (أو زيارة سابقة) تلقائياً
+  // ✅ استعادة الكوبون المحفوظ تلقائياً، وإعادة حساب خصمه كلما تغيّر المجموع
+  // (خصم النسبة يتغير مع الكمية، وقد يسقط الكوبون إن نزل المجموع تحت حده الأدنى)
   useEffect(() => {
-    if (savedCouponCode && !appliedCoupon && subtotal > 0) {
+    if (savedCouponCode && subtotal > 0 && validatedFor.current !== `${savedCouponCode}|${subtotal}`) {
       applyCoupon(savedCouponCode, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -253,7 +264,7 @@ const CartPage = () => {
 
   // عدد القطع، والتوفير من خصومات المنتجات
   const allItems = vendorsSummary.flatMap(v => v.items || [])
-  const itemsCount = allItems.reduce((sum, i) => sum + (i.quantity || 0), 0) || cartItems?.length || 0
+  const itemsCount = countPieces(allItems) || cartItems?.length || 0
   const totalSavings = allItems.reduce((sum, i) =>
     sum + (i.originalPrice > i.price ? (i.originalPrice - i.price) * i.quantity : 0), 0)
 
@@ -345,7 +356,7 @@ const CartPage = () => {
                           <span className="flex items-center gap-1"><Truck size={12} />توصيل {feeText(vendor)}</span>
                         </p>
                       </div>
-                      <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{vendor.subtotal.toLocaleString()} د.ع</p>
+                      <p className="font-bold text-gray-900 text-sm whitespace-nowrap">{vendor.subtotal.toLocaleString('en-US')} د.ع</p>
                     </div>
 
                     {/* الحد الأدنى للطلب */}
@@ -357,7 +368,7 @@ const CartPage = () => {
                       ) : (
                         <div className="mt-2.5">
                           <p className="text-xs text-amber-700">
-                            أضف <span className="font-bold">{remaining.toLocaleString()} د.ع</span> للوصول للحد الأدنى ({vendor.minOrderAmount.toLocaleString()} د.ع)
+                            أضف <span className="font-bold">{remaining.toLocaleString('en-US')} د.ع</span> للوصول للحد الأدنى ({vendor.minOrderAmount.toLocaleString('en-US')} د.ع)
                           </p>
                           <div className="mt-1.5 h-1.5 rounded-full bg-amber-100 overflow-hidden">
                             <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${progress}%` }} />
@@ -395,7 +406,7 @@ const CartPage = () => {
                             <div className="flex flex-wrap items-baseline gap-x-2 mt-1">
                               <span className="font-bold text-primary text-sm lg:text-base">{formatPrice(item.price || 0, item.weightStepKg)}</span>
                               {item.originalPrice > item.price && (
-                                <span className="text-xs text-gray-400 line-through">{Math.round(pricePerKg(item.originalPrice, item.weightStepKg)).toLocaleString()}</span>
+                                <span className="text-xs text-gray-400 line-through">{Math.round(pricePerKg(item.originalPrice, item.weightStepKg)).toLocaleString('en-US')}</span>
                               )}
                             </div>
 
@@ -419,14 +430,14 @@ const CartPage = () => {
                                     <Minus size={16} />
                                   </button>
                                 ) : (
-                                  <button onClick={() => handleRemoveItem(item.productId)} disabled={busy}
+                                  <button onClick={() => handleRemoveItem(item)} disabled={busy}
                                     className="w-9 h-full flex items-center justify-center text-red-500 disabled:opacity-50"
                                     aria-label="حذف المنتج">
                                     <Trash2 size={15} />
                                   </button>
                                 )}
                               </div>
-                              <p className="text-sm font-bold text-gray-900 whitespace-nowrap">{lineTotal.toLocaleString()} د.ع</p>
+                              <p className="text-sm font-bold text-gray-900 whitespace-nowrap">{lineTotal.toLocaleString('en-US')} د.ع</p>
                             </div>
                           </div>
                         </div>
@@ -491,13 +502,13 @@ const CartPage = () => {
               <div className="space-y-2.5 py-3 border-t border-gray-100 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>المجموع الفرعي</span>
-                  <span>{subtotal.toLocaleString()} د.ع</span>
+                  <span>{subtotal.toLocaleString('en-US')} د.ع</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1"><Truck size={15} />رسوم التوصيل</span>
                   <span>{anyByZone
-                    ? (fixedFees > 0 ? `${fixedFees.toLocaleString()} د.ع + حسب منطقتك` : 'حسب منطقتك')
-                    : `${totalDeliveryFees.toLocaleString()} د.ع`}</span>
+                    ? (fixedFees > 0 ? `${fixedFees.toLocaleString('en-US')} د.ع + حسب منطقتك` : 'حسب منطقتك')
+                    : `${totalDeliveryFees.toLocaleString('en-US')} د.ع`}</span>
                 </div>
                 {vendorsSummary.length > 1 && (
                   <div className="pr-4 space-y-1">
@@ -512,14 +523,14 @@ const CartPage = () => {
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>خصم الكوبون</span>
-                    <span>-{discount.toLocaleString()} د.ع</span>
+                    <span>-{discount.toLocaleString('en-US')} د.ع</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between items-baseline py-3 border-t border-gray-100">
                 <span className="text-base lg:text-lg font-bold">الإجمالي{anyByZone && <span className="block text-[11px] font-normal text-gray-500">قبل رسوم توصيل منطقتك</span>}</span>
-                <span className="text-lg font-bold text-primary">{total.toLocaleString()} د.ع</span>
+                <span className="text-lg font-bold text-primary">{total.toLocaleString('en-US')} د.ع</span>
               </div>
 
               {/* التوفير والنقاط */}
@@ -528,13 +539,13 @@ const CartPage = () => {
                   {totalSavings > 0 && (
                     <p className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl px-3 py-2">
                       <PiggyBank size={16} className="flex-shrink-0" />
-                      وفّرت <span className="font-bold">{totalSavings.toLocaleString()} د.ع</span> في هذا الطلب
+                      وفّرت <span className="font-bold">{totalSavings.toLocaleString('en-US')} د.ع</span> في هذا الطلب
                     </p>
                   )}
                   {pointsToEarn > 0 && (
                     <Link to="/loyalty" className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
                       <Star size={16} className="flex-shrink-0 fill-amber-400 text-amber-400" />
-                      ستكسب <span className="font-bold">{pointsToEarn.toLocaleString()} نقطة تشجيعية</span> من هذا الطلب
+                      ستكسب <span className="font-bold">{pointsToEarn.toLocaleString('en-US')} نقطة تشجيعية</span> من هذا الطلب
                     </Link>
                   )}
                 </div>
@@ -559,7 +570,7 @@ const CartPage = () => {
         <div className="h-16 px-4 flex items-center gap-3">
           <div className="flex-shrink-0">
             <p className="text-[11px] text-gray-500 leading-none">الإجمالي</p>
-            <p className="text-base font-bold text-gray-900 mt-1 whitespace-nowrap">{total.toLocaleString()} د.ع</p>
+            <p className="text-base font-bold text-gray-900 mt-1 whitespace-nowrap">{total.toLocaleString('en-US')} د.ع</p>
           </div>
           <button onClick={() => navigate('/checkout')}
             className="flex-1 h-12 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2 active:scale-[0.99] transition">

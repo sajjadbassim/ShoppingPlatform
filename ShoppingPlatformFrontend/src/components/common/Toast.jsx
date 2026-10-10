@@ -57,7 +57,7 @@ const ToastItem = ({ id, type = 'info', message, title, duration = 5000, onRemov
   return (
     <div
       className={`
-        flex items-start gap-3 p-4 rounded-lg shadow-dropdown min-w-[320px] max-w-md
+        flex items-start gap-3 p-4 rounded-lg shadow-dropdown w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[320px] max-w-md
         ${typeConfig.bgColor} text-white
         ${isExiting ? 'animate-fade-out' : 'animate-slide-up'}
       `}

@@ -21,9 +21,14 @@ export const pricePerKg = (unitPrice, weightStepKg) => {
 
 // نص السعر: «3,000 د.ع / كغم» للبيع بالوزن، وإلا «3,000 د.ع»
 export const formatPrice = (unitPrice, weightStepKg) => {
-  const value = Math.round(pricePerKg(Number(unitPrice) || 0, weightStepKg)).toLocaleString()
+  const value = Math.round(pricePerKg(Number(unitPrice) || 0, weightStepKg)).toLocaleString('en-US')
   return isByWeight({ weightStepKg }) ? `${value} د.ع / كغم` : `${value} د.ع`
 }
+
+// عدد القطع للعرض (شارة السلة، "N قطعة"): منتج الوزن قطعة واحدة مهما كان وزنه
+// (كميته بالوحدات: 1 كغم بوحدة 100 غ = 10، فكان يُعدّ 10 قطع)
+export const countPieces = (items = []) =>
+  items.reduce((sum, i) => sum + (isByWeight(i) ? 1 : (Number(i.quantity) || 0)), 0)
 
 // وصف الوحدة للبائع والزبون: «كل وحدة 500 غ»
 export const stepLabel = (weightStepKg) => formatQuantity(1, weightStepKg)

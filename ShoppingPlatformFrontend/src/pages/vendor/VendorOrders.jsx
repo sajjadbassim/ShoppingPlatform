@@ -49,7 +49,7 @@ const itemName = (it) => {
   const name = it.productNameAr || it.productName
   return it.variantLabel ? `${name} (${it.variantLabel})` : name
 }
-const money = (n) => `${(n ?? 0).toLocaleString()} د.ع`
+const money = (n) => `${(n ?? 0).toLocaleString('en-US')} د.ع`
 
 const timeAgo = (date) => {
   const min = Math.round((Date.now() - new Date(date).getTime()) / 60000)
@@ -57,7 +57,7 @@ const timeAgo = (date) => {
   if (min < 60) return `منذ ${min} د`
   const h = Math.round(min / 60)
   if (h < 24) return `منذ ${h} س`
-  return new Date(date).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' })
+  return new Date(date).toLocaleDateString('ar-IQ-u-nu-latn', { day: 'numeric', month: 'short' })
 }
 
 // رقم عراقي محلي ← دولي لروابط واتساب
@@ -262,7 +262,7 @@ const OrderSheet = ({ order, vendorId, storeName, onClose, onAccept, onReject, o
         <div className="flex items-center gap-2 p-4 border-b border-gray-100">
           <div className="flex-1 min-w-0">
             <p className="font-bold text-gray-900" dir="ltr">#{order.subOrderNumber}</p>
-            <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+            <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</p>
           </div>
           {pending ? <Countdown deadline={order.confirmationDeadline} big /> : <StatusBadge status={order.status} />}
           <button onClick={() => { if (!printOrder(order, storeName)) showError('اسمح بالنوافذ المنبثقة لهذا الموقع لطباعة الإيصال') }}
@@ -347,7 +347,7 @@ const OrderSheet = ({ order, vendorId, storeName, onClose, onAccept, onReject, o
                       <option value="">بلا بديل — احذفه وأعد المبلغ</option>
                       {storeProducts.filter(p => p.id !== it.productId && p.stockQuantity >= m).map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.nameAr || p.name} — {Math.min(p.price, it.unitPrice).toLocaleString()} د.ع{p.price > it.unitPrice ? ' (بسعر الأصلي)' : ''}
+                          {p.nameAr || p.name} — {Math.min(p.price, it.unitPrice).toLocaleString('en-US')} د.ع{p.price > it.unitPrice ? ' (بسعر الأصلي)' : ''}
                         </option>
                       ))}
                     </select>

@@ -35,7 +35,7 @@ const OverdueConfirmationsAlert = ({ orderLink, allLink }) => {
             <Link to={orderLink(o)} className="flex-1 min-w-0">
               <p className="text-sm font-bold text-gray-900 truncate">{o.vendorName}</p>
               <p className="text-xs text-gray-500 truncate">
-                <span dir="ltr">{o.orderNumber}</span>{o.customerName ? ` · ${o.customerName}` : ''} · {(o.total || 0).toLocaleString()} د.ع
+                <span dir="ltr">{o.orderNumber}</span>{o.customerName ? ` · ${o.customerName}` : ''} · {(o.total || 0).toLocaleString('en-US')} د.ع
               </p>
             </Link>
             <span className="text-xs font-bold text-red-700 bg-red-100 rounded-full px-2 py-1 whitespace-nowrap">

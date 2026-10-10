@@ -411,7 +411,7 @@ const LinkProductModal = ({ video, vendorId, onClose, onSave, saving }) => {
                     </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-sm font-medium text-gray-900 truncate">{p.nameAr || p.name}</span>
-                      <span className="block text-xs text-gray-500">{p.price?.toLocaleString()} د.ع</span>
+                      <span className="block text-xs text-gray-500">{p.price?.toLocaleString('en-US')} د.ع</span>
                     </span>
                     {current === p.id && <CheckCircle2 size={18} className="text-primary flex-shrink-0" />}
                   </button>
@@ -439,7 +439,7 @@ const timeAgo = (date) => {
   if (min < 60) return `منذ ${plural(min, 'دقيقة', 'دقيقتين', 'دقائق', 'دقيقة')}`
   const h = Math.round(min / 60)
   if (h < 24) return `منذ ${plural(h, 'ساعة', 'ساعتين', 'ساعات', 'ساعة')}`
-  return new Date(date).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' })
+  return new Date(date).toLocaleDateString('ar-IQ-u-nu-latn', { day: 'numeric', month: 'short' })
 }
 
 // المنصات القادمة — تظهر كصفوف مختصرة في نفس القائمة
@@ -629,7 +629,7 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
           </div>
 
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>مربوط منذ {new Date(status.connectedAt).toLocaleDateString('ar-IQ')}</span>
+            <span>مربوط منذ {new Date(status.connectedAt).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
             <a href={cfg.privacyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-gray-600">
               سياسة خصوصية {cfg.name} <ExternalLink size={11} />
             </a>
@@ -656,7 +656,7 @@ const POST_STATUS = {
   CANCELLED: { label: 'ملغى', tone: 'muted' },
 }
 const toneClass = { ok: 'bg-green-50 text-green-700', info: 'bg-blue-50 text-blue-700', error: 'bg-red-50 text-red-700', muted: 'bg-gray-100 text-gray-500' }
-const formatPostDate = (d) => new Date(d).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })
+const formatPostDate = (d) => new Date(d).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })
 
 const InstagramPostsSection = () => {
   const { success, error: showError } = useToast()

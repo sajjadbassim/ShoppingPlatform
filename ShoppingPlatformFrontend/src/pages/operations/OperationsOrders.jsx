@@ -55,14 +55,14 @@ const CANCEL_REASONS = ['المتجر لم يرد', 'المنتج غير متو�
 // الإلغاء متاح في كل المراحل قبل خروج الطلب مع السائق
 const CANCELLABLE_LATE = ['CONFIRMED', 'PREPARING', 'READY']
 
-const money = (n) => `${(n || 0).toLocaleString()} د.ع`
+const money = (n) => `${(n || 0).toLocaleString('en-US')} د.ع`
 const timeAgo = (d) => {
   const min = Math.round((Date.now() - new Date(d).getTime()) / 60000)
   if (min < 1) return 'الآن'
   if (min < 60) return `منذ ${min} د`
   const h = Math.round(min / 60)
   if (h < 24) return `منذ ${h} س`
-  return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' })
+  return new Date(d).toLocaleDateString('ar-IQ-u-nu-latn', { day: 'numeric', month: 'short' })
 }
 const waLink = (phone) => {
   const d = (phone || '').replace(/\D/g, '')
@@ -253,7 +253,7 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
       <div className="flex items-center gap-3 p-4 border-b border-gray-100 bg-white">
         <div className="flex-1 min-w-0">
           <p className="font-bold text-gray-900" dir="ltr">{order.orderNumber}</p>
-          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+          <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</p>
         </div>
         <StatusChip status={order.status} />
         <button onClick={onClose} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center" aria-label="إغلاق"><X size={18} /></button>
@@ -492,7 +492,7 @@ const OperationsOrders = () => {
           <h1 className="text-2xl font-bold text-gray-900">الطلبات</h1>
           <p className="text-xs text-gray-500 mt-0.5">
             {allCount} طلب · تحديث تلقائي كل 30 ثانية
-            {dataUpdatedAt ? ` · آخر تحديث ${new Date(dataUpdatedAt).toLocaleTimeString('ar-IQ', { hour: 'numeric', minute: '2-digit' })}` : ''}
+            {dataUpdatedAt ? ` · آخر تحديث ${new Date(dataUpdatedAt).toLocaleTimeString('ar-IQ-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}` : ''}
           </p>
         </div>
         <button onClick={() => { refetch(); refetchCounts() }} disabled={isFetching} aria-label="تحديث"

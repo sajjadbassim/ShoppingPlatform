@@ -55,7 +55,7 @@ namespace ecommerce.Services.ProductService.ProductService
             {
                 Id = product.Id,
                 VendorId = product.VendorId,
-                VendorName = product.Vendor?.Name,
+                VendorName = product.Vendor?.DisplayName,   // العربي أولاً (بطاقات المنتجات للزبون)
                 VendorIsOpen = product.Vendor == null || StoreHours.IsOpen(product.Vendor, DateTime.UtcNow),
                 VendorOpenStatus = product.Vendor == null ? null : StoreHours.Status(product.Vendor, DateTime.UtcNow).Message,
                 CategoryId = product.CategoryId,
@@ -865,7 +865,7 @@ namespace ecommerce.Services.ProductService.ProductService
                 RegularIsAvailable = product.IsAvailable,
                 IsActive = product.IsActive,
                 VendorId = product.VendorId,
-                VendorName = product.Vendor?.Name,
+                VendorName = product.Vendor?.DisplayName,
                 VendorIsOpen = product.Vendor == null || StoreHours.IsOpen(product.Vendor, DateTime.UtcNow),
                 VendorOpenStatus = product.Vendor == null ? null : StoreHours.Status(product.Vendor, DateTime.UtcNow).Message,
                 CategoryId = product.CategoryId,

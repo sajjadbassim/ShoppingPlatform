@@ -223,7 +223,7 @@ const Slide = memo(({ video, index, active, near, loadPlayer, paused, onTap, set
           </span>
           <span className="flex-1 min-w-0">
             <span className="block text-sm font-bold text-gray-900 truncate">{video.product.nameAr || video.product.name}</span>
-            <span className="block text-sm font-bold text-primary">{video.product.price?.toLocaleString()} د.ع</span>
+            <span className="block text-sm font-bold text-primary">{video.product.price?.toLocaleString('en-US')} د.ع</span>
           </span>
           <span className="h-9 px-3 rounded-full bg-primary text-white text-xs font-bold flex items-center gap-1 flex-shrink-0">
             <ShoppingBag size={14} />اشترِ الآن

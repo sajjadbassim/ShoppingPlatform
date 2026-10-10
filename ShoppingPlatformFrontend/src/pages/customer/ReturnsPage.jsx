@@ -1,5 +1,5 @@
 // src/pages/customer/ReturnsPage.jsx
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   RotateCcw, Plus, X, Package, AlertCircle,
@@ -50,6 +50,9 @@ const NewReturnForm = ({ onClose, onSuccess }) => {
   // كل بند يشير إلى بند الطلب نفسه (orderItemId) حتى يُعرف المتغير المُرجَع بدقة
   const [items, setItems]       = useState([{ orderItemId: '', quantity: 1 }])
   const [images, setImages]     = useState([])
+  // معاينات الصور: رابط واحد لكل صورة يُحرَّر عند تغيّرها (لا رابط جديد مع كل إعادة رسم)
+  const previews = useMemo(() => images.map(img => URL.createObjectURL(img)), [images])
+  useEffect(() => () => previews.forEach(url => URL.revokeObjectURL(url)), [previews])
 
   // جلب الطلبات المُسلَّمة
   const { data: ordersData } = useCustomerOrders(user?.userId || user?.id)
@@ -145,7 +148,7 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
                 <option value="">اختر الطلب...</option>
                 {deliveredOrders.map(o => (
                   <option key={o.id} value={o.id}>
-                    {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ')}
+                    {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
                   </option>
                 ))}
               </select>
@@ -191,7 +194,9 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
                     className="flex-1 h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary">
                     <option value="">اختر المنتج...</option>
                     {orderItems.map(oi => (
-                      <option key={oi.id} value={oi.id}>
+                      // المنتج المختار في سطر آخر لا يُختار مرتين — تُعدَّل كميته في سطره
+                      <option key={oi.id} value={oi.id}
+                        disabled={items.some((other, j) => j !== i && other.orderItemId === oi.id)}>
                         {oi.productNameAr || oi.productName}
                         {oi.variantSku ? ` (${oi.variantSku})` : ''}
                       </option>
@@ -226,7 +231,7 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
               <div className="flex gap-2 mt-2 flex-wrap">
                 {images.map((img, i) => (
                   <div key={i} className="relative">
-                    <img src={URL.createObjectURL(img)} alt=""
+                    <img src={previews[i]} alt=""
                       className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
                     <button type="button"
                       onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
@@ -268,7 +273,7 @@ const ReturnCard = ({ ret }) => {
         <div>
           <p className="font-medium text-gray-900">طلب إرجاع #{ret.returnNumber || ret.id?.slice(0,8)}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {new Date(ret.createdAt).toLocaleDateString('ar-IQ')}
+            {new Date(ret.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
           </p>
         </div>
         <StatusBadge status={ret.status} />
@@ -318,7 +323,7 @@ const ReturnsPage = () => {
   const [showForm, setShowForm] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-returns'],
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.RETURNS.MY)
@@ -367,6 +372,15 @@ const ReturnsPage = () => {
         {isLoading ? (
           <div className="space-y-4">
             {[1,2,3].map(i => <Skeleton key={i} className="h-40 rounded-xl" />)}
+          </div>
+        ) : isError ? (
+          // فشل التحميل ليس "لا توجد طلبات" — العميل قد يظن أن طلباته ضاعت
+          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+            <AlertCircle size={32} className="mx-auto mb-2 text-red-400" />
+            <p className="text-red-700 font-medium">تعذّر تحميل طلبات الإرجاع</p>
+            <button onClick={() => refetch()} className="mt-3 px-5 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-sm font-medium">
+              إعادة المحاولة
+            </button>
           </div>
         ) : returns.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">

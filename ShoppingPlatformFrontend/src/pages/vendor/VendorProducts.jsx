@@ -146,8 +146,8 @@ const ProductRow = ({ product: p, sold, selected, selecting, onSelect, onToggleA
           </p>
         </div>
         <div className="flex items-center gap-2 mt-1.5 sm:mt-0 sm:block">
-          <p className="font-bold text-gray-900 text-sm">{(p.price || 0).toLocaleString()} <span className="text-xs font-normal text-gray-500">د.ع</span></p>
-          {discount > 0 && <p className="text-[11px] text-gray-400 line-through">{p.originalPrice.toLocaleString()}</p>}
+          <p className="font-bold text-gray-900 text-sm">{(p.price || 0).toLocaleString('en-US')} <span className="text-xs font-normal text-gray-500">د.ع</span></p>
+          {discount > 0 && <p className="text-[11px] text-gray-400 line-through">{p.originalPrice.toLocaleString('en-US')}</p>}
         </div>
         <div className="mt-1.5 sm:mt-0">
           <StockEditor product={p} onSave={onStock} saving={busy === 'stock'} />

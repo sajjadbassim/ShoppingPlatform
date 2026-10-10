@@ -336,7 +336,7 @@ const VendorProductForm = () => {
               {weightStep > 0 && (
                 <p className="text-xs text-gray-500 mt-1.5">
                   اكتب السعر لكل كيلو والمخزون بالكيلو — يطلب الزبون بخطوات {stepLabel(weightStep)}
-                  {price > 0 && <> (سعر الخطوة {toUnit(price).toLocaleString()} د.ع)</>}
+                  {price > 0 && <> (سعر الخطوة {toUnit(price).toLocaleString('en-US')} د.ع)</>}
                 </p>
               )}
             </div>

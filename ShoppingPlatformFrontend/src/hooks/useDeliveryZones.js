@@ -18,6 +18,12 @@ export const usePublicZones = () => useQuery({
 export const vendorUsesZones = (config, vendorId) =>
   !!config?.enabled && (config.mode === 'ALL' || (config.mode === 'SELECTED' && config.vendorIds?.includes(vendorId)))
 
+// نص رسوم توصيل متجر في البطاقات: ثابتة، أو حسب المنطقة، أو مجاني
+export const deliveryFeeLabel = (store, config) =>
+  vendorUsesZones(config, store.id) ? 'حسب منطقتك'
+    : store.deliveryFee > 0 ? `${Number(store.deliveryFee).toLocaleString('en-US')} د.ع`
+    : 'توصيل مجاني'
+
 // رسوم توصيل السلة لعنوان محفوظ أو لمنطقة (عنوان جديد)
 export const useDeliveryQuote = ({ addressId, zoneId, enabled = true }) => useQuery({
   queryKey: ['zones', 'quote', addressId || null, zoneId || null],

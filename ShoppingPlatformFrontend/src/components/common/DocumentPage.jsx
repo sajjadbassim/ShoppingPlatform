@@ -7,7 +7,7 @@ import Breadcrumb from './Breadcrumb'
 import { CONTACT } from '../../pages/company/companyContent'
 
 const formatDate = (date) =>
-  new Date(date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+  new Date(date).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' })
 
 // أنواع الكتل: نص | { list: [] } | { note: '' }
 const SectionContent = ({ content }) => (

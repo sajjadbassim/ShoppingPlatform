@@ -316,25 +316,50 @@ namespace ecommerce.Repositories
         // ===================================
         // Admin
         // ===================================
-        public async Task<(IEnumerable<Review> Reviews, int TotalCount)> GetReportedReviewsAsync(
+        // كل تقييم عليه بلاغ واحد على الأقل (الموافقة تمسح بلاغاته فيخرج من القائمة)
+        // الإسقاط إلى DTO: لا حلقات مراجع في الـ JSON ولا بيانات حساب الكاتب
+        public async Task<(List<ReportedReviewDto> Reviews, int TotalCount)> GetReportedReviewsAsync(
             int pageNumber = 1,
             int pageSize = 20)
         {
-            var query = _context.Reviews
-                .Include(r => r.User)
-                .Include(r => r.Images)
-                .Include(r => r.Reports)
-                .Where(r => !r.IsApproved)
-                .OrderByDescending(r => r.Reports.Count)
-                .AsQueryable();
+            var query = _context.Reviews.Where(r => r.Reports.Any());
 
             var totalCount = await query.CountAsync();
 
             var reviews = await query
+                .OrderByDescending(r => r.Reports.Count)
+                .ThenByDescending(r => r.Reports.Max(rep => rep.CreatedAt))
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
+                .Select(r => new ReportedReviewDto
+                {
+                    Id = r.Id,
+                    ProductId = r.ProductId,
+                    ProductName = r.Product.NameAr ?? r.Product.Name,
+                    UserName = r.User.FullName,
+                    Rating = r.Rating,
+                    Title = r.Title,
+                    Body = r.Body,
+                    CreatedAt = r.CreatedAt,
+                    IsHidden = !r.IsApproved,
+                    Images = r.Images.OrderBy(i => i.DisplayOrder).Select(i => i.ImageUrl).ToList(),
+                    ReportCount = r.Reports.Count,
+                    LastReportedAt = r.Reports.Max(rep => rep.CreatedAt),
+                    Reports = r.Reports
+                        .OrderByDescending(rep => rep.CreatedAt)
+                        .Select(rep => new ReviewReportItemDto
+                        {
+                            Reason = rep.Reason,
+                            Details = rep.Details,
+                            ReporterName = rep.User.FullName,
+                            CreatedAt = rep.CreatedAt
+                        }).ToList()
+                })
                 .AsNoTracking()
                 .ToListAsync();
+
+            foreach (var report in reviews.SelectMany(r => r.Reports))
+                report.ReasonAr = ReportReviewDto.ReasonAr(report.Reason);
 
             return (reviews, totalCount);
         }

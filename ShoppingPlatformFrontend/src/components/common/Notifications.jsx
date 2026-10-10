@@ -62,7 +62,7 @@ export const NotificationBell = () => {
     if (minutes < 60) return `منذ ${minutes} دقيقة`
     if (hours < 24) return `منذ ${hours} ساعة`
     if (days < 7) return `منذ ${days} يوم`
-    return date.toLocaleDateString('ar-IQ')
+    return date.toLocaleDateString('ar-IQ-u-nu-latn')
   }
 
   return (
@@ -179,7 +179,7 @@ export const NotificationsPage = () => {
 
   const formatTime = (dateString) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('ar-IQ', {
+    return date.toLocaleDateString('ar-IQ-u-nu-latn', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -210,7 +210,7 @@ export const NotificationsPage = () => {
               )}
               {notifications.length > 0 && (
                 <button
-                  onClick={clearAll}
+                  onClick={() => { if (confirm('حذف كل الإشعارات نهائياً؟')) clearAll() }}
                   className="px-4 py-2 text-sm text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                 >
                   مسح الكل

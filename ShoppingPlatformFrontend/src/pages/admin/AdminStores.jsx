@@ -106,7 +106,7 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
               <div className="mt-1 flex items-center gap-2">
                 <StatusBadge active={store.isActive} />
                 <span className="text-xs text-gray-400">
-                  {new Date(store.createdAt).toLocaleDateString('ar-IQ')}
+                  {new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
                 </span>
               </div>
             </div>
@@ -116,8 +116,8 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
             {[
               { icon: Phone,    label: 'الهاتف',            value: store.phone,             dir: 'ltr' },
               { icon: MapPin,   label: 'العنوان',            value: store.address                       },
-              { icon: Package,  label: 'الحد الأدنى للطلب', value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString()} د.ع` : '—' },
-              { icon: TrendingUp, label: 'رسوم التوصيل',   value: store.deliveryFee ? `${store.deliveryFee.toLocaleString()} د.ع` : '—' },
+              { icon: Package,  label: 'الحد الأدنى للطلب', value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString('en-US')} د.ع` : '—' },
+              { icon: TrendingUp, label: 'رسوم التوصيل',   value: store.deliveryFee ? `${store.deliveryFee.toLocaleString('en-US')} د.ع` : '—' },
               { icon: Store,    label: 'وقت التحضير',       value: store.estimatedPrepTime ? `${store.estimatedPrepTime} دقيقة` : '—' },
               { icon: Star,     label: 'التقييم',            value: avgRating ? `${Number(avgRating).toFixed(1)} ⭐` : '—' },
             ].map(({ icon: Icon, label, value, dir }) => (
@@ -193,10 +193,10 @@ const StoreRow = ({ store, onView, onToggle, toggling }) => (
     <td className="px-4 py-3 text-sm text-gray-600" dir="ltr">{store.phone || '—'}</td>
     <td className="px-4 py-3 text-sm text-gray-500 max-w-32 truncate">{store.address || '—'}</td>
     <td className="px-4 py-3 text-sm text-gray-600">
-      {store.deliveryFee ? `${store.deliveryFee.toLocaleString()} د.ع` : '—'}
+      {store.deliveryFee ? `${store.deliveryFee.toLocaleString('en-US')} د.ع` : '—'}
     </td>
     <td className="px-4 py-3 text-xs text-gray-400">
-      {new Date(store.createdAt).toLocaleDateString('ar-IQ')}
+      {new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
     </td>
     <td className="px-4 py-3"><StatusBadge active={store.isActive} /></td>
     <td className="px-4 py-3">
@@ -406,7 +406,7 @@ const AdminStores = () => {
                   <p className="font-medium text-gray-900">
                     {(v.totalRevenue ?? 0) > 1000000
                       ? `${((v.totalRevenue ?? 0) / 1000000).toFixed(1)}M`
-                      : (v.totalRevenue ?? 0).toLocaleString()} د.ع
+                      : (v.totalRevenue ?? 0).toLocaleString('en-US')} د.ع
                   </p>
                   {v.rating > 0 && <p className="text-xs text-yellow-500">⭐ {v.rating.toFixed(1)}</p>}
                 </div>

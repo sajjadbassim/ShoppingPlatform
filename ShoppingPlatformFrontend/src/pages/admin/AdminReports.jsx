@@ -123,7 +123,7 @@ const AdminReports = () => {
                       style={{ bottom: `${pct+20}px` }}>
                       <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
                         <p className="font-medium">{label}</p>
-                        <p>{day.totalRevenue.toLocaleString()} د.ع</p>
+                        <p>{day.totalRevenue.toLocaleString('en-US')} د.ع</p>
                         <p className="text-gray-300">{day.totalOrders} طلب</p>
                       </div>
                     </div>
@@ -135,8 +135,8 @@ const AdminReports = () => {
               })}
             </div>
             <div className="mt-2 pt-4 border-t border-gray-100 flex justify-between text-sm text-gray-500">
-              <span>من: {salesData?.startDate ? new Date(salesData.startDate).toLocaleDateString('ar-IQ') : '—'}</span>
-              <span>إلى: {salesData?.endDate ? new Date(salesData.endDate).toLocaleDateString('ar-IQ') : '—'}</span>
+              <span>من: {salesData?.startDate ? new Date(salesData.startDate).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</span>
+              <span>إلى: {salesData?.endDate ? new Date(salesData.endDate).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</span>
             </div>
           </>
         )}
@@ -167,7 +167,7 @@ const AdminReports = () => {
                     </div>
                   </div>
                   <div className="text-left text-xs flex-shrink-0">
-                    <p className="font-medium text-gray-900">{v.totalRevenue > 1000000 ? `${(v.totalRevenue/1000000).toFixed(1)}M` : (v.totalRevenue||0).toLocaleString()} د.ع</p>
+                    <p className="font-medium text-gray-900">{v.totalRevenue > 1000000 ? `${(v.totalRevenue/1000000).toFixed(1)}M` : (v.totalRevenue||0).toLocaleString('en-US')} د.ع</p>
                     <p className="text-gray-400">{v.totalOrders ?? 0} طلب</p>
                   </div>
                 </div>
@@ -202,7 +202,7 @@ const AdminReports = () => {
                     </div>
                   </div>
                   <div className="text-left text-xs flex-shrink-0">
-                    <p className="font-medium text-gray-900">{(p.totalRevenue||0).toLocaleString()} د.ع</p>
+                    <p className="font-medium text-gray-900">{(p.totalRevenue||0).toLocaleString('en-US')} د.ع</p>
                     <p className="text-gray-400">{p.totalQuantity ?? p.quantity ?? 0} وحدة</p>
                   </div>
                 </div>

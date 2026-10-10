@@ -19,7 +19,6 @@ const LoginPage = () => {
   const [formData, setFormData] = useState({
     identifier: location.state?.identifier || '',   // قادم من رسالة «إذا كان لديك حساب»
     password: '',
-    remember: false,
   })
   const [errors, setErrors] = useState({})
 
@@ -162,17 +161,8 @@ const LoginPage = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="remember"
-                    checked={formData.remember}
-                    onChange={handleChange}
-                    className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-gray-600">تذكرني</span>
-                </label>
+              {/* الجلسة تبقى محفوظة على الجهاز دائماً حتى تسجيل الخروج — لا حاجة لخيار "تذكرني" */}
+              <div className="flex items-center justify-end">
                 <Link to="/forgot-password" className="text-sm text-primary hover:underline font-medium">
                   نسيت كلمة المرور؟
                 </Link>

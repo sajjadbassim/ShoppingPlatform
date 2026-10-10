@@ -8,6 +8,7 @@ import Breadcrumb from '../../components/common/Breadcrumb'
 import { Skeleton } from '../../components/common/Loading'
 import { useCategories } from '../../hooks/useCategories'
 import { SUPERMARKET_PATH, isGroceryCategory } from '../../utils/shopScope'
+import { formatPrice } from '../../utils/weight'
 
 const GRADIENTS = [
   'from-blue-500 to-blue-600',
@@ -44,7 +45,7 @@ const CategoryProductCard = ({ p }) => {
       </div>
       <p className="mt-1.5 text-xs leading-snug line-clamp-2 min-h-[2lh]">{p.nameAr || p.name}</p>
       <div className="flex items-center justify-between mt-0.5">
-        <span className="text-[13px] font-bold">{p.price?.toLocaleString()} د.ع</span>
+        <span className="text-[13px] font-bold">{formatPrice(p.price, p.weightStepKg)}</span>
         {rating > 0 && (
           <span className="flex items-center gap-0.5 text-[11px] text-gray-500">
             <Star size={11} className="text-warning fill-warning" />{Number(rating).toFixed(1)}

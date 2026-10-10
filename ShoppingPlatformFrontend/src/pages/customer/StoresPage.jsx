@@ -7,8 +7,10 @@ import { Search, AlertCircle, X, Store } from 'lucide-react'
 import { Skeleton } from '../../components/common/Loading'
 import Pagination from '../../components/common/Pagination'
 import EmptyState from '../../components/common/EmptyState'
-import { useVendorsPaged } from '../../hooks/useVendors'
+import { useVendors } from '../../hooks/useVendors'
 import { FeaturedStore, StoreCard } from '../../components/common/StoreCards'
+
+const PAGE_SIZE = 12
 
 // خيارات الترتيب — تُطبَّق على المتاجر المعروضة
 const SORT_OPTIONS = [
@@ -39,29 +41,29 @@ const StoresPage = () => {
   })
   const featuredIds = useMemo(() => (section?.data || []).map(v => v.id), [section])
 
-  const { data: vendorsData, isLoading: vendorsLoading, isError, error } = useVendorsPaged({
-    pageNumber: sectionId ? 1 : currentPage,
-    pageSize: sectionId ? 100 : 12,
-    isActive: true,
-  })
+  // كل المتاجر النشطة مرة واحدة (عددها في المدينة صغير) — البحث والترتيب والتقسيم لصفحات
+  // على القائمة كاملة؛ سابقاً كانا يعملان على الـ 12 متجراً في الصفحة الحالية فقط
+  const { data: allVendorsData, isLoading: vendorsLoading, isError, error } = useVendors(true)
   const isLoading = vendorsLoading || (!!sectionId && sectionLoading)
 
-  const allVendors = vendorsData?.items || vendorsData || []
-  const vendors = sectionId
+  const allVendors = allVendorsData || []
+  const vendors = useMemo(() => sectionId
     ? featuredIds.map(id => allVendors.find(v => v.id === id)).filter(Boolean)
-    : allVendors
-  const totalPages = sectionId ? 1 : vendorsData?.totalPages || 1
-  const totalCount = sectionId ? vendors.length : vendorsData?.totalCount || vendors.length
+    : allVendors, [sectionId, featuredIds, allVendors])
+  const totalCount = vendors.length
   const totalProducts = vendors.reduce((sum, v) => sum + (v.productsCount || 0), 0)
 
   // البحث بالاسم أو الوصف أو العنوان، ثم الترتيب (المميزة تبقى بترتيبها: الأكثر طلبات)
-  const shownVendors = useMemo(() => {
-    const q = searchQuery.trim()
-    const list = vendors.filter(v => !q || [v.nameAr, v.name, v.description, v.address].some(t => t?.includes(q)))
+  const matchedVendors = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const list = vendors.filter(v => !q || [v.nameAr, v.name, v.description, v.address].some(t => t?.toLowerCase().includes(q)))
     if (sectionId) return list
     const option = SORT_OPTIONS.find(o => o.value === sortBy)
     return [...list].sort(option.sort)
   }, [vendors, searchQuery, sortBy, sectionId])
+  const totalPages = sectionId ? 1 : Math.max(1, Math.ceil(matchedVendors.length / PAGE_SIZE))
+  const shownVendors = sectionId ? matchedVendors
+    : matchedVendors.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   // المتجر المميز يظهر في الصفحة الأولى فقط ودون بحث
   const showFeatured = !searchQuery.trim() && currentPage === 1 && shownVendors.length > 1
@@ -97,8 +99,8 @@ const StoresPage = () => {
               {isLoading
                 ? 'جاري التحميل...'
                 : sectionId
-                  ? <>أكثر {totalCount} متاجر طلباً عند زبائننا • {totalProducts.toLocaleString()} منتج</>
-                  : <>{totalCount} متجر محلي • أكثر من {totalProducts.toLocaleString()} منتج بانتظارك</>}
+                  ? <>أكثر {totalCount} متاجر طلباً عند زبائننا • {totalProducts.toLocaleString('en-US')} منتج</>
+                  : <>{totalCount} متجر محلي • أكثر من {totalProducts.toLocaleString('en-US')} منتج بانتظارك</>}
             </p>
             {sectionId && (
               <button onClick={() => setSearchParams({})}
@@ -114,7 +116,15 @@ const StoresPage = () => {
                 enterKeyHint="search"
                 placeholder="ابحث عن متجر بالاسم أو المنطقة..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  // نتائج البحث تبدأ من الصفحة الأولى
+                  if (currentPage !== 1) {
+                    const params = new URLSearchParams(searchParams)
+                    params.delete('page')
+                    setSearchParams(params, { replace: true })
+                  }
+                }}
                 className="w-full h-12 pr-11 pl-10 bg-white rounded-full text-gray-900 shadow-lg focus:ring-4 focus:ring-white/40 border-0"
               />
               {searchQuery && (

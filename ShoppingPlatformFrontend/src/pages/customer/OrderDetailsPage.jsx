@@ -225,10 +225,15 @@ const OrderRatingForm = ({ order, onSuccess }) => {
 const OrderDetailsPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { success, error } = useToast()
 
-  const isSuccess = searchParams.get('success') === 'true'
+  // شاشة النجاح مرة واحدة: نحفظها لهذه الزيارة ونزيل ?success من الرابط،
+  // فلا تعود عند تحديث الصفحة أو فتح الرابط لاحقاً
+  const [isSuccess] = useState(() => searchParams.get('success') === 'true')
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
   const { hash } = useLocation()
 
   // جلب تفاصيل الطلب
@@ -290,7 +295,11 @@ const OrderDetailsPage = () => {
   }
 
   // إعادة الطلب
+  // الزر معطّل أثناء الإضافة — ضغطه مرتين كان يضاعف كل الكميات
+  const [reordering, setReordering] = useState(false)
   const handleReorder = async () => {
+    if (reordering) return
+    setReordering(true)
     try {
       const subOrders = order.subOrders || []
       const items = subOrders.flatMap(sub => sub.items || [])
@@ -300,7 +309,9 @@ const OrderDetailsPage = () => {
       success('تمت إضافة المنتجات للسلة')
       navigate('/cart')
     } catch (err) {
-      error('فشل إضافة المنتجات للسلة')
+      error(err.message || 'فشل إضافة المنتجات للسلة')
+    } finally {
+      setReordering(false)
     }
   }
 
@@ -403,8 +414,10 @@ const OrderDetailsPage = () => {
       { key: 'DELIVERED',            label: 'تم التوصيل'     },
     ]
 
+    // "مؤكد جزئياً" (بعض المتاجر أكدت) يقع في مرحلة التأكيد — وإلا ظهر الخط رمادياً كله
+    const status = order.status?.toUpperCase()
     const currentIndex = statuses.findIndex(
-      s => s.key === order.status?.toUpperCase()
+      s => s.key === (status === 'PARTIALLY_CONFIRMED' ? 'CONFIRMED' : status)
     )
 
     return statuses.map((status, index) => ({
@@ -442,7 +455,7 @@ const OrderDetailsPage = () => {
                 </div>
                 <div className="bg-gray-50 rounded-xl p-3">
                   <p className="text-xs text-gray-500">المبلغ عند الاستلام</p>
-                  <p className="font-bold text-primary mt-0.5">{total.toLocaleString()} د.ع</p>
+                  <p className="font-bold text-primary mt-0.5">{total.toLocaleString('en-US')} د.ع</p>
                 </div>
               </div>
 
@@ -477,7 +490,7 @@ const OrderDetailsPage = () => {
                   </h1>
                   <p className="text-gray-500 mt-1">
                     تاريخ الطلب:{' '}
-                    {new Date(order.createdAt).toLocaleDateString('ar-IQ', {
+                    {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', {
                       year: 'numeric', month: 'long', day: 'numeric',
                       hour: '2-digit', minute: '2-digit',
                     })}
@@ -533,7 +546,7 @@ const OrderDetailsPage = () => {
                         </p>
                         {step.date && step.completed && (
                           <p className="text-sm text-gray-500">
-                            {new Date(step.date).toLocaleDateString('ar-IQ')}
+                            {new Date(step.date).toLocaleDateString('ar-IQ-u-nu-latn')}
                           </p>
                         )}
                       </div>
@@ -586,7 +599,7 @@ const OrderDetailsPage = () => {
                       </div>
                       <div className="text-left">
                         <p className="font-bold text-gray-900">
-                          {(item.subtotal || 0).toLocaleString()} د.ع
+                          {(item.subtotal || 0).toLocaleString('en-US')} د.ع
                         </p>
                       </div>
                     </div>
@@ -645,22 +658,22 @@ const OrderDetailsPage = () => {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">المجموع الفرعي</span>
-                  <span>{subtotal.toLocaleString()} د.ع</span>
+                  <span>{subtotal.toLocaleString('en-US')} د.ع</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">الشحن</span>
-                  <span>{shipping === 0 ? 'مجاني' : `${shipping.toLocaleString()} د.ع`}</span>
+                  <span>{shipping === 0 ? 'مجاني' : `${shipping.toLocaleString('en-US')} د.ع`}</span>
                 </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>الخصم</span>
-                    <span>-{discount.toLocaleString()} د.ع</span>
+                    <span>-{discount.toLocaleString('en-US')} د.ع</span>
                   </div>
                 )}
               </div>
               <div className="flex justify-between pt-3 mt-3 border-t border-gray-200">
                 <span className="font-bold">الإجمالي</span>
-                <span className="font-bold text-primary">{total.toLocaleString()} د.ع</span>
+                <span className="font-bold text-primary">{total.toLocaleString('en-US')} د.ع</span>
               </div>
             </div>
 
@@ -683,7 +696,7 @@ const OrderDetailsPage = () => {
 
               {/* إعادة الطلب */}
               {orderService.isDelivered(order.status) && (
-                <Button variant="outline" fullWidth onClick={handleReorder}>
+                <Button variant="outline" fullWidth onClick={handleReorder} loading={reordering} disabled={reordering}>
                   إعادة الطلب
                 </Button>
               )}

@@ -15,7 +15,9 @@ const round = (n) => Math.round(n * 1e7) / 1e7
 const Tracker = ({ touched, onTouch, onMove, setZoom }) => {
   const map = useMapEvents({
     dragstart: onTouch,
-    zoomstart: () => {},
+    // التكبير بإصبعين/العجلة يكون حول المنتصف، فما تحت الدبوس هو ما اختاره الزبون — يُحسب تحريكاً
+    // (أول zoomstart عند تحميل الخريطة يسبق ربط هذه المستمعات، فلا يضع دبوساً تلقائياً)
+    zoomstart: onTouch,
     moveend: () => {
       setZoom(map.getZoom())
       if (touched.current) {

@@ -123,7 +123,7 @@ const ProductsPage = () => {
   }
 
   // البحث والتصنيف (رئيسي أو فرعي مع فئاته الفرعية) يُفلتران في الخادم — نفس الفلاتر والترتيب والتقسيم
-  const { data: filterData, isLoading: filterLoading, isError: filterError, error: filterErrorMsg } =
+  const { data: filterData, isLoading: filterLoading, isError: filterError, error: filterErrorMsg, isPlaceholderData: showingPrevious } =
     useAdvancedFilter(advancedFilterParams, !sectionId)
 
   // عند البحث في قسم: كم نتيجة في القسم الآخر؟ (رابط سريع بدل خلط النتائج)
@@ -199,13 +199,16 @@ const ProductsPage = () => {
     setSearchParams(scopeParam === SCOPE.GROCERY ? { scope: SCOPE.GROCERY } : {})
   }
 
-  const handleAddToCart = async ({ id, quantity = 1 }) => {
+  const handleAddToCart = async ({ id, quantity = 1, variantId = null }) => {
     if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
     try {
-      // المنتج ذو الخيارات (مقاس/لون) يُفتح لاختيارها بدل محاولة إضافته بلا خيار (نفس سلوك الرئيسية)
-      const variants = await variantsService.getVariants(id).catch(() => [])
-      if (variantsService.hasVariants(variants)) { navigate(`/products/${id}`); return }
-      await addToCart(id, quantity)
+      // اختار الخيار من البطاقة نفسها → يُضاف مباشرة. وإلا فالمنتج ذو الخيارات (مقاس/لون)
+      // يُفتح لاختيارها بدل محاولة إضافته بلا خيار (نفس سلوك الرئيسية)
+      if (!variantId) {
+        const variants = await variantsService.getVariants(id).catch(() => [])
+        if (variantsService.hasVariants(variants)) { navigate(`/products/${id}`); return }
+      }
+      await addToCart(id, quantity, variantId)
       success('تمت الإضافة للسلة')
     }
     catch (err) { showError(err.message || 'فشل إضافة المنتج') }
@@ -555,7 +558,8 @@ const ProductsPage = () => {
                 />
               </div>
             ) : (
-              <div className={viewMode === 'grid' ? 'product-grid' : 'space-y-4'}>
+              // النتائج السابقة تبقى ظاهرة (باهتة) حتى تصل الجديدة — بدل وميض هياكل التحميل
+              <div className={`${viewMode === 'grid' ? 'product-grid' : 'space-y-4'} transition-opacity ${showingPrevious && !sectionId ? 'opacity-50 pointer-events-none' : ''}`}>
                 {products.map(product => (
                   <ProductCard
                     key={product.id}

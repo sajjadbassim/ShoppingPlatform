@@ -541,10 +541,10 @@ const VariantsList = ({ productId, basePrice }) => {
                       )
                     })}
                     <td className="px-4 py-3 font-medium text-primary">
-                      {variantsService.getFinalPrice(basePrice, v).toLocaleString()} د.ع
+                      {variantsService.getFinalPrice(basePrice, v).toLocaleString('en-US')} د.ع
                       {v.priceAdjustment !== 0 && (
                         <span className="text-xs text-gray-400 block">
-                          ({v.priceAdjustment > 0 ? '+' : ''}{v.priceAdjustment.toLocaleString()})
+                          ({v.priceAdjustment > 0 ? '+' : ''}{v.priceAdjustment.toLocaleString('en-US')})
                         </span>
                       )}
                     </td>

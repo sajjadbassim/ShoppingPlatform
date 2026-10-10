@@ -406,7 +406,7 @@ const OperationsDrivers = () => {
   }
 
   const handleSettleCash = async () => {
-    if (!window.confirm(`تأكيد استلام ${(cash?.total || 0).toLocaleString()} د.ع من ${cashDriver.fullName}؟`)) return
+    if (!window.confirm(`تأكيد استلام ${(cash?.total || 0).toLocaleString('en-US')} د.ع من ${cashDriver.fullName}؟`)) return
     try {
       await settleCash(cashDriver.id)
       success('تم تسجيل استلام النقد')
@@ -671,11 +671,11 @@ const OperationsDrivers = () => {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium text-gray-900">
-                        {(order.total || 0).toLocaleString()} د.ع
+                        {(order.total || 0).toLocaleString('en-US')} د.ع
                       </span>
                       <span className="text-gray-400">
-                        {new Date(order.createdAt).toLocaleDateString('ar-IQ')} —{' '}
-                        {new Date(order.createdAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')} —{' '}
+                        {new Date(order.createdAt).toLocaleTimeString('ar-IQ-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </div>
@@ -762,7 +762,7 @@ const OperationsDrivers = () => {
           <div className="space-y-4">
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
               <p className="text-sm text-amber-800">مبالغ استلمها من الزبائن ولم يسلّمها بعد</p>
-              <p className="text-2xl font-extrabold text-gray-900 mt-1">{(cash?.total || 0).toLocaleString()} د.ع</p>
+              <p className="text-2xl font-extrabold text-gray-900 mt-1">{(cash?.total || 0).toLocaleString('en-US')} د.ع</p>
             </div>
             {cash?.items?.length > 0 ? (
               <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-xl">
@@ -770,9 +770,9 @@ const OperationsDrivers = () => {
                   <div key={i.orderId} className="flex items-center justify-between p-3 text-sm">
                     <div>
                       <p className="font-mono text-gray-900" dir="ltr">{i.orderNumber}</p>
-                      <p className="text-xs text-gray-500">{new Date(i.collectedAt).toLocaleString('ar-IQ', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                      <p className="text-xs text-gray-500">{new Date(i.collectedAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}</p>
                     </div>
-                    <span className="font-bold text-gray-900">{i.amount.toLocaleString()} د.ع</span>
+                    <span className="font-bold text-gray-900">{i.amount.toLocaleString('en-US')} د.ع</span>
                   </div>
                 ))}
               </div>

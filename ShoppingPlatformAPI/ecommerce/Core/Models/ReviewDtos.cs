@@ -61,6 +61,44 @@ namespace ecommerce.Core.DTO.Review
 
         [MaxLength(500, ErrorMessage = "التفاصيل لا تتجاوز 500 حرف")]
         public string? Details { get; set; }
+
+        public static string ReasonAr(string reason) => reason switch
+        {
+            "spam" => "إزعاج أو إعلان",
+            "offensive" => "محتوى مسيء",
+            "fake" => "تقييم مزيف",
+            "irrelevant" => "لا علاقة له بالمنتج",
+            _ => reason
+        };
+    }
+
+    // ===================================
+    // Reported Review DTO (Admin) — تقييم عليه بلاغ واحد على الأقل
+    // ===================================
+    public class ReportedReviewDto
+    {
+        public Guid Id { get; set; }
+        public Guid ProductId { get; set; }
+        public string? ProductName { get; set; }
+        public string? UserName { get; set; }
+        public int Rating { get; set; }
+        public string? Title { get; set; }
+        public string? Body { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsHidden { get; set; }              // أُخفي تلقائياً بعد 3 بلاغات
+        public List<string> Images { get; set; } = new();
+        public int ReportCount { get; set; }
+        public DateTime LastReportedAt { get; set; }
+        public List<ReviewReportItemDto> Reports { get; set; } = new();
+    }
+
+    public class ReviewReportItemDto
+    {
+        public string Reason { get; set; }
+        public string ReasonAr { get; set; }
+        public string? Details { get; set; }
+        public string? ReporterName { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 
     // ===================================

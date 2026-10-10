@@ -40,7 +40,7 @@ const ForgotPasswordPage = () => {
       await authService.forgotPassword(phone)
       setStep(2)
     } catch (err) {
-      showError(err.response?.data?.message || 'تعذّر إرسال رمز التحقق')
+      showError(err.message || 'تعذّر إرسال رمز التحقق')
     } finally {
       setLoading(false)
     }
@@ -61,7 +61,7 @@ const ForgotPasswordPage = () => {
       setResetToken(token)
       setStep(3)
     } catch (err) {
-      showError(err.response?.data?.message || 'رمز التحقق غير صحيح')
+      showError(err.message || 'رمز التحقق غير صحيح')
     } finally {
       setLoading(false)
     }
@@ -86,7 +86,7 @@ const ForgotPasswordPage = () => {
       showSuccess('تم تغيير كلمة المرور بنجاح')
       setStep(4)
     } catch (err) {
-      showError(err.response?.data?.message || 'تعذّر تغيير كلمة المرور')
+      showError(err.message || 'تعذّر تغيير كلمة المرور')
     } finally {
       setLoading(false)
     }

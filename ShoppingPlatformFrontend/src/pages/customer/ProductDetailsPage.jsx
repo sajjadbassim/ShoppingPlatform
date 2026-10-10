@@ -18,7 +18,8 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { variantsService } from '../../services/variantsService'
-import { useProductReviews, useProductReviewSummary, useCreateReview, useDeleteReview, useMarkHelpful } from '../../hooks/useReviews'
+import { useProductReviews, useProductReviewSummary, useCreateReview, useDeleteReview, useMarkHelpful, useReportReview } from '../../hooks/useReviews'
+import Modal from '../../components/common/Modal'
 import { useCustomerOrders } from '../../hooks/useOrders'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
@@ -90,9 +91,7 @@ const ReviewSummary = ({ summary, isLoading }) => {
 // ===========================
 // ReviewCard — بطاقة تقييم
 // ===========================
-const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful }) => {
-  const [showReport, setShowReport] = useState(false)
-
+const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful, onReport }) => {
   return (
     <div className="border-b border-gray-100 pb-5 last:border-0">
       <div className="flex items-start justify-between mb-2">
@@ -102,7 +101,7 @@ const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful }) => {
           </div>
           <div>
             <p className="font-medium text-gray-900 text-sm">{review.userName || review.userFullName || 'مستخدم'}</p>
-            <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ')}</p>
+            <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -147,7 +146,7 @@ const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful }) => {
             <Trash2 size={13} />حذف
           </button>
         ) : (
-          <button onClick={() => setShowReport(!showReport)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <button onClick={() => onReport(review)} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
             <Flag size={13} />إبلاغ
           </button>
         )}
@@ -167,7 +166,7 @@ const timeAgo = (date) => {
   return `منذ ${Math.floor(days / 365)} سنة`
 }
 
-const MobileReviewCard = ({ review, onMarkHelpful }) => {
+const MobileReviewCard = ({ review, currentUserId, onMarkHelpful, onReport }) => {
   const name = review.userName || review.userFullName || 'مستخدم'
   const voted = review.isCurrentUserVotedHelpful ?? review.isHelpful
   return (
@@ -205,6 +204,12 @@ const MobileReviewCard = ({ review, onMarkHelpful }) => {
         {review.helpfulCount > 0 && (
           <span className="text-xs text-gray-500">{review.helpfulCount} شخص وجدوه مفيد</span>
         )}
+        {currentUserId !== review.userId && (
+          <button onClick={() => onReport(review)} aria-label="إبلاغ عن التقييم"
+            className="mr-auto w-9 h-9 rounded-full text-gray-400 hover:text-gray-600 flex items-center justify-center">
+            <Flag size={15} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -239,6 +244,55 @@ const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) =>
 }
 
 // ===========================
+// ReportReviewModal — الإبلاغ عن تقييم (يظهر للأدمن في صفحة التقييمات)
+// ===========================
+const REPORT_REASONS = [
+  { value: 'spam',       label: 'إزعاج أو إعلان' },
+  { value: 'offensive',  label: 'محتوى مسيء' },
+  { value: 'fake',       label: 'تقييم مزيف' },
+  { value: 'irrelevant', label: 'لا علاقة له بالمنتج' },
+]
+
+const ReportReviewModal = ({ review, onClose }) => {
+  const { success: showSuccess, error: showError } = useToast()
+  const { mutateAsync: reportReview, isPending } = useReportReview()
+  const [reason, setReason] = useState('')
+  const [details, setDetails] = useState('')
+
+  const handleSubmit = async () => {
+    try {
+      await reportReview({ id: review.id, data: { reason, details: details.trim() || undefined } })
+      showSuccess('شكراً، وصل بلاغك وسيراجعه فريقنا')
+      onClose()
+    } catch (err) {
+      showError(err.message || 'تعذّر إرسال البلاغ')
+    }
+  }
+
+  return (
+    <Modal isOpen={!!review} onClose={onClose} title="الإبلاغ عن تقييم" size="sm">
+      <div className="space-y-2">
+        {REPORT_REASONS.map(r => (
+          <label key={r.value}
+            className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+              reason === r.value ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'}`}>
+            <input type="radio" name="report-reason" value={r.value} checked={reason === r.value}
+              onChange={() => setReason(r.value)} className="accent-primary" />
+            <span className="text-sm font-medium text-gray-800">{r.label}</span>
+          </label>
+        ))}
+        <textarea value={details} onChange={e => setDetails(e.target.value)} maxLength={500} rows={2}
+          placeholder="تفاصيل إضافية (اختياري)"
+          className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm resize-none focus:ring-2 focus:ring-primary focus:border-primary" />
+        <Button variant="primary" fullWidth onClick={handleSubmit} loading={isPending} disabled={!reason || isPending}>
+          إرسال البلاغ
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+// ===========================
 // WriteReviewForm — نموذج كتابة تقييم
 // ===========================
 const WriteReviewForm = ({ productId, onSuccess }) => {
@@ -252,10 +306,13 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
   const [orderId, setOrderId] = useState('')
   const [showForm, setShowForm] = useState(false)
 
-  // جلب طلبات العميل لاختيار الطلب المرتبط
+  // جلب طلبات العميل لاختيار الطلب المرتبط — المُسلَّمة التي تحتوي هذا المنتج فقط
+  // (الخادم يرفض تقييماً مرتبطاً بطلب لا يحتويه)
   const { data: ordersData } = useCustomerOrders(user?.userId || user?.id)
+  const sameId = (a, b) => String(a).toLowerCase() === String(b).toLowerCase()
   const customerOrders = (ordersData || [])
-    .filter(o => o.status === 'DELIVERED' || o.status === 'Delivered')
+    .filter(o => o.status?.toUpperCase() === 'DELIVERED')
+    .filter(o => (o.subOrders || []).some(s => (s.items || []).some(i => sameId(i.productId, productId))))
 
   if (!isAuthenticated) return (
     <div className="text-center py-6 bg-gray-50 rounded-xl">
@@ -317,7 +374,7 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
             <option value="">اختر الطلب...</option>
             {customerOrders.map(o => (
               <option key={o.id} value={o.id}>
-                {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ')}
+                {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
               </option>
             ))}
           </select>
@@ -377,9 +434,9 @@ const PromotionBadge = ({ promotions }) => {
             <p className="text-xs text-red-500">
               خصم {promo.discountType === 'percentage'
                 ? `${promo.discountValue}%`
-                : `${Number(promo.discountValue).toLocaleString()} د.ع`
+                : `${Number(promo.discountValue).toLocaleString('en-US')} د.ع`
               }
-              {promo.expiresAt && ` • ينتهي ${new Date(promo.expiresAt).toLocaleDateString('ar-IQ')}`}
+              {promo.expiresAt && ` • ينتهي ${new Date(promo.expiresAt).toLocaleDateString('ar-IQ-u-nu-latn')}`}
             </p>
           </div>
           <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full flex items-center gap-0.5">
@@ -535,7 +592,7 @@ const ImageGallery = ({ images, alt }) => {
   )
 }
 
-const ProductDetailsPage = () => {
+const ProductDetailsContent = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const { success, error: showError } = useToast()
@@ -585,10 +642,32 @@ const ProductDetailsPage = () => {
   const reviewsTotalPages = reviewsData?.totalPages ?? 1
 
   const handleDeleteReview = async (reviewId) => {
-    try { await deleteReview(reviewId); refetchReviews() } catch {}
+    if (!confirm('حذف تقييمك نهائياً؟')) return
+    try {
+      await deleteReview(reviewId)
+      refetchReviews()
+      success('تم حذف تقييمك')
+    } catch (err) {
+      showError(err.message || 'تعذّر حذف التقييم')
+    }
   }
   const handleMarkHelpful = async (reviewId, isHelpful) => {
-    try { await markHelpful({ id: reviewId, isHelpful }); refetchReviews() } catch {}
+    if (!isAuthenticated) {
+      showError('سجّل الدخول لتقييم المراجعة')
+      navigate('/login', { state: { from: `/products/${id}` } })
+      return
+    }
+    try { await markHelpful({ id: reviewId, isHelpful }); refetchReviews() }
+    catch (err) { showError(err.message || 'تعذّر حفظ تصويتك') }
+  }
+  const [reportingReview, setReportingReview] = useState(null)
+  const handleReport = (review) => {
+    if (!isAuthenticated) {
+      showError('سجّل الدخول للإبلاغ عن تقييم')
+      navigate('/login', { state: { from: `/products/${id}` } })
+      return
+    }
+    setReportingReview(review)
   }
   const [quantity, setQuantity] = useState(1)
 
@@ -678,9 +757,11 @@ const ProductDetailsPage = () => {
   }
 
   const handleToggleWishlist = async () => {
+    if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login', { state: { from: `/products/${id}` } }); return }
+    const wasWishlisted = isInWishlist(product.id)
     try {
-      await toggleWishlist(id)
-      success('تمت الإضافة للمفضلة')
+      await toggleWishlist(product.id)
+      success(wasWishlisted ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة')
     } catch {
       showError('فشلت العملية')
     }
@@ -827,12 +908,12 @@ const ProductDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Rating */}
-              {product.rating > 0 && (
+              {/* Rating — من ملخص التقييمات (بيانات المنتج لا تحمل التقييم) */}
+              {totalReviews > 0 && (
                 <div className="flex items-center gap-1 mb-4">
                   <Star size={18} className="text-yellow-400 fill-yellow-400" />
-                  <span className="font-medium">{product.rating.toFixed(1)}</span>
-                  <span className="text-gray-500">({product.reviewsCount || 0} تقييم)</span>
+                  <span className="font-medium">{Number(avgRating).toFixed(1)}</span>
+                  <span className="text-gray-500">({totalReviews} تقييم)</span>
                 </div>
               )}
 
@@ -847,7 +928,7 @@ const ProductDetailsPage = () => {
                 {discount > 0 && (
                   <>
                     <span className="text-lg text-gray-400 line-through">
-                      {Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString()} د.ع
+                      {Math.round(pricePerKg(product.originalPrice, product.weightStepKg)).toLocaleString('en-US')} د.ع
                     </span>
                     <span className="px-2 py-1 bg-red-500 text-white text-sm font-medium rounded">
                       -{discount}%
@@ -856,14 +937,14 @@ const ProductDetailsPage = () => {
                 )}
                 {selectedVariant?.priceAdjustment !== 0 && selectedVariant?.priceAdjustment && (
                   <span className="text-sm text-gray-500">
-                    ({selectedVariant.priceAdjustment > 0 ? '+' : ''}{selectedVariant.priceAdjustment.toLocaleString()} د.ع)
+                    ({selectedVariant.priceAdjustment > 0 ? '+' : ''}{selectedVariant.priceAdjustment.toLocaleString('en-US')} د.ع)
                   </span>
                 )}
               </div>
 
               {/* Description */}
               {product.description && (
-                <p className="text-gray-600 mb-6">{product.description}</p>
+                <p className="text-gray-600 mb-6 whitespace-pre-line">{product.description}</p>
               )}
 
               {/* ===== Variant Selector ===== */}
@@ -929,7 +1010,7 @@ const ProductDetailsPage = () => {
                     </button>
                   </div>
                   {isByWeight(product) && (
-                    <span className="text-sm text-gray-500">المجموع: <b className="text-gray-900">{Math.round(finalPrice * quantity).toLocaleString()} د.ع</b></span>
+                    <span className="text-sm text-gray-500">المجموع: <b className="text-gray-900">{Math.round(finalPrice * quantity).toLocaleString('en-US')} د.ع</b></span>
                   )}
                 </div>
               )}
@@ -998,19 +1079,13 @@ const ProductDetailsPage = () => {
 
         {/* Tabs */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-          <Tabs defaultValue="description">
+          {/* الوصف معروض أعلى الصفحة بجانب السعر — لا نكرره هنا */}
+          <Tabs defaultValue="specs">
             <TabsList>
-              <TabsTrigger value="description">الوصف</TabsTrigger>
               <TabsTrigger value="specs">المواصفات</TabsTrigger>
               {hasVariants && <TabsTrigger value="variants">التشكيلات ({variants.length})</TabsTrigger>}
 
             </TabsList>
-
-            <TabsContent value="description" className="mt-6">
-              <div className="prose prose-sm max-w-none">
-                {product.description || 'لا يوجد وصف متاح لهذا المنتج.'}
-              </div>
-            </TabsContent>
 
             <TabsContent value="specs" className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1066,7 +1141,7 @@ const ProductDetailsPage = () => {
                             )
                           })}
                           <td className="px-4 py-3 font-medium text-primary">
-                            {variantsService.getFinalPrice(product.price, v).toLocaleString()} د.ع
+                            {variantsService.getFinalPrice(product.price, v).toLocaleString('en-US')} د.ع
                           </td>
                           <td className="px-4 py-3 text-gray-700">{v.stockQuantity}</td>
                           <td className="px-4 py-3">
@@ -1130,7 +1205,7 @@ const ProductDetailsPage = () => {
                 {reviews.map(review => (
                   <ReviewCard key={review.id} review={review}
                     currentUserId={user?.userId || user?.id}
-                    onDelete={handleDeleteReview} onMarkHelpful={handleMarkHelpful} />
+                    onDelete={handleDeleteReview} onMarkHelpful={handleMarkHelpful} onReport={handleReport} />
                 ))}
               </div>
               {reviewsTotalPages > 1 && (
@@ -1147,7 +1222,8 @@ const ProductDetailsPage = () => {
           ) : (
             <div className="flex gap-3 overflow-x-auto snap-x scroll-px-4 lg:scroll-px-6 hide-scrollbar -mx-4 px-4 lg:-mx-6 lg:px-6 pb-1">
               {reviews.map(review => (
-                <MobileReviewCard key={review.id} review={review} onMarkHelpful={handleMarkHelpful} />
+                <MobileReviewCard key={review.id} review={review} currentUserId={user?.userId || user?.id}
+                  onMarkHelpful={handleMarkHelpful} onReport={handleReport} />
               ))}
             </div>
           )}
@@ -1167,6 +1243,10 @@ const ProductDetailsPage = () => {
             <WriteReviewForm productId={id} onSuccess={refetchReviews} />
           </div>
         </div>
+
+        {reportingReview && (
+          <ReportReviewModal key={reportingReview.id} review={reportingReview} onClose={() => setReportingReview(null)} />
+        )}
 
         {/* ===== منتجات من نفس القسم ===== */}
         {mobileRelatedProducts.length > 0 && (
@@ -1213,6 +1293,13 @@ const ProductDetailsPage = () => {
       </div>
     </div>
   )
+}
+
+// الانتقال لمنتج آخر (من "منتجات من نفس القسم") يبقي المكوّن نفسه — المفتاح يعيد تهيئته
+// حتى لا ينتقل اختيار المقاس/اللون والكمية وصفحة التقييمات من المنتج السابق
+const ProductDetailsPage = () => {
+  const { id } = useParams()
+  return <ProductDetailsContent key={id} />
 }
 
 export default ProductDetailsPage

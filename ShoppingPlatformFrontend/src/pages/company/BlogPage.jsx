@@ -6,7 +6,7 @@ import Breadcrumb from '../../components/common/Breadcrumb'
 import { blogPosts, blogCategories } from './companyContent'
 
 export const formatPostDate = (date) =>
-  new Date(date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+  new Date(date).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' })
 
 // غلاف ملوّن لكل تصنيف بدلاً من الصور
 export const categoryStyles = {

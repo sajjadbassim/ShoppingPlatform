@@ -89,10 +89,12 @@ export const useNotificationsStore = create(
         }
       },
 
-      // مسح كل الإشعارات (المقروءة تُحذف فعليًا من الخادم، والباقي محليًا)
+      // مسح كل الإشعارات: الخادم يحذف المقروءة فقط، فنحدد الكل كمقروء أولاً
+      // (وإلا عادت غير المقروءة عند التحديث التالي)
       clearAll: async () => {
         set({ notifications: [], unreadCount: 0 });
         try {
+          await notificationsService.markAllAsRead();
           await notificationsService.deleteAllRead();
         } catch {
           get().fetchNotifications();

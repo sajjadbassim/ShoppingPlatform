@@ -83,11 +83,11 @@ const VendorReports = () => {
   const topProducts = dash.topProducts || []
 
   const stats = [
-    { label: 'صافي المبيعات',     value: `${(sales.totalRevenue||0) > 1000000 ? ((sales.totalRevenue||0)/1000000).toFixed(1)+'M' : (sales.totalRevenue||0).toLocaleString()} د.ع`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50',
+    { label: 'صافي المبيعات',     value: `${(sales.totalRevenue||0) > 1000000 ? ((sales.totalRevenue||0)/1000000).toFixed(1)+'M' : (sales.totalRevenue||0).toLocaleString('en-US')} د.ع`, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50',
       delta: <Delta now={sales.totalRevenue || 0} before={sales.previousRevenue || 0} /> },
     { label: 'الطلبات',           value: (sales.totalOrders||0).toString(),                                                                                                          icon: ShoppingCart, color: 'text-blue-600',  bg: 'bg-blue-50',
       delta: <Delta now={sales.totalOrders || 0} before={sales.previousOrders || 0} /> },
-    { label: 'متوسط قيمة الطلب',  value: `${(sales.averageOrderValue||0).toLocaleString()} د.ع`,                                                                                    icon: TrendingUp,   color: 'text-purple-600',bg: 'bg-purple-50'},
+    { label: 'متوسط قيمة الطلب',  value: `${(sales.averageOrderValue||0).toLocaleString('en-US')} د.ع`,                                                                                    icon: TrendingUp,   color: 'text-purple-600',bg: 'bg-purple-50'},
     { label: 'المنتجات النشطة',   value: `${dash.activeProducts||0}/${dash.totalProducts||0}`,                                                                                       icon: Package,     color: 'text-yellow-600',bg: 'bg-yellow-50'},
   ]
 
@@ -162,7 +162,7 @@ const VendorReports = () => {
             المبيعات اليومية — {PERIODS.find(p=>p.key===period)?.label}
           </h2>
           <div className="text-sm text-gray-500">
-            {sales.totalOrders ?? 0} طلب · {(sales.totalRevenue ?? 0).toLocaleString()} د.ع
+            {sales.totalOrders ?? 0} طلب · {(sales.totalRevenue ?? 0).toLocaleString('en-US')} د.ع
           </div>
         </div>
 
@@ -185,7 +185,7 @@ const VendorReports = () => {
                     style={{ bottom: `${pct + 20}px` }}>
                     <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
                       <p className="font-medium">{label}</p>
-                      <p>{day.revenue.toLocaleString()} د.ع</p>
+                      <p>{day.revenue.toLocaleString('en-US')} د.ع</p>
                       <p className="text-gray-300">{day.orderCount} طلب</p>
                     </div>
                   </div>
@@ -230,7 +230,7 @@ const VendorReports = () => {
                   </div>
                 </div>
                 <p className="text-sm font-medium text-gray-900 flex-shrink-0">
-                  {p.totalRevenue > 1000000 ? `${(p.totalRevenue/1000000).toFixed(1)}M` : (p.totalRevenue||0).toLocaleString()} د.ع
+                  {p.totalRevenue > 1000000 ? `${(p.totalRevenue/1000000).toFixed(1)}M` : (p.totalRevenue||0).toLocaleString('en-US')} د.ع
                 </p>
               </div>
             ))}

@@ -493,7 +493,7 @@ namespace ecommerce.Repositories
                     PrimaryImageUrl = primaryImage,
                     VendorId = p.VendorId,
                     CategoryId = p.CategoryId,
-                    VendorName = p.Vendor?.Name ?? string.Empty,
+                    VendorName = p.Vendor?.DisplayName ?? string.Empty,   // العربي أولاً
                     CategoryName = p.Category?.Name ?? string.Empty,
                     AverageRating = rating != null ? Math.Round((decimal)rating.Average, 1) : null,
                     ReviewCount = rating?.Count ?? 0,

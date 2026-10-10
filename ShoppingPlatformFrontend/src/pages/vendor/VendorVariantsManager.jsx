@@ -363,8 +363,8 @@ const VariantsList = ({ productId, basePrice }) => {
                       return <td key={attr.attributeId} className="px-3 py-3 text-gray-700">{av?.valueAr||av?.value||'—'}</td>
                     })}
                     <td className="px-3 py-3 font-medium text-primary">
-                      {variantsService.getFinalPrice(basePrice,v).toLocaleString()} د.ع
-                      {v.priceAdjustment !== 0 && <span className="text-xs text-gray-400 block">({v.priceAdjustment>0?'+':''}{v.priceAdjustment?.toLocaleString()})</span>}
+                      {variantsService.getFinalPrice(basePrice,v).toLocaleString('en-US')} د.ع
+                      {v.priceAdjustment !== 0 && <span className="text-xs text-gray-400 block">({v.priceAdjustment>0?'+':''}{v.priceAdjustment?.toLocaleString('en-US')})</span>}
                     </td>
                     <td className="px-3 py-3 text-gray-700">{v.stockQuantity}</td>
                     <td className="px-3 py-3">

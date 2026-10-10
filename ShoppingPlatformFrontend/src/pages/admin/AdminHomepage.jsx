@@ -90,7 +90,7 @@ const ProductPicker = ({ onSelect, excludeIds = [], scope }) => {
                   : <Package size={14} className="text-gray-400" />}
               </div>
               <span className="text-sm text-gray-800 truncate flex-1">{p.nameAr || p.name}</span>
-              <span className="text-xs text-primary font-medium">{(p.price || 0).toLocaleString()} د.ع</span>
+              <span className="text-xs text-primary font-medium">{(p.price || 0).toLocaleString('en-US')} د.ع</span>
             </button>
           ))}
         </div>

@@ -9,6 +9,9 @@ import { PageLoader } from './components/common/PageLoader'
 import { ProtectedRoute, GuestRoute } from './components/auth'
 import { useAuthStore } from './stores/authStore'
 import { useNotificationsStore } from './stores/notificationsStore'
+import { useCartStore } from './stores/cartStore'
+import { useWishlistStore } from './stores/wishlistStore'
+import { useCouponStore } from './stores/couponStore'
 import { useNotificationsRealtime } from './hooks/useNotificationsRealtime'
 import { syncPush } from './utils/push'
 import { useThemeSync } from './hooks/usePreferences'
@@ -190,12 +193,25 @@ function App() {
   useNotificationsRealtime()
   useThemeSync()
 
+  // الدخول: بيانات هذا الحساب (عدد السلة في الشريط يتحدث فوراً، لا عند فتح السلة)
+  // الخروج (أو انتهاء الجلسة): مسح السلة والمفضلة والكوبون والإشعارات المحفوظة على الجهاز
+  // حتى لا يراها من يستخدم الجهاز بعده
+  const userId = useAuthStore((s) => s.user?.id)
   useEffect(() => {
-    if (isAuthenticated) fetchNotifications()
-  }, [isAuthenticated])
+    if (isAuthenticated) {
+      fetchNotifications()
+      useCartStore.getState().fetchCart().catch(() => {})
+      useWishlistStore.getState().fetchWishlist().catch(() => {})
+    } else {
+      useCartStore.getState().clearLocalCart()
+      useWishlistStore.setState({ items: [] })
+      useCouponStore.getState().clear()
+      useNotificationsStore.setState({ notifications: [], unreadCount: 0 })
+      try { localStorage.removeItem('recentSearches') } catch { /* التخزين محجوب */ }
+    }
+  }, [isAuthenticated, userId])
 
   // الجهاز الذي فعّل الإشعارات سابقاً يُربط بالحساب الداخل حالياً
-  const userId = useAuthStore((s) => s.user?.id)
   useEffect(() => {
     if (isAuthenticated && userId) syncPush()
   }, [isAuthenticated, userId])

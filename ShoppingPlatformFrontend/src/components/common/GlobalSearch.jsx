@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, X, Package, Store, Tag, Clock, TrendingUp, ArrowLeft } from 'lucide-react'
+import { Search, X, Package, Store, Tag, Clock, ArrowLeft } from 'lucide-react'
 import { useAdvancedFilter } from '../../hooks/useProducts'
 import { useVendorsPaged } from '../../hooks/useVendors'
 import { useCategories } from '../../hooks/useCategories'
 import { getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
 import { SCOPE, isGroceryCategory, searchLink, useShopScope } from '../../utils/shopScope'
+import { formatPrice } from '../../utils/weight'
 
 const GlobalSearch = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
@@ -16,18 +17,25 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   const scope = useShopScope()
   const grocery = scope === SCOPE.GROCERY
 
+  // البحث بعد توقف الكتابة 300ms — لا طلبين للخادم مع كل حرف
+  const [term, setTerm] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(query.trim()), 300)
+    return () => clearTimeout(t)
+  }, [query])
+
   // جلب النتائج
   const { data: productsData, isLoading: productsLoading } = useAdvancedFilter({
-    searchTerm: query,
+    searchTerm: term,
     pageSize: 5,
     isActive: true,
     scope,
-  }, query.length >= 2)
+  }, term.length >= 2)
 
   const { data: vendorsData, isLoading: vendorsLoading } = useVendorsPaged({
-    searchTerm: query,
+    searchTerm: term,
     pageSize: 3,
-  }, { enabled: query.length >= 2 })
+  }, { enabled: term.length >= 2 })
 
   const { data: categoriesData } = useCategories()
 
@@ -41,13 +49,16 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   const isLoading = productsLoading || vendorsLoading
   const hasResults = products.length > 0 || vendors.length > 0 || categories.length > 0
 
-  // تحميل البحث الأخير
+  // تحميل البحث الأخير عند كل فتح (يُمسح عند تسجيل الخروج، والهيدر لا يُعاد تركيبه)
   useEffect(() => {
-    const saved = localStorage.getItem('recentSearches')
-    if (saved) {
-      setRecentSearches(JSON.parse(saved))
+    if (!isOpen) return
+    try {
+      const saved = JSON.parse(localStorage.getItem('recentSearches') || '[]')
+      setRecentSearches(Array.isArray(saved) ? saved : [])
+    } catch {
+      setRecentSearches([])
     }
-  }, [])
+  }, [isOpen])
 
   // Focus عند الفتح
   useEffect(() => {
@@ -56,15 +67,16 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     }
   }, [isOpen])
 
-  // إغلاق بـ Escape
+  // إغلاق بـ Escape + منع تمرير الصفحة — فقط والنافذة مفتوحة
+  // (كان التنظيف يفك قفل التمرير مع كل إعادة رسم للهيدر حتى والنافذة مغلقة،
+  //  فتتحرك الصفحة خلف أي نافذة أخرى مفتوحة)
   useEffect(() => {
+    if (!isOpen) return
     const handleEscape = (e) => {
       if (e.key === 'Escape') onClose()
     }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'hidden'
-    }
+    document.addEventListener('keydown', handleEscape)
+    document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = ''
@@ -143,14 +155,14 @@ const GlobalSearch = ({ isOpen, onClose }) => {
           {/* Results */}
           <div className="flex-1 sm:flex-none sm:max-h-[60vh] overflow-y-auto">
             {/* Loading */}
-            {isLoading && query.length >= 2 && (
+            {isLoading && query.trim().length >= 2 && term.length >= 2 && (
               <div className="p-8 text-center text-gray-500">
                 <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
                 <p>جاري البحث...</p>
               </div>
             )}
 
-            {/* No Query - Show Recent & Trending */}
+            {/* بلا نص: البحث الأخير فقط (أُزيلت قائمة "الأكثر بحثاً" الثابتة — كانت تقترح آيفون حتى في السوبرماركت) */}
             {!query && (
               <div className="p-4">
                 {/* Recent Searches */}
@@ -178,30 +190,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                     </div>
                   </div>
                 )}
-
-                {/* Trending */}
-                <div>
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                    <TrendingUp size={18} className="text-primary" />
-                    الأكثر بحثاً
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {['آيفون', 'سامسونج', 'لابتوب', 'سماعات', 'ساعة ذكية'].map((term, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSearch(term)}
-                        className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm hover:bg-primary/20 transition-colors"
-                      >
-                        {term}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
             {/* Results */}
-            {query.length >= 2 && !isLoading && (
+            {query.trim().length >= 2 && term.length >= 2 && !isLoading && (
               <>
                 {/* Products */}
                 {products.length > 0 && (
@@ -226,7 +219,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-gray-900 truncate">{product.nameAr || product.name}</p>
-                            <p className="text-sm text-primary font-bold">{(product.price || 0).toLocaleString()} د.ع</p>
+                            <p className="text-sm text-primary font-bold">{formatPrice(product.price, product.weightStepKg)}</p>
                           </div>
                           <ArrowLeft size={16} className="text-gray-400" />
                         </button>
@@ -292,7 +285,7 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                 {!hasResults && (
                   <div className="p-8 text-center text-gray-500">
                     <Search size={48} className="mx-auto mb-4 text-gray-300" />
-                    <p className="font-medium">لا توجد نتائج لـ "{query}"</p>
+                    <p className="font-medium">لا توجد نتائج لـ "{term}"</p>
                     <p className="text-sm mt-1">جرب كلمات مختلفة أو تصفح الفئات</p>
                   </div>
                 )}

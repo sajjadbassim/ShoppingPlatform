@@ -55,11 +55,13 @@ export const GuestRoute = ({ children, redirectTo = '/' }) => {
       CUSTOMER: '/',
     };
     
-    // إذا جاء من صفحة محمية، أعده إليها
+    // الزبون يعود للصفحة المحمية التي جاء منها؛ الأدوار الأخرى إلى لوحاتها
+    // (صاحب متجر سجّل الدخول من /cart مثلاً لا يُعاد لسلة زبون)
     const from = location.state?.from;
     const defaultRedirect = roleRedirects[user?.role] || redirectTo;
-    
-    return <Navigate to={from || defaultRedirect} replace />;
+    const target = user?.role === 'CUSTOMER' && from ? from : defaultRedirect;
+
+    return <Navigate to={target} replace />;
   }
 
   return children;

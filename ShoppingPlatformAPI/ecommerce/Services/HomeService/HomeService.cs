@@ -731,7 +731,7 @@ namespace ecommerce.Services.HomeService
                 PromotionNameAr = promotion?.NameAr,
                 PrimaryImageUrl = primaryImage,
                 p.VendorId,
-                VendorName = p.Vendor?.Name,
+                VendorName = p.Vendor?.DisplayName,
                 VendorIsOpen = p.Vendor == null || StoreHours.IsOpen(p.Vendor, DateTime.UtcNow),
                 VendorOpenStatus = p.Vendor == null ? null : StoreHours.Status(p.Vendor, DateTime.UtcNow).Message,
                 AverageRating = hasRating ? Math.Round((decimal)rating.Average, 1) : (decimal?)null,

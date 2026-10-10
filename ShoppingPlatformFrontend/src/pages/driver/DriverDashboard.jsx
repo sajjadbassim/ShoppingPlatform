@@ -21,8 +21,8 @@ import {
   useDriverProfile, useMyDriverOrders, useSetDriverWorkStatus, usePickUpStop, useDeliverOrder, useFailOrder,
 } from '../../hooks/useDriverApp'
 
-const money = (n) => `${Math.round(n || 0).toLocaleString()} د.ع`
-const time = (d) => d ? new Date(d).toLocaleTimeString('ar-IQ', { hour: 'numeric', minute: '2-digit' }) : ''
+const money = (n) => `${Math.round(n || 0).toLocaleString('en-US')} د.ع`
+const time = (d) => d ? new Date(d).toLocaleTimeString('ar-IQ-u-nu-latn', { hour: 'numeric', minute: '2-digit' }) : ''
 
 const WORK_STATUSES = [
   { value: 'available', label: 'متاح', dot: 'bg-green-500' },
@@ -549,7 +549,7 @@ const DriverDashboard = () => {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-gray-900 truncate">{o.customerName}{o.status === 'DELIVERY_FAILED' && <span className="text-xs font-medium text-orange-600"> · تعذّر التسليم</span>}</p>
                   <p className="text-xs text-gray-500 flex items-center gap-1"><Clock size={11} />
-                    {o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('ar-IQ', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + time(o.deliveredAt) : '—'}
+                    {o.deliveredAt ? new Date(o.deliveredAt).toLocaleDateString('ar-IQ-u-nu-latn', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + time(o.deliveredAt) : '—'}
                     <span className="font-mono" dir="ltr">· {o.orderNumber}</span>
                   </p>
                 </div>

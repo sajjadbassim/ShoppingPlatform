@@ -27,7 +27,7 @@ const toLocalInput = (d) => {
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
-const formatDate = (d) => new Date(d).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })
+const formatDate = (d) => new Date(d).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })
 const formatDuration = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
 
 // المنصات تختصر النص الطويل بـ «… المزيد» — القص بالأسطر لا بـ line-clamp (الإيموجي تُظهر نصف سطر)

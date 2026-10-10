@@ -4,6 +4,7 @@ import { Skeleton } from './Loading'
 import { useProductsByVendor } from '../../hooks/useProducts'
 import { getVendorLogo, getVendorCover, getPrimaryImage } from '../../utils/imageHelper'
 import { ClosedBadge } from '../vendor/StoreHoursEditor'
+import { usePublicZones, vendorUsesZones, deliveryFeeLabel } from '../../hooks/useDeliveryZones'
 
 // بطاقات المتاجر المشتركة بين صفحة المتاجر والصفحة الرئيسية
 
@@ -64,12 +65,21 @@ const StoreStats = ({ store, className = '' }) => (
         <Clock size={12} className="text-primary" />{store.estimatedPrepTime} د
       </span>
     )}
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${store.deliveryFee > 0 ? 'bg-gray-100 text-gray-700' : 'bg-green-100 text-green-700 font-medium'}`}>
-      <Truck size={12} className={store.deliveryFee > 0 ? 'text-primary' : ''} />
-      {store.deliveryFee > 0 ? `${Number(store.deliveryFee).toLocaleString()} د.ع` : 'توصيل مجاني'}
-    </span>
+    <DeliveryFeeChip store={store} />
   </div>
 )
+
+// متجر يتبع مناطق التوصيل: رسومه حسب العنوان، فلا نعرضه "مجاناً" لأن رسمه الثابت صفر
+const DeliveryFeeChip = ({ store }) => {
+  const { data: zonesCfg } = usePublicZones()
+  const free = !(store.deliveryFee > 0) && !vendorUsesZones(zonesCfg, store.id)
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${free ? 'bg-green-100 text-green-700 font-medium' : 'bg-gray-100 text-gray-700'}`}>
+      <Truck size={12} className={free ? '' : 'text-primary'} />
+      {deliveryFeeLabel(store, zonesCfg)}
+    </span>
+  )
+}
 
 // معاينة منتجات المتجر (تُجلب لكل متجر وتُخزَّن — نفس بيانات صفحة المتجر)
 const ProductsPreview = ({ storeId, count = 4, size = 'h-16' }) => {
@@ -161,7 +171,7 @@ export const StoreCard = ({ store, index, className = '' }) => (
       <StoreStats store={store} />
       <div className="mt-auto flex items-center justify-between pt-1">
         {store.minOrderAmount > 0
-          ? <span className="text-[11px] text-gray-500">أقل طلب {Number(store.minOrderAmount).toLocaleString()} د.ع</span>
+          ? <span className="text-[11px] text-gray-500">أقل طلب {Number(store.minOrderAmount).toLocaleString('en-US')} د.ع</span>
           : <span />}
         <span className="inline-flex items-center gap-1 text-sm font-bold text-primary">
           زيارة المتجر <ArrowLeft size={15} className="group-hover:-translate-x-1 transition-transform" />

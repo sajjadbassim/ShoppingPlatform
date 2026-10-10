@@ -2,10 +2,10 @@
 import { Link } from 'react-router-dom'
 import { TrendingUp, Percent, MinusCircle, Banknote, Wallet } from 'lucide-react'
 
-export const money = (n) => `${Math.round(n || 0).toLocaleString()} د.ع`
+export const money = (n) => `${Math.round(n || 0).toLocaleString('en-US')} د.ع`
 
 export const commissionLabel = (c) => !c ? '—'
-  : c.type === 'FIXED' ? `${Number(c.value).toLocaleString()} د.ع / طلب` : `${Number(c.value)}%`
+  : c.type === 'FIXED' ? `${Number(c.value).toLocaleString('en-US')} د.ع / طلب` : `${Number(c.value)}%`
 
 export const SummaryCards = ({ s }) => {
   const cards = [
@@ -19,7 +19,7 @@ export const SummaryCards = ({ s }) => {
       <div className={`rounded-2xl p-4 border ${s.balance >= 0 ? 'bg-primary/5 border-primary/20' : 'bg-red-50 border-red-200'}`}>
         <p className="text-sm text-gray-600 flex items-center gap-1.5"><Wallet size={16} /> {s.balance >= 0 ? 'الرصيد المستحق للمتجر' : 'على المتجر للمنصة'}</p>
         <p className={`text-3xl font-extrabold mt-1 ${s.balance >= 0 ? 'text-primary' : 'text-red-600'}`}>{money(Math.abs(s.balance))}</p>
-        {s.lastPayoutAt && <p className="text-xs text-gray-500 mt-1">آخر دفعة: {new Date(s.lastPayoutAt).toLocaleDateString('ar-IQ')}</p>}
+        {s.lastPayoutAt && <p className="text-xs text-gray-500 mt-1">آخر دفعة: {new Date(s.lastPayoutAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>}
       </div>
       <div className="grid grid-cols-2 gap-2">
         {cards.map(c => (
@@ -50,11 +50,11 @@ export const LedgerList = ({ entries, orderLink }) => {
               {e.orderId && orderLink ? <Link to={orderLink(e)} className="hover:underline">{e.description}</Link> : e.description}
               {e.reference ? ` · ${e.reference}` : ''}
             </p>
-            <p className="text-[11px] text-gray-400">{new Date(e.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+            <p className="text-[11px] text-gray-400">{new Date(e.createdAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' })}</p>
           </div>
           <div className="text-left flex-shrink-0" dir="ltr">
             <p className={`text-sm font-bold ${e.amount >= 0 ? (TONE[e.type] || 'text-green-700') : (TONE[e.type] || 'text-red-600')}`}>
-              {e.amount >= 0 ? '+' : '−'}{Math.round(Math.abs(e.amount)).toLocaleString()}
+              {e.amount >= 0 ? '+' : '−'}{Math.round(Math.abs(e.amount)).toLocaleString('en-US')}
             </p>
             <p className="text-[11px] text-gray-400">{money(e.runningBalance)}</p>
           </div>

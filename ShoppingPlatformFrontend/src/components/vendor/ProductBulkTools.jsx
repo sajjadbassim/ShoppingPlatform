@@ -12,7 +12,7 @@ export const roundIqd = (n) => Math.max(250, Math.round(n / 250) * 250)
 const storedPrice = (p) => p.regularPrice ?? p.price ?? 0
 const storedOriginal = (p) => (p.regularOriginalPrice !== undefined ? p.regularOriginalPrice : p.originalPrice) || null
 const storedStock = (p) => p.regularStockQuantity ?? p.stockQuantity ?? 0
-const fmt = (n) => (n ?? 0).toLocaleString()
+const fmt = (n) => (n ?? 0).toLocaleString('en-US')
 
 // ===========================
 // تعديل الأسعار جماعياً

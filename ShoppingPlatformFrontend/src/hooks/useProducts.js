@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { productService } from '../services';
 
 // ===========================
@@ -39,7 +39,7 @@ export const useProductsPaged = (params = {}, options = {}) => {
   return useQuery({
     queryKey: productKeys.list(params),
     queryFn: () => productService.getPaged(params),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData, // v5: الخيار القديم keepPreviousData أُلغي ولم يعد يعمل
     ...options,
   });
 };
@@ -109,7 +109,7 @@ export const useUnifiedSearch = (term, params = {}) => {
     queryFn: () => productService.unifiedSearch(term, params),
     enabled: !!term && term.length >= 2,
     staleTime: 30 * 1000, // 30 ثانية — البحث يتغير كثيراً
-    keepPreviousData: true,
+    placeholderData: keepPreviousData, // v5: الخيار القديم keepPreviousData أُلغي ولم يعد يعمل
   });
 };
 
@@ -135,7 +135,7 @@ export const useAdvancedFilter = (filters = {}, enabled = true) => {
     queryKey: productKeys.advancedFilter(filters),
     queryFn: () => productService.advancedFilter(filters),
     enabled,
-    keepPreviousData: true,
+    placeholderData: keepPreviousData, // v5: الخيار القديم keepPreviousData أُلغي ولم يعد يعمل
     staleTime: 1 * 60 * 1000,
   });
 };

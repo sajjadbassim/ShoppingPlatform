@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react'
 import { lazy as lazyLoad, Suspense } from 'react'
 const LocationPicker = lazyLoad(() => import('../../components/common/LocationPicker'))
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft, Bell } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/common/Tabs'
 import Breadcrumb from '../../components/common/Breadcrumb'
-import { Toggle } from '../../components/common/FormControls'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { ConfirmModal } from '../../components/common/Modal'
@@ -26,7 +25,7 @@ const ProfilePage = () => {
   const navigate = useNavigate()
   // فتح تبويب محدد من رابط خارجي (مثل الإعدادات: ?tab=addresses أو ?tab=security)
   const [searchParams] = useSearchParams()
-  const TABS = ['profile', 'addresses', 'returns', 'notifications', 'security']
+  const TABS = ['profile', 'addresses', 'returns', 'security']
   const initialTab = TABS.includes(searchParams.get('tab')) ? searchParams.get('tab') : 'profile'
   const { success, error } = useToast()
 
@@ -72,9 +71,6 @@ const { items: wishlistItems, fetchWishlist } = useWishlistStore()
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [addressToDelete, setAddressToDelete] = useState(null)
-  const [notifications, setNotifications] = useState({
-    orders: true, promotions: true, updates: false, newsletter: true,
-  })
 useEffect(() => {
   fetchWishlist()
 }, [])
@@ -111,8 +107,6 @@ useEffect(() => {
   useEffect(() => {
     if (user) setFormData({ fullName: user.fullName || '', email: user.email || '', phone: user.phone || '' })
   }, [user])
-
-  if (!isAuthenticated) { navigate('/login', { state: { from: '/profile' } }); return null }
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value })
 
@@ -258,7 +252,7 @@ const stats = {
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm font-bold text-gray-900">النقاط التشجيعية</span>
                   <span className="block text-xs text-amber-700 truncate">
-                    رصيدك <span className="font-bold">{(loyaltyAccount?.balance ?? 0).toLocaleString()}</span> نقطة
+                    رصيدك <span className="font-bold">{(loyaltyAccount?.balance ?? 0).toLocaleString('en-US')}</span> نقطة
                     {loyaltyAccount?.tierAr && <> • المستوى {loyaltyAccount.tierAr}</>}
                   </span>
                 </span>
@@ -277,7 +271,7 @@ const stats = {
                   <Star size={20} className="text-yellow-400" /><span>النقاط التشجيعية</span>
                   {(loyaltyAccount?.balance ?? 0) > 0 && (
                     <span className="mr-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
-                      {loyaltyAccount.balance.toLocaleString()}
+                      {loyaltyAccount.balance.toLocaleString('en-US')}
                     </span>
                   )}
                 </Link>
@@ -308,7 +302,6 @@ const stats = {
                     <TabsTrigger value="returns">
                       الإرجاع{pendingReturnsCount > 0 ? ` (${pendingReturnsCount})` : ''}
                     </TabsTrigger>
-                    <TabsTrigger value="notifications">الإشعارات</TabsTrigger>
                     <TabsTrigger value="security">الأمان</TabsTrigger>
                   </TabsList>
                 </div>
@@ -347,6 +340,15 @@ const stats = {
                           )}
                         </div>
                       ))}
+                      {/* إعدادات الإشعارات المحفوظة فعلاً موجودة في صفحة الإعدادات */}
+                      <Link to="/settings" className="flex items-center gap-3 p-3 lg:p-4 bg-gray-50 rounded-xl hover:bg-gray-100">
+                        <span className="w-10 h-10 rounded-xl bg-white text-gray-500 flex items-center justify-center flex-shrink-0"><Bell size={18} /></span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-medium text-gray-900">إعدادات الإشعارات</span>
+                          <span className="block text-xs lg:text-sm text-gray-500">تحديثات الطلبات والتذكيرات</span>
+                        </span>
+                        <ChevronLeft size={18} className="text-gray-400 flex-shrink-0" />
+                      </Link>
                     </div>
                   )}
                 </TabsContent>
@@ -428,7 +430,7 @@ const stats = {
                           <div key={ret.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                             <div>
                               <p className="font-medium text-gray-900">#{ret.returnNumber || ret.id?.slice(0,8)}</p>
-                              <p className="text-xs text-gray-400">{new Date(ret.createdAt).toLocaleDateString('ar-IQ')}</p>
+                              <p className="text-xs text-gray-400">{new Date(ret.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
                               <p className="text-sm text-gray-500 mt-0.5">{ret.reasonAr || ret.reason}</p>
                             </div>
                             <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${s.color}`}>
@@ -446,27 +448,6 @@ const stats = {
                   )}
                 </TabsContent>
 
-                {/* Notifications Tab */}
-                <TabsContent value="notifications" className="p-4 lg:p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6">إعدادات الإشعارات</h3>
-                  <div className="space-y-4">
-                    {[
-                      { key: 'orders',     title: 'تحديثات الطلبات',  desc: 'إشعارات عن حالة طلباتك' },
-                      { key: 'promotions', title: 'العروض والخصومات', desc: 'إشعارات عن العروض الجديدة' },
-                      { key: 'updates',    title: 'تحديثات المنصة',   desc: 'إشعارات عن الميزات الجديدة' },
-                      { key: 'newsletter', title: 'النشرة البريدية',  desc: 'رسائل أسبوعية عن المنتجات' },
-                    ].map(item => (
-                      <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-900">{item.title}</p>
-                          <p className="text-sm text-gray-500">{item.desc}</p>
-                        </div>
-                        <Toggle checked={notifications[item.key]} onChange={(e) => setNotifications({ ...notifications, [item.key]: e.target.checked })} />
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-
                 {/* Security Tab */}
                 <TabsContent value="security" className="p-4 lg:p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-6">الأمان وكلمة المرور</h3>
@@ -479,11 +460,6 @@ const stats = {
                         <Input label="تأكيد كلمة المرور" type="password" placeholder="••••••••" value={passwordData.confirmPassword} onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })} />
                         <Button variant="primary" onClick={handleChangePassword} loading={passwordLoading} disabled={!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}>تحديث كلمة المرور</Button>
                       </div>
-                    </div>
-                    <div className="p-4 bg-red-50 rounded-lg">
-                      <h4 className="font-medium text-red-700 mb-2">حذف الحساب</h4>
-                      <p className="text-sm text-gray-600 mb-4">سيتم حذف جميع بياناتك نهائياً</p>
-                      <Button variant="danger">حذف الحساب</Button>
                     </div>
                   </div>
                 </TabsContent>

@@ -75,7 +75,7 @@ const OperationsDashboard = () => {
       <div className="flex items-center gap-3">
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-gray-900">لوحة التشغيل</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{new Date().toLocaleDateString('ar-IQ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{new Date().toLocaleDateString('ar-IQ-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
         <button onClick={refetch} disabled={isLoading} aria-label="تحديث"
           className="w-10 h-10 rounded-full hover:bg-gray-100 text-gray-500 flex items-center justify-center">
@@ -147,7 +147,7 @@ const OperationsDashboard = () => {
                 <Link key={order.id} to={`/operations/orders?status=${order.status}`} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{order.customerName || 'زبون'} <span className="text-xs text-gray-400" dir="ltr">{order.subOrderNumber}</span></p>
-                    <p className="text-xs text-gray-500 truncate">{order.vendorNameAr || order.vendorName} · {order.items?.length || 0} منتج · {(order.total || 0).toLocaleString()} د.ع</p>
+                    <p className="text-xs text-gray-500 truncate">{order.vendorNameAr || order.vendorName} · {order.items?.length || 0} منتج · {(order.total || 0).toLocaleString('en-US')} د.ع</p>
                   </div>
                   <StatusBadge status={order.status} />
                 </Link>

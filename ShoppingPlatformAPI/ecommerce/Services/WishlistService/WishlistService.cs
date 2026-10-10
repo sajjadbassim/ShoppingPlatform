@@ -41,7 +41,7 @@ namespace ecommerce.Services
                     PrimaryImageUrl = w.Product.Images?
                         .FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
                     VendorId = w.Product.VendorId,
-                    VendorName = w.Product.Vendor?.Name
+                    VendorName = w.Product.Vendor?.DisplayName
                 }
             });
         }
@@ -85,7 +85,7 @@ namespace ecommerce.Services
                     PrimaryImageUrl = created.Product.Images?
                         .FirstOrDefault(i => i.IsPrimary)?.ImageUrl,
                     VendorId = created.Product.VendorId,
-                    VendorName = created.Product.Vendor?.Name
+                    VendorName = created.Product.Vendor?.DisplayName
                 }
             };
         }

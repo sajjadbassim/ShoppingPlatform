@@ -11,6 +11,13 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
 import { getPrimaryImage } from '../../utils/imageHelper'
+import { variantsService } from '../../services/variantsService'
+
+const isInStock = (item) => item.product?.isAvailable && item.product?.stockQuantity > 0
+
+// المنتج ذو الخيارات (مقاس/لون) لا يُضاف بلا اختيار — الخادم يرفضه
+const hasOptions = async (productId) =>
+  variantsService.hasVariants(await variantsService.getVariants(productId).catch(() => []))
 
 // صف منتج مضغوط (الهاتف): كل التفاصيل ظاهرة دون تمرير
 const WishlistRow = ({ item, onAddToCart, onRemove }) => {
@@ -39,8 +46,8 @@ const WishlistRow = ({ item, onAddToCart, onRemove }) => {
           {p.nameAr || p.name}
         </Link>
         <div className="flex items-baseline gap-2 mt-1">
-          <span className="font-bold text-primary">{(p.price || 0).toLocaleString()} د.ع</span>
-          {hasDiscount && <span className="text-xs text-gray-400 line-through">{p.originalPrice.toLocaleString()}</span>}
+          <span className="font-bold text-primary">{(p.price || 0).toLocaleString('en-US')} د.ع</span>
+          {hasDiscount && <span className="text-xs text-gray-400 line-through">{p.originalPrice.toLocaleString('en-US')}</span>}
         </div>
 
         <div className="flex items-center gap-2 mt-auto pt-2">
@@ -69,14 +76,15 @@ const WishlistPage = () => {
   const { 
     items: wishlistItems, 
     isLoading,
+    error: loadError,
     fetchWishlist,
     removeItem, 
     clearWishlist, 
-    getCount 
   } = useWishlistStore()
   const { addItem: addToCart } = useCartStore()
   
   const [showClearModal, setShowClearModal] = useState(false)
+  const [addingAll, setAddingAll] = useState(false)
 
   // ✅ جلب المفضلات عند التحميل
   useEffect(() => {
@@ -117,10 +125,14 @@ const WishlistPage = () => {
     }
 
     try {
+      if (await hasOptions(item.productId)) {
+        navigate(`/products/${item.productId}`)
+        return
+      }
       await addToCart(item.productId, 1)
       success('تمت الإضافة للسلة')
     } catch (err) {
-      error('فشل إضافة المنتج للسلة')
+      error(err.message || 'فشل إضافة المنتج للسلة')
     }
   }
 
@@ -132,50 +144,60 @@ const WishlistPage = () => {
       return
     }
 
-    const inStockItems = wishlistItems.filter(item => item.product?.isAvailable)
-    
+    const inStockItems = wishlistItems.filter(isInStock)
+
     if (inStockItems.length === 0) {
       error('لا توجد منتجات متوفرة')
       return
     }
 
-    try {
-      for (const item of inStockItems) {
+    // كل منتج على حدة: فشل منتج لا يوقف البقية، وذو الخيارات يُترك ليختار العميل مقاسه/لونه
+    // الزر معطّل أثناء العمل — ضغطه مرتين كان يضيف كل منتج مرتين
+    if (addingAll) return
+    setAddingAll(true)
+    let added = 0, needOptions = 0, failed = 0
+    for (const item of inStockItems) {
+      try {
+        if (await hasOptions(item.productId)) { needOptions++; continue }
         await addToCart(item.productId, 1)
+        added++
+      } catch {
+        failed++
       }
-      success(`تمت إضافة ${inStockItems.length} منتج للسلة`)
-    } catch (err) {
-      error('فشل إضافة بعض المنتجات')
     }
+    setAddingAll(false)
+    if (added > 0) success(`تمت إضافة ${added} منتج للسلة`)
+    if (needOptions > 0) error(`${needOptions} منتج يحتاج اختيار المقاس أو اللون — افتحه من القائمة وأضفه`)
+    if (failed > 0) error(`تعذّرت إضافة ${failed} منتج`)
   }
 
   // مشاركة المفضلة
+  // رابط /wishlist خاص بكل حساب (يفتح مفضلة من يفتحه)، فنشارك المنتجات نفسها بروابطها
   const handleShare = async () => {
-    const url = window.location.href
+    const lines = wishlistItems.slice(0, 20).map(item =>
+      `• ${item.product?.nameAr || item.product?.name || 'منتج'}: ${window.location.origin}/products/${item.productId}`)
+    const text = `مفضلتي في منصة واسط:\n${lines.join('\n')}`
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'قائمة المفضلة - منصة واسط',
-          url: url,
-        })
-      } catch (err) {
-        // المستخدم ألغى المشاركة
-      }
+      try { await navigator.share({ title: 'مفضلتي - منصة واسط', text }) } catch { /* ألغى المستخدم */ }
     } else {
-      navigator.clipboard.writeText(url)
-      success('تم نسخ الرابط')
+      try {
+        await navigator.clipboard.writeText(text)
+        success('تم نسخ قائمة المفضلة')
+      } catch {
+        error('تعذّر النسخ — المتصفح لا يسمح بالوصول للحافظة')
+      }
     }
   }
 
   const breadcrumbItems = [{ label: 'المفضلة' }]
 
   // حساب الإحصائيات
-  const inStockCount = wishlistItems.filter(item => item.product?.isAvailable).length
+  const inStockCount = wishlistItems.filter(isInStock).length
   const outOfStockCount = wishlistItems.length - inStockCount
   const totalPrice = wishlistItems.reduce((sum, item) => sum + (item.product?.price || 0), 0)
 
-  // ✅ Loading
-  if (isLoading) {
+  // التحميل الأول فقط — الحذف والإضافة يضبطان isLoading أيضاً، ولا نخفي القائمة أثناءهما
+  if (isLoading && wishlistItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Spinner size="lg" />
@@ -190,6 +212,15 @@ const WishlistPage = () => {
         <div className="container-main py-6">
           <Breadcrumb items={breadcrumbItems} className="mb-6" />
           <div className="bg-white rounded-xl border border-gray-200 p-8">
+            {/* فشل التحميل ليس "فارغة" — العميل قد يظن أن مفضلته ضاعت */}
+            {loadError ? (
+              <div className="text-center">
+                <p className="text-red-700 font-medium">تعذّر تحميل المفضلة</p>
+                <Button variant="outline" className="mt-4" onClick={() => fetchWishlist().catch(() => {})}>
+                  إعادة المحاولة
+                </Button>
+              </div>
+            ) : (
             <EmptyState
               type="wishlist"
               title="قائمة المفضلة فارغة"
@@ -200,6 +231,7 @@ const WishlistPage = () => {
                 </Button>
               }
             />
+            )}
           </div>
         </div>
       </div>
@@ -220,7 +252,7 @@ const WishlistPage = () => {
                 المفضلة
               </h1>
               <p className="text-sm text-gray-500 mt-1">
-                {wishlistItems.length} منتج • <span className="font-bold text-primary">{totalPrice.toLocaleString()} د.ع</span>
+                {wishlistItems.length} منتج • <span className="font-bold text-primary">{totalPrice.toLocaleString('en-US')} د.ع</span>
                 {outOfStockCount > 0 && <span className="text-red-500"> • {outOfStockCount} غير متوفر</span>}
               </p>
             </div>
@@ -236,8 +268,8 @@ const WishlistPage = () => {
             </div>
           </div>
           {inStockCount > 0 && (
-            <button onClick={handleAddAllToCart}
-              className="w-full lg:w-auto lg:px-8 h-11 mt-4 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2">
+            <button onClick={handleAddAllToCart} disabled={addingAll}
+              className="w-full lg:w-auto lg:px-8 h-11 mt-4 rounded-full bg-primary text-white font-bold flex items-center justify-center gap-2 disabled:opacity-60">
               <ShoppingCart size={18} />
               إضافة الكل للسلة ({inStockCount})
             </button>

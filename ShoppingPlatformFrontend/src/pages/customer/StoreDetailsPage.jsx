@@ -22,6 +22,7 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { StoreHoursList } from '../../components/vendor/StoreHoursEditor'
 import { isStoreClosed } from '../../components/common/StoreClosedBadge'
+import { variantsService } from '../../services/variantsService'
 
 const StoreDetailsPage = () => {
   const { id } = useParams()
@@ -68,15 +69,25 @@ const StoreDetailsPage = () => {
   const tab = searchParams.get('tab') === 'videos' && socialItems.length > 0 ? 'videos' : searchParams.get('tab') === 'about' ? 'about' : 'products'
   const setTab = (value) => setSearchParams(value === 'products' ? {} : { tab: value }, { replace: true })
 
-  const handleAddToCart = async ({ id: productId, quantity = 1 }) => {
+  const handleAddToCart = async ({ id: productId, quantity = 1, variantId = null }) => {
     if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
-    try { await addToCart(productId, quantity); success('تمت الإضافة للسلة') }
+    try {
+      // اختار الخيار من البطاقة → يُضاف مباشرة، وإلا فذو الخيارات يُفتح لاختيارها (نفس صفحة المنتجات)
+      if (!variantId) {
+        const variants = await variantsService.getVariants(productId).catch(() => [])
+        if (variantsService.hasVariants(variants)) { navigate(`/products/${productId}`); return }
+      }
+      await addToCart(productId, quantity, variantId)
+      success('تمت الإضافة للسلة')
+    }
     catch (err) { showError(err.message || 'فشل إضافة المنتج') }
   }
 
   const handleToggleWishlist = async (p) => {
     if (!isAuthenticated) { showError('يجب تسجيل الدخول أولاً'); navigate('/login'); return }
-    try { await toggleWishlist(typeof p === 'string' ? p : p.id); success('تمت الإضافة للمفضلة') }
+    const productId = typeof p === 'string' ? p : p.id
+    const wasWishlisted = isInWishlist(productId)
+    try { await toggleWishlist(productId); success(wasWishlisted ? 'تمت الإزالة من المفضلة' : 'تمت الإضافة للمفضلة') }
     catch { showError('فشلت العملية') }
   }
 
@@ -126,6 +137,7 @@ const StoreDetailsPage = () => {
     inStock: p.isAvailable && p.stockQuantity > 0,
     storeClosed: isStoreClosed(p) || store.isOpenNow === false,
     storeStatus: p.vendorOpenStatus || store.openStatus,
+    weightStepKg: p.weightStepKg,
     isWishlisted: isInWishlist(p.id),
   }))
 
@@ -191,12 +203,12 @@ const StoreDetailsPage = () => {
                 )}
                 {store.deliveryFee > 0 && (
                   <span className="flex items-center gap-1 text-sm text-gray-600">
-                    <DollarSign size={15} className="text-primary" />{store.deliveryFee.toLocaleString()} د.ع توصيل
+                    <DollarSign size={15} className="text-primary" />{store.deliveryFee.toLocaleString('en-US')} د.ع توصيل
                   </span>
                 )}
                 {store.minOrderAmount > 0 && (
                   <span className="flex items-center gap-1 text-sm text-gray-600">
-                    <Package size={15} className="text-primary" />حد أدنى {store.minOrderAmount.toLocaleString()} د.ع
+                    <Package size={15} className="text-primary" />حد أدنى {store.minOrderAmount.toLocaleString('en-US')} د.ع
                   </span>
                 )}
               </div>
@@ -304,13 +316,13 @@ const StoreDetailsPage = () => {
                     {store.deliveryFee > 0 && (
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <span className="text-primary">🚚</span>
-                        <div><p className="text-xs text-gray-400">رسوم التوصيل</p><p className="font-medium">{store.deliveryFee.toLocaleString()} د.ع</p></div>
+                        <div><p className="text-xs text-gray-400">رسوم التوصيل</p><p className="font-medium">{store.deliveryFee.toLocaleString('en-US')} د.ع</p></div>
                       </div>
                     )}
                     {store.minOrderAmount > 0 && (
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <Package size={16} className="text-primary" />
-                        <div><p className="text-xs text-gray-400">الحد الأدنى للطلب</p><p className="font-medium">{store.minOrderAmount.toLocaleString()} د.ع</p></div>
+                        <div><p className="text-xs text-gray-400">الحد الأدنى للطلب</p><p className="font-medium">{store.minOrderAmount.toLocaleString('en-US')} د.ع</p></div>
                       </div>
                     )}
                     {store.estimatedPrepTime > 0 && (
@@ -322,7 +334,7 @@ const StoreDetailsPage = () => {
                     {store.createdAt && (
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <span className="text-primary">📅</span>
-                        <div><p className="text-xs text-gray-400">انضم للمنصة</p><p className="font-medium">{new Date(store.createdAt).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long' })}</p></div>
+                        <div><p className="text-xs text-gray-400">انضم للمنصة</p><p className="font-medium">{new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long' })}</p></div>
                       </div>
                     )}
                   </div>

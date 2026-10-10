@@ -168,7 +168,7 @@ const AdminUsers = () => {
           </span>
         </td>
         <td className="px-4 py-4 text-gray-500 text-sm">
-          {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ar-IQ') : '—'}
+          {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}
         </td>
         <td className="px-4 py-4">
           <Dropdown
@@ -327,7 +327,7 @@ const AdminUsers = () => {
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">تاريخ الانضمام</p>
-                  <p className="font-medium text-sm">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('ar-IQ') : '—'}</p>
+                  <p className="font-medium text-sm">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">إجمالي الطلبات</p>
@@ -335,7 +335,7 @@ const AdminUsers = () => {
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">إجمالي الإنفاق</p>
-                  <p className="font-medium text-sm">{(selectedUser.totalSpent ?? 0).toLocaleString()} د.ع</p>
+                  <p className="font-medium text-sm">{(selectedUser.totalSpent ?? 0).toLocaleString('en-US')} د.ع</p>
                 </div>
               </div>
               <div className="flex gap-2 pt-2">

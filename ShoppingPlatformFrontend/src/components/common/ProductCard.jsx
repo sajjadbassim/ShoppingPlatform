@@ -68,11 +68,11 @@ const InlineVariantPicker = ({ productId, basePrice, onConfirm }) => {
         </div>
       ))}
       <div className="flex items-center justify-between pt-1">
-        <span className="text-sm font-bold text-primary">{finalPrice.toLocaleString()} د.ع</span>
+        <span className="text-sm font-bold text-primary">{finalPrice.toLocaleString('en-US')} د.ع</span>
         <button disabled={!isComplete || !selectedVariant}
           onClick={e => {
             e.preventDefault(); e.stopPropagation()
-            if (isComplete && selectedVariant) onConfirm()
+            if (isComplete && selectedVariant) onConfirm(selectedVariant)
           }}
           className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
             isComplete && selectedVariant
@@ -99,7 +99,8 @@ const ProductCard = ({
   className = '',
 }) => {
   const [quantity] = useState(1)
-  const [isWishlisted, setIsWishlisted] = useState(product?.isWishlisted || false)
+  // من المتجر (الأب) مباشرة: لا نلوّن القلب قبل نجاح العملية — الزائر يُنقل لتسجيل الدخول دون تغيير
+  const isWishlisted = !!product?.isWishlisted
   const [imageError, setImageError] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
@@ -153,7 +154,6 @@ const ProductCard = ({
 
   const handleToggleWishlist = useCallback((e) => {
     e.preventDefault(); e.stopPropagation()
-    setIsWishlisted(prev => !prev)
     onToggleWishlist?.(product)
   }, [product, onToggleWishlist])
 
@@ -167,13 +167,14 @@ const ProductCard = ({
       >
         <Store size={10} className="flex-shrink-0 text-gray-400" />
         {vendorId ? (
-          <Link
-            to={`/stores/${vendorId}`}
-            onClick={e => e.stopPropagation()}
-            className="truncate hover:text-primary transition-colors"
+          // زر لا رابط: البطاقة كلها رابط للمنتج، والرابط داخل رابط بنية HTML غير صالحة
+          <button
+            type="button"
+            onClick={e => { e.preventDefault(); e.stopPropagation(); navigate(`/stores/${vendorId}`) }}
+            className="truncate hover:text-primary transition-colors text-right"
           >
             {storeName}
-          </Link>
+          </button>
         ) : (
           <span className="truncate">{storeName}</span>
         )}
@@ -248,7 +249,7 @@ const ProductCard = ({
               <div className="flex flex-wrap items-baseline gap-x-2 mb-2 sm:mb-3">
                 <span className="text-sm sm:text-lg font-bold text-primary">{formatPrice(price, weightStepKg)}</span>
                 {hasDiscount && (
-                  <span className="text-[11px] sm:text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString()} د.ع</span>
+                  <span className="text-[11px] sm:text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString('en-US')} د.ع</span>
                 )}
               </div>
 
@@ -268,7 +269,7 @@ const ProductCard = ({
           <InlineVariantPicker
             productId={id}
             basePrice={price}
-            onConfirm={() => onAddToCart?.({ ...product, quantity: 1 })}
+            onConfirm={(selectedVariant) => onAddToCart?.({ ...product, quantity: 1, variantId: selectedVariant.id })}
           />
         )}
       </div>
@@ -351,7 +352,7 @@ const ProductCard = ({
             <div className="flex items-center gap-2">
               <span className="font-bold text-primary">{formatPrice(price, weightStepKg)}</span>
               {hasDiscount && (
-                <span className="text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString()} د.ع</span>
+                <span className="text-sm text-gray-400 line-through">{Math.round(pricePerKg(originalPrice, weightStepKg)).toLocaleString('en-US')} د.ع</span>
               )}
             </div>
             {inStock && (

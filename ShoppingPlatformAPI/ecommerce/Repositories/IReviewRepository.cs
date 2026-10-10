@@ -65,7 +65,7 @@ namespace ecommerce.Repositories
         // ===================================
         // Admin
         // ===================================
-        Task<(IEnumerable<Review> Reviews, int TotalCount)> GetReportedReviewsAsync(
+        Task<(List<ReportedReviewDto> Reviews, int TotalCount)> GetReportedReviewsAsync(
             int pageNumber = 1,
             int pageSize = 20);
         Task<bool> ApproveReviewAsync(Guid reviewId);

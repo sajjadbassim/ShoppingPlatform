@@ -77,17 +77,17 @@ const TransactionItem = ({ tx }) => {
             <p className="text-xs text-primary">طلب #{tx.orderNumber}</p>
           )}
           <p className="text-xs text-gray-400">
-            {new Date(tx.createdAt || tx.date).toLocaleDateString('ar-IQ')}
+            {new Date(tx.createdAt || tx.date).toLocaleDateString('ar-IQ-u-nu-latn')}
           </p>
           {tx.expiresAt && (
             <p className="text-xs text-orange-500">
-              تنتهي: {new Date(tx.expiresAt).toLocaleDateString('ar-IQ')}
+              تنتهي: {new Date(tx.expiresAt).toLocaleDateString('ar-IQ-u-nu-latn')}
             </p>
           )}
         </div>
       </div>
       <span className={`font-bold text-sm ${isEarn ? 'text-green-600' : 'text-red-500'}`}>
-        {isEarn ? '+' : '-'}{Math.abs(tx.points ?? 0).toLocaleString()} نقطة
+        {isEarn ? '+' : '-'}{Math.abs(tx.points ?? 0).toLocaleString('en-US')} نقطة
       </span>
     </div>
   )
@@ -101,7 +101,7 @@ const LoyaltyPage = () => {
   const { success, error: showError } = useToast()
   const [txPage, setTxPage] = useState(1)
 
-  const { data: account, isLoading: accountLoading, refetch } = useLoyaltyAccount()
+  const { data: account, isLoading: accountLoading, isError: accountError, refetch } = useLoyaltyAccount()
   const { data: txData, isLoading: txLoading } = useLoyaltyTransactions({
     PageNumber: txPage,
     PageSize: 10,
@@ -125,10 +125,25 @@ const LoyaltyPage = () => {
   const expiringPoints = account?.expiringPoints ?? 0
   const expiringDate   = account?.expiringDate   ?? null
 
-  // حساب نسبة التقدم نحو المستوى التالي
-  const progressPct = nextTier && pointsToNext > 0
-    ? Math.min(100, ((totalEarned % pointsToNext) / pointsToNext) * 100)
-    : 100
+  // نسبة التقدم من بداية المستوى الحالي إلى بداية التالي
+  // (nextTierPoints = المتبقي للمستوى التالي، لذا حدّه = المكتسب + المتبقي)
+  const { data: loyaltySettings } = useQuery({
+    queryKey: ['loyalty-settings'],
+    queryFn: async () => {
+      const r = await apiGet(API_ENDPOINTS.LOYALTY.SETTINGS)
+      return r.data.data || r.data
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+  const tierStart = {
+    silver: loyaltySettings?.silverThreshold,
+    gold:   loyaltySettings?.goldThreshold,
+  }[tier?.toLowerCase()] ?? 0
+  const nextThreshold = totalEarned + pointsToNext
+  const progressPct = !nextTier ? 100
+    : nextThreshold > tierStart
+      ? Math.min(100, Math.max(0, ((totalEarned - tierStart) / (nextThreshold - tierStart)) * 100))
+      : 0
 
   const breadcrumbItems = [
     { label: 'حسابي', path: '/profile' },
@@ -154,6 +169,14 @@ const LoyaltyPage = () => {
               {[1,2,3].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
             </div>
           </div>
+        ) : accountError ? (
+          // فشل التحميل لا يُعرض كرصيد صفر — العميل قد يظن أن نقاطه ضاعت
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center">
+            <p className="text-red-700 font-medium">تعذّر تحميل رصيد نقاطك</p>
+            <button onClick={() => refetch()} className="mt-3 px-5 py-2 rounded-xl bg-white border border-red-200 text-red-700 text-sm font-medium">
+              إعادة المحاولة
+            </button>
+          </div>
         ) : (
           <div className="space-y-6">
 
@@ -162,9 +185,9 @@ const LoyaltyPage = () => {
               <div className="flex items-start justify-between mb-6">
                 <div>
                   <p className="text-white/70 text-sm mb-1">رصيد النقاط</p>
-                  <p className="text-5xl font-bold">{points.toLocaleString()}</p>
+                  <p className="text-5xl font-bold">{points.toLocaleString('en-US')}</p>
                   <p className="text-white/70 text-sm mt-1">
-                    ≈ {(points * pointValue).toLocaleString()} د.ع
+                    ≈ {(points * pointValue).toLocaleString('en-US')} د.ع
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -181,7 +204,7 @@ const LoyaltyPage = () => {
                 <div>
                   <div className="flex justify-between text-xs text-white/70 mb-1">
                     <span>المستوى الحالي: {tier}</span>
-                    <span>التالي: {nextTier} ({pointsToNext.toLocaleString()} نقطة)</span>
+                    <span>التالي: {nextTier} ({pointsToNext.toLocaleString('en-US')} نقطة)</span>
                   </div>
                   <div className="bg-white/20 rounded-full h-2">
                     <div
@@ -197,17 +220,17 @@ const LoyaltyPage = () => {
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
                 <TrendingUp size={20} className="mx-auto text-green-500 mb-2" />
-                <p className="text-xl font-bold text-gray-900">{totalEarned.toLocaleString()}</p>
+                <p className="text-xl font-bold text-gray-900">{totalEarned.toLocaleString('en-US')}</p>
                 <p className="text-xs text-gray-500">إجمالي المكتسبة</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
                 <Gift size={20} className="mx-auto text-purple-500 mb-2" />
-                <p className="text-xl font-bold text-gray-900">{totalRedeemed.toLocaleString()}</p>
+                <p className="text-xl font-bold text-gray-900">{totalRedeemed.toLocaleString('en-US')}</p>
                 <p className="text-xs text-gray-500">إجمالي المستخدمة</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-center">
                 <Star size={20} className="mx-auto text-primary mb-2" />
-                <p className="text-xl font-bold text-gray-900">{points.toLocaleString()}</p>
+                <p className="text-xl font-bold text-gray-900">{points.toLocaleString('en-US')}</p>
                 <p className="text-xs text-gray-500">الرصيد الحالي</p>
               </div>
             </div>
@@ -218,10 +241,10 @@ const LoyaltyPage = () => {
                 <Clock size={18} className="text-orange-500 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-medium text-orange-700">
-                    {expiringPoints.toLocaleString()} نقطة ستنتهي قريباً
+                    {expiringPoints.toLocaleString('en-US')} نقطة ستنتهي قريباً
                   </p>
                   <p className="text-xs text-orange-600">
-                    تاريخ الانتهاء: {new Date(expiringDate).toLocaleDateString('ar-IQ')}
+                    تاريخ الانتهاء: {new Date(expiringDate).toLocaleDateString('ar-IQ-u-nu-latn')}
                   </p>
                 </div>
               </div>
@@ -237,11 +260,12 @@ const LoyaltyPage = () => {
                 كيف تكسب نقاط؟
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* طرق الكسب الحقيقية فقط — تظهر حسب إعدادات النظام */}
                 {[
-                  { icon: '🛍️', title: 'كل طلب', desc: 'اكسب نقاط على كل عملية شراء' },
-                  { icon: '⭐', title: 'كتابة تقييم', desc: 'قيّم منتجاتك واكسب نقاط إضافية' },
-                  { icon: '🎂', title: 'عيد ميلادك', desc: 'احصل على نقاط مضاعفة في عيد ميلادك' },
-                ].map((item, i) => (
+                  { icon: '🛍️', title: 'كل طلب', desc: 'اكسب نقاط على كل عملية شراء', show: true },
+                  { icon: '⭐', title: 'كتابة تقييم', desc: 'قيّم منتجاتك واكسب نقاط إضافية', show: loyaltySettings?.reviewPoints > 0 },
+                  { icon: '🎁', title: 'ادعُ صديقاً', desc: 'تكسب أنت وصديقك نقاطاً عند توصيل أول طلب له', show: loyaltySettings?.referralPoints > 0 },
+                ].filter(item => item.show).map((item, i) => (
                   <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                     <p className="text-2xl mb-1">{item.icon}</p>
                     <p className="font-medium text-gray-800 text-sm">{item.title}</p>

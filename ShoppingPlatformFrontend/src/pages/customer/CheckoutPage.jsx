@@ -24,7 +24,7 @@ import { apiPost, apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { getImageUrl } from '../../utils/imageHelper'
-import { formatQuantity } from '../../utils/weight'
+import { formatQuantity, countPieces } from '../../utils/weight'
 
 // تفضيل الاستبدال عند نفاد منتج سوبرماركت
 const SUBSTITUTION_OPTIONS = [
@@ -51,7 +51,7 @@ const ZoneSelect = ({ zones = [], value, onChange, disabled }) => (
   <select value={value || ''} disabled={disabled} onChange={e => onChange(e.target.value)}
     className="w-full h-11 px-3 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary focus:border-primary">
     <option value="">— اختر المنطقة —</option>
-    {zones.map(z => <option key={z.id} value={z.id}>{z.name} — {Number(z.fee).toLocaleString()} د.ع</option>)}
+    {zones.map(z => <option key={z.id} value={z.id}>{z.name} — {Number(z.fee).toLocaleString('en-US')} د.ع</option>)}
   </select>
 )
 
@@ -229,6 +229,12 @@ const CheckoutPage = () => {
   const minRedemption   = loyaltySettings?.minRedemptionPoints ?? 100
   const maxPoints       = pointsEstimate?.maxRedeemablePoints ?? 0   // الباك يعيد 0 إن كان الرصيد أقل من الحد الأدنى
   const pointsToEarn    = pointsEstimate?.pointsToEarn ?? 0
+  // الحد الأقصى يتغير مع المجموع — لا نبقي اختياراً أكبر منه (ونلغي الاستخدام إن صار دون الحد الأدنى)
+  useEffect(() => {
+    if (!usePoints || !pointsEstimate) return   // أثناء جلب التقدير الجديد لا نحكم على 0 مؤقت
+    if (maxPoints < minRedemption) { setUsePoints(false); setPointsToRedeem(0) }
+    else if (pointsToRedeem > maxPoints) setPointsToRedeem(maxPoints)
+  }, [usePoints, pointsEstimate, maxPoints, minRedemption, pointsToRedeem])
   const pointsDiscount  = usePoints ? Math.round(pointsToRedeem * pointValue) : 0
   const discountAmount  = appliedCoupon?.discountAmount ?? 0
   const totalAmount     = Math.max(0, subtotal + totalDeliveryFees - discountAmount - pointsDiscount)
@@ -327,6 +333,9 @@ const CheckoutPage = () => {
         }
         const savedAddr = await createAddressMutation.mutateAsync(newAddress)
         addressId = savedAddr.id
+        // العنوان حُفظ — إن فشل الطلب بعده فإعادة المحاولة تستخدمه بدل حفظه مرة ثانية
+        setSelectedAddressId(savedAddr.id)
+        setUseNewAddress(false)
       }
 
       const orderData = {
@@ -339,13 +348,18 @@ const CheckoutPage = () => {
 
       const response = await orderService.create(orderData)
       // ✅ استرداد النقاط إذا تم اختيارها
+      let pointsFailed = false
       if (usePoints && pointsToRedeem > 0 && response.id) {
         try {
           await redeemPoints({ orderId: response.id, points: pointsToRedeem })
-        } catch {}
+        } catch {
+          pointsFailed = true
+        }
       }
 
       success('تم إنشاء الطلب بنجاح!')
+      // الطلب أُنشئ لكن خصم النقاط لم يُطبَّق — المبلغ المطلوب هو الإجمالي بدونه، والعميل يجب أن يعرف
+      if (pointsFailed) error('تعذّر استخدام نقاطك على هذا الطلب — المبلغ المطلوب لا يشمل خصم النقاط، ورصيدك لم يُخصم')
       navigate(`/orders/${response.orderNumber || response.id}?success=true`)
       // ✅ الباك اند يُفرغ السلة فعلياً عند إنشاء الطلب — هنا فقط نُزامن الحالة المحلية
       clearLocalCart()
@@ -372,11 +386,6 @@ const CheckoutPage = () => {
   ]
 
   const breadcrumbItems = [{ label: 'السلة', path: '/cart' }, { label: 'إتمام الطلب' }]
-
-  if (!isAuthenticated) {
-    navigate('/login', { state: { from: '/checkout' } })
-    return null
-  }
 
   if (!cartLoading && (!cartItems || cartItems.length === 0)) {
     return (
@@ -420,7 +429,7 @@ const CheckoutPage = () => {
       ? { label: 'التالي: مراجعة الطلب', onClick: handleNextStep, type: 'button' }
       : { label: 'تأكيد الطلب', onClick: placeOrder, type: 'button' }
 
-  const itemsCount = displayItems.reduce((sum, i) => sum + (i.quantity || 0), 0)
+  const itemsCount = countPieces(displayItems)
 
   const OptionCard = ({ selected, disabled, onClick, children }) => (
     <button type="button" onClick={onClick} disabled={disabled}
@@ -729,7 +738,7 @@ const CheckoutPage = () => {
                       <VariantBadges variantAttributes={item.variantAttributes} />
                       <p className="flex justify-between text-xs text-gray-500 mt-0.5">
                         <span>الكمية: {formatQuantity(item.quantity, item.weightStepKg)}</span>
-                        <span className="font-bold text-gray-900">{(item.subtotal || (item.price * item.quantity)).toLocaleString()} د.ع</span>
+                        <span className="font-bold text-gray-900">{(item.subtotal || (item.price * item.quantity)).toLocaleString('en-US')} د.ع</span>
                       </p>
                     </div>
                   </div>
@@ -744,7 +753,7 @@ const CheckoutPage = () => {
                       <Tag size={14} className="text-green-600" />
                       <div>
                         <p className="text-sm font-medium text-green-700">{appliedCoupon.code}</p>
-                        <p className="text-xs text-green-600">خصم {discountAmount.toLocaleString()} د.ع</p>
+                        <p className="text-xs text-green-600">خصم {discountAmount.toLocaleString('en-US')} د.ع</p>
                       </div>
                     </div>
                     <button type="button" onClick={handleRemoveCoupon} className="text-gray-400 hover:text-red-500" aria-label="إزالة الكوبون">
@@ -788,7 +797,7 @@ const CheckoutPage = () => {
                       </span>
                       <span>
                         <span className="block text-sm font-medium text-gray-800">استخدم نقاطك التشجيعية</span>
-                        <span className="block text-xs text-gray-500">لديك {availablePoints.toLocaleString()} نقطة</span>
+                        <span className="block text-xs text-gray-500">لديك {availablePoints.toLocaleString('en-US')} نقطة</span>
                       </span>
                     </span>
                     <input type="checkbox" checked={usePoints}
@@ -797,12 +806,13 @@ const CheckoutPage = () => {
                   </label>
                   {usePoints && (
                     <div className="mt-2 space-y-1">
-                      <input type="range" min={minRedemption} max={maxPoints} step={Math.max(1, Math.min(minRedemption, maxPoints))}
+                      {/* خطوة نقطة واحدة: كان الشريط يقفز بمقدار الحد الأدنى (100) فلا يصل لرصيد مثل 350 */}
+                      <input type="range" min={minRedemption} max={maxPoints} step={1}
                         value={pointsToRedeem} onChange={e => setPointsToRedeem(Number(e.target.value))}
                         className="w-full accent-primary" />
                       <div className="flex justify-between text-xs text-gray-500">
-                        <span>{pointsToRedeem.toLocaleString()} نقطة</span>
-                        <span className="text-green-600 font-medium">خصم {pointsDiscount.toLocaleString()} د.ع</span>
+                        <span>{pointsToRedeem.toLocaleString('en-US')} نقطة</span>
+                        <span className="text-green-600 font-medium">خصم {pointsDiscount.toLocaleString('en-US')} د.ع</span>
                       </div>
                     </div>
                   )}
@@ -812,36 +822,36 @@ const CheckoutPage = () => {
               {/* الإجماليات */}
               <div className="space-y-2 py-3 mt-3 border-t border-gray-100 text-sm">
                 <div className="flex justify-between text-gray-600">
-                  <span>المجموع الفرعي</span><span>{subtotal.toLocaleString()} د.ع</span>
+                  <span>المجموع الفرعي</span><span>{subtotal.toLocaleString('en-US')} د.ع</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1"><Truck size={14} />رسوم التوصيل
                     {quote?.zoneName && <span className="text-xs text-gray-400">({quote.zoneName})</span>}</span>
-                  <span className={quoting ? 'opacity-50' : ''}>{totalDeliveryFees.toLocaleString()} د.ع</span>
+                  <span className={quoting ? 'opacity-50' : ''}>{totalDeliveryFees.toLocaleString('en-US')} د.ع</span>
                 </div>
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span className="flex items-center gap-1"><Tag size={14} />خصم الكوبون</span>
-                    <span>-{discountAmount.toLocaleString()} د.ع</span>
+                    <span>-{discountAmount.toLocaleString('en-US')} د.ع</span>
                   </div>
                 )}
                 {pointsDiscount > 0 && (
                   <div className="flex justify-between text-amber-600">
                     <span className="flex items-center gap-1"><Star size={14} className="fill-amber-400" />خصم النقاط</span>
-                    <span>-{pointsDiscount.toLocaleString()} د.ع</span>
+                    <span>-{pointsDiscount.toLocaleString('en-US')} د.ع</span>
                   </div>
                 )}
               </div>
 
               <div className="flex justify-between items-baseline py-3 border-t border-gray-100">
                 <span className="text-base lg:text-lg font-bold">الإجمالي</span>
-                <span className="text-lg font-bold text-primary">{totalAmount.toLocaleString()} د.ع</span>
+                <span className="text-lg font-bold text-primary">{totalAmount.toLocaleString('en-US')} د.ع</span>
               </div>
 
               {pointsToEarn > 0 && (
                 <p className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 rounded-xl px-3 py-2">
                   <Star size={15} className="flex-shrink-0 fill-amber-400 text-amber-400" />
-                  ستكسب <span className="font-bold">{pointsToEarn.toLocaleString()} نقطة</span> بعد توصيل الطلب
+                  ستكسب <span className="font-bold">{pointsToEarn.toLocaleString('en-US')} نقطة</span> بعد توصيل الطلب
                 </p>
               )}
 
@@ -864,7 +874,7 @@ const CheckoutPage = () => {
             ) : (
               <div className="flex-shrink-0">
                 <p className="text-[11px] text-gray-500 leading-none">الإجمالي</p>
-                <p className="text-base font-bold text-gray-900 mt-1 whitespace-nowrap">{totalAmount.toLocaleString()} د.ع</p>
+                <p className="text-base font-bold text-gray-900 mt-1 whitespace-nowrap">{totalAmount.toLocaleString('en-US')} د.ع</p>
               </div>
             )}
             <button type={primaryAction.type} onClick={primaryAction.onClick} disabled={loading}
@@ -872,7 +882,7 @@ const CheckoutPage = () => {
               {step === 3 && loading ? <Spinner size="sm" /> : (
                 <>
                   {primaryAction.label}
-                  {step === 3 && <span className="font-normal opacity-90">• {totalAmount.toLocaleString()} د.ع</span>}
+                  {step === 3 && <span className="font-normal opacity-90">• {totalAmount.toLocaleString('en-US')} د.ع</span>}
                   {step < 3 && <ChevronLeft size={18} />}
                 </>
               )}

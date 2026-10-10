@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
+import { countPieces } from '../../utils/weight'
 
 const PAGE_SIZE = 10
 
@@ -51,9 +52,9 @@ const GROUPS = [
 const formatDate = (date) => {
   const d = new Date(date)
   const days = Math.floor((Date.now() - d) / 86400000)
-  if (days < 1) return `اليوم، ${d.toLocaleTimeString('ar-IQ', { hour: 'numeric', minute: '2-digit' })}`
+  if (days < 1) return `اليوم، ${d.toLocaleTimeString('ar-IQ-u-nu-latn', { hour: 'numeric', minute: '2-digit' })}`
   if (days < 2) return 'أمس'
-  return d.toLocaleDateString('ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 // جلب كل طلبات العميل (القائمة صغيرة) — الفلترة والتقسيم لصفحات تتم في الواجهة
@@ -98,7 +99,7 @@ const OrderCard = ({ order, onReorder, reordering }) => {
   const info = STATUS_INFO[status] || STATUS_INFO.PENDING_CONFIRMATION
   const StatusIcon = info.icon
   const items = (order.subOrders || []).flatMap(s => s.items || [])
-  const itemsCount = items.reduce((sum, i) => sum + (i.quantity || 0), 0)
+  const itemsCount = countPieces(items)
   const vendorNames = [...new Set((order.subOrders || []).map(s => s.vendorNameAr || s.vendorName).filter(Boolean))]
   const isActive = ACTIVE_STATUSES.includes(status)
   const firstName = items[0]?.productNameAr || items[0]?.productName
@@ -159,7 +160,7 @@ const OrderCard = ({ order, onReorder, reordering }) => {
       <div className="flex items-center justify-between gap-2 px-4 py-3 bg-gray-50 border-t border-gray-100">
         <div>
           <p className="text-[11px] text-gray-500">{itemsCount} قطعة</p>
-          <p className="font-bold text-gray-900">{(order.totalAmount || 0).toLocaleString()} د.ع</p>
+          <p className="font-bold text-gray-900">{(order.totalAmount || 0).toLocaleString('en-US')} د.ع</p>
         </div>
         <div className="flex items-center gap-2">
           {isActive ? (
@@ -232,6 +233,8 @@ const OrdersPage = () => {
     setReorderingId(order.id)
     try {
       const items = (order.subOrders || []).flatMap(s => s.items || [])
+      // لا "تمت الإضافة" ثم سلة فارغة إن لم تصل منتجات الطلب
+      if (items.length === 0) { showError('تعذّر قراءة منتجات هذا الطلب — افتح الطلب وأعد المحاولة'); return }
       for (const item of items) {
         await addToCart(item.productId, item.quantity, item.variantId || null)
       }
@@ -242,11 +245,6 @@ const OrdersPage = () => {
     } finally {
       setReorderingId(null)
     }
-  }
-
-  if (!isAuthenticated) {
-    navigate('/login', { state: { from: '/orders' } })
-    return null
   }
 
   const emptyText = {

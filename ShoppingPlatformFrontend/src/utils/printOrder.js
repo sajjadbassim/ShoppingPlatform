@@ -45,7 +45,7 @@ export const buildPackingSlipHtml = (order, storeName = '') => {
   <div class="head">
     <div><h1>${escapeHtml(storeName || 'إيصال تجهيز')}</h1><div class="muted">إيصال تجهيز طلب</div></div>
     <div style="text-align:left"><div class="num-big">#${escapeHtml(order.subOrderNumber)}</div>
-      <div class="muted">${escapeHtml(new Date(order.createdAt).toLocaleString('ar-IQ', { dateStyle: 'medium', timeStyle: 'short' }))}</div></div>
+      <div class="muted">${escapeHtml(new Date(order.createdAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' }))}</div></div>
   </div>
   <div class="block">
     <div><b>${escapeHtml(order.customerName)}</b> ${order.customerPhone ? `<span dir="ltr">${escapeHtml(order.customerPhone)}</span>` : ''}</div>

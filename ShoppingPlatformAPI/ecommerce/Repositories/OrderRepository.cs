@@ -54,12 +54,18 @@ namespace ecommerce.Repositories
 
         public async Task<IEnumerable<Order>> GetByCustomerAsync(Guid customerId)
         {
+            // المنتجات ضرورية لقائمة "طلباتي": الصور والأسماء وعدد القطع وزر "إعادة الطلب"
+            // وتقييم المنتج (اختيار الطلب الذي يحتويه) — كانت تصل null فتظهر "0 قطعة"
             return await _context.Orders
+                .AsNoTracking()
                 .Include(o => o.Address)
                 .Include(o => o.SubOrders)
                     .ThenInclude(so => so.Vendor)
+                .Include(o => o.SubOrders)
+                    .ThenInclude(so => so.Items)
                 .Where(o => o.CustomerId == customerId)
                 .OrderByDescending(o => o.CreatedAt)
+                .AsSplitQuery()
                 .ToListAsync();
         }
 

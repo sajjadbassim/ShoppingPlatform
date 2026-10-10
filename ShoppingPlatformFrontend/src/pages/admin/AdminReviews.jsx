@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
-import { getVendorLogo } from '../../utils/imageHelper'
+import { getVendorLogo, getImageUrl } from '../../utils/imageHelper'
 
 // ===========================
 // Helpers
@@ -50,14 +50,17 @@ const useAdminRatings = (params = {}) => useQuery({
   staleTime: 2 * 60 * 1000,
 })
 
+// يرجع { data: [...], pagination: { total, totalPages } } — نحتفظ بالرد كاملاً لأجل الترقيم
 const useReportedReviews = (params = {}) => useQuery({
   queryKey: ['reported-reviews', params],
-  queryFn: async () => {
-    const r = await apiGet(API_ENDPOINTS.REVIEWS.REPORTED, params)
-    return r.data.data || r.data
-  },
+  queryFn: async () => (await apiGet(API_ENDPOINTS.REVIEWS.REPORTED, params)).data,
   staleTime: 2 * 60 * 1000,
 })
+
+// ملخص الأسباب: "تقييم مزيف ×2 • محتوى مسيء"
+const summarizeReasons = (reports = []) => Object.entries(
+  reports.reduce((acc, r) => ({ ...acc, [r.reasonAr]: (acc[r.reasonAr] || 0) + 1 }), {})
+).map(([reason, n]) => (n > 1 ? `${reason} ×${n}` : reason)).join(' • ')
 
 const useApproveReview = () => {
   const queryClient = useQueryClient()
@@ -224,7 +227,7 @@ const OrderRatingsTab = () => {
                   }
                 </td>
                 <td className="px-4 py-3 text-gray-400 text-xs">
-                  {new Date(r.createdAt).toLocaleDateString('ar-IQ')}
+                  {new Date(r.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
                 </td>
               </tr>
             ))}
@@ -250,32 +253,37 @@ const ReportedReviewsTab = () => {
   const [page, setPage] = useState(1)
   const [selectedReview, setSelectedReview] = useState(null)
 
-  const { data, isLoading, refetch } = useReportedReviews({ pageNumber: page, pageSize: 10 })
-  const { mutateAsync: approveReview, isPending: approving } = useApproveReview()
-  const { mutateAsync: rejectReview, isPending: rejecting } = useRejectReview()
+  const { data, isLoading } = useReportedReviews({ pageNumber: page, pageSize: 10 })
+  const { mutateAsync: approveReview } = useApproveReview()
+  const { mutateAsync: rejectReview } = useRejectReview()
+  const [pending, setPending] = useState(null) // { id, action } — التحميل على زر التقييم المعني فقط
 
-  const reviews = data?.items ?? (Array.isArray(data) ? data : [])
-  const totalPages = data?.totalPages ?? 1
+  const reviews = data?.data ?? []
+  const totalPages = data?.pagination?.totalPages ?? 1
 
   const handleApprove = async (id) => {
+    setPending({ id, action: 'approve' })
     try {
       await approveReview(id)
-      success('تم قبول التقييم')
+      success('تم إبقاء التقييم ومسح بلاغاته')
       setSelectedReview(null)
     } catch (err) {
       toastError(err.message || 'فشل قبول التقييم')
-    }
+    } finally { setPending(null) }
   }
 
   const handleReject = async (id) => {
+    if (!confirm('حذف هذا التقييم نهائياً؟')) return
+    setPending({ id, action: 'reject' })
     try {
       await rejectReview(id)
       success('تم حذف التقييم')
       setSelectedReview(null)
     } catch (err) {
       toastError(err.message || 'فشل حذف التقييم')
-    }
+    } finally { setPending(null) }
   }
+  const isPending = (id, action) => pending?.id === id && pending?.action === action
 
   if (isLoading) return (
     <div className="space-y-3">
@@ -302,28 +310,30 @@ const ReportedReviewsTab = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{review.userName || 'مستخدم'}</p>
-                  <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ')}</p>
+                  <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
                 </div>
                 <StarDisplay value={review.rating} />
                 <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Flag size={10} />
-                  {review.reportCount ?? 1} بلاغ
+                  {review.reportCount} {review.reportCount === 1 ? 'بلاغ' : 'بلاغات'}
                 </span>
+                {review.isHidden && (
+                  <span className="text-xs bg-gray-800 text-white px-2 py-0.5 rounded-full">مخفي عن العملاء</span>
+                )}
               </div>
-              {(review.productNameAr || review.productName) && (
-                <p className="text-xs bg-primary/5 text-primary px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-2">
+              {review.productName && (
+                <Link to={`/products/${review.productId}`} target="_blank"
+                  className="text-xs bg-primary/5 text-primary px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-2 hover:underline">
                   <Package size={11} />
-                  {review.productNameAr || review.productName}
-                </p>
+                  {review.productName}
+                </Link>
               )}
               {review.title && <p className="font-semibold text-gray-800 text-sm mb-1">{review.title}</p>}
               {review.body && <p className="text-gray-600 text-sm line-clamp-2">{review.body}</p>}
 
-              {review.reportReason && (
-                <p className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded mt-2">
-                  سبب البلاغ: {review.reportReason}
-                </p>
-              )}
+              <p className="text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded mt-2">
+                سبب البلاغ: {summarizeReasons(review.reports)}
+              </p>
             </div>
 
             <div className="flex flex-col gap-2 flex-shrink-0">
@@ -337,15 +347,17 @@ const ReportedReviewsTab = () => {
               <Button
                 variant="primary"
                 size="sm"
-                loading={approving}
+                loading={isPending(review.id, 'approve')}
+                disabled={!!pending}
                 onClick={() => handleApprove(review.id)}
               >
-                <Check size={14} className="ml-1" />قبول
+                <Check size={14} className="ml-1" />إبقاء
               </Button>
               <Button
                 variant="danger"
                 size="sm"
-                loading={rejecting}
+                loading={isPending(review.id, 'reject')}
+                disabled={!!pending}
                 onClick={() => handleReject(review.id)}
               >
                 <Trash2 size={14} className="ml-1" />حذف
@@ -390,24 +402,36 @@ const ReportedReviewsTab = () => {
             {selectedReview.images?.length > 0 && (
               <div className="flex gap-2 flex-wrap">
                 {selectedReview.images.map((img, i) => (
-                  <img key={i} src={img.url || img} alt="" className="w-20 h-20 object-cover rounded-lg border" />
+                  <img key={i} src={getImageUrl(img)} alt="" className="w-20 h-20 object-cover rounded-lg border" />
                 ))}
               </div>
             )}
 
-            {selectedReview.reportReason && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-red-700">سبب البلاغ:</p>
-                <p className="text-sm text-red-600">{selectedReview.reportReason}</p>
-              </div>
-            )}
+            {/* كل البلاغات: السبب والمُبلِّغ والتفاصيل */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-medium text-red-700">البلاغات ({selectedReview.reportCount})</p>
+              {selectedReview.reports?.map((rep, i) => (
+                <div key={i} className="text-sm border-t border-red-100 pt-2 first:border-0 first:pt-0">
+                  <p className="text-red-700 font-medium">{rep.reasonAr}</p>
+                  {rep.details && <p className="text-gray-700 mt-0.5">{rep.details}</p>}
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {rep.reporterName || 'مستخدم'} • {new Date(rep.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              «إبقاء» يمسح البلاغات ويُظهر التقييم للعملاء. «حذف» يزيله نهائياً.
+            </p>
 
             <div className="flex gap-2 pt-2">
               <Button variant="ghost" fullWidth onClick={() => setSelectedReview(null)}>إغلاق</Button>
-              <Button variant="primary" fullWidth loading={approving} onClick={() => handleApprove(selectedReview.id)}>
-                <Check size={14} className="ml-1" />قبول التقييم
+              <Button variant="primary" fullWidth loading={isPending(selectedReview.id, 'approve')} disabled={!!pending}
+                onClick={() => handleApprove(selectedReview.id)}>
+                <Check size={14} className="ml-1" />إبقاء التقييم
               </Button>
-              <Button variant="danger" fullWidth loading={rejecting} onClick={() => handleReject(selectedReview.id)}>
+              <Button variant="danger" fullWidth loading={isPending(selectedReview.id, 'reject')} disabled={!!pending}
+                onClick={() => handleReject(selectedReview.id)}>
                 <Trash2 size={14} className="ml-1" />حذف التقييم
               </Button>
             </div>
@@ -487,7 +511,7 @@ const ProductReviewsTab = () => {
                       <p className="font-medium text-gray-900 text-sm truncate">{review.userFullName || 'مستخدم'}</p>
                       <div className="flex items-center gap-2">
                         <StarDisplay value={review.rating} size={12} />
-                        <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ')}</span>
+                        <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
                         {review.isVerifiedPurchase && (
                           <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">شراء موثق</span>
                         )}
@@ -752,6 +776,9 @@ const DriverRatingsTab = () => {
 const AdminReviews = () => {
   const [activeTab, setActiveTab] = useState('ratings')
   const { data: stats, isLoading: statsLoading, refetch } = useAdminRatingStats()
+  // نفس استعلام الصفحة الأولى في التبويب (مخزّن مشترك) — عدد البلاغات المعلّقة على التبويب
+  const { data: reportedData } = useReportedReviews({ pageNumber: 1, pageSize: 10 })
+  const reportedCount = reportedData?.pagination?.total ?? 0
 
   const tabs = [
     { key: 'ratings',  label: 'تقييمات الطلبات',     icon: Star },
@@ -792,6 +819,11 @@ const AdminReviews = () => {
             >
               <tab.icon size={16} />
               {tab.label}
+              {tab.key === 'reported' && reportedCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  {reportedCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
