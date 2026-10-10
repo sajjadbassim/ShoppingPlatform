@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { createBrowserRouter, createRoutesFromElements, RouterProvider, Route, Outlet } from 'react-router-dom'
 import { ToastProvider } from './components/common/Toast'
 import ErrorBoundary from './components/common/ErrorBoundary'
+import RouteError from './components/common/RouteError'
 import PWAPrompt from './components/common/PWAPrompt'
 import ScrollToTop from './components/common/ScrollToTop'
 import TopLoadingBar from './components/common/TopLoadingBar'
@@ -95,7 +96,8 @@ const RootLayout = () => (
 
 // موجّه بيانات (data router) بنفس المسارات: يتيح useBlocker لتنبيه «تغييرات غير محفوظة» عند مغادرة الصفحة
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route element={<RootLayout />}>
+  // errorElement: شاشة خطأ عربية لكل الصفحات (بدل شاشة React Router الإنجليزية للمطوّرين)
+  <Route element={<RootLayout />} errorElement={<RouteError />}>
     <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
     <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
     <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
