@@ -197,7 +197,7 @@ const Header = () => {
         {/* Actions */}
         <div className="flex items-center gap-2">
           {/* Mobile Search Toggle */}
-          <button 
+          <button aria-label="البحث"
             className="md:hidden p-2 [@media(hover:hover)]:hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors"
             onClick={() => setGlobalSearchOpen(true)}
           >
@@ -209,7 +209,7 @@ const Header = () => {
 
           {/* Wishlist */}
           <Link 
-            to="/wishlist" 
+            to="/wishlist" aria-label="المفضلة"
             className="hidden lg:flex p-2 hover:bg-gray-100 rounded-full transition-colors relative"
           >
             <Heart size={22} className="text-gray-600" />
@@ -222,7 +222,7 @@ const Header = () => {
 
           {/* Cart */}
           <Link 
-            to="/cart" 
+            to="/cart" aria-label="السلة"
             className="hidden lg:flex p-2 hover:bg-gray-100 rounded-full transition-colors relative"
           >
             <ShoppingCart size={22} className="text-gray-600" />

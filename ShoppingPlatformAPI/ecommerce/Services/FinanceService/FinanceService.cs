@@ -201,12 +201,14 @@ namespace ecommerce.Services.FinanceService
                 Add(LedgerType.Commission, -CommissionOn(commission, sale), $"{label} — عمولة {CommissionLabel(commission)}");
 
                 // كوبون خاص بهذا المتجر = خصم على المتجر (الكوبون العام والنقاط على المنصة)
-                if (!string.IsNullOrEmpty(order.CouponCode) && order.DiscountAmount > 0)
+                // جزء النقاط من الخصم (PointsDiscountAmount) لا يُحسب على المتجر
+                var couponDiscount = OrderTotals.CouponDiscount(order);
+                if (!string.IsNullOrEmpty(order.CouponCode) && couponDiscount > 0)
                 {
-                    var couponVendor = await _context.Coupons.AsNoTracking()
+                    var couponVendor = order.CouponVendorId ?? await _context.Coupons.AsNoTracking()
                         .Where(c => c.Code == order.CouponCode).Select(c => c.VendorId).FirstOrDefaultAsync(ct);
                     if (couponVendor == sub.VendorId)
-                        Add(LedgerType.VendorCoupon, -Math.Min(order.DiscountAmount, sale), $"{label} — كوبون {order.CouponCode}");
+                        Add(LedgerType.VendorCoupon, -Math.Min(couponDiscount, sale), $"{label} — كوبون {order.CouponCode}");
                 }
 
                 // رفض جزئي والأجرة على المتجر

@@ -35,6 +35,8 @@ namespace ecommerce.Repositories
                     .ThenInclude(so => so.ConfirmedByUser)
                 .Include(o => o.SubOrders)
                     .ThenInclude(so => so.CancelledByUser)
+                .Include(o => o.SubOrders)
+                    .ThenInclude(so => so.Driver)   // اسم السائق في صفحة الطلب
                 .FirstOrDefaultAsync(o => o.Id == id);
         }
 

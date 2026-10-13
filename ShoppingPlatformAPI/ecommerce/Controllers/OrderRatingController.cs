@@ -37,7 +37,7 @@ namespace ecommerce.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                return Forbid(ex.Message);
+                return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = ex.Message });
             }
             catch (AppException ex)
             {

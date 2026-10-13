@@ -7,6 +7,9 @@ import { wishlistService } from '../services';
  * ✅ إصلاح: wishlistService الآن يرجع البيانات مباشرة (بعد توحيد الـ return)
  *    لذا نقرأ data مباشرة بدون .data إضافية
  */
+// طلب جلب المفضلة الجاري: طلب ثانٍ قبل انتهائه (App + الملف الشخصي عند التحميل) ينتظر نفسه
+let pendingFetch = null;
+
 export const useWishlistStore = create(
   persist(
     (set, get) => ({
@@ -16,17 +19,24 @@ export const useWishlistStore = create(
       error: null,
 
       // جلب المفضلات من الـ API
-      fetchWishlist: async () => {
+      // force: بعد إضافة/حذف — طلب جديد دائماً (لا ننتظر جلباً بدأ قبل التغيير)
+      fetchWishlist: (force = false) => {
+        if (pendingFetch && !force) return pendingFetch;
         set({ isLoading: true, error: null });
-        try {
-          // ✅ إصلاح: wishlistService.getAll() يرجع البيانات مباشرة
-          const data = await wishlistService.getAll();
-          set({ items: data || [], isLoading: false });
-          return data;
-        } catch (error) {
-          set({ isLoading: false, error: error.message });
-          throw error;
-        }
+        pendingFetch = (async () => {
+          try {
+            // ✅ إصلاح: wishlistService.getAll() يرجع البيانات مباشرة
+            const data = await wishlistService.getAll();
+            set({ items: data || [], isLoading: false });
+            return data;
+          } catch (error) {
+            set({ isLoading: false, error: error.message });
+            throw error;
+          } finally {
+            pendingFetch = null;
+          }
+        })();
+        return pendingFetch;
       },
 
       // إضافة منتج للمفضلة
@@ -34,7 +44,7 @@ export const useWishlistStore = create(
         set({ isLoading: true, error: null });
         try {
           await wishlistService.addItem(productId);
-          await get().fetchWishlist();
+          await get().fetchWishlist(true);
         } catch (error) {
           set({ isLoading: false, error: error.message });
           throw error;
@@ -46,7 +56,7 @@ export const useWishlistStore = create(
         set({ isLoading: true, error: null });
         try {
           await wishlistService.removeItem(productId);
-          await get().fetchWishlist();
+          await get().fetchWishlist(true);
         } catch (error) {
           set({ isLoading: false, error: error.message });
           throw error;
@@ -58,7 +68,7 @@ export const useWishlistStore = create(
         set({ isLoading: true, error: null });
         try {
           await wishlistService.toggleItem(productId);
-          await get().fetchWishlist();
+          await get().fetchWishlist(true);
         } catch (error) {
           set({ isLoading: false, error: error.message });
           throw error;

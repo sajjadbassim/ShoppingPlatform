@@ -124,6 +124,10 @@ namespace ecommerce.Services
             if (driver == null)
                 throw new NotFoundException("السائق غير موجود");
 
+            // إيقاف سائق معه طلب في الطريق يترك الطلب بلا من يسلّمه
+            if (driver.Status == DriverStatus.Active && await _subOrderRepository.HasActiveDeliveryAsync(driver.Id))
+                throw new BusinessRuleException("مع السائق طلب في الطريق — انتظر تسليمه أو تعذّره قبل إيقافه");
+
             driver.Status = driver.Status == DriverStatus.Active
                 ? DriverStatus.Suspended
                 : DriverStatus.Active;
@@ -162,6 +166,13 @@ namespace ecommerce.Services
 
             if (!allowedStatuses.Contains(dto.WorkStatus))
                 throw new BusinessRuleException("حالة العمل غير صحيحة");
+
+            // «يوصل» تتبع الطلبات فعلاً: لا يُجعل السائق متاحاً (فيُعيَّن له طلب ثانٍ) وهو في الطريق، ولا «يوصل» بلا طلب
+            var delivering = await _subOrderRepository.HasActiveDeliveryAsync(driver.Id);
+            if (delivering && dto.WorkStatus != DriverWorkStatus.Delivering)
+                throw new BusinessRuleException("مع السائق طلب في الطريق — تتغير حالته تلقائياً بعد التسليم");
+            if (!delivering && dto.WorkStatus == DriverWorkStatus.Delivering)
+                throw new BusinessRuleException("لا يوجد مع السائق طلب في الطريق");
 
             driver.WorkStatus = dto.WorkStatus;
             driver = await _driverRepository.UpdateAsync(driver);

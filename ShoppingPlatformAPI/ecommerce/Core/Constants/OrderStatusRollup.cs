@@ -21,9 +21,10 @@
             if (failed > 0 && delivered == 0 && failed == active) return OrderStatus.DELIVERY_FAILED;
             if (failed > 0 && delivered > 0 && delivered + failed == active) return OrderStatus.DELIVERED;
             if (delivered == active) return OrderStatus.DELIVERED;
-            if (outForDel > 0) return OrderStatus.OUT_FOR_DELIVERY;
-            if (ready > 0 && ready + delivered == active) return OrderStatus.READY;     // كل المتاجر (الباقية) جهّزت
-            if (ready > 0 || preparing > 0) return OrderStatus.PREPARING;               // بعضها ما زال يحضّر
+            // «في الطريق» فقط حين خرج كل ما بقي — جزء مع السائق وجزء ما زال في متجره ليس «في الطريق» بعد
+            if (outForDel > 0 && outForDel + delivered + failed == active) return OrderStatus.OUT_FOR_DELIVERY;
+            if (ready > 0 && ready + outForDel + delivered == active) return OrderStatus.READY;     // كل المتاجر (الباقية) جهّزت
+            if (ready > 0 || preparing > 0 || outForDel > 0) return OrderStatus.PREPARING;          // بعضها ما زال يحضّر
             if (confirmed == active) return OrderStatus.CONFIRMED;
             if (confirmed > 0) return OrderStatus.PARTIALLY_CONFIRMED;
             return OrderStatus.PENDING_CONFIRMATION;

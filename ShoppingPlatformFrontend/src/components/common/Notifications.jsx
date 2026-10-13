@@ -67,7 +67,7 @@ export const NotificationBell = () => {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
+      <button aria-label={unreadCount > 0 ? `الإشعارات (${unreadCount} غير مقروء)` : 'الإشعارات'}
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 [@media(hover:hover)]:hover:bg-gray-100 active:bg-gray-200 rounded-full transition-colors relative"
       >
@@ -119,7 +119,7 @@ export const NotificationBell = () => {
                         <p className={`text-sm break-words min-w-0 ${!notification.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
                           {notification.title}
                         </p>
-                        <button
+                        <button aria-label="إزالة الإشعار"
                           onClick={() => removeNotification(notification.id)}
                           className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600"
                         >
@@ -270,7 +270,7 @@ export const NotificationsPage = () => {
                                 تحديد كمقروء
                               </button>
                             )}
-                            <button
+                            <button aria-label="حذف الإشعار"
                               onClick={() => removeNotification(notification.id)}
                               className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
                             >

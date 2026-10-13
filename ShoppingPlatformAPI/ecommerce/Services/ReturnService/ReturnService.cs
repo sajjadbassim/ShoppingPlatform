@@ -112,10 +112,18 @@ namespace ecommerce.Services
                 if (hasActiveReturn)
                     throw new BusinessRuleException("يوجد طلب إرجاع نشط لهذا الطلب مسبقاً");
 
-                // 5️⃣ التحقق أن المنتجات موجودة في الطلب
+                // 5️⃣ التحقق أن المنتجات وصلت الزبون فعلاً: من طلب متجر مُسلَّم (لا ما رفضه المتجر أو أزاله لعدم توفره)
                 var orderItems = order.SubOrders
+                    .Where(so => so.Status == OrderStatus.DELIVERED)
                     .SelectMany(so => so.Items)
+                    .Where(oi => oi.Quantity - oi.RefusedQuantity > 0)
                     .ToList();
+
+                // ما أُرجع سابقاً (غير المرفوض) يُخصم مما يمكن إرجاعه — الرفض عند الباب محسوب في RefusedQuantity
+                var returnedBefore = await _context.ReturnItems.AsNoTracking()
+                    .Where(ri => ri.Return.OrderId == order.Id && ri.Return.Status != ReturnStatus.REJECTED && !ri.Return.IsDoorRefusal)
+                    .Select(ri => new { ri.ProductId, ri.VariantId, ri.Quantity })
+                    .ToListAsync();
 
                 var returnItems = new List<ReturnItem>();
                 foreach (var item in dto.Items)
@@ -127,8 +135,10 @@ namespace ecommerce.Services
                     if (orderItem == null)
                         throw new NotFoundException($"المنتج غير موجود في هذا الطلب");
 
-                    if (item.Quantity > orderItem.Quantity)
-                        throw new BusinessRuleException($"الكمية المطلوبة للإرجاع ({item.Quantity}) أكبر من الكمية المشتراة ({orderItem.Quantity})");
+                    var received = orderItem.Quantity - orderItem.RefusedQuantity
+                        - returnedBefore.Where(r => r.ProductId == orderItem.ProductId && r.VariantId == orderItem.VariantId).Sum(r => r.Quantity);
+                    if (item.Quantity > received)
+                        throw new BusinessRuleException($"الكمية المطلوبة للإرجاع ({item.Quantity}) أكبر من الكمية المستلمة ({Math.Max(0, received)})");
 
                     returnItems.Add(new ReturnItem
                     {

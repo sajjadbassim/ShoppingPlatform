@@ -7,6 +7,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
 import { SCOPE, isGroceryCategory, searchLink, useShopScope } from '../../utils/shopScope'
 import { formatPrice } from '../../utils/weight'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 const GlobalSearch = ({ isOpen, onClose }) => {
   const navigate = useNavigate()
@@ -16,6 +17,11 @@ const GlobalSearch = ({ isOpen, onClose }) => {
   // من صفحة السوبرماركت يبحث في السوبرماركت فقط، ومن غيرها في بقية المنتجات فقط
   const scope = useShopScope()
   const grocery = scope === SCOPE.GROCERY
+
+  // زر الرجوع في الهاتف يغلق البحث بدل مغادرة الصفحة
+  useBackToClose(isOpen, onClose)
+  // الانتقال من داخل البحث يحلّ محل خطوة البحث في السجل: الرجوع من النتيجة يعود للصفحة الأصلية
+  const go = (to) => { navigate(to, { replace: true }); onClose() }
 
   // البحث بعد توقف الكتابة 300ms — لا طلبين للخادم مع كل حرف
   const [term, setTerm] = useState('')
@@ -92,23 +98,19 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     localStorage.setItem('recentSearches', JSON.stringify(newRecent))
 
     // الانتقال للنتائج
-    navigate(searchLink(searchQuery, scope))
-    onClose()
+    go(searchLink(searchQuery, scope))
   }
 
   const handleProductClick = (product) => {
-    navigate(`/products/${product.id}`)
-    onClose()
+    go(`/products/${product.id}`)
   }
 
   const handleVendorClick = (vendor) => {
-    navigate(`/stores/${vendor.id}`)
-    onClose()
+    go(`/stores/${vendor.id}`)
   }
 
   const handleCategoryClick = (category) => {
-    navigate(`/products?category=${category.id}`)
-    onClose()
+    go(`/products?category=${category.id}`)
   }
 
   const clearRecentSearches = () => {

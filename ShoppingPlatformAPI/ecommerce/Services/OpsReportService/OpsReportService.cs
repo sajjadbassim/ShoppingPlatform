@@ -47,12 +47,13 @@ namespace ecommerce.Services.OpsReportService
             var current = subs.Where(s => s.CreatedAt >= StartUtc(from)).ToList();
             var previous = subs.Where(s => s.CreatedAt < StartUtc(from)).ToList();
 
+            var extras = await LoadExtrasAsync(StartUtc(prevFrom), StartUtc(to.AddDays(1)), ct);
             var report = new OpsReportDto
             {
                 From = from,
                 To = to,
-                Summary = Summarize(current),
-                PreviousSummary = Summarize(previous),
+                Summary = Summarize(current, extras.Where(e => e.OrderCreatedAt >= StartUtc(from))),
+                PreviousSummary = Summarize(previous, extras.Where(e => e.OrderCreatedAt < StartUtc(from))),
             };
 
             // يومي — كل الأيام حتى الخالية
@@ -149,6 +150,7 @@ namespace ecommerce.Services.OpsReportService
             public string? DriverName { get; init; }
             public string Status { get; init; } = "";
             public decimal Total { get; init; }
+            public decimal Discount { get; init; }
             public DateTime CreatedAt { get; init; }
             public string? CancellationReason { get; init; }
             public double? ConfirmMinutes { get; init; }
@@ -167,8 +169,21 @@ namespace ecommerce.Services.OpsReportService
                     s.CreatedAt, s.ConfirmedAt, s.AssignedAt, s.CancellationReason,
                     VendorName = s.Vendor.NameAr ?? s.Vendor.Name,
                     DriverName = s.Driver != null ? s.Driver.FullName : null,
+                    Refused = s.Items.Sum(i => (decimal?)(i.UnitPrice * i.RefusedQuantity)) ?? 0,
                 })
                 .ToListAsync(ct);
+
+            // نصيب كل طلب متجر من خصم طلبه — ليطابق الإيراد ما حُصّل فعلاً
+            var orderIds = subs.Select(s => s.OrderId).Distinct().ToList();
+            var discounted = await _context.Orders.AsNoTracking()
+                .Where(o => orderIds.Contains(o.Id) && o.DiscountAmount > 0)
+                .Select(o => new { o.Id, o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId })
+                .ToListAsync(ct);
+            var shares = new Dictionary<Guid, decimal>();
+            foreach (var o in discounted)
+                foreach (var (subId, share) in OrderTotals.DiscountShares(o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId,
+                             subs.Where(s => s.OrderId == o.Id).Select(s => new OrderTotals.Line(s.Id, s.VendorId, s.Status, s.Subtotal, s.DeliveryFee))))
+                    shares[subId] = share;
 
             // أوقات الخروج والتسليم من سجل الحالات
             var ids = subs.Select(s => s.Id).ToList();
@@ -194,7 +209,8 @@ namespace ecommerce.Services.OpsReportService
                     DriverId = s.DriverId,
                     DriverName = s.DriverName,
                     Status = s.Status,
-                    Total = s.Subtotal + s.DeliveryFee,
+                    Total = s.Subtotal + s.DeliveryFee - shares.GetValueOrDefault(s.Id) - s.Refused,
+                    Discount = shares.GetValueOrDefault(s.Id),
                     CreatedAt = s.CreatedAt,
                     CancellationReason = s.CancellationReason,
                     ConfirmMinutes = Minutes(s.CreatedAt, s.ConfirmedAt),
@@ -204,10 +220,30 @@ namespace ecommerce.Services.OpsReportService
             }).ToList();
         }
 
-        private static OpsReportSummaryDto Summarize(List<Row> rows)
+        // أجور الرفض والإرجاعات — تُنسب لفترة الطلب نفسه مثل بقية التقرير
+        internal sealed record Extra(DateTime OrderCreatedAt, decimal RefusalFee, decimal ReturnAmount, bool IsReturn);
+
+        private async Task<List<Extra>> LoadExtrasAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct)
         {
+            var fees = await _context.DriverCashEntries.AsNoTracking()
+                .Where(e => e.Kind == DriverCashKind.RefusalFee && e.Order.CreatedAt >= fromUtc && e.Order.CreatedAt < toUtc)
+                .Select(e => new Extra(e.Order.CreatedAt, e.Amount, 0, false))
+                .ToListAsync(ct);
+            var returns = await _context.Returns.AsNoTracking()
+                .Where(r => !r.IsDoorRefusal && (r.Status == ReturnStatus.APPROVED || r.Status == ReturnStatus.COMPLETED)
+                            && r.Order.CreatedAt >= fromUtc && r.Order.CreatedAt < toUtc)
+                .Select(r => new Extra(r.Order.CreatedAt, 0, r.Items.Sum(i => (decimal?)(i.UnitPrice * i.Quantity)) ?? 0, true))
+                .ToListAsync(ct);
+            return fees.Concat(returns).ToList();
+        }
+
+        private static OpsReportSummaryDto Summarize(List<Row> rows, IEnumerable<Extra> extras)
+        {
+            var extra = extras.ToList();
             var delivered = rows.Where(r => r.Status == OrderStatus.DELIVERED).ToList();
             var revenue = delivered.Sum(r => r.Total);
+            var refusalFees = extra.Sum(e => e.RefusalFee);
+            var returnsAmount = extra.Sum(e => e.ReturnAmount);
             var deliveredOrders = delivered.Select(r => r.OrderId).Distinct().Count();
             var cancelled = rows.Count(r => r.Status == OrderStatus.CANCELLED);
             return new OpsReportSummaryDto
@@ -218,6 +254,11 @@ namespace ecommerce.Services.OpsReportService
                 Cancelled = cancelled,
                 CancellationRate = rows.Count == 0 ? 0 : Math.Round((double)cancelled / rows.Count, 4),
                 Revenue = revenue,
+                Discounts = delivered.Sum(r => r.Discount),
+                RefusalFees = refusalFees,
+                Returns = extra.Count(e => e.IsReturn),
+                ReturnsAmount = returnsAmount,
+                NetRevenue = revenue + refusalFees - returnsAmount,
                 AverageOrderValue = deliveredOrders == 0 ? 0 : Math.Round(revenue / deliveredOrders, 0),
                 AvgConfirmMinutes = Avg(rows.Select(r => r.ConfirmMinutes)),
                 AvgDeliveryMinutes = Avg(delivered.Select(r => r.DeliveryMinutes)),

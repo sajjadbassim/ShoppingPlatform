@@ -19,6 +19,7 @@ import { apiGet, apiPutForm, apiDelete } from '../../api/axios'
 import UserAvatar from '../../components/common/UserAvatar'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import AddPhoneModal from '../../components/auth/AddPhoneModal'
+import { useBackToClose } from '../../hooks/useBackToClose'
 import { usePublicZones } from '../../hooks/useDeliveryZones'
 
 const ProfilePage = () => {
@@ -66,13 +67,15 @@ const { items: wishlistItems, fetchWishlist } = useWishlistStore()
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [showAddressModal, setShowAddressModal] = useState(false)
   const [editingAddress, setEditingAddress] = useState(null)
+  // زر الرجوع في الهاتف يغلق نافذة العنوان
+  useBackToClose(showAddressModal, () => setShowAddressModal(false))
   const [addressFormData, setAddressFormData] = useState({
     title: '', phone: '', city: '', area: '', street: '', building: '', isDefault: false,
   })
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [addressToDelete, setAddressToDelete] = useState(null)
 useEffect(() => {
-  fetchWishlist()
+  fetchWishlist().catch(() => {})
 }, [])
   const [addPhoneOpen, setAddPhoneOpen] = useState(false)
   const { data: zonesCfg } = usePublicZones()

@@ -24,6 +24,7 @@ import { useVendor } from '../../hooks/useVendors'
 import { SCOPE, searchLink } from '../../utils/shopScope'
 import { variantsService } from '../../services/variantsService'
 import { isStoreClosed } from '../../components/common/StoreClosedBadge'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 // ===========================
 // Filter Section Component
@@ -54,6 +55,8 @@ const ProductsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [viewMode, setViewMode] = useState('grid')
   const [showMobileFilters, setShowMobileFilters] = useState(false)
+  // زر الرجوع في الهاتف يغلق درج الفلاتر (وتبقى الفلاتر المختارة)؛ تغييرها والدرج مفتوح يحلّ محل الخطوة في السجل
+  useBackToClose(showMobileFilters, () => setShowMobileFilters(false))
 
   const navigate = useNavigate()
   const { success, error: showError } = useToast()
@@ -176,7 +179,7 @@ const ProductsPage = () => {
     const p = new URLSearchParams(searchParams)
     if (value) p.set(key, value); else p.delete(key)
     p.set('page', '1')
-    setSearchParams(p)
+    setSearchParams(p, { replace: showMobileFilters })
   }
 
   const handleCategoryChange = (catId) => {
@@ -190,13 +193,13 @@ const ProductsPage = () => {
     if (filters.priceRange.min) p.set('minPrice', filters.priceRange.min); else p.delete('minPrice')
     if (filters.priceRange.max) p.set('maxPrice', filters.priceRange.max); else p.delete('maxPrice')
     p.set('page', '1')
-    setSearchParams(p)
+    setSearchParams(p, { replace: showMobileFilters })
   }
 
   const clearFilters = () => {
     setFilters({ categories: [], priceRange: { min: '', max: '' }, inStock: false, minRating: '', hasDiscount: false })
     // مسح الفلاتر لا يُخرج المستخدم من السوبرماركت
-    setSearchParams(scopeParam === SCOPE.GROCERY ? { scope: SCOPE.GROCERY } : {})
+    setSearchParams(scopeParam === SCOPE.GROCERY ? { scope: SCOPE.GROCERY } : {}, { replace: showMobileFilters })
   }
 
   const handleAddToCart = async ({ id, quantity = 1, variantId = null }) => {
@@ -251,7 +254,7 @@ const ProductsPage = () => {
         {categoriesLoading ? (
           <div className="space-y-2">{[1,2,3,4].map(i => <div key={i} className="h-5 bg-gray-100 rounded animate-pulse"/>)}</div>
         ) : (
-          <div className="space-y-1 max-h-64 overflow-y-auto pl-1">
+          <div className="space-y-1 max-h-64 overflow-y-auto pl-1" tabIndex={0} aria-label="التصنيفات">
             {rootCategories.map(root => {
               const children = getChildren(root.id)
               const rootSelected = filters.categories.includes(root.id)
@@ -329,7 +332,7 @@ const ProductsPage = () => {
                     if (r.min) ps.set('minPrice', r.min); else ps.delete('minPrice')
                     if (r.max) ps.set('maxPrice', r.max); else ps.delete('maxPrice')
                     ps.set('page', '1')
-                    setSearchParams(ps)
+                    setSearchParams(ps, { replace: showMobileFilters })
                   }}
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                     isActive ? 'bg-primary text-white border-primary' : 'border-gray-200 text-gray-600 hover:border-primary hover:text-primary'
@@ -451,7 +454,7 @@ const ProductsPage = () => {
                   )}
 
                   {/* Sort */}
-                  {!sectionId && <select value={sortBy} onChange={e => { const p = new URLSearchParams(searchParams); p.set('sort', e.target.value); p.set('page','1'); setSearchParams(p) }}
+                  {!sectionId && <select aria-label="ترتيب المنتجات" value={sortBy} onChange={e => { const p = new URLSearchParams(searchParams); p.set('sort', e.target.value); p.set('page','1'); setSearchParams(p) }}
                     className="flex-1 sm:flex-none h-10 sm:h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-primary">
                     <option value="newest">الأحدث</option>
                     <option value="price-low">السعر: الأقل</option>
@@ -463,11 +466,11 @@ const ProductsPage = () => {
 
                   {/* View mode */}
                   <div className="hidden sm:flex border border-gray-300 rounded-lg overflow-hidden">
-                    <button onClick={() => setViewMode('grid')}
+                    <button onClick={() => setViewMode('grid')} aria-label="عرض شبكي" aria-pressed={viewMode === 'grid'}
                       className={`p-2 transition-colors ${viewMode==='grid' ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
                       <Grid size={16} />
                     </button>
-                    <button onClick={() => setViewMode('list')}
+                    <button onClick={() => setViewMode('list')} aria-label="عرض قائمة" aria-pressed={viewMode === 'list'}
                       className={`p-2 transition-colors ${viewMode==='list' ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
                       <List size={16} />
                     </button>

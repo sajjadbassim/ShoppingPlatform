@@ -35,7 +35,12 @@ namespace ecommerce.Core.DTO.Ops
         public int Delivered { get; set; }              // طلبات فرعية مُسلّمة
         public int Cancelled { get; set; }
         public double CancellationRate { get; set; }    // 0..1
-        public decimal Revenue { get; set; }            // قيمة المُسلّم (منتجات + توصيل)
+        public decimal Revenue { get; set; }            // ما دفعه الزبائن عن المُسلّم: منتجات + توصيل − الخصم − المرفوض عند الباب
+        public decimal Discounts { get; set; }          // خصومات المُسلّم (كوبونات + نقاط)
+        public decimal RefusalFees { get; set; }        // أجور توصيل حُصّلت عند رفض الزبون
+        public int Returns { get; set; }                // إرجاعات موافق عليها (بعد الاستلام)
+        public decimal ReturnsAmount { get; set; }
+        public decimal NetRevenue { get; set; }         // الإيرادات + أجور الرفض − الإرجاعات
         public decimal AverageOrderValue { get; set; }
         public double? AvgConfirmMinutes { get; set; }  // من الطلب حتى تأكيد المتجر
         public double? AvgDeliveryMinutes { get; set; } // من الطلب حتى التسليم

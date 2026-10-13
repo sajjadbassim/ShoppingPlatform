@@ -18,6 +18,10 @@ namespace ecommerce.Repositories
         Guid driverId, int pageNumber, int pageSize, string? filter);
 
         Task<DriverStatsDto> GetDriverStatsAsync(Guid driverId);
+        // نصيب كل طلب فرعي من خصم طلبه (كوبون/نقاط) — لكل الطلبات الفرعية للطلبات المعطاة
+        Task<Dictionary<Guid, decimal>> GetDiscountSharesAsync(IEnumerable<Guid> orderIds);
+        // هل مع السائق طلب «في الطريق» غير المستثنى؟ (لتحديد هل يعود متاحاً)
+        Task<bool> HasActiveDeliveryAsync(Guid driverId, Guid? exceptSubOrderId = null);
 
 
 

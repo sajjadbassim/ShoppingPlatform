@@ -171,6 +171,33 @@ namespace ecommerce.Repositories
             return (items, total);
         }
 
+        public async Task<Dictionary<Guid, decimal>> GetDiscountSharesAsync(IEnumerable<Guid> orderIds)
+        {
+            var ids = orderIds.Distinct().ToList();
+            var orders = await _context.Orders.AsNoTracking()
+                .Where(o => ids.Contains(o.Id) && o.DiscountAmount > 0)
+                .Select(o => new { o.Id, o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId })
+                .ToListAsync();
+            if (orders.Count == 0) return new();
+
+            var withDiscount = orders.Select(o => o.Id).ToList();
+            var lines = await _context.SubOrders.AsNoTracking()
+                .Where(so => withDiscount.Contains(so.OrderId))
+                .Select(so => new { so.OrderId, Line = new OrderTotals.Line(so.Id, so.VendorId, so.Status, so.Subtotal, so.DeliveryFee) })
+                .ToListAsync();
+
+            var result = new Dictionary<Guid, decimal>();
+            foreach (var o in orders)
+                foreach (var (subId, share) in OrderTotals.DiscountShares(o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId,
+                             lines.Where(l => l.OrderId == o.Id).Select(l => l.Line)))
+                    result[subId] = share;
+            return result;
+        }
+
+        public Task<bool> HasActiveDeliveryAsync(Guid driverId, Guid? exceptSubOrderId = null) =>
+            _context.SubOrders.AnyAsync(so => so.DriverId == driverId && so.Status == OrderStatus.OUT_FOR_DELIVERY
+                && (exceptSubOrderId == null || so.Id != exceptSubOrderId));
+
         public async Task<DriverStatsDto> GetDriverStatsAsync(Guid driverId)
         {
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == driverId);

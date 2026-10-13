@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react'
 import Button from './Button'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 /**
  * Modal Component
@@ -25,6 +26,8 @@ const Modal = ({
   className = '',
 }) => {
   const modalRef = useRef(null)
+  // زر الرجوع في الهاتف يغلق النافذة بدل مغادرة الصفحة
+  useBackToClose(isOpen, onClose)
 
   // أحجام النافذة
   const sizes = {

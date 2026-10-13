@@ -25,8 +25,8 @@ namespace ecommerce.Tests.Services
             _driver = new Driver { FullName = "باسل", Phone = "0780" };
             _order = new Order { OrderNumber = "ORD-1", CustomerId = _customer, Status = OrderStatus.DELIVERED };
             // نفس السائق أوصل من المتجرين
-            _sub1 = new SubOrder { OrderId = _order.Id, VendorId = v1.Id, Vendor = v1, SubOrderNumber = "V1", DriverId = _driver.Id };
-            _sub2 = new SubOrder { OrderId = _order.Id, VendorId = v2.Id, Vendor = v2, SubOrderNumber = "V2", DriverId = _driver.Id };
+            _sub1 = new SubOrder { OrderId = _order.Id, VendorId = v1.Id, Vendor = v1, SubOrderNumber = "V1", DriverId = _driver.Id, Status = OrderStatus.DELIVERED };
+            _sub2 = new SubOrder { OrderId = _order.Id, VendorId = v2.Id, Vendor = v2, SubOrderNumber = "V2", DriverId = _driver.Id, Status = OrderStatus.DELIVERED };
             _context.AddRange(new User { Id = _customer }, _driver, v1, v2, _order, _sub1, _sub2);
             _context.SaveChanges();
         }
@@ -35,6 +35,18 @@ namespace ecommerce.Tests.Services
         private OrderRatingService Service() => new(_context);
         private static CreateSubOrderRatingDto Store(Guid sub, int stars, int? driver = null) =>
             new() { SubOrderId = sub, VendorRating = stars, DriverRating = driver };
+
+        [Fact]
+        public async Task StoreThatNeverDelivered_CannotBeRated()
+        {
+            // المتجر رفض طلبه — الطلب «مُسلَّم» من المتجر الآخر فقط
+            _sub2.Status = OrderStatus.CANCELLED;
+            _context.SaveChanges();
+
+            await Assert.ThrowsAsync<BusinessRuleException>(() =>
+                Service().AddStoreRatingsAsync(_order.Id, _customer, new List<CreateSubOrderRatingDto> { Store(_sub2.Id, 1) }));
+            await Service().AddStoreRatingsAsync(_order.Id, _customer, new List<CreateSubOrderRatingDto> { Store(_sub1.Id, 5) });
+        }
 
         [Fact]
         public async Task Experience_Alone_DoesNotRateStores()

@@ -76,9 +76,9 @@ namespace ecommerce.Services.DriverAppService
                 .Where(l => l.ChangedBy == userId && l.NewStatus == OrderStatus.DELIVERED && l.SubOrderId != null && l.CreatedAt >= todayUtc)
                 .Select(l => l.SubOrder.OrderId).Distinct().CountAsync(ct);
 
-            var cash = await _context.Orders
-                .Where(o => o.CashCollectedByDriverId == driver.Id && o.CashSettledAt == null)
-                .SumAsync(o => o.CashCollectedAmount ?? 0, ct);
+            var cash = await _context.DriverCashEntries
+                .Where(e => e.DriverId == driver.Id && e.SettledAt == null)
+                .SumAsync(e => e.Amount, ct);
 
             return new DriverProfileDto
             {
@@ -137,11 +137,12 @@ namespace ecommerce.Services.DriverAppService
             var subs = await query.ToListAsync(ct);
             var orderIds = subs.Select(s => s.OrderId).Distinct().ToList();
 
-            // لحساب المبلغ: هل يحمل السائق الطلب كاملاً أم جزءاً منه؟
+            // لحساب المبلغ: هل يحمل السائق الطلب كاملاً أم جزءاً منه؟ ونصيب كل جزء من خصم الطلب
             var allSubs = await _context.SubOrders.AsNoTracking()
                 .Where(so => orderIds.Contains(so.OrderId) && so.Status != OrderStatus.CANCELLED)
                 .Select(so => new { so.OrderId, so.DriverId })
                 .ToListAsync(ct);
+            var shares = await DiscountSharesAsync(orderIds, ct);
 
             var payers = await GetPayersAsync(ct);
             var deliveredAt = history
@@ -156,7 +157,7 @@ namespace ecommerce.Services.DriverAppService
                 .GroupBy(s => s.OrderId)
                 .Select(g =>
                 {
-                    var dto = MapOrder(g.ToList(), allSubs.Where(a => a.OrderId == g.Key).All(a => a.DriverId == driver.Id), payers);
+                    var dto = MapOrder(g.ToList(), allSubs.Where(a => a.OrderId == g.Key).All(a => a.DriverId == driver.Id), payers, shares);
                     dto.DeliveredAt = deliveredAt.TryGetValue(g.Key, out var at) ? at : null;
                     return dto;
                 })
@@ -192,9 +193,13 @@ namespace ecommerce.Services.DriverAppService
             if (mine.Count == 0)
                 throw new NotFoundException("الطلب غير موجود أو تم تسليمه");
 
+            // التسليم بعد استلام البضاعة من كل متجر — وإلا لا شيء يثبت أن السائق مرّ بالمتجر
+            RequirePickedUp(mine);
+
             var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId, ct);
             var carriesWholeOrder = !await _context.SubOrders
                 .AnyAsync(so => so.OrderId == orderId && so.Status != OrderStatus.CANCELLED && so.DriverId != driver.Id, ct);
+            var shares = await DiscountSharesAsync(new[] { orderId }, ct);
 
             // ===== الرفض الجزئي: تُخصم قيمة القطع المرفوضة من المبلغ وترجع للمتجر =====
             var refused = ValidateRefusal(mine, dto);
@@ -203,7 +208,7 @@ namespace ecommerce.Services.DriverAppService
             var payers = await GetPayersAsync(ct);
             var payer = payers.Partial;
             var fee = FeeOf(order, mine, carriesWholeOrder);
-            var amount = AmountToCollect(order, mine, carriesWholeOrder);
+            var amount = AmountToCollect(order, mine, carriesWholeOrder, shares);
             if (amount > 0) amount = Math.Max(0, amount - refusedValue - (refused.Count > 0 && payer != RefusalFeePayer.Customer ? fee : 0));
 
             if (amount > 0 && !dto.CashCollected)
@@ -247,13 +252,7 @@ namespace ecommerce.Services.DriverAppService
                 tracked.RefusalFeeAmount = fee;
                 tracked.RefusalFeePayer = payer;
             }
-            if (amount > 0)
-            {
-                tracked.CashCollectedAmount = (tracked.CashCollectedAmount ?? 0) + amount;
-                tracked.CashCollectedAt = DateTime.UtcNow;
-                tracked.CashCollectedByDriverId = driver.Id;
-                tracked.CashSettledAt = null;
-            }
+            if (amount > 0) RecordCash(tracked, driver.Id, amount, DriverCashKind.Delivery);
             var fullyDelivered = !await _context.SubOrders.AnyAsync(so => so.OrderId == orderId
                 && so.Status != OrderStatus.CANCELLED && so.Status != OrderStatus.DELIVERED, ct);
             if (fullyDelivered && tracked.PaymentMethod == PaymentMethods.COD)
@@ -273,7 +272,7 @@ namespace ecommerce.Services.DriverAppService
                 .Include(so => so.Items)
                 .Where(so => mineIds.Contains(so.Id))
                 .ToListAsync(ct);
-            var result = MapOrder(delivered, carriesWholeOrder, payers);
+            var result = MapOrder(delivered, carriesWholeOrder, payers, shares);
             result.DeliveredAt = DateTime.UtcNow;
             return result;
         }
@@ -292,6 +291,8 @@ namespace ecommerce.Services.DriverAppService
                 .ToListAsync(ct);
             if (mine.Count == 0)
                 throw new NotFoundException("الطلب غير موجود أو تم إغلاقه");
+            // الرفض / لا يرد / عنوان خاطئ تحدث عند الزبون، أي بعد الاستلام. «سبب آخر» قد يسبق الاستلام (مشكلة في المتجر مثلاً)
+            if (dto.Reason != DeliveryFailureReason.Other) RequirePickedUp(mine);
 
             var order = await _context.Orders.AsNoTracking().FirstAsync(o => o.Id == orderId, ct);
             var carriesWholeOrder = !await _context.SubOrders
@@ -314,13 +315,7 @@ namespace ecommerce.Services.DriverAppService
                 tracked.RefusalFeeAmount = fee;
                 tracked.RefusalFeePayer = payer;
             }
-            if (feeCollected)
-            {
-                tracked.CashCollectedAmount = (tracked.CashCollectedAmount ?? 0) + fee;
-                tracked.CashCollectedAt = DateTime.UtcNow;
-                tracked.CashCollectedByDriverId = driver.Id;
-                tracked.CashSettledAt = null;
-            }
+            if (feeCollected) RecordCash(tracked, driver.Id, fee, DriverCashKind.RefusalFee);
             await _context.SaveChangesAsync(ct);
 
             await NotifyFailureAsync(order, mine, dto.Reason, note);
@@ -336,7 +331,7 @@ namespace ecommerce.Services.DriverAppService
                 .Include(so => so.Items)
                 .Where(so => failedIds.Contains(so.Id))
                 .ToListAsync(ct);
-            return MapOrder(failed, carriesWholeOrder, payers);
+            return MapOrder(failed, carriesWholeOrder, payers, await DiscountSharesAsync(new[] { orderId }, ct));
         }
 
         private async Task NotifyFailureAsync(Order order, List<SubOrder> subs, string reason, string? note)
@@ -455,33 +450,35 @@ namespace ecommerce.Services.DriverAppService
 
         public async Task<DriverCashDto> GetCashAsync(Guid driverId, CancellationToken ct = default)
         {
-            var items = await _context.Orders.AsNoTracking()
-                .Where(o => o.CashCollectedByDriverId == driverId && o.CashSettledAt == null && o.CashCollectedAmount > 0)
-                .OrderBy(o => o.CashCollectedAt)
-                .Select(o => new DriverCashItemDto
+            // ما جمعه هذا السائق نفسه فقط — في الطلب الموزّع على سائقين لكلٍّ نصيبه
+            var items = await _context.DriverCashEntries.AsNoTracking()
+                .Where(e => e.DriverId == driverId && e.SettledAt == null)
+                .GroupBy(e => new { e.OrderId, e.Order.OrderNumber })
+                .Select(g => new DriverCashItemDto
                 {
-                    OrderId = o.Id,
-                    OrderNumber = o.OrderNumber,
-                    Amount = o.CashCollectedAmount ?? 0,
-                    CollectedAt = o.CashCollectedAt ?? o.UpdatedAt,
+                    OrderId = g.Key.OrderId,
+                    OrderNumber = g.Key.OrderNumber,
+                    Amount = g.Sum(e => e.Amount),
+                    CollectedAt = g.Max(e => e.CollectedAt),
                 })
                 .ToListAsync(ct);
+            items = items.Where(i => i.Amount != 0).OrderBy(i => i.CollectedAt).ToList();
             return new DriverCashDto { Items = items, Total = items.Sum(i => i.Amount) };
         }
 
         public async Task<int> SettleCashAsync(Guid driverId, Guid opsUserId, CancellationToken ct = default)
         {
-            var orders = await _context.Orders
-                .Where(o => o.CashCollectedByDriverId == driverId && o.CashSettledAt == null && o.CashCollectedAmount > 0)
+            var entries = await _context.DriverCashEntries
+                .Where(e => e.DriverId == driverId && e.SettledAt == null)
                 .ToListAsync(ct);
             var now = DateTime.UtcNow;
-            foreach (var o in orders)
+            foreach (var e in entries)
             {
-                o.CashSettledAt = now;
-                o.CashSettledBy = opsUserId;
+                e.SettledAt = now;
+                e.SettledBy = opsUserId;
             }
             await _context.SaveChangesAsync(ct);
-            return orders.Count;
+            return entries.Select(e => e.OrderId).Distinct().Count();
         }
 
         // ===================================
@@ -551,17 +548,44 @@ namespace ecommerce.Services.DriverAppService
             catch { /* الإشعار لا يُفشل التسليم */ }
         }
 
+        private static void RequirePickedUp(IEnumerable<SubOrder> mine)
+        {
+            if (mine.Any(so => so.PickedUpAt == null))
+                throw new BusinessRuleException("سجّل استلام الطلب من كل المتاجر أولاً");
+        }
+
+        // نقد بيد هذا السائق: سطر خاص به (للتسوية)، ومجموع الطلب للعرض
+        private void RecordCash(Order order, Guid driverId, decimal amount, string kind)
+        {
+            var now = DateTime.UtcNow;
+            _context.DriverCashEntries.Add(new DriverCashEntry { OrderId = order.Id, DriverId = driverId, Amount = amount, Kind = kind, CollectedAt = now });
+            order.CashCollectedAmount = (order.CashCollectedAmount ?? 0) + amount;
+            order.CashCollectedAt = now;
+            order.CashCollectedByDriverId = driverId;
+        }
+
+        private async Task<Dictionary<Guid, decimal>> DiscountSharesAsync(IEnumerable<Guid> orderIds, CancellationToken ct)
+        {
+            var ids = orderIds.Distinct().ToList();
+            var orders = await _context.Orders.AsNoTracking()
+                .Where(o => ids.Contains(o.Id) && o.DiscountAmount > 0)
+                .Include(o => o.SubOrders)
+                .ToListAsync(ct);
+            return orders.SelectMany(o => OrderTotals.DiscountShares(o, o.SubOrders)).ToDictionary(x => x.Key, x => x.Value);
+        }
+
         private static decimal FeeOf(Order order, IEnumerable<SubOrder> mine, bool carriesWholeOrder) =>
             carriesWholeOrder ? order.DeliveryFees : mine.Sum(s => s.DeliveryFee);
 
-        // الطلب كاملاً معه: إجمالي الطلب (بعد الخصم). جزء منه فقط: قيمة أجزائه
-        private static decimal AmountToCollect(Order order, IEnumerable<SubOrder> mine, bool carriesWholeOrder)
+        // الطلب كاملاً معه: إجمالي الطلب (بعد الخصم). جزء منه فقط: قيمة أجزائه بعد نصيبها من الخصم —
+        // فمجموع ما يجمعه السائقون = إجمالي الطلب
+        private static decimal AmountToCollect(Order order, IEnumerable<SubOrder> mine, bool carriesWholeOrder, IReadOnlyDictionary<Guid, decimal> shares)
         {
             if (order.PaymentMethod != PaymentMethods.COD || order.PaymentStatus == PaymentStatus.Paid) return 0;
-            return carriesWholeOrder ? order.TotalAmount : mine.Sum(s => s.Subtotal + s.DeliveryFee);
+            return carriesWholeOrder ? order.TotalAmount : mine.Sum(s => s.Subtotal + s.DeliveryFee - shares.GetValueOrDefault(s.Id));
         }
 
-        private static DriverOrderDto MapOrder(List<SubOrder> subs, bool carriesWholeOrder, (string Full, string Partial) payers)
+        private static DriverOrderDto MapOrder(List<SubOrder> subs, bool carriesWholeOrder, (string Full, string Partial) payers, IReadOnlyDictionary<Guid, decimal> shares)
         {
             var order = subs[0].Order;
             var a = order.Address;
@@ -592,7 +616,7 @@ namespace ecommerce.Services.DriverAppService
                 DeliverySlotEnd = order.DeliverySlotEnd,
                 PaymentMethod = order.PaymentMethod,
                 PaymentStatus = order.PaymentStatus,
-                AmountToCollect = pending.Count > 0 ? AmountToCollect(order, pending, carriesWholeOrder) : 0,
+                AmountToCollect = pending.Count > 0 ? AmountToCollect(order, pending, carriesWholeOrder, shares) : 0,
                 DeliveryFee = FeeOf(order, subs, carriesWholeOrder),
                 RefusalFeePayer = payers.Full,
                 PartialRefusalFeePayer = payers.Partial,

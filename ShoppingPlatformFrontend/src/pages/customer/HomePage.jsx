@@ -118,6 +118,14 @@ const HeroSlider = ({ banners, loading }) => {
 
   const displaySlides = slides.length > 0 ? slides : fallbackSlides
 
+  // تحميل صور الشرائح عند الحاجة فقط: الظاهرة والتالية (وما ظهر سابقاً يبقى محمَّلاً)
+  // — كانت الخمس تُحمَّل فوراً (~3.6 MB) مع أن واحدة فقط ظاهرة
+  const [seen, setSeen] = useState(() => new Set([0, 1]))
+  useEffect(() => {
+    const next = (current + 1) % Math.max(1, displaySlides.length)
+    setSeen(prev => (prev.has(current) && prev.has(next) ? prev : new Set([...prev, current, next])))
+  }, [current, displaySlides.length])
+
   const [touchStartX, setTouchStartX] = useState(null)
   const swipedRef = useRef(false)
 
@@ -161,10 +169,14 @@ const HeroSlider = ({ banners, loading }) => {
         const link   = slide.id?.startsWith('f') ? slide.linkUrl : getBannerLink(slide)
         return (
           <BannerLink key={slide.id} to={link}
+            aria-label={slide.titleAr || slide.title || `عرض ${i + 1}`}
             tabIndex={i === current ? 0 : -1}
             aria-hidden={i !== current}
             className={`absolute inset-0 block cursor-pointer transition-opacity duration-700 ${i === current ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <img src={imgUrl} alt="" className="w-full h-full object-cover" onError={e => e.target.style.display='none'} />
+            {seen.has(i) && (
+              <img src={imgUrl} alt="" className="w-full h-full object-cover"
+                fetchpriority={i === 0 ? 'high' : 'auto'} onError={e => e.target.style.display='none'} />
+            )}
             {/* النص فوق البنر يُخفى على الهاتف لأن المساحة لا تكفيه */}
             <div className={`${slide.id?.startsWith('f') ? 'hidden sm:block' : 'hidden'} absolute inset-0 bg-gradient-to-l from-black/60 via-black/30 to-transparent`} />
             <div className={`${slide.id?.startsWith('f') ? 'hidden sm:flex' : 'hidden'} h-full px-10 items-center relative z-10`}>
@@ -189,19 +201,23 @@ const HeroSlider = ({ banners, loading }) => {
 
       {displaySlides.length > 1 && (
         <>
-          <button onClick={() => setCurrent(p => (p - 1 + displaySlides.length) % displaySlides.length)}
+          <button onClick={() => setCurrent(p => (p - 1 + displaySlides.length) % displaySlides.length)} aria-label="الشريحة السابقة"
             className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-white/40 rounded-full items-center justify-center text-white backdrop-blur-sm transition-colors">
             <ChevronRight size={22} />
           </button>
-          <button onClick={() => setCurrent(p => (p + 1) % displaySlides.length)}
+          <button onClick={() => setCurrent(p => (p + 1) % displaySlides.length)} aria-label="الشريحة التالية"
             className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/20 hover:bg-white/40 rounded-full items-center justify-center text-white backdrop-blur-sm transition-colors">
             <ChevronLeft size={22} />
           </button>
           {/* مؤشرات الشرائح فوق أسفل الصورة */}
-          <div className="absolute bottom-3 right-4 lg:right-1/2 lg:translate-x-1/2 flex gap-1.5 z-10">
+          {/* منطقة اللمس 28px حول كل نقطة (كانت 12×6 بكسل)، والنقطة المرئية بنفس شكلها */}
+          <div className="absolute bottom-1 right-2 lg:right-1/2 lg:translate-x-1/2 flex z-10">
             {displaySlides.map((_, i) => (
               <button key={i} onClick={() => setCurrent(i)} aria-label={`الشريحة ${i + 1}`}
-                className={`h-1.5 rounded-full shadow transition-all ${i === current ? 'bg-white w-6' : 'bg-white/60 w-3'}`} />
+                aria-current={i === current ? 'true' : undefined}
+                className="h-7 px-[3px] flex items-center">
+                <span className={`block h-1.5 rounded-full shadow transition-all ${i === current ? 'bg-white w-6' : 'bg-white/60 w-3'}`} />
+              </button>
             ))}
           </div>
         </>

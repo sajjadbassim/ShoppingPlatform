@@ -4,6 +4,9 @@ import { cartService } from '../services';
 import { countPieces } from '../utils/weight';
 import { useAuthStore } from './authStore';
 
+// طلب جلب السلة الجاري: طلب ثانٍ قبل انتهائه (App + صفحة السلة عند التحميل) ينتظر نفسه بدل طلب مكرر
+let pendingFetch = null;
+
 export const useCartStore = create(
   persist(
     (set, get) => ({
@@ -12,16 +15,22 @@ export const useCartStore = create(
       isLoading: false,
       error: null,
 
-      fetchCart: async () => {
+      fetchCart: () => {
+        if (pendingFetch) return pendingFetch;
         set({ isLoading: true, error: null });
-        try {
-          const data = await cartService.get();
-          set({ items: data.items || [], cartData: data, isLoading: false });
-          return data;
-        } catch (error) {
-          set({ isLoading: false, error: error.message });
-          throw error;
-        }
+        pendingFetch = (async () => {
+          try {
+            const data = await cartService.get();
+            set({ items: data.items || [], cartData: data, isLoading: false });
+            return data;
+          } catch (error) {
+            set({ isLoading: false, error: error.message });
+            throw error;
+          } finally {
+            pendingFetch = null;
+          }
+        })();
+        return pendingFetch;
       },
 
       addItem: async (productId, quantity = 1, variantId = null) => {

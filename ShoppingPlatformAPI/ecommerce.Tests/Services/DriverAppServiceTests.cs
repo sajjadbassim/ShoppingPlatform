@@ -72,7 +72,7 @@ namespace ecommerce.Tests.Services
             var order = new Order { OrderNumber = $"ORD-{Guid.NewGuid():N}"[..12], CustomerId = customer.Id, AddressId = address.Id, TotalAmount = total, PaymentMethod = PaymentMethods.COD, PaymentStatus = PaymentStatus.Pending, Status = OrderStatus.OUT_FOR_DELIVERY };
             _context.Orders.Add(order);
             foreach (var (vendor, driver, subtotal) in parts)
-                _context.SubOrders.Add(new SubOrder { OrderId = order.Id, VendorId = vendor.Id, DriverId = driver.Id, Subtotal = subtotal, Status = OrderStatus.OUT_FOR_DELIVERY, SubOrderNumber = "S", AssignedAt = DateTime.UtcNow });
+                _context.SubOrders.Add(new SubOrder { OrderId = order.Id, VendorId = vendor.Id, DriverId = driver.Id, Subtotal = subtotal, Status = OrderStatus.OUT_FOR_DELIVERY, SubOrderNumber = "S", AssignedAt = DateTime.UtcNow, PickedUpAt = DateTime.UtcNow });
             _context.SaveChanges();
             return order;
         }
@@ -114,6 +114,63 @@ namespace ecommerce.Tests.Services
             Assert.Equal(_driver.Id, saved.CashCollectedByDriverId);
             Assert.Equal(PaymentStatus.Paid, saved.PaymentStatus);
             Assert.Equal(30_000, (await Service().GetProfileAsync(_driverUser.Id)).CashInHand);
+        }
+
+        [Fact]
+        public async Task Deliver_BeforePickup_IsRejected()
+        {
+            var order = AddOrder(30_000, (_v1, _driver, 28_000));
+            var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
+            sub.PickedUpAt = null;
+            _context.SaveChanges();
+
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true }));
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().FailAsync(_driverUser.Id, order.Id, new DriverFailDto { Reason = DeliveryFailureReason.NoAnswer }));
+            _ops.Verify(o => o.MarkDeliveredByDriverAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
+
+            await Service().PickUpAsync(_driverUser.Id, sub.Id);
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+        }
+
+        [Fact]
+        public async Task SplitOrder_EachDriverHoldsOnlyTheirOwnCash()
+        {
+            // 20,000 مع السائق الأول و25,000 مع الثاني — كلٌّ يُحاسَب على ما جمعه هو
+            var order = AddOrder(45_000, (_v1, _driver, 20_000), (_v2, _otherDriver, 25_000));
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+
+            var otherUser = new User { Phone = "0771", Role = UserRoles.Driver, IsActive = true };
+            _context.Users.Add(otherUser);
+            _otherDriver.UserId = otherUser.Id;
+            _context.SaveChanges();
+            await Service().DeliverAsync(otherUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+
+            Assert.Equal(20_000, (await Service().GetCashAsync(_driver.Id)).Total);
+            Assert.Equal(25_000, (await Service().GetCashAsync(_otherDriver.Id)).Total);
+            Assert.Equal(1, await Service().SettleCashAsync(_driver.Id, Guid.NewGuid()));
+            Assert.Equal(25_000, (await Service().GetCashAsync(_otherDriver.Id)).Total);   // تسوية الأول لا تمسّ نقد الثاني
+        }
+
+        [Fact]
+        public async Task SplitOrder_WithDiscount_PartsAddUpToOrderTotal()
+        {
+            // كوبون 3,000 لمتجر v1 + نقاط 1,000: مجموع ما يجمعه السائقان = إجمالي الطلب بعد الخصم
+            var order = AddOrder(41_000, (_v1, _driver, 20_000), (_v2, _otherDriver, 25_000));
+            var tracked = _context.Orders.Single(o => o.Id == order.Id);
+            tracked.DiscountAmount = 4_000;
+            tracked.PointsDiscountAmount = 1_000;
+            tracked.CouponVendorId = _v1.Id;
+            _context.SaveChanges();
+
+            var mine = Assert.Single(await Service().GetOrdersAsync(_driverUser.Id, history: false));
+            var otherUser = new User { Phone = "0772", Role = UserRoles.Driver, IsActive = true };
+            _context.Users.Add(otherUser);
+            _otherDriver.UserId = otherUser.Id;
+            _context.SaveChanges();
+            var theirs = Assert.Single(await Service().GetOrdersAsync(otherUser.Id, history: false));
+
+            Assert.Equal(41_000, mine.AmountToCollect + theirs.AmountToCollect);
+            Assert.Equal(20_000 - 3_000 - 444.44m, mine.AmountToCollect);   // الكوبون كله على متجره + نصيبه من النقاط
         }
 
         [Fact]

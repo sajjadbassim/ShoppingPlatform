@@ -20,6 +20,7 @@ import { useWishlistStore } from '../../stores/wishlistStore'
 import { useToast } from './Toast'
 import { getDashboardLink } from '../../utils/dashboardLink'
 import UserAvatar from './UserAvatar'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 // المسارات التي تُعتبر ضمن تبويب "حسابي"
 const ACCOUNT_PATHS = ['/profile', '/orders', '/wishlist', '/settings', '/loyalty', '/returns', '/notifications']
@@ -83,6 +84,8 @@ const BottomNav = () => {
   const cartCount = useCartStore((s) => s.getItemsCount())
   const wishlistCount = useWishlistStore((s) => s.items.length)
   const [sheetOpen, setSheetOpen] = useState(false)
+  // زر الرجوع في الهاتف يغلق القائمة بدل مغادرة الصفحة
+  useBackToClose(sheetOpen, () => setSheetOpen(false))
 
   const { pathname } = location
   const dashboardLink = isAuthenticated ? getDashboardLink(user?.role) : null
@@ -109,7 +112,7 @@ const BottomNav = () => {
     logout()
     success('تم تسجيل الخروج بنجاح')
     setSheetOpen(false)
-    navigate('/')
+    navigate('/', { replace: true })   // يحلّ محل خطوة القائمة في السجل
   }
 
   // صفحات المنتج والسلة وإتمام الطلب تعرض شريط إجراء ثابتاً مكان التبويبات
@@ -130,7 +133,7 @@ const BottomNav = () => {
   ]
 
   const SheetLink = ({ to, icon: Icon, label, count, className = 'text-gray-800' }) => (
-    <Link to={to} className={`flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 ${className}`}>
+    <Link to={to} replace className={`flex items-center gap-3 px-4 py-3.5 active:bg-gray-50 ${className}`}>
       <Icon size={20} className="opacity-70" />
       <span className="flex-1 font-medium">{label}</span>
       {count > 0 && (
@@ -162,10 +165,10 @@ const BottomNav = () => {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 px-4 pb-4">
-                <Link to="/login" className="h-12 flex items-center justify-center bg-gray-900 text-white rounded-xl font-bold">
+                <Link to="/login" replace className="h-12 flex items-center justify-center bg-gray-900 text-white rounded-xl font-bold">
                   تسجيل الدخول
                 </Link>
-                <Link to="/register" className="h-12 flex items-center justify-center border border-gray-300 text-gray-800 rounded-xl font-bold">
+                <Link to="/register" replace className="h-12 flex items-center justify-center border border-gray-300 text-gray-800 rounded-xl font-bold">
                   إنشاء حساب
                 </Link>
               </div>
@@ -174,7 +177,7 @@ const BottomNav = () => {
             {/* الإدارة: لكل الأدوار عدا الزبون، تفتح لوحة الدور */}
             {dashboardLink && (
               <div className="px-4 pb-4">
-                <Link to={dashboardLink.path}
+                <Link to={dashboardLink.path} replace
                   className="flex items-center gap-3 p-3.5 rounded-2xl bg-primary text-white shadow-md shadow-primary/25 active:scale-[0.98] transition-transform">
                   <span className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
                     <dashboardLink.icon size={20} />

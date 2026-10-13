@@ -389,6 +389,11 @@ namespace ecommerce.Services.LoyaltyService
             if (order == null)
                 throw new NotFoundException("الطلب غير موجود");
 
+            // الخصم يغيّر المبلغ المطلوب: يُسمح به قبل خروج الطلب مع السائق فقط — لا على ملغى ولا على ما سُلّم ودُفع
+            var redeemable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.PARTIALLY_CONFIRMED, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY };
+            if (!redeemable.Contains(order.Status) || order.PaymentStatus == PaymentStatus.Paid)
+                throw new BusinessRuleException($"لا يمكن استخدام النقاط على طلب «{OrderStatusText.Ar(order.Status)}»");
+
             // التحقق أنه لم يتم استرداد نقاط لهذا الطلب من قبل
             var alreadyRedeemed = await _context.LoyaltyTransactions
                 .AnyAsync(t => t.OrderId == dto.OrderId && t.Type == LoyaltyTransactionType.Redeemed);
@@ -415,6 +420,7 @@ namespace ecommerce.Services.LoyaltyService
 
             // تطبيق الخصم على الطلب
             order.DiscountAmount += discountAmount;
+            order.PointsDiscountAmount += discountAmount;   // تتحمّله المنصة لا المتجر
             order.TotalAmount -= discountAmount;
             if (order.TotalAmount < 0) order.TotalAmount = 0;
 

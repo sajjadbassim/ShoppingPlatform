@@ -32,7 +32,9 @@
         // المبالغ
         public decimal Subtotal { get; set; }
         public decimal DeliveryFee { get; set; }
-        public decimal Total => Subtotal + DeliveryFee;
+        // نصيب هذا المتجر من خصم الطلب (كوبون/نقاط) — الإجمالي = ما يُحصَّل عن هذا الجزء
+        public decimal DiscountShare { get; set; }
+        public decimal Total => Subtotal + DeliveryFee - DiscountShare;
 
         // التوقيت
         public DateTime CreatedAt { get; set; }

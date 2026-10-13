@@ -47,6 +47,7 @@ namespace ecommerce.Data
         public DbSet<DeliveryZone> DeliveryZones { get; set; }
         public DbSet<OrderDriverRating> OrderDriverRatings { get; set; }
         public DbSet<VendorLedgerEntry> VendorLedgerEntries { get; set; }
+        public DbSet<DriverCashEntry> DriverCashEntries { get; set; }
 
         public DbSet<PasswordResetOtp> PasswordResetOtps { get; set; }
 

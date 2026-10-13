@@ -125,11 +125,11 @@ const ActiveOrderCard = ({ order, onDeliver, onFail }) => {
             </div>
           </div>
 
-          <button type="button" onClick={() => onDeliver(order)}
-            className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-2">
+          <button type="button" onClick={() => onDeliver(order)} disabled={!allPicked}
+            className="w-full h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             <CheckCircle2 size={18} /> تم التسليم
           </button>
-          {!allPicked && <p className="text-[11px] text-gray-400 text-center -mt-2">يمكنك التسليم مباشرة — سيُسجّل الاستلام تلقائياً</p>}
+          {!allPicked && <p className="text-[11px] text-gray-500 text-center -mt-2">اضغط «استلمت» عند كل متجر أولاً</p>}
           <button type="button" onClick={() => onFail(order)}
             className="w-full h-10 rounded-xl border border-orange-300 text-orange-700 text-sm font-bold">
             تعذّر التسليم

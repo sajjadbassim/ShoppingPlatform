@@ -79,7 +79,7 @@ namespace ecommerce.Services
         // ─────────────────────────────────────────────────────────────────────
         // Helper: Map SubOrder → PendingSubOrderDto
         // ─────────────────────────────────────────────────────────────────────
-        private static PendingSubOrderDto MapToPendingDto(SubOrder so)
+        private static PendingSubOrderDto MapToPendingDto(SubOrder so, decimal discountShare)
         {
             var timeRemaining = so.ConfirmationDeadline.HasValue
                 ? so.ConfirmationDeadline.Value - DateTime.UtcNow
@@ -108,6 +108,7 @@ namespace ecommerce.Services
                 VendorPhone = so.Vendor?.Phone,
                 Subtotal = so.Subtotal,
                 DeliveryFee = so.DeliveryFee,
+                DiscountShare = discountShare,
                 CreatedAt = so.CreatedAt,
                 ConfirmationDeadline = so.ConfirmationDeadline,
                 MinutesRemaining = (int)Math.Max(0, timeRemaining.TotalMinutes),
@@ -121,8 +122,9 @@ namespace ecommerce.Services
         // ─────────────────────────────────────────────────────────────────────
         public async Task<IEnumerable<PendingSubOrderDto>> GetPendingSubOrdersAsync()
         {
-            var subOrders = await _subOrderRepository.GetPendingSubOrdersAsync();
-            return subOrders.Select(MapToPendingDto).OrderBy(so => so.MinutesRemaining);
+            var subOrders = (await _subOrderRepository.GetPendingSubOrdersAsync()).ToList();
+            var shares = await SharesAsync(subOrders);
+            return subOrders.Select(so => MapToPendingDto(so, shares.GetValueOrDefault(so.Id))).OrderBy(so => so.MinutesRemaining);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -132,7 +134,7 @@ namespace ecommerce.Services
         {
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
-            return MapToDto(subOrder);
+            return await MapToDtoAsync(subOrder);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -160,7 +162,7 @@ namespace ecommerce.Services
             await _notificationService.NotifyCustomerAsync(subOrder.Order.CustomerId, $"تم تأكيد جزء من طلبك ({subOrder.Vendor.Name})", new { subOrderId = subOrder.Id });
             await UpdateMainOrderStatusAsync(subOrder.OrderId);
 
-            return MapToDto(subOrder);
+            return await MapToDtoAsync(subOrder);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -209,7 +211,7 @@ namespace ecommerce.Services
             await UpdateMainOrderStatusAsync(subOrder.OrderId);
             if (wholeOrderCancelled) await _loyaltyService.CancelRedemptionAsync(order.Id);   // النقاط المستخدمة ترجع للزبون
 
-            return MapToDto(subOrder);
+            return await MapToDtoAsync(subOrder);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -265,7 +267,7 @@ namespace ecommerce.Services
             await UpdateMainOrderStatusAsync(subOrder.OrderId);
             if (dto.NewStatus == OrderStatus.DELIVERED && _finance != null)
                 await _finance.EnsureSubOrderEntriesAsync(subOrder.Id);
-            return MapToDto(subOrder);
+            return await MapToDtoAsync(subOrder);
         }
         public async Task<IEnumerable<SubOrderDto>> AssignDriverToOrderAsync(Guid orderId, AssignDriverToOrderDto dto)
         {
@@ -315,7 +317,7 @@ namespace ecommerce.Services
 
             await UpdateMainOrderStatusAsync(orderId);
 
-            return activeSubOrders.Select(MapToDto);
+            return await MapToDtosAsync(activeSubOrders);
         }
         // ─────────────────────────────────────────────────────────────────────
         // ASSIGN DRIVER
@@ -350,7 +352,7 @@ namespace ecommerce.Services
             await _notificationService.NotifyDriverUpdatedAsync(driver.Id, driver.WorkStatus, "assigned");
             await UpdateMainOrderStatusAsync(subOrder.OrderId);
 
-            return MapToDto(subOrder);
+            return await MapToDtoAsync(subOrder);
         }
 
         // ─────────────────────────────────────────────────────────────────────
@@ -359,10 +361,12 @@ namespace ecommerce.Services
         public async Task<SubOrdersPagedResultDto> GetSubOrdersPagedAsync(int pageNumber, int pageSize, string? status)
         {
             var (items, totalCount) = await _subOrderRepository.GetPagedAsync(pageNumber, pageSize, status);
+            var list = items.ToList();
+            var shares = await SharesAsync(list);
 
             return new SubOrdersPagedResultDto
             {
-                Items = items.Select(MapToPendingDto).ToList(),
+                Items = list.Select(so => MapToPendingDto(so, shares.GetValueOrDefault(so.Id))).ToList(),
                 TotalCount = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize
@@ -380,7 +384,19 @@ namespace ecommerce.Services
         // ─────────────────────────────────────────────────────────────────────
         // PRIVATE: MapToDto (SubOrderDto — للتفاصيل)
         // ─────────────────────────────────────────────────────────────────────
-        private SubOrderDto MapToDto(SubOrder so)
+        private async Task<SubOrderDto> MapToDtoAsync(SubOrder so) =>
+            MapToDto(so, (await SharesAsync(new[] { so })).GetValueOrDefault(so.Id));
+
+        private async Task<List<SubOrderDto>> MapToDtosAsync(IReadOnlyCollection<SubOrder> subs)
+        {
+            var shares = await SharesAsync(subs);
+            return subs.Select(so => MapToDto(so, shares.GetValueOrDefault(so.Id))).ToList();
+        }
+
+        private Task<Dictionary<Guid, decimal>> SharesAsync(IEnumerable<SubOrder> subs) =>
+            _subOrderRepository.GetDiscountSharesAsync(subs.Select(s => s.OrderId));
+
+        private SubOrderDto MapToDto(SubOrder so, decimal discountShare)
         {
             var timeRemaining = so.ConfirmationDeadline.HasValue
                 ? so.ConfirmationDeadline.Value - DateTime.UtcNow
@@ -397,6 +413,7 @@ namespace ecommerce.Services
                 VendorPhone = so.Vendor?.Phone,
                 Subtotal = so.Subtotal,
                 DeliveryFee = so.DeliveryFee,
+                DiscountShare = discountShare,
                 ConfirmedBy = so.ConfirmedBy,
                 ConfirmedByName = so.ConfirmedByUser?.FullName,
                 ConfirmedAt = so.ConfirmedAt,
@@ -477,8 +494,7 @@ namespace ecommerce.Services
             if (driver != null)
             {
                 driver.TotalDeliveries += 1;
-                var (stillActive, _) = await _subOrderRepository.GetByDriverAsync(driverId, 1, 1, "active");
-                if (!stillActive.Any()) driver.WorkStatus = DriverWorkStatus.Available;
+                if (!await _subOrderRepository.HasActiveDeliveryAsync(driverId)) driver.WorkStatus = DriverWorkStatus.Available;
                 await _driverRepository.UpdateAsync(driver);
             }
 
@@ -510,8 +526,7 @@ namespace ecommerce.Services
             var driver = await _driverRepository.GetByIdAsync(driverId);
             if (driver != null)
             {
-                var (stillActive, _) = await _subOrderRepository.GetByDriverAsync(driverId, 1, 1, "active");
-                if (!stillActive.Any(s => s.Status == OrderStatus.OUT_FOR_DELIVERY)) driver.WorkStatus = DriverWorkStatus.Available;
+                if (!await _subOrderRepository.HasActiveDeliveryAsync(driverId)) driver.WorkStatus = DriverWorkStatus.Available;
                 await _driverRepository.UpdateAsync(driver);
             }
 
@@ -577,9 +592,16 @@ namespace ecommerce.Services
 
             if (newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.CANCELLED)
             {
-                driver.WorkStatus = DriverWorkStatus.Available;
-                driver.TotalDeliveries += newStatus == OrderStatus.DELIVERED ? 1 : 0;
-                await _driverRepository.UpdateAsync(driver);
+                // يعود متاحاً فقط إن كان «يوصل» ولم يبقَ معه طلب آخر في الطريق — إلغاء طلب فشل سابقاً
+                // (ما زال يحمل معرّف سائقه القديم) لا يحرّر سائقاً خرج بطلب جديد
+                var changed = false;
+                if (driver.WorkStatus == DriverWorkStatus.Delivering && !await _subOrderRepository.HasActiveDeliveryAsync(driver.Id, subOrder.Id))
+                {
+                    driver.WorkStatus = DriverWorkStatus.Available;
+                    changed = true;
+                }
+                if (newStatus == OrderStatus.DELIVERED) { driver.TotalDeliveries += 1; changed = true; }
+                if (changed) await _driverRepository.UpdateAsync(driver);
             }
             else if (newStatus == OrderStatus.OUT_FOR_DELIVERY)
             {

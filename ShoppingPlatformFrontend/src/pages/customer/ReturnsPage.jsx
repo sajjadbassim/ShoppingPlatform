@@ -13,6 +13,7 @@ import { apiGet, apiPostForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useAuthStore } from '../../stores/authStore'
 import { useCustomerOrders } from '../../hooks/useOrders'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 // ===========================
 // Helpers
@@ -40,6 +41,8 @@ const StatusBadge = ({ status }) => {
 // ===========================
 
 const NewReturnForm = ({ onClose, onSuccess }) => {
+  // زر الرجوع في الهاتف يغلق النموذج بدل مغادرة الصفحة
+  useBackToClose(true, onClose)
   const { success: showSuccess, error: showError } = useToast()
   const { user } = useAuthStore()
   const queryClient = useQueryClient()

@@ -208,6 +208,7 @@ const ProductCard = ({
             )}
 
             <button onClick={handleToggleWishlist}
+              aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة للمفضلة'} aria-pressed={isWishlisted}
               className={`absolute top-2 left-2 sm:top-3 sm:left-3 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center transition-all duration-200 ${
                 isWishlisted
                   ? 'bg-error text-white'
@@ -356,7 +357,7 @@ const ProductCard = ({
               )}
             </div>
             {inStock && (
-              <button onClick={handleAddToCart} className="btn-primary btn-sm">
+              <button onClick={handleAddToCart} aria-label="إضافة للسلة" className="btn-primary btn-sm">
                 <ShoppingCart size={16} />
               </button>
             )}

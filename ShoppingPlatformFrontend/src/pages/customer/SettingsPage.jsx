@@ -61,7 +61,7 @@ const ToggleRow = ({ icon, color, title, subtitle, checked, onChange, disabled }
       <span className="block text-sm font-medium text-gray-900">{title}</span>
       {subtitle && <span className="block text-xs text-gray-500 mt-0.5">{subtitle}</span>}
     </span>
-    <Toggle checked={checked} onChange={onChange} disabled={disabled} />
+    <Toggle checked={checked} onChange={onChange} disabled={disabled} aria-label={title} />
   </label>
 )
 

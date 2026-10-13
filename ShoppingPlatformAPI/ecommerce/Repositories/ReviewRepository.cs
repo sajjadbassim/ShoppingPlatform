@@ -1,4 +1,5 @@
 ﻿using ecommerce.Core.DTO.Review;
+using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using Microsoft.EntityFrameworkCore;
@@ -183,12 +184,14 @@ namespace ecommerce.Repositories
 
         public async Task<bool> HasUserPurchasedProductAsync(Guid userId, Guid productId, Guid orderId)
         {
+            // وصل فعلاً: طلب متجره مُسلَّم وبقي منه شيء بعد ما أزاله المتجر (غير متوفر) أو رفضه الزبون عند الباب
             return await _context.SubOrderItems
                 .AnyAsync(i =>
                     i.SubOrder.Order.Id == orderId &&
                     i.SubOrder.Order.CustomerId == userId &&
                     i.ProductId == productId &&
-                    i.SubOrder.Order.Status == "DELIVERED");
+                    i.SubOrder.Status == OrderStatus.DELIVERED &&
+                    i.Quantity - i.RefusedQuantity > 0);
         }
 
         // ===================================

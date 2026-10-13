@@ -87,6 +87,17 @@ namespace ecommerce.Data.Configurations
         }
     }
 
+    public class DriverCashEntryConfiguration : IEntityTypeConfiguration<DriverCashEntry>
+    {
+        public void Configure(EntityTypeBuilder<DriverCashEntry> entity)
+        {
+            entity.HasIndex(e => new { e.DriverId, e.SettledAt }).HasDatabaseName("idx_driver_cash_driver_settled");
+            entity.HasIndex(e => e.OrderId).HasDatabaseName("idx_driver_cash_order");
+            entity.HasOne(e => e.Order).WithMany().HasForeignKey(e => e.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Driver).WithMany().HasForeignKey(e => e.DriverId).OnDelete(DeleteBehavior.Restrict);
+        }
+    }
+
     // ===================================
     // تكوين جدول SubOrders
     // ===================================

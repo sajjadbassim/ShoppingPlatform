@@ -56,7 +56,7 @@ export const TabsList = ({ children, className = '' }) => {
 
   return (
     // تمرير أفقي بدل أن تدفع التبويبات الكثيرة الصفحة خارج الشاشة على الهاتف
-    <div className={`flex gap-1 overflow-x-auto hide-scrollbar ${variants[variant]} ${className}`}>
+    <div role="tablist" className={`flex gap-1 overflow-x-auto hide-scrollbar ${variants[variant]} ${className}`}>
       {children}
     </div>
   )

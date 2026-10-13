@@ -751,6 +751,54 @@ namespace ecommerce.Migrations
                     b.ToTable("drivers");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.DriverCashEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTime>("CollectedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("collected_at");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("driver_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTime?>("SettledAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("settled_at");
+
+                    b.Property<Guid?>("SettledBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("settled_by");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId")
+                        .HasDatabaseName("idx_driver_cash_order");
+
+                    b.HasIndex("DriverId", "SettledAt")
+                        .HasDatabaseName("idx_driver_cash_driver_settled");
+
+                    b.ToTable("driver_cash_entries");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.FacebookConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1724,6 +1772,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("coupon_code");
 
+                    b.Property<Guid?>("CouponVendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("coupon_vendor_id");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("created_at");
@@ -1793,6 +1845,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasDefaultValue("PENDING")
                         .HasColumnName("payment_status");
+
+                    b.Property<decimal>("PointsDiscountAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("points_discount_amount");
 
                     b.Property<decimal?>("RefusalFeeAmount")
                         .HasColumnType("decimal(10,2)")
@@ -4015,6 +4071,25 @@ namespace ecommerce.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.DriverCashEntry", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Driver", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Driver");
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.FacebookConnection", b =>

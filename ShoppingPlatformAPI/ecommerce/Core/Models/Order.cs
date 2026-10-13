@@ -116,6 +116,14 @@ namespace ecommerce.Core.Models
         [Column("coupon_code")]
         public string? CouponCode { get; set; }
 
+        // جزء الخصم الآتي من النقاط (تتحمّله المنصة). الباقي من DiscountAmount = خصم الكوبون
+        [Column("points_discount_amount", TypeName = "decimal(10,2)")]
+        public decimal PointsDiscountAmount { get; set; } = 0;
+
+        // متجر الكوبون إن كان كوبوناً خاصاً بمتجر (يتحمّله المتجر ويُحسب على طلبه الفرعي فقط) — فارغ = كوبون عام
+        [Column("coupon_vendor_id")]
+        public Guid? CouponVendorId { get; set; }
+
         // موعد التوصيل الذي اختاره الزبون لطلب فيه منتجات سوبرماركت (UTC) — فارغ = في أقرب وقت
         [Column("delivery_slot_start")]
         public DateTime? DeliverySlotStart { get; set; }

@@ -145,6 +145,8 @@ namespace ecommerce.Services.OrderRatingService
             {
                 var subOrder = order.SubOrders.FirstOrDefault(so => so.Id == subDto.SubOrderId)
                     ?? throw new BusinessRuleException("المتجر المُقيَّم لا ينتمي لهذا الطلب");
+                if (subOrder.Status != OrderStatus.DELIVERED)
+                    throw new BusinessRuleException("لا يمكن تقييم متجر لم يصلك طلبه");
 
                 if (rating.SubOrderRatings.Any(sr => sr.SubOrderId == subDto.SubOrderId))
                 {

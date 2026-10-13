@@ -18,6 +18,10 @@ namespace ecommerce.Controllers
             _opsService = opsService;
         }
 
+        // منفّذ الإجراء من جلسة الدخول دائماً — opsUserId المرسل في الطلب يُتجاهل (وإلا سُجّل الإجراء باسم موظف آخر)
+        private Guid CurrentUserId =>
+            Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("userId")?.Value, out var id) ? id : Guid.Empty;
+
         // GET: api/ops/suborders/pending
         [HttpGet("suborders/pending")]
         public async Task<IActionResult> GetPendingSubOrders()
@@ -54,6 +58,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                dto.OpsUserId = CurrentUserId;
                 var subOrder = await _opsService.ConfirmSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تأكيد الطلب الفرعي بنجاح" });
             }
@@ -70,6 +75,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                dto.OpsUserId = CurrentUserId;
                 var subOrder = await _opsService.CancelSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم إلغاء الطلب الفرعي بنجاح" });
             }
@@ -85,6 +91,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                dto.OpsUserId = CurrentUserId;
                 var subOrder = await _opsService.UpdateSubOrderStatusAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تحديث حالة الطلب بنجاح" });
             }
@@ -134,6 +141,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                dto.OpsUserId = CurrentUserId;
                 var subOrder = await _opsService.AssignDriverAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تعيين السائق بنجاح" });
             }
@@ -149,6 +157,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                dto.OpsUserId = CurrentUserId;
                 var result = await _opsService.AssignDriverToOrderAsync(orderId, dto);
                 return Ok(new { success = true, data = result, message = "تم تعيين السائق لكامل الطلب بنجاح" });
             }

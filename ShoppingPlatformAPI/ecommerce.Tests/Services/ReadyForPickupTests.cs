@@ -119,7 +119,11 @@ namespace ecommerce.Tests.Services
         [InlineData(new[] { "READY", "CONFIRMED" }, "PREPARING")]
         [InlineData(new[] { "READY", "CANCELLED" }, "READY")]
         [InlineData(new[] { "READY", "DELIVERED" }, "READY")]            // إعادة محاولة متجر بعد تسليم آخر
-        [InlineData(new[] { "READY", "OUT_FOR_DELIVERY" }, "OUT_FOR_DELIVERY")]
+        [InlineData(new[] { "READY", "OUT_FOR_DELIVERY" }, "READY")]            // جزء خرج وجزء ما زال في متجره — ليس «في الطريق» بعد
+        [InlineData(new[] { "PREPARING", "OUT_FOR_DELIVERY" }, "PREPARING")]
+        [InlineData(new[] { "OUT_FOR_DELIVERY", "OUT_FOR_DELIVERY" }, "OUT_FOR_DELIVERY")]
+        [InlineData(new[] { "OUT_FOR_DELIVERY", "DELIVERED" }, "OUT_FOR_DELIVERY")]
+        [InlineData(new[] { "OUT_FOR_DELIVERY", "CANCELLED" }, "OUT_FOR_DELIVERY")]
         [InlineData(new[] { "CONFIRMED", "CONFIRMED" }, "CONFIRMED")]
         [InlineData(new[] { "CONFIRMED", "PENDING_CONFIRMATION" }, "PARTIALLY_CONFIRMED")]
         [InlineData(new[] { "DELIVERED", "DELIVERY_FAILED" }, "DELIVERED")]

@@ -33,23 +33,30 @@ import { StoreClosedBadge, isStoreClosed } from '../../components/common/StoreCl
 // ===========================
 // ReviewSummary — ملخص التقييمات
 // ===========================
-const StarRating = ({ value, onChange, size = 24 }) => (
-  <div className="flex gap-1">
-    {[1,2,3,4,5].map(star => (
-      <button
-        key={star}
-        type="button"
-        onClick={() => onChange?.(star)}
-        className={onChange ? 'cursor-pointer' : 'cursor-default'}
-      >
-        <Star
-          size={size}
-          className={star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}
-        />
-      </button>
-    ))}
-  </div>
-)
+// للعرض فقط (بلا onChange): نجوم عادية بوصف واحد لقارئ الشاشة — لا أزرار لا تفعل شيئاً
+// للاختيار (نموذج التقييم): أزرار باسم كل نجمة
+const StarRating = ({ value, onChange, size = 24 }) => {
+  if (!onChange) {
+    return (
+      <div className="flex gap-1" role="img" aria-label={`${value} من 5 نجوم`}>
+        {[1,2,3,4,5].map(star => (
+          <Star key={star} size={size} aria-hidden="true"
+            className={star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div className="flex gap-1">
+      {[1,2,3,4,5].map(star => (
+        <button key={star} type="button" onClick={() => onChange(star)} aria-label={`${star} من 5 نجوم`}
+          aria-pressed={star === value} className="cursor-pointer">
+          <Star size={size} className={star <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} />
+        </button>
+      ))}
+    </div>
+  )
+}
 
 const ReviewSummary = ({ summary, isLoading }) => {
   if (isLoading) return <Skeleton className="h-32 w-full" />
@@ -547,7 +554,7 @@ const ImageGallery = ({ images, alt }) => {
   return (
     <div>
       <div className="relative mb-4">
-        <div ref={trackRef}
+        <div ref={trackRef} tabIndex={0} aria-label="صور المنتج"
           className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar rounded-lg product-media overscroll-x-contain">
           {slides.map((src, i) => (
             <div key={`${src}-${i}`} data-index={i} className="w-full flex-shrink-0 snap-center snap-always aspect-square">
@@ -579,7 +586,7 @@ const ImageGallery = ({ images, alt }) => {
       {slides.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
           {slides.map((src, i) => (
-            <button key={`${src}-${i}`} type="button" onClick={() => goTo(i)}
+            <button key={`${src}-${i}`} type="button" onClick={() => goTo(i)} aria-label={`الصورة ${i + 1}`} aria-current={i === index ? 'true' : undefined}
               className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-colors ${
                 i === index ? 'border-primary' : 'border-transparent hover:border-gray-300'
               }`}>
@@ -896,13 +903,14 @@ const ProductDetailsContent = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={handleToggleWishlist}
+                    aria-label={isWishlisted ? 'إزالة من المفضلة' : 'إضافة للمفضلة'} aria-pressed={isWishlisted}
                     className={`p-2 rounded-full border transition-colors ${
                       isWishlisted ? 'bg-red-500 text-white border-red-500' : 'border-gray-300 hover:bg-gray-100'
                     }`}
                   >
                     <Heart size={20} fill={isWishlisted ? 'currentColor' : 'none'} />
                   </button>
-                  <button onClick={handleShare} className="p-2 rounded-full border border-gray-300 hover:bg-gray-100">
+                  <button onClick={handleShare} aria-label="مشاركة المنتج" className="p-2 rounded-full border border-gray-300 hover:bg-gray-100">
                     <Share2 size={20} />
                   </button>
                 </div>
@@ -994,7 +1002,7 @@ const ProductDetailsContent = () => {
                   <span className="text-gray-700">{isByWeight(product) ? 'الوزن:' : 'الكمية:'}</span>
                   <div className="flex items-center border border-gray-300 rounded-lg">
                     <button
-                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))} aria-label="إنقاص الكمية"
                       disabled={quantity <= 1}
                       className="p-2 hover:bg-gray-100 transition-colors disabled:opacity-50"
                     >
@@ -1002,7 +1010,7 @@ const ProductDetailsContent = () => {
                     </button>
                     <span className={`${isByWeight(product) ? 'min-w-[4.5rem] px-2' : 'w-12'} text-center font-medium whitespace-nowrap`}>{formatQuantity(quantity, product.weightStepKg)}</span>
                     <button
-                      onClick={() => setQuantity(q => Math.min(availableStock, q + 1))}
+                      onClick={() => setQuantity(q => Math.min(availableStock, q + 1))} aria-label="زيادة الكمية"
                       disabled={quantity >= availableStock}
                       className="p-2 hover:bg-gray-100 transition-colors disabled:opacity-50"
                     >

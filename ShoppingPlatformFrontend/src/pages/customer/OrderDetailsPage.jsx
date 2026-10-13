@@ -17,6 +17,7 @@ import { orderService } from '../../services'
 import { CustomerDeliveredIn } from '../../components/common/OrderTiming'
 import DeliverySlot from '../../components/common/DeliverySlot'
 import { formatQuantity, formatPrice } from '../../utils/weight'
+import { useBackToClose } from '../../hooks/useBackToClose'
 
 
 // ===========================
@@ -256,6 +257,8 @@ const OrderDetailsPage = () => {
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [cancellationReason, setCancellationReason] = useState('')
   const [cancellingOrder, setCancellingOrder] = useState(false)
+  // زر الرجوع في الهاتف يغلق نافذة الإلغاء
+  useBackToClose(showCancelModal, () => { setShowCancelModal(false); setCancellationReason('') })
 
   // الانتقال لقسم التتبع عند القدوم من زر "تتبع الطلب" (#order-tracking) بعد تحميل الطلب
   useEffect(() => {

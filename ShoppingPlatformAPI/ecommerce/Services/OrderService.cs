@@ -200,6 +200,19 @@ namespace ecommerce.Services
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                // إرسال الطلب مرتين معاً (نقرتان، شبكة بطيئة): قفل لكل زبون حتى نهاية المعاملة، ثم التأكد أن السلة
+                // ما زالت كما قُرئت — الطلب الثاني ينتظر الأول فيجد سلته فارغة بدل أن ينشئ طلباً مكرراً
+                if (_context.Database.IsSqlServer())
+                {
+                    var lockResult = (await _context.Database.SqlQuery<int>(
+                        $"DECLARE @r int; EXEC @r = sp_getapplock @Resource = {"checkout:" + userId}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r AS [Value]")
+                        .ToListAsync()).FirstOrDefault(-1);
+                    if (lockResult < 0) throw new ConflictException("طلبك السابق ما زال قيد الإرسال — حاول بعد لحظات");
+                    var cartItemIds = cart.Items.Select(i => i.Id).ToList();
+                    if (await _context.CartItems.CountAsync(ci => cartItemIds.Contains(ci.Id)) != cartItemIds.Count)
+                        throw new ConflictException("تم إرسال هذا الطلب مسبقاً — راجع صفحة طلباتك");
+                }
+
                 // خصم المخزون عند إنشاء الطلب (ذرياً) — يمنع بيع نفس القطعة لزبونين في نفس الوقت
                 stockChanges = await _inventoryService.ReserveAsync(cart.Items.Select(i => new StockLine(
                     i.ProductId, i.VariantId, i.Quantity,
@@ -231,6 +244,7 @@ namespace ecommerce.Services
                     DiscountAmount = discountAmount,
                     TotalAmount = totalSubtotal + totalDelivery - discountAmount,
                     CouponCode = dto.CouponCode?.ToUpper(),
+                    CouponVendorId = discountAmount > 0 ? appliedCoupon?.VendorId : null,
                     PaymentMethod = PaymentMethods.COD,
                     PaymentStatus = PaymentStatus.Pending,
                     CustomerNotes = dto.CustomerNotes,
@@ -480,6 +494,7 @@ namespace ecommerce.Services
 
         private OrderResponseDto MapToDto(Order order)
         {
+            var shares = order.SubOrders == null ? new() : OrderTotals.DiscountShares(order, order.SubOrders);
             var subOrdersDto = order.SubOrders?.Select(so => new SubOrderDto
             {
                 Id = so.Id,
@@ -491,6 +506,7 @@ namespace ecommerce.Services
                 VendorPhone = so.Vendor?.Phone,
                 Subtotal = so.Subtotal,
                 DeliveryFee = so.DeliveryFee,
+                DiscountShare = shares.GetValueOrDefault(so.Id),
                 ConfirmedBy = so.ConfirmedBy,
                 ConfirmedByName = so.ConfirmedByUser?.FullName,
                 ConfirmedAt = so.ConfirmedAt,
@@ -564,7 +580,8 @@ namespace ecommerce.Services
                 CancellationReason = order.CancellationReason,
                 SubOrders = subOrdersDto,
                 TotalSubOrders = subOrdersDto?.Count ?? 0,
-                ConfirmedSubOrders = subOrdersDto?.Count(so => so.Status == SubOrderStatus.Confirmed) ?? 0,
+                // كل متجر قَبِل طلبه (مؤكد فما بعده) — لا «مؤكد» حرفياً فقط
+                ConfirmedSubOrders = subOrdersDto?.Count(so => so.Status != SubOrderStatus.PendingConfirmation && so.Status != SubOrderStatus.Cancelled) ?? 0,
                 CancelledSubOrders = subOrdersDto?.Count(so => so.Status == SubOrderStatus.Cancelled) ?? 0,
                 PendingSubOrders = subOrdersDto?.Count(so => so.Status == SubOrderStatus.PendingConfirmation) ?? 0,
                 CreatedAt = order.CreatedAt,
