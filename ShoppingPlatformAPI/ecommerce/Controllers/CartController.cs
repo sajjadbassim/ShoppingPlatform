@@ -9,7 +9,8 @@ namespace ecommerce.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    // الشراء للزبائن فقط: حساب متجر كان يستطيع شراء منتجاته هو
+    [Authorize(Policy = ecommerce.Core.Constants.PolicyNames.CustomerOnly)]
     public class CartController : Controller
     {
         private readonly ICartService _cartService;

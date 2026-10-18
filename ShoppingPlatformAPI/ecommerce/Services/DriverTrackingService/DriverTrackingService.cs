@@ -168,13 +168,15 @@ namespace ecommerce.Services.DriverTrackingService
                     var order = g.First().Order;
                     var subs = g.ToList();
                     var outForDelivery = subs.Where(s => s.Status == OrderStatus.OUT_FOR_DELIVERY).ToList();
+                    // السائق المعيَّن (استلم أو في طريقه للمتجر) — يظهر اسمه حتى قبل الاستلام
+                    var onTrip = subs.Where(DriverTrip.IsOpen).ToList();
 
                     string stage;
                     DateTime? since;
                     if (outForDelivery.Count > 0)
                     {
                         stage = StageOutForDelivery;
-                        since = outForDelivery.Min(s => s.AssignedAt ?? s.UpdatedAt);
+                        since = outForDelivery.Min(s => s.PickedUpAt ?? s.AssignedAt ?? s.UpdatedAt);
                     }
                     else if (subs.All(s => s.Status == OrderStatus.READY))
                     {
@@ -187,7 +189,7 @@ namespace ecommerce.Services.DriverTrackingService
                         since = order.CreatedAt;
                     }
 
-                    var driverSub = outForDelivery.FirstOrDefault(s => s.Driver != null);
+                    var driverSub = onTrip.FirstOrDefault(s => s.Driver != null);
                     return new TrackingDeliveryDto
                     {
                         OrderId = order.Id,
@@ -203,7 +205,10 @@ namespace ecommerce.Services.DriverTrackingService
                         Longitude = (double?)(order.DeliveryLongitude ?? order.Address?.Longitude),
                         Stores = subs.Select(s => s.Vendor?.NameAr ?? s.Vendor?.Name ?? "").Where(n => n != "").Distinct().ToList(),
                         DriverId = driverSub?.DriverId,
-                        DriverName = driverSub?.Driver?.FullName,
+                        DriverIds = onTrip.Where(s => s.DriverId.HasValue).Select(s => s.DriverId!.Value).Distinct().ToList(),
+                        // طلب موزّع على أكثر من سائق: كل الأسماء
+                        DriverName = onTrip.Where(s => s.Driver != null).Select(s => s.Driver!.FullName).Distinct() is var names && names.Any()
+                            ? string.Join("، ", names) : null,
                         Total = order.TotalAmount,
                         CreatedAt = order.CreatedAt,
                         StageSince = since,
@@ -213,9 +218,10 @@ namespace ecommerce.Services.DriverTrackingService
                 .ThenBy(d => d.StageSince)
                 .ToList();
 
+            // طلب موزّع على سائقين يُحسب توصيلةً نشطة لكلٍّ منهما
             var activeByDriver = deliveries
-                .Where(d => d.DriverId.HasValue)
-                .GroupBy(d => d.DriverId!.Value)
+                .SelectMany(d => d.DriverIds)
+                .GroupBy(id => id)
                 .ToDictionary(g => g.Key, g => g.Count());
 
             var drivers = await _context.Drivers

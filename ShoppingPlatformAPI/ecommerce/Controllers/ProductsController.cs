@@ -63,13 +63,15 @@ namespace ecommerce.Controllers
         // ===================================
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll([FromQuery] int limit = 100)
+        public async Task<IActionResult> GetAll([FromQuery] int limit = 100, [FromQuery] int page = 1)
         {
             try
             {
-                // حد أعلى للنتائج — للقوائم الكاملة استخدم /paged
-                var products = (await _productService.GetAllAsync()).Take(Math.Clamp(limit, 1, 200));
-                return Ok(new { success = true, data = products });
+                // حد أعلى للنتائج مع رقم الصفحة (كانت الصفحة تُتجاهل فتتكرر أول 100 منتج) — للقوائم الكاملة /paged
+                limit = Math.Clamp(limit, 1, 200);
+                var all = (await _productService.GetAllAsync()).ToList();
+                var products = all.Skip((Math.Max(1, page) - 1) * limit).Take(limit);
+                return Ok(new { success = true, data = products, total = all.Count, page = Math.Max(1, page), limit });
             }
             catch (AppException ex)
             {

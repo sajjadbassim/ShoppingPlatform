@@ -75,8 +75,8 @@ namespace ecommerce.Services
 
             if (eligibleAmount < coupon.MinOrderAmount)
                 return InvalidResult(coupon.VendorId != null
-                    ? $"الحد الأدنى لمشتريات هذا المتجر لاستخدام الكوبون هو {coupon.MinOrderAmount} دينار"
-                    : $"الحد الأدنى للطلب لاستخدام هذا الكوبون هو {coupon.MinOrderAmount} دينار");
+                    ? $"الحد الأدنى لمشتريات هذا المتجر لاستخدام الكوبون هو {coupon.MinOrderAmount:N0} د.ع"
+                    : $"الحد الأدنى للطلب لاستخدام هذا الكوبون هو {coupon.MinOrderAmount:N0} د.ع");
 
             // ===================================
             // 8. حساب مبلغ الخصم
@@ -156,8 +156,8 @@ namespace ecommerce.Services
             if (!DiscountType.All.Contains(dto.DiscountType))
                 throw new BusinessRuleException("نوع الخصم يجب أن يكون percentage أو fixed");
 
-            if (dto.DiscountType == DiscountType.PERCENTAGE && dto.DiscountValue > 100)
-                throw new BusinessRuleException("نسبة الخصم لا يمكن أن تتجاوز 100%");
+            ValidateValues(dto.DiscountType, dto.DiscountValue, dto.MinOrderAmount, dto.MaxDiscountAmount, dto.UsageLimit, 0, dto.UserUsageLimit);
+            ValidateDates(dto.StartsAt, dto.ExpiresAt);
 
             var coupon = new Coupon
             {
@@ -189,18 +189,53 @@ namespace ecommerce.Services
             if (coupon == null)
                 throw new NotFoundException("الكوبون غير موجود");
 
+            // نفس شروط الإنشاء — تعديل كوبون فعّال بخطأ (15 ← 150%) يجعل البضاعة مجانية
+            // سقف الخصم 0 = إلغاء السقف؛ حد الاستخدام 0 = بلا حد
+            var maxDiscount = dto.MaxDiscountAmount.HasValue ? (dto.MaxDiscountAmount > 0 ? dto.MaxDiscountAmount : null) : coupon.MaxDiscountAmount;
+            var usageLimit = dto.UsageLimit.HasValue ? (dto.UsageLimit > 0 ? dto.UsageLimit : null) : coupon.UsageLimit;
+            ValidateValues(coupon.DiscountType, dto.DiscountValue ?? coupon.DiscountValue, dto.MinOrderAmount ?? coupon.MinOrderAmount,
+                maxDiscount, usageLimit, coupon.UsageCount, dto.UserUsageLimit ?? coupon.UserUsageLimit);
+
             if (dto.Description != null) coupon.Description = dto.Description;
             if (dto.DiscountValue.HasValue) coupon.DiscountValue = dto.DiscountValue.Value;
             if (dto.MinOrderAmount.HasValue) coupon.MinOrderAmount = dto.MinOrderAmount.Value;
-            if (dto.MaxDiscountAmount.HasValue) coupon.MaxDiscountAmount = dto.MaxDiscountAmount;
-            if (dto.UsageLimit.HasValue) coupon.UsageLimit = dto.UsageLimit;
+            coupon.MaxDiscountAmount = maxDiscount;
+            coupon.UsageLimit = usageLimit;
             if (dto.UserUsageLimit.HasValue) coupon.UserUsageLimit = dto.UserUsageLimit.Value;
             if (dto.IsActive.HasValue) coupon.IsActive = dto.IsActive.Value;
+            if (dto.ExpiresAt.HasValue) ValidateDates(dto.StartsAt ?? coupon.StartsAt, dto.ExpiresAt);
+            else if (dto.StartsAt.HasValue) ValidateDates(dto.StartsAt, coupon.ExpiresAt, checkPast: false);
             if (dto.StartsAt.HasValue) coupon.StartsAt = dto.StartsAt;
             if (dto.ExpiresAt.HasValue) coupon.ExpiresAt = dto.ExpiresAt;
 
             await _couponRepository.UpdateAsync(coupon);
             return await GetByIdAsync(id);
+        }
+
+        private static void ValidateValues(string type, decimal value, decimal minOrder, decimal? maxDiscount,
+            int? usageLimit, int usageCount, int userUsageLimit)
+        {
+            if (value <= 0)
+                throw new BusinessRuleException("قيمة الخصم يجب أن تكون أكبر من صفر");
+            if (type == DiscountType.PERCENTAGE && value > 100)
+                throw new BusinessRuleException("نسبة الخصم لا يمكن أن تتجاوز 100%");
+            if (minOrder < 0)
+                throw new BusinessRuleException("الحد الأدنى للطلب لا يكون سالباً");
+            if (maxDiscount is < 0)
+                throw new BusinessRuleException("سقف الخصم لا يكون سالباً");
+            if (usageLimit.HasValue && usageLimit.Value < usageCount)
+                throw new BusinessRuleException($"حد الاستخدام ({usageLimit}) أقل من عدد مرات استخدامه حتى الآن ({usageCount})");
+            if (userUsageLimit < 1)
+                throw new BusinessRuleException("حد الاستخدام لكل زبون يجب أن يكون 1 على الأقل");
+        }
+
+        // كوبون ينتهي قبل أن يُنشأ لا يعمل أبداً — غالباً خطأ في إدخال التاريخ (لإيقاف كوبون: عطّله)
+        private static void ValidateDates(DateTime? startsAt, DateTime? expiresAt, bool checkPast = true)
+        {
+            if (checkPast && expiresAt.HasValue && expiresAt.Value <= DateTime.UtcNow)
+                throw new BusinessRuleException("تاريخ انتهاء الكوبون مضى — اختر تاريخاً قادماً، أو عطّل الكوبون بدلاً من ذلك");
+            if (startsAt.HasValue && expiresAt.HasValue && startsAt.Value >= expiresAt.Value)
+                throw new BusinessRuleException("تاريخ بداية الكوبون يجب أن يسبق تاريخ انتهائه");
         }
 
         // ===================================

@@ -67,7 +67,10 @@ namespace ecommerce.Data.Interceptors
             if (stored == null) return;
             var user = entry.Entity;
 
-            var roleChanged = stored.GetValue<string>(nameof(User.Role)) != user.Role;
+            var roleChanged = stored.GetValue<string>(nameof(User.Role)) != user.Role
+                // الصلاحيات ومتجر الموظف مثل الدور: التوكن القديم يُرفض والتجديد يعطي التوكن الجديد
+                || stored.GetValue<string?>(nameof(User.Permissions)) != user.Permissions
+                || stored.GetValue<Guid?>(nameof(User.StaffVendorId)) != user.StaffVendorId;
             var passwordChanged = stored.GetValue<string>(nameof(User.PasswordHash)) != user.PasswordHash;
             var wasActive = stored.GetValue<bool>(nameof(User.IsActive));
             if (!roleChanged && !passwordChanged && wasActive == user.IsActive)

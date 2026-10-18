@@ -34,7 +34,7 @@ namespace ecommerce.Tests.Services
             _ops.Setup(o => o.MarkDeliveredByDriverAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>()))
                 .Returns<Guid, Guid, Guid>(async (orderId, driverId, _) =>
                 {
-                    var subs = _context.SubOrders.Where(s => s.OrderId == orderId && s.DriverId == driverId).ToList();
+                    var subs = _context.SubOrders.Where(s => s.OrderId == orderId && s.DriverId == driverId && s.Status == OrderStatus.OUT_FOR_DELIVERY).ToList();
                     subs.ForEach(s => s.Status = OrderStatus.DELIVERED);
                     await _context.SaveChangesAsync();
                     var order = _context.Orders.Single(o => o.Id == orderId);
@@ -44,6 +44,16 @@ namespace ecommerce.Tests.Services
                     return subs;
                 });
         }
+
+        // الاستلام من المتجر (OpsService): الجزء المعيَّن «جاهز» يصير «في الطريق»
+        private void SetupPickUp() =>
+            _ops.Setup(o => o.MarkPickedUpByDriverAsync(It.IsAny<SubOrder>(), It.IsAny<Guid>()))
+                .Returns<SubOrder, Guid>(async (s, _) =>
+                {
+                    s.PickedUpAt = DateTime.UtcNow;
+                    s.Status = OrderStatus.OUT_FOR_DELIVERY;
+                    await _context.SaveChangesAsync();
+                });
 
         private void SetupFail() =>
             _ops.Setup(o => o.MarkFailedByDriverAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<string?>()))
@@ -100,6 +110,34 @@ namespace ecommerce.Tests.Services
         }
 
         [Fact]
+        public async Task SameDriver_SeparateTrips_LastTripCollectsOnlyItsPart()
+        {
+            // ORD-20261011-0002: ثلاثة متاجر، نفس السائق، ثلاث رحلات — آخر رحلة كانت تطلب إجمالي الطلب مرة ثانية
+            var v3 = new Vendor { Name = "C" };
+            _context.Vendors.Add(v3);
+            var order = AddOrder(90_500, (_v1, _driver, 42_700), (_v2, _driver, 27_100), (v3, _driver, 11_700));
+            order.DeliveryFees = 9_000;
+            var subs = _context.SubOrders.Where(s => s.OrderId == order.Id).ToList();
+            foreach (var s in subs) { s.DeliveryFee = 3_000; s.Status = OrderStatus.READY; s.DriverId = null; }
+            _context.SaveChanges();
+
+            var collected = new List<decimal>();
+            foreach (var trip in subs)
+            {
+                trip.DriverId = _driver.Id;
+                trip.Status = OrderStatus.OUT_FOR_DELIVERY;
+                _context.SaveChanges();
+                var o = Assert.Single(await Service().GetOrdersAsync(_driverUser.Id, history: false));
+                collected.Add(o.AmountToCollect);
+                await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+            }
+
+            Assert.Equal(new decimal[] { 45_700, 30_100, 14_700 }, collected);
+            Assert.Equal(90_500, (await Service().GetProfileAsync(_driverUser.Id)).CashInHand);
+            Assert.Equal(PaymentStatus.Paid, (await _context.Orders.AsNoTracking().SingleAsync(x => x.Id == order.Id)).PaymentStatus);
+        }
+
+        [Fact]
         public async Task Deliver_Cod_RequiresCashConfirmation_ThenRecordsCashAndPaid()
         {
             var order = AddOrder(30_000, (_v1, _driver, 28_000));
@@ -122,7 +160,9 @@ namespace ecommerce.Tests.Services
             var order = AddOrder(30_000, (_v1, _driver, 28_000));
             var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
             sub.PickedUpAt = null;
+            sub.Status = OrderStatus.READY;   // التعيين يُبقيه «جاهز» حتى الاستلام
             _context.SaveChanges();
+            SetupPickUp();
 
             await Assert.ThrowsAsync<BusinessRuleException>(() => Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true }));
             await Assert.ThrowsAsync<BusinessRuleException>(() => Service().FailAsync(_driverUser.Id, order.Id, new DriverFailDto { Reason = DeliveryFailureReason.NoAnswer }));
@@ -147,8 +187,27 @@ namespace ecommerce.Tests.Services
 
             Assert.Equal(20_000, (await Service().GetCashAsync(_driver.Id)).Total);
             Assert.Equal(25_000, (await Service().GetCashAsync(_otherDriver.Id)).Total);
-            Assert.Equal(1, await Service().SettleCashAsync(_driver.Id, Guid.NewGuid()));
+            Assert.Equal(1, (await Service().SettleCashAsync(_driver.Id, Guid.NewGuid(), 20_000)).Orders);
             Assert.Equal(25_000, (await Service().GetCashAsync(_otherDriver.Id)).Total);   // تسوية الأول لا تمسّ نقد الثاني
+
+            // ملخص الأدمن: من سوّى نقده يختفي، ويبقى الآخر بمبلغه
+            var custody = Assert.Single(await Service().GetCashCustodyAsync());
+            Assert.Equal((_otherDriver.Id, 25_000m, 1), (custody.DriverId, custody.Total, custody.Orders));
+        }
+
+        [Fact]
+        public async Task SettleCash_RefusesWhenAmountChangedSinceShown()
+        {
+            var order = AddOrder(20_000, (_v1, _driver, 20_000));
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+
+            // عُرض 15,000 ثم قبض السائق غيره: لا تسوية
+            await Assert.ThrowsAsync<ConflictException>(() => Service().SettleCashAsync(_driver.Id, Guid.NewGuid(), 15_000));
+            Assert.Equal(20_000, (await Service().GetCashAsync(_driver.Id)).Total);
+
+            var (orders, amount) = await Service().SettleCashAsync(_driver.Id, Guid.NewGuid(), 20_000);
+            Assert.Equal((1, 20_000m), (orders, amount));
+            await Assert.ThrowsAsync<NotFoundException>(() => Service().SettleCashAsync(Guid.NewGuid(), Guid.NewGuid()));
         }
 
         [Fact]
@@ -170,7 +229,7 @@ namespace ecommerce.Tests.Services
             var theirs = Assert.Single(await Service().GetOrdersAsync(otherUser.Id, history: false));
 
             Assert.Equal(41_000, mine.AmountToCollect + theirs.AmountToCollect);
-            Assert.Equal(20_000 - 3_000 - 444.44m, mine.AmountToCollect);   // الكوبون كله على متجره + نصيبه من النقاط
+            Assert.Equal(20_000 - 3_000 - 444m, mine.AmountToCollect);   // الكوبون كله على متجره + نصيبه من النقاط
         }
 
         [Fact]
@@ -180,7 +239,7 @@ namespace ecommerce.Tests.Services
             await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
 
             Assert.Equal(30_000, (await Service().GetCashAsync(_driver.Id)).Total);
-            Assert.Equal(1, await Service().SettleCashAsync(_driver.Id, Guid.NewGuid()));
+            Assert.Equal(1, (await Service().SettleCashAsync(_driver.Id, Guid.NewGuid(), 30_000)).Orders);
             Assert.Equal(0, (await Service().GetCashAsync(_driver.Id)).Total);
             Assert.Equal(0, (await Service().GetProfileAsync(_driverUser.Id)).CashInHand);
         }
@@ -200,6 +259,10 @@ namespace ecommerce.Tests.Services
         {
             var order = AddOrder(10_000, (_v1, _driver, 10_000));
             var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
+            sub.PickedUpAt = null;
+            sub.Status = OrderStatus.READY;
+            _context.SaveChanges();
+            SetupPickUp();
 
             await Service().PickUpAsync(_driverUser.Id, sub.Id);
             var first = (await _context.SubOrders.AsNoTracking().SingleAsync(s => s.Id == sub.Id)).PickedUpAt;
@@ -280,6 +343,103 @@ namespace ecommerce.Tests.Services
         }
 
         [Fact]
+        public async Task PartialRefusal_OnCouponOrder_RefusedItemTakesItsDiscountShare()
+        {
+            // ORD-0017/0019 (جولة 2): كوبون 10% على 55,000 = 5,500. رفض الحذاء (25,000) — الخصم يبقى 10% مما احتُفظ به فقط
+            var (order, _, shoes) = OrderWithItems();
+            var tracked = _context.Orders.Single(o => o.Id == order.Id);
+            var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
+            tracked.CouponCode = "P10"; tracked.CouponDiscountType = DiscountType.PERCENTAGE; tracked.CouponDiscountValue = 10;
+            tracked.CouponOriginalAmount = 5_500; tracked.DiscountAmount = 5_500; tracked.DeliveryFees = 5_000; tracked.TotalAmount = 54_500;
+            sub.CouponShare = 5_500; sub.DeliveryFee = 5_000;
+            _context.SaveChanges();
+
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto
+            {
+                CashCollected = true,
+                RefusedItems = { new DriverRefusedItemDto { SubOrderItemId = shoes.Id, Quantity = 1 } },
+                RefusalReason = ReturnReason.CHANGED_MIND,
+            });
+
+            var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+            var savedSub = await _context.SubOrders.AsNoTracking().SingleAsync(s => s.Id == sub.Id);
+            Assert.Equal(32_000, saved.CashCollectedAmount);   // قميصان 30,000 − 10% (3,000) + التوصيل 5,000 — لا 29,500
+            Assert.Equal(3_000, savedSub.CouponShare);
+            Assert.Equal(25_000, savedSub.RefusedAmount);
+            Assert.Equal(3_000, saved.DiscountAmount);
+            Assert.Equal(32_000, saved.TotalAmount);           // الإجمالي = ما دفعه الزبون (الخيار ج)
+            Assert.Equal(30_000, saved.Subtotal);
+        }
+
+        [Fact]
+        public async Task PartialRefusal_OfExpensiveItem_NeverCollectsZero()
+        {
+            // ORD-0019: خصم الكوبون أكبر من قيمة ما احتُفظ به — كان السائق يقبض 0 ويُسجَّل الطلب مدفوعاً
+            var (order, shirt, shoes) = OrderWithItems();
+            var tracked = _context.Orders.Single(o => o.Id == order.Id);
+            var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
+            tracked.CouponCode = "P10"; tracked.CouponDiscountType = DiscountType.PERCENTAGE; tracked.CouponDiscountValue = 10;
+            tracked.CouponOriginalAmount = 5_500; tracked.DiscountAmount = 5_500; tracked.DeliveryFees = 4_000; tracked.TotalAmount = 53_500;
+            sub.CouponShare = 5_500; sub.DeliveryFee = 4_000;
+            _context.SaveChanges();
+
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto
+            {
+                CashCollected = true,
+                RefusedItems = { new() { SubOrderItemId = shoes.Id, Quantity = 1 }, new() { SubOrderItemId = shirt.Id, Quantity = 1 } },
+                RefusalReason = ReturnReason.CHANGED_MIND,
+            });
+
+            // بقي قميص واحد 15,000 − 10% + التوصيل 4,000
+            var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+            Assert.Equal(17_500, saved.CashCollectedAmount);
+            Assert.Equal(17_500, saved.TotalAmount);
+        }
+
+        [Fact]
+        public async Task FailedPart_StopsCountingImmediately()
+        {
+            // جزء تعذّر تسليمه لا ينتظر استلام المتجر: إجمالي الطلب = ما قبضه السائق الآخر
+            SetupFail();
+            var order = AddOrder(45_000, (_v1, _driver, 20_000), (_v2, _otherDriver, 25_000));
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto { CashCollected = true });
+            var otherUser = new User { Phone = "0773", Role = UserRoles.Driver, IsActive = true };
+            _context.Users.Add(otherUser);
+            _otherDriver.UserId = otherUser.Id;
+            _context.SaveChanges();
+
+            await Service().FailAsync(otherUser.Id, order.Id, new DriverFailDto { Reason = DeliveryFailureReason.NoAnswer });
+
+            var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+            Assert.Equal(20_000, saved.TotalAmount);
+            Assert.Equal(20_000, saved.CashCollectedAmount);
+        }
+
+        [Fact]
+        public async Task PartialRefusal_FeeOnStore_TotalExcludesFee()
+        {
+            // الرفض الجزئي والأجرة على المتجر: الزبون لا يدفعها، والإجمالي يساويه
+            _context.DeliverySettings.Add(new DeliverySettings { RefusalFeePayer = RefusalFeePayer.Vendor, PartialRefusalCustomerPays = false });
+            var (order, shirt, _) = OrderWithItems();
+            var tracked = _context.Orders.Single(o => o.Id == order.Id);
+            var sub = _context.SubOrders.Single(s => s.OrderId == order.Id);
+            tracked.DeliveryFees = 5_000; tracked.TotalAmount = 60_000; sub.DeliveryFee = 5_000;
+            _context.SaveChanges();
+
+            await Service().DeliverAsync(_driverUser.Id, order.Id, new DriverDeliverDto
+            {
+                CashCollected = true,
+                RefusedItems = { new() { SubOrderItemId = shirt.Id, Quantity = 1 } },
+                RefusalReason = ReturnReason.DEFECTIVE,
+            });
+
+            var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+            Assert.Equal(40_000, saved.CashCollectedAmount);   // 55,000 − قميص 15,000، بلا الأجرة
+            Assert.Equal(40_000, saved.TotalAmount);
+            Assert.Equal(0, saved.DeliveryFees);
+        }
+
+        [Fact]
         public async Task Refusal_Rules()
         {
             var (order, shirt, shoes) = OrderWithItems();
@@ -337,6 +497,30 @@ namespace ecommerce.Tests.Services
             var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
             Assert.Null(saved.CashCollectedAmount);
             Assert.Equal(payer, saved.RefusalFeePayer);
+        }
+
+        [Fact]
+        public async Task RefusalFeeOverride_BeatsGlobalSetting_OnlyBeforeRefusal()
+        {
+            SetupFail(); SetPayer(RefusalFeePayer.Customer);
+            var order = OrderWithFee(4_000);
+
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().SetRefusalFeeOverrideAsync(order.Id, RefusalFeePayer.Vendor, null, Guid.NewGuid()));
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().SetRefusalFeeOverrideAsync(order.Id, "X", "سبب", Guid.NewGuid()));
+
+            // المتجر أرسل قطعة خاطئة: الأجرة عليه لهذا الطلب، والسائق يرى ذلك
+            var fee = await Service().SetRefusalFeeOverrideAsync(order.Id, RefusalFeePayer.Vendor, "قطعة خاطئة", Guid.NewGuid());
+            Assert.Equal((RefusalFeePayer.Customer, RefusalFeePayer.Vendor), (fee.DefaultFullPayer, fee.OverridePayer));
+            var mine = Assert.Single(await Service().GetOrdersAsync(_driverUser.Id, history: false));
+            Assert.Equal((RefusalFeePayer.Vendor, RefusalFeePayer.Vendor), (mine.RefusalFeePayer, mine.PartialRefusalFeePayer));
+
+            await Service().FailAsync(_driverUser.Id, order.Id, new DriverFailDto { Reason = DeliveryFailureReason.CustomerRefused, FeeCollected = true });
+            var saved = await _context.Orders.AsNoTracking().SingleAsync(o => o.Id == order.Id);
+            Assert.Null(saved.CashCollectedAmount);
+            Assert.Equal(RefusalFeePayer.Vendor, saved.RefusalFeePayer);
+
+            // بعد تسجيل الرفض لا يُغيَّر (المال تحرّك أمام السائق)
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().SetRefusalFeeOverrideAsync(order.Id, null, null, Guid.NewGuid()));
         }
 
         [Fact]

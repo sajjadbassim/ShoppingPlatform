@@ -322,7 +322,7 @@ const ReportedReviewsTab = () => {
                 )}
               </div>
               {review.productName && (
-                <Link to={`/products/${review.productId}`} target="_blank"
+                <Link to={`/products/${review.productId}`}
                   className="text-xs bg-primary/5 text-primary px-2 py-0.5 rounded-full inline-flex items-center gap-1 mb-2 hover:underline">
                   <Package size={11} />
                   {review.productName}
@@ -524,7 +524,7 @@ const ProductReviewsTab = () => {
                     <span>👍 {review.helpfulCount} مفيد</span>
                     {review.vendorReply && <span className="text-blue-500">رد المتجر ✓</span>}
                     {review.productId && (
-                      <Link to={`/products/${review.productId}`} target="_blank"
+                      <Link to={`/products/${review.productId}`}
                         className="flex items-center gap-1 text-primary hover:underline">
                         <Package size={11} />
                         عرض المنتج
@@ -574,7 +574,7 @@ const ProductReviewsTab = () => {
                 <span className="text-primary font-medium">
                   {selectedReview.productNameAr || selectedReview.productName || selectedReview.productId.slice(0,8)+'...'}
                 </span>
-                <Link to={`/products/${selectedReview.productId}`} target="_blank"
+                <Link to={`/products/${selectedReview.productId}`}
                   className="text-xs text-gray-400 hover:underline mr-auto">
                   عرض ←
                 </Link>

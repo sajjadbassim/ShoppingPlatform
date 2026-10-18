@@ -12,6 +12,9 @@ namespace ecommerce.Services.VendorService.VendorService
 {
     public class VendorService : IVendorService
     {
+        // أجرة توصيل المتجر الجديد حتى يغيّرها الأدمن
+        public const decimal DefaultDeliveryFee = 3000m;
+
         private readonly IVendorRepository _vendorRepository;
         private readonly IFileService _fileService;
         private readonly INotificationService _notificationService;
@@ -58,6 +61,8 @@ namespace ecommerce.Services.VendorService.VendorService
                 if (await _vendorRepository.GetByOwnerIdAsync(ownerId.Value) != null)
                     throw new BusinessRuleException("لديك متجر أو طلب متجر مسبقاً");
                 dto.IsActive = false;
+                // أجرة التوصيل للمنصة (سائقوها) — يحددها الأدمن لا صاحب المتجر
+                dto.DeliveryFee = DefaultDeliveryFee;
             }
 
             string logoUrl = "";

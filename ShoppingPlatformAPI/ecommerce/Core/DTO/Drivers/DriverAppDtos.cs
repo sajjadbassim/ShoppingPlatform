@@ -16,6 +16,7 @@ namespace ecommerce.Core.DTO.Drivers
         public int DeliveredToday { get; set; }
         public int ActiveOrders { get; set; }
         public decimal CashInHand { get; set; }      // نقد استلمه ولم يسلّمه للعمليات بعد
+        public int OpenReturnTrips { get; set; }     // بضاعة مرتجعة معه لم تُسلَّم لمتاجرها
         public DateTime? LastLocationAt { get; set; }
     }
 
@@ -58,6 +59,10 @@ namespace ecommerce.Core.DTO.Drivers
         public int ItemsCount { get; set; }
         public string Status { get; set; }
         public DateTime? PickedUpAt { get; set; }
+        // لحساب المبلغ عند الرفض الجزئي: القطع المرفوضة تأخذ نصيبها من خصم الجزء (بنسبة قيمتها مما بقي)
+        public decimal KeptAmount { get; set; }
+        public decimal CouponShare { get; set; }
+        public decimal PointsShare { get; set; }
         public List<DriverItemDto> Items { get; set; } = new();
     }
 
@@ -105,6 +110,7 @@ namespace ecommerce.Core.DTO.Drivers
         [Required]
         public string RefusalFeePayer { get; set; }  // CUSTOMER | VENDOR | NONE
         public bool? PartialRefusalCustomerPays { get; set; }   // null = بلا تغيير
+        public string? ReturnPickupFeePayer { get; set; }       // أجرة استلام المرتجع — null = بلا تغيير
         public DateTime? UpdatedAt { get; set; }
     }
 
@@ -136,5 +142,35 @@ namespace ecommerce.Core.DTO.Drivers
         public string OrderNumber { get; set; }
         public decimal Amount { get; set; }
         public DateTime CollectedAt { get; set; }
+    }
+
+    // ملخص النقد الذي بعهدة السائقين ولم يُسلَّم للمنصة — عرض للأدمن (التسوية عند العمليات)
+    public class DriverCashCustodyDto
+    {
+        public Guid DriverId { get; set; }
+        public string DriverName { get; set; }
+        public string Phone { get; set; }
+        public decimal Total { get; set; }
+        public int Orders { get; set; }
+        public DateTime OldestCollectedAt { get; set; }
+    }
+
+    // من يتحمّل أجرة التوصيل إن رفض الزبون هذا الطلب: إعداد الأدمن العام، واستثناء العمليات إن وُجد
+    public class OrderRefusalFeeDto
+    {
+        public string DefaultFullPayer { get; set; }
+        public string DefaultPartialPayer { get; set; }
+        public string? OverridePayer { get; set; }
+        public string? OverrideReason { get; set; }
+        public DateTime? OverrideAt { get; set; }
+    }
+
+    public class SetFeePayerOverrideDto
+    {
+        // null = إلغاء الاستثناء والعودة لإعداد الأدمن (للطلب)
+        public string? Payer { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(300)]
+        public string? Reason { get; set; }
     }
 }

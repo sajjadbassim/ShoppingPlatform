@@ -1,3 +1,4 @@
+using ecommerce.Core.Constants;
 using ecommerce.Core.Exceptions;
 using ecommerce.Data;
 using Microsoft.EntityFrameworkCore;
@@ -44,13 +45,10 @@ namespace ecommerce.Services.VendorAccessService
 
         public async Task EnsureCanManageVendorAsync(Guid vendorId, CancellationToken ct = default)
         {
-            var ownerId = await _context.Vendors
-                .Where(v => v.Id == vendorId)
-                .Select(v => new { v.OwnerId })
-                .FirstOrDefaultAsync(ct)
-                ?? throw new NotFoundException("المتجر غير موجود");
+            if (!await _context.Vendors.AnyAsync(v => v.Id == vendorId, ct))
+                throw new NotFoundException("المتجر غير موجود");
 
-            EnsureOwner(ownerId.OwnerId);
+            await EnsureMemberAsync(vendorId, ct);
         }
 
         // نفس قاعدة EnsureOwner لكن بدون رمي استثناء — للنقاط العامة التي تعرض أكثر للمالك
@@ -63,29 +61,29 @@ namespace ecommerce.Services.VendorAccessService
                 !Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var userId))
                 return false;
 
-            return await _context.Vendors.AnyAsync(v => v.Id == vendorId && v.OwnerId == userId, ct);
+            return await VendorMembership.IsMemberAsync(_context, userId, vendorId, ct);
         }
 
         public async Task EnsureCanManageProductAsync(Guid productId, CancellationToken ct = default)
         {
             var product = await _context.Products
                 .Where(p => p.Id == productId && !p.IsDeleted)
-                .Select(p => new { p.Vendor.OwnerId })
+                .Select(p => new { p.VendorId })
                 .FirstOrDefaultAsync(ct)
                 ?? throw new NotFoundException("المنتج غير موجود");
 
-            EnsureOwner(product.OwnerId);
+            await EnsureMemberAsync(product.VendorId, ct);
         }
 
         public async Task EnsureCanManageProductImageAsync(Guid imageId, CancellationToken ct = default)
         {
             var image = await _context.ProductImages
                 .Where(i => i.Id == imageId && !i.Product.IsDeleted)
-                .Select(i => new { i.Product.Vendor.OwnerId })
+                .Select(i => new { i.Product.VendorId })
                 .FirstOrDefaultAsync(ct)
                 ?? throw new NotFoundException("الصورة غير موجودة");
 
-            EnsureOwner(image.OwnerId);
+            await EnsureMemberAsync(image.VendorId, ct);
         }
 
         // الخاصية/القيمة/المتغير يجب أن تتبع المنتج المذكور في الرابط — وإلا يمكن تمرير منتج مملوك مع عنصر من منتج آخر
@@ -110,10 +108,11 @@ namespace ecommerce.Services.VendorAccessService
                 throw new NotFoundException("المتغير غير موجود");
         }
 
-        private void EnsureOwner(Guid? ownerId)
+        // صاحب المتجر أو موظف فيه (صلاحيات الموظف يفرضها StaffPermissionFilter)
+        private async Task EnsureMemberAsync(Guid vendorId, CancellationToken ct)
         {
             if (IsStaff) return;
-            if (User.IsInRole("VENDOR") && ownerId.HasValue && ownerId.Value == CurrentUserId) return;
+            if (User.IsInRole("VENDOR") && await VendorMembership.IsMemberAsync(_context, CurrentUserId, vendorId, ct)) return;
             throw new ForbiddenException(Denied);
         }
     }

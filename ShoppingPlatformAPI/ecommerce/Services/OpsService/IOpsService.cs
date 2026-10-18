@@ -16,8 +16,10 @@ namespace ecommerce.Services
         Task<OpsDashboardStatsDto> GetDashboardStatsAsync();
 
         Task<SubOrderDto> AssignDriverAsync(Guid subOrderId, AssignDriverDto dto);
+        Task<SubOrderDto> UnassignDriverAsync(Guid subOrderId, Guid opsUserId, string? reason);
         Task<IEnumerable<SubOrderDto>> AssignDriverToOrderAsync(Guid orderId, AssignDriverToOrderDto dto);
         Task<IReadOnlyList<ecommerce.Core.Models.SubOrder>> MarkDeliveredByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId);
+        Task MarkPickedUpByDriverAsync(ecommerce.Core.Models.SubOrder subOrder, Guid driverUserId);
         Task<IReadOnlyList<ecommerce.Core.Models.SubOrder>> MarkFailedByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId, string reason, string? note);
     }
 

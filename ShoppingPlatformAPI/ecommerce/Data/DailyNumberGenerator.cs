@@ -20,7 +20,8 @@ namespace ecommerce.Data
         public static async Task<string> NextAsync(
             AppDbContext context, string prefix, IQueryable<string> existingNumbers, CancellationToken ct = default)
         {
-            var dayKey = $"{prefix}-{DateTime.UtcNow:yyyyMMdd}";
+            // يوم بغداد لا يوم UTC: طلب بعد منتصف الليل يحمل تاريخ اليوم الجديد (مثل الفواتير والتقارير)
+            var dayKey = $"{prefix}-{ecommerce.Core.Constants.IraqTime.FromUtc(DateTime.UtcNow):yyyyMMdd}";
             var lastExisting = await existingNumbers
                 .Where(n => n.StartsWith(dayKey + "-"))
                 .OrderByDescending(n => n)

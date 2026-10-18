@@ -33,6 +33,7 @@ namespace ecommerce.Middleware
                     NotFoundException => (StatusCodes.Status404NotFound, ex.Message),
                     BusinessRuleException => (StatusCodes.Status400BadRequest, ex.Message),
                     ConflictException => (StatusCodes.Status409Conflict, ex.Message),
+                    TooManyAttemptsException => (StatusCodes.Status429TooManyRequests, ex.Message),
                     UnauthorizedException => (StatusCodes.Status401Unauthorized, ex.Message),
                     ForbiddenException => (StatusCodes.Status403Forbidden, ex.Message),
                     // بعض الخدمات ترفض الوصول لمورد غير مملوك بهذا النوع (رسالة عربية للمستخدم)

@@ -14,5 +14,6 @@ namespace ecommerce.Core.DTO.Drivers
         public int TotalDeliveries { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool HasAccount { get; set; }          // يستطيع الدخول للوحة السائق
+        public int ActiveOrders { get; set; }         // طلبات معه الآن (قائمة التعيين فقط)
     }
 }

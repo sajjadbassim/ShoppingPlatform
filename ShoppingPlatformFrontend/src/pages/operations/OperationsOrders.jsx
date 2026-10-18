@@ -1,7 +1,7 @@
 // src/pages/operations/OperationsOrders.jsx
 // إدارة الطلبات للعمليات: قائمة مختصرة تُظهر «الخطوة التالية» لكل طلب + لوحة تفاصيل فيها كل الإجراءات
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   Search, Truck, Package, Clock, CheckCircle, XCircle, MapPin, RefreshCw, AlertCircle, Store,
   Phone, FileText, X, ChevronLeft, MessageCircle, Bike, Car, Timer, User,
@@ -12,15 +12,17 @@ import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
 import { apiGet } from '../../api/axios'
+import { orderService } from '../../services/orderService'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
 import {
   useOrdersPaged, useOrder, useConfirmSubOrder, useCancelSubOrder, useUpdateSubOrderStatus,
-  useAssignDriverToOrder, useAvailableDrivers,
+  useAssignDriverToOrder, useUnassignDriver, useAvailableDrivers,
 } from '../../hooks/useOrders'
 import { DurationChip, OrderTimingCard } from '../../components/common/OrderTiming'
 import { useOrderTimings } from '../../hooks/useOrderTiming'
 import DeliverySlot from '../../components/common/DeliverySlot'
+import { OrderRefusalFeeException } from '../../components/common/FeePayerException'
 
 // ===========================
 // الحالات
@@ -54,6 +56,8 @@ const FILTERS = [
 const CANCEL_REASONS = ['المتجر لم يرد', 'المنتج غير متوفر', 'نقص عند المتجر بعد التأكيد', 'طلب الزبون الإلغاء', 'تعذّر الوصول للزبون']
 // الإلغاء متاح في كل المراحل قبل خروج الطلب مع السائق
 const CANCELLABLE_LATE = ['CONFIRMED', 'PREPARING', 'READY']
+// جزء مع سائق: معيَّن (جاهز ولم يُستلم) أو استلمه (في الطريق)
+const onTrip = (s) => !!s.driverId && (s.status === 'READY' || s.status === 'OUT_FOR_DELIVERY')
 
 const money = (n) => `${(n || 0).toLocaleString('en-US')} د.ع`
 const timeAgo = (d) => {
@@ -82,9 +86,15 @@ const nextStep = (order) => {
     const mins = Math.min(...subs.filter(x => x.status === 'PENDING_CONFIRMATION').map(x => x.minutesRemaining ?? 99))
     return { text: `بانتظار تأكيد ${pending === 1 ? 'متجر' : pending + ' متاجر'}${mins < 99 ? ` · ${mins > 0 ? `باقي ${mins} د` : 'انتهت المهلة'}` : ''}`, tone: mins <= 0 ? 'text-red-600' : 'text-amber-700', urgent: true }
   }
-  if (count('DELIVERY_FAILED')) return { text: 'تعذّر التسليم — أعد المحاولة أو ألغِ', tone: 'text-orange-700', urgent: true }
-  if (subs.every(x => x.status === 'READY' || x.status === 'DELIVERED') && count('READY'))
+  if (count('DELIVERY_FAILED')) return { text: 'تعذّر التسليم — البضاعة تعود مع السائق للمتجر', tone: 'text-orange-700' }
+  // التعيين يُبقي الجزء «جاهز للاستلام» حتى يستلمه السائق من المتجر (معه driverId)
+  const allOut = subs.every(x => x.status === 'READY' || x.status === 'DELIVERED' || x.status === 'OUT_FOR_DELIVERY')
+  if (allOut && subs.some(x => x.status === 'READY' && !x.driverId))
     return { text: 'جاهز للاستلام — عيّن سائقاً', tone: 'text-teal-700', urgent: true }
+  if (allOut && subs.some(x => x.status === 'READY' && x.driverId)) {
+    const d = subs.find(x => x.status === 'READY' && x.driverName)?.driverName
+    return { text: d ? `بانتظار استلام ${d} من المتجر` : 'بانتظار استلام السائق من المتجر', tone: 'text-purple-700' }
+  }
   const ready = count('READY')
   if (ready) return { text: `${ready} من ${subs.length} متاجر جاهزة — بانتظار الباقي`, tone: 'text-indigo-700' }
   if (count('PREPARING')) return { text: 'قيد التحضير في المتجر', tone: 'text-indigo-700' }
@@ -141,7 +151,7 @@ const OrderRow = ({ order, active, onOpen, timing }) => {
 // ===========================
 // طلب فرعي (متجر) داخل لوحة التفاصيل
 // ===========================
-const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
+const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, onUnassign, busy }) => {
   const pending = sub.status === 'PENDING_CONFIRMATION'
   const late = pending && (sub.minutesRemaining ?? 1) <= 0
   return (
@@ -182,6 +192,7 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
       {sub.driverName && (
         <p className="mx-3 mb-3 flex items-center gap-2 text-xs text-purple-800 bg-purple-50 rounded-lg p-2">
           <Truck size={14} /><span className="font-bold">{sub.driverName}</span>
+          {sub.status === 'READY' && <span className="text-purple-600">· لم يستلمه من المتجر بعد</span>}
           {sub.driverPhone && <a href={`tel:${sub.driverPhone}`} className="mr-auto" dir="ltr">{sub.driverPhone}</a>}
         </p>
       )}
@@ -189,7 +200,7 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
       {sub.status === 'DELIVERY_FAILED' && (
         <p className="mx-3 mb-3 text-xs text-orange-800 bg-orange-50 rounded-lg p-2">
           تعذّر التسليم: <b>{sub.failureReasonAr || '—'}</b>{sub.failureNote ? ` — ${sub.failureNote}` : ''}
-          <span className="block mt-0.5 text-orange-700">البضاعة رجعت مع السائق. إعادة المحاولة تعيده «جاهز للاستلام» لتعيين سائق، والإلغاء يعيد القطع للمخزون.</span>
+          <span className="block mt-0.5 text-orange-700">البضاعة تعود مع السائق إلى المتجر، ويُغلق هذا الجزء ويعود مخزونه حين يؤكد المتجر استلامها (لا إعادة محاولة).</span>
         </p>
       )}
 
@@ -211,19 +222,17 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, busy }) => {
         {sub.status === 'PREPARING' && (
           <button onClick={() => onStatus(sub, 'READY')} disabled={busy} className="h-9 px-4 rounded-lg bg-teal-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />جاهز للاستلام</button>
         )}
-        {sub.status === 'READY' && (
+        {sub.status === 'READY' && !sub.driverId && (
           <button onClick={() => onStatus(sub, 'PREPARING')} disabled={busy} className="h-9 px-3 rounded-lg border border-gray-300 text-gray-600 text-sm font-medium disabled:opacity-50">ليس جاهزاً بعد</button>
         )}
-        {sub.status === 'DELIVERY_FAILED' && (
-          <>
-            <button onClick={() => onCancel(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm font-bold disabled:opacity-50">إلغاء</button>
-            {sub.failureReason !== 'customer_refused' && (
-              <button onClick={() => onStatus(sub, 'READY')} disabled={busy} className="h-9 px-4 rounded-lg bg-orange-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><Truck size={15} />إعادة المحاولة</button>
-            )}
-          </>
+        {/* عُيّن سائق ولم يستلم من المتجر بعد (يبقى «جاهز للاستلام»): يمكن سحبه وتعيين غيره */}
+        {sub.status === 'READY' && sub.driverId && (
+          <button onClick={() => onUnassign(sub)} disabled={busy} className="h-9 px-3 rounded-lg border border-purple-200 text-purple-700 text-sm font-bold disabled:opacity-50">سحب من السائق</button>
         )}
-        {sub.status === 'OUT_FOR_DELIVERY' && (
-          <button onClick={() => onStatus(sub, 'DELIVERED')} disabled={busy} className="h-9 px-4 rounded-lg bg-green-600 text-white text-sm font-bold inline-flex items-center gap-1 disabled:opacity-50"><CheckCircle size={15} />تم التوصيل</button>
+        {sub.status === 'DELIVERY_FAILED' && (
+          <Link to="/operations/returns" className="h-9 px-3 rounded-lg bg-orange-50 text-orange-700 text-sm font-bold inline-flex items-center gap-1">
+            <Truck size={15} />البضاعة تعود مع السائق للمتجر
+          </Link>
         )}
       </div>
     </div>
@@ -238,7 +247,10 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
   const order = detail ? { ...fallback, ...detail } : fallback
   const subs = order?.subOrders || []
   const active = subs.filter(s => s.status !== 'CANCELLED')
-  const readyForDriver = active.some(s => s.status === 'READY') && active.every(s => s.status === 'READY' || s.status === 'DELIVERED')
+  // جزء جهز بعد خروج الباقي مع سائق: يُضاف لنفس السائق فيُسلَّم الطلب في توصيلة واحدة
+  const carrierIds = [...new Set(active.filter(onTrip).map(s => s.driverId))]
+  const readyForDriver = active.some(s => s.status === 'READY' && !s.driverId) && carrierIds.length <= 1
+    && active.every(s => s.status === 'READY' || s.status === 'DELIVERED' || s.status === 'OUT_FOR_DELIVERY')
   const wa = waLink(order?.customerPhone || order?.deliveryPhone)
   const phone = order?.deliveryPhone || order?.customerPhone
 
@@ -271,6 +283,13 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
 
         <OrderTimingCard orderId={order.id} />
 
+        {order.status === 'DELIVERED' && (
+          <button onClick={() => actions.invoice(order)} disabled={actions.busy}
+            className="w-full h-11 rounded-2xl border border-gray-200 bg-white text-sm font-bold text-gray-700 inline-flex items-center justify-center gap-2 disabled:opacity-50">
+            <FileText size={16} />عرض الفاتورة
+          </button>
+        )}
+
         {/* الزبون والتوصيل */}
         <div className="rounded-2xl bg-white border border-gray-200 p-4">
           <div className="flex items-center gap-2.5">
@@ -301,6 +320,10 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
           )}
         </div>
 
+        {/* استثناء أجرة الرفض لهذا الطلب — قبل أن يسجّل السائق الرفض */}
+        <OrderRefusalFeeException orderId={order.id}
+          open={subs.some(s => !['DELIVERED', 'CANCELLED', 'DELIVERY_FAILED'].includes(s.status))} />
+
         {/* المتاجر */}
         <div>
           <p className="text-sm font-bold text-gray-700 mb-2">المتاجر ({subs.length})</p>
@@ -308,7 +331,7 @@ const OrderPanel = ({ orderId, fallback, onClose, actions }) => {
             <div className="space-y-3">
               {subs.map(sub => (
                 <SubOrderBlock key={sub.id} sub={sub} busy={actions.busy}
-                  onConfirm={actions.confirm} onCancel={actions.cancel} onStatus={actions.status} />
+                  onConfirm={actions.confirm} onCancel={actions.cancel} onStatus={actions.status} onUnassign={actions.unassign} />
               ))}
             </div>
           )}
@@ -361,14 +384,19 @@ const CancelSheet = ({ sub, onClose, onSubmit, busy }) => {
 
 const vehicle = (t) => t === 'car' ? { Icon: Car, label: 'سيارة' } : t === 'motorcycle' ? { Icon: Bike, label: 'دراجة نارية' } : { Icon: Bike, label: 'دراجة' }
 
-const AssignSheet = ({ order, drivers, onClose, onSubmit, busy }) => {
-  const [driverId, setDriverId] = useState('')
+const AssignSheet = ({ order, drivers: available, onClose, onSubmit, busy }) => {
+  // السائق الذي يحمل بقية الطلب أولاً (ولو لم يكن «متاحاً») — يأخذ الجزء الجاهز إلى نفس التوصيلة
+  const carrier = (order.subOrders || []).find(onTrip)
+  const drivers = carrier
+    ? [{ id: carrier.driverId, fullName: carrier.driverName, phone: carrier.driverPhone, carrying: true }, ...available.filter(d => d.id !== carrier.driverId)]
+    : available
+  const [driverId, setDriverId] = useState(carrier?.driverId || '')
   return (
     <Sheet onClose={onClose} busy={busy}>
       <h3 className="font-bold text-gray-900">تعيين سائق للطلب <span dir="ltr">{order.orderNumber}</span></h3>
       <p className="text-sm text-gray-500 mt-1">السائق يستلم من كل متاجر الطلب ويوصل للزبون</p>
       {drivers.length === 0 ? (
-        <p className="mt-4 p-4 rounded-2xl bg-amber-50 text-amber-800 text-sm text-center">لا يوجد سائق متاح الآن</p>
+        <p className="mt-4 p-4 rounded-2xl bg-amber-50 text-amber-800 text-sm text-center">لا يوجد سائق متصل الآن</p>
       ) : (
         <div className="mt-4 space-y-2">
           {drivers.map(d => {
@@ -379,7 +407,11 @@ const AssignSheet = ({ order, drivers, onClose, onSubmit, busy }) => {
                 <span className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"><v.Icon size={18} className="text-gray-600" /></span>
                 <span className="flex-1 min-w-0">
                   <span className="block font-bold text-gray-900 text-sm truncate">{d.fullName}</span>
-                  <span className="block text-xs text-gray-500">{v.label}{d.phone && <> · <span dir="ltr">{d.phone}</span></>}</span>
+                  <span className="block text-xs text-gray-500">
+                    {d.carrying ? 'معه بقية هذا الطلب' : v.label}
+                    {!d.carrying && (d.activeOrders > 0 ? ` · معه ${d.activeOrders === 1 ? 'طلب' : `${d.activeOrders} طلبات`}` : ' · متاح')}
+                    {d.phone && <> · <span dir="ltr">{d.phone}</span></>}
+                  </span>
                 </span>
                 {driverId === d.id && <CheckCircle size={20} className="text-primary" />}
               </button>
@@ -449,7 +481,8 @@ const OperationsOrders = () => {
   const { mutateAsync: cancelSubOrder, isPending: cancelling } = useCancelSubOrder()
   const { mutateAsync: updateStatus, isPending: updating } = useUpdateSubOrderStatus()
   const { mutateAsync: assignDriver, isPending: assigning } = useAssignDriverToOrder()
-  const busy = confirming || cancelling || updating || assigning
+  const { mutateAsync: unassignDriver, isPending: unassigning } = useUnassignDriver()
+  const busy = confirming || cancelling || updating || assigning || unassigning
 
   const after = (msg) => { success(msg); refetch(); refetchCounts() }
   const actions = {
@@ -465,6 +498,15 @@ const OperationsOrders = () => {
       catch (e) { toastError(e.message || 'فشل تحديث الحالة') }
     },
     assign: (order) => setAssignOrder(order),
+    invoice: async (order) => {
+      try { await orderService.openInvoice(order.id) }
+      catch (e) { toastError(e.message || 'تعذّر فتح الفاتورة') }
+    },
+    unassign: async (sub) => {
+      if (!window.confirm(`سحب طلب ${sub.vendorNameAr || sub.vendorName} من السائق ${sub.driverName || ''}؟ يعود «جاهز للاستلام» لتعيين سائق آخر.`)) return
+      try { await unassignDriver({ id: sub.id }); after('سُحب الطلب من السائق — عيّن سائقاً آخر') }
+      catch (e) { toastError(e.message || 'تعذّر سحب الطلب') }
+    },
   }
 
   const setStatus = (v) => {

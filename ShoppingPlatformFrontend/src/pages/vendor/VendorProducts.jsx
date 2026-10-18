@@ -296,7 +296,8 @@ const VendorProducts = () => {
   const actionsFor = (p) => [
     { label: 'تعديل', icon: Edit, onClick: () => navigate(`/vendor/products/${p.id}/edit`) },
     { label: 'نسخ المنتج', icon: Copy, onClick: () => duplicate(p) },
-    { label: 'عرض في المتجر', icon: Eye, onClick: () => window.open(`/products/${p.id}`, '_blank') },
+    // نفس النافذة: الرجوع يعيد لتبويبة المنتجات (نافذة جديدة في التطبيق المثبّت تعيد تحميله كاملاً وبلا سجل)
+    { label: 'عرض في المتجر', icon: Eye, onClick: () => navigate(`/products/${p.id}`) },
     { label: 'نشر', icon: Send, onClick: () => navigate(`/vendor/products/${p.id}/publish`) },
     { divider: true },
     { label: 'حذف', icon: Trash2, danger: true, onClick: () => setToDelete(p) },

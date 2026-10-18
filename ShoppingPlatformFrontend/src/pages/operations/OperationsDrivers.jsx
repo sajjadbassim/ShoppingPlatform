@@ -408,7 +408,7 @@ const OperationsDrivers = () => {
   const handleSettleCash = async () => {
     if (!window.confirm(`تأكيد استلام ${(cash?.total || 0).toLocaleString('en-US')} د.ع من ${cashDriver.fullName}؟`)) return
     try {
-      await settleCash(cashDriver.id)
+      await settleCash({ driverId: cashDriver.id, expectedAmount: cash?.total || 0 })
       success('تم تسجيل استلام النقد')
       setCashDriver(null)
     } catch (err) {

@@ -23,7 +23,7 @@ const RegisterPage = () => {
     accountType: 'customer',
     fullName: '', email: '', phone: '', password: '', confirmPassword: '',
     storeName: '', storeNameAr: '', storeDesc: '', storePhone: '', storeAddress: '',
-    deliveryFee: '3000', minOrder: '5000', prepTime: '30',
+    minOrder: '5000', prepTime: '30',
     agreeTerms: false,
     referralCode: getReferral(),   // من رابط دعوة صديق، ويمكن كتابته يدوياً
   })
@@ -53,7 +53,6 @@ const RegisterPage = () => {
       if (!formData.storeNameAr.trim())  e.storeNameAr  = 'اسم المتجر بالعربي مطلوب'
       if (!formData.storeAddress.trim()) e.storeAddress = 'العنوان مطلوب'
       if (!formData.storeDesc.trim())    e.storeDesc    = 'وصف المتجر مطلوب'
-      if (!formData.deliveryFee)         e.deliveryFee  = 'رسوم التوصيل مطلوبة'
       if (!formData.minOrder)            e.minOrder     = 'الحد الأدنى للطلب مطلوب'
       if (!formData.prepTime)            e.prepTime     = 'وقت التحضير مطلوب'
     }
@@ -110,7 +109,6 @@ const RegisterPage = () => {
         fd.append('NameAr',            formData.storeNameAr.trim())
         fd.append('Phone',             formData.storePhone || formData.phone.replace(/\s/g, ''))
         fd.append('IsActive',          'false')
-        fd.append('DeliveryFee',       formData.deliveryFee       || '3000')
         fd.append('MinOrderAmount',    formData.minOrder          || '5000')
         fd.append('EstimatedPrepTime', formData.prepTime          || '30')
         fd.append('Address',           formData.storeAddress      || '-')
@@ -288,9 +286,9 @@ const RegisterPage = () => {
                         className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary resize-none ${errors.storeDesc ? 'border-red-400' : 'border-gray-300'}`} />
                       {errors.storeDesc && <p className="text-xs text-red-500 mt-0.5">{errors.storeDesc}</p>}
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* أجرة التوصيل تحددها الإدارة عند الموافقة على المتجر */}
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { name: 'deliveryFee', label: 'رسوم التوصيل *', placeholder: '3000' },
                         { name: 'minOrder',    label: 'الحد الأدنى *',  placeholder: '5000' },
                         { name: 'prepTime',    label: 'وقت التحضير *',  placeholder: '30'   },
                       ].map(f => (

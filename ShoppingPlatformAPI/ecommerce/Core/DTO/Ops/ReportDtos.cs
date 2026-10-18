@@ -32,7 +32,8 @@ namespace ecommerce.Core.DTO.Ops
     {
         public int Orders { get; set; }                 // طلبات رئيسية
         public int StoreOrders { get; set; }            // طلبات فرعية (لكل متجر)
-        public int Delivered { get; set; }              // طلبات فرعية مُسلّمة
+        public int Delivered { get; set; }              // طلبات مُسلّمة (وصل منها شيء)
+        // Cancelled: طلبات أُلغيت كلها
         public int Cancelled { get; set; }
         public double CancellationRate { get; set; }    // 0..1
         public decimal Revenue { get; set; }            // ما دفعه الزبائن عن المُسلّم: منتجات + توصيل − الخصم − المرفوض عند الباب

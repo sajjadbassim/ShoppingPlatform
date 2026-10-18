@@ -83,7 +83,7 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<VendorStatementDto>>> Me(CancellationToken ct)
         {
             var userId = Guid.TryParse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : Guid.Empty;
-            var vendorId = await _context.Vendors.Where(v => v.OwnerId == userId).Select(v => (Guid?)v.Id).FirstOrDefaultAsync(ct);
+            var vendorId = await ecommerce.Core.Constants.VendorMembership.VendorIdOfAsync(_context, userId, ct);
             if (vendorId == null) return NotFound(ApiResponse<VendorStatementDto>.Fail("لا يوجد متجر مرتبط بحسابك"));
             return Ok(ApiResponse<VendorStatementDto>.Ok(await _finance.GetStatementAsync(vendorId.Value, ct: ct)));
         }
@@ -91,14 +91,15 @@ namespace ecommerce.Controllers
 
     public class PayoutDto
     {
-        [Range(1, 1_000_000_000, ErrorMessage = "المبلغ غير صالح")] public decimal Amount { get; set; }
+        // حدود بنوع decimal: Range(int, int) يحوّل القيمة إلى int فيفشل مع مبلغ ضخم (خطأ 500 بدل رسالة)
+        [Range(typeof(decimal), "1", "1000000000", ErrorMessage = "المبلغ غير صالح")] public decimal Amount { get; set; }
         [MaxLength(100)] public string? Reference { get; set; }
         [MaxLength(300)] public string? Note { get; set; }
     }
 
     public class AdjustmentDto
     {
-        public decimal Amount { get; set; }
+        [Range(typeof(decimal), "-1000000000", "1000000000", ErrorMessage = "المبلغ غير صالح")] public decimal Amount { get; set; }
         [Required(ErrorMessage = "اكتب سبب التسوية"), MaxLength(300)] public string Note { get; set; } = "";
     }
 

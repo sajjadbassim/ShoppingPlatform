@@ -4,6 +4,7 @@ using System.Net;
 
 namespace ecommerce.Core.Models
 {
+    [Microsoft.EntityFrameworkCore.Index(nameof(StaffVendorId))]
     public class User
     {
         [Key]
@@ -65,6 +66,15 @@ namespace ecommerce.Core.Models
 
         // رموز التجديد الصادرة قبل هذا الوقت مرفوضة: تغيير كلمة المرور أو تعطيل الحساب ينهي كل الجلسات
         public DateTime? SessionsRevokedAt { get; set; }
+
+        // موظف متجر: يعمل في هذا المتجر (دوره VENDOR) بصلاحيات Permissions التي حددها صاحبه
+        [Column("staff_vendor_id")]
+        public Guid? StaffVendorId { get; set; }
+
+        // صلاحيات الحساب المساعد (مفصولة بفواصل، StaffPermissions) — null = بلا قيود (صاحب متجر / أدمن كامل)
+        [MaxLength(500)]
+        [Column("permissions")]
+        public string? Permissions { get; set; }
 
         // ادعُ صديقاً: رمز دعوة المستخدم (يُنشأ عند أول طلب له)، ومن دعاه، ومتى صُرفت مكافأة الدعوة
         [MaxLength(16)]

@@ -110,6 +110,8 @@ namespace ecommerce.Repositories
                 .Include(o => o.SubOrders).ThenInclude(so => so.Vendor)
                 .Include(o => o.SubOrders).ThenInclude(so => so.Driver)
                 .Include(o => o.SubOrders).ThenInclude(so => so.Items)
+                .Include(o => o.SubOrders).ThenInclude(so => so.ConfirmedByUser)
+                .Include(o => o.SubOrders).ThenInclude(so => so.CancelledByUser)
                 .AsSplitQuery()
                 .AsQueryable();
 

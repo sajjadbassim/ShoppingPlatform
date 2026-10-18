@@ -83,6 +83,9 @@ namespace ecommerce.Repositories
             return true;
         }
 
+        public Task<int> CountActiveAdminsAsync() =>
+            _context.Users.CountAsync(u => u.Role == ecommerce.Core.Constants.UserRoles.Admin && u.IsActive);
+
         public async Task<bool> ExistsAsync(string phone)
         {
             return await _context.Users

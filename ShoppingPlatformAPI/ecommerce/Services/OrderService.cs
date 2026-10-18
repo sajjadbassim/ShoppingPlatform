@@ -85,6 +85,8 @@ namespace ecommerce.Services
             var address = await _addressRepository.GetByIdAsync(dto.AddressId);
             if (address == null) throw new NotFoundException("العنوان غير موجود");
             if (address.UserId != userId) throw new BusinessRuleException("هذا العنوان غير مسجل باسمك");
+            if (!ServiceArea.Covers(address.Latitude, address.Longitude))
+                throw new BusinessRuleException("عنوان التوصيل خارج منطقة التوصيل (محافظة واسط فقط) — اختر عنواناً آخر أو عدّل موقعه على الخريطة");
 
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null || cart.Items == null || !cart.Items.Any())
@@ -105,32 +107,32 @@ namespace ecommerce.Services
             {
                 // المنتج ذو المتغيرات: التوفر من المتغير (يُتحقق منه أدناه)
                 if (!item.Product.IsActive || (item.Variant == null && !item.Product.IsAvailable))
-                    errors.Add($"المنتج '{item.Product.Name}' غير متوفر");
+                    errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» غير متوفر");
 
                 if (item.Product.Vendor == null || !item.Product.Vendor.IsActive)
-                    errors.Add($"المنتج '{item.Product.Name}' من متجر غير متاح حالياً");
+                    errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» من متجر غير متاح حالياً");
 
                 if (item.Product.CategoryId.HasValue && hiddenCategoryIds.Contains(item.Product.CategoryId.Value))
-                    errors.Add($"المنتج '{item.Product.Name}' غير متاح حالياً");
+                    errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» غير متاح حالياً");
 
                 if (item.Variant == null && productsWithVariants.Contains(item.ProductId))
-                    errors.Add($"المنتج '{item.Product.Name}' يحتاج اختيار الخيارات");
+                    errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» يحتاج اختيار الخيارات");
 
                 if (item.Variant != null)
                 {
                     if (!item.Variant.IsAvailable)
-                        errors.Add($"المتغير '{item.Variant.Sku}' غير متوفر حالياً");
+                        errors.Add($"الخيار المختار من «{item.Product.NameAr ?? item.Product.Name}» غير متوفر حالياً");
                     if (item.Quantity > item.Variant.StockQuantity)
-                        errors.Add($"المنتج '{item.Product.Name}' الكمية المتوفرة من هذا المتغير فقط {item.Variant.StockQuantity}");
+                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» الكمية المتوفرة من هذا المتغير فقط {item.Variant.StockQuantity}");
                 }
                 else
                 {
                     if (item.Quantity > item.Product.StockQuantity)
-                        errors.Add($"المنتج '{item.Product.Name}' الكمية المتوفرة فقط {item.Product.StockQuantity}");
+                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» الكمية المتوفرة فقط {item.Product.StockQuantity}");
                 }
             }
 
-            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
+            if (errors.Any()) throw new BusinessRuleException(string.Join("، ", errors));
 
             // منتجات السوبرماركت في السلة: موعد توصيل من الفترات المتاحة + ماذا نفعل إن نفد منتج
             var groceryIds = await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
@@ -139,6 +141,9 @@ namespace ecommerce.Services
                 .Select(i => i.Product.Vendor).DistinctBy(v => v.Id).ToList();
             DeliverySlotDto? slot = null;
             string? substitution = null;
+            // موعد أُرسل لطلب بلا منتجات سوبرماركت: كان يُتجاهل بصمت فيظن الزبون أن طلبه بموعد
+            if (groceryStores.Count == 0 && dto.DeliverySlotStart != null)
+                throw new BusinessRuleException("موعد التوصيل متاح لطلبات السوبرماركت فقط — أرسل الطلب بلا موعد ويصلك في أقرب وقت");
             if (groceryStores.Count > 0)
             {
                 // الموعد يجب أن يقع ضمن أوقات عمل متاجر السوبرماركت في السلة
@@ -153,25 +158,18 @@ namespace ecommerce.Services
             foreach (var vendor in cart.Items.Select(i => i.Product.Vendor).Where(v => v != null).DistinctBy(v => v.Id))
             {
                 if (!vendor.IsAcceptingOrders)
-                    errors.Add($"متجر '{vendor.NameAr ?? vendor.Name}': المتجر لا يستقبل طلبات حالياً");
+                    errors.Add($"متجر «{vendor.NameAr ?? vendor.Name}»: المتجر لا يستقبل طلبات حالياً");
                 else if (!scheduledStoreIds.Contains(vendor.Id) && StoreHours.Status(vendor, checkoutTime) is { IsOpen: false } closed)
-                    errors.Add($"متجر '{vendor.NameAr ?? vendor.Name}': {closed.Message}");
+                    errors.Add($"متجر «{vendor.NameAr ?? vendor.Name}»: {closed.Message}");
             }
 
-            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
+            if (errors.Any()) throw new BusinessRuleException(string.Join("، ", errors));
 
             // ✅ سعر الوحدة الفعلي بعد تطبيق أفضل عرض فعّال على كل منتج (يُحسب مرة واحدة ويُعاد استخدامه)
-            var promoPrices = await _promotionService.CalculateFinalPricesAsync(cart.Items.Select(i =>
-                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId, i.Product.Price)));
-            var unitPrices = new Dictionary<Guid, decimal>();
-            foreach (var item in cart.Items)
-            {
-                var promoPrice = promoPrices[item.ProductId];
-
-                unitPrices[item.Id] = item.Variant != null
-                    ? promoPrice + item.Variant.PriceAdjustment
-                    : promoPrice;
-            }
+            // العرض على السعر الكامل للمتغير (الأساسي + فرق المتغير) — نسبة الخصم نفسها على كل المقاسات
+            var unitPrices = new Dictionary<Guid, decimal>(await _promotionService.CalculateFinalPricesAsync(cart.Items.Select(i =>
+                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId,
+                    i.Product.Price + (i.Variant?.PriceAdjustment ?? 0), i.Id))));
 
             var vendorGroups = cart.Items.GroupBy(i => i.Product.VendorId);
             decimal totalSubtotal = 0;
@@ -186,10 +184,10 @@ namespace ecommerce.Services
                 totalSubtotal += vendorSubtotal;
                 totalDelivery += feeRules.FeeFor(vendor);
                 if (vendorSubtotal < vendor.MinOrderAmount)
-                    errors.Add($"الطلب من '{vendor.Name}' أقل من الحد الأدنى ({vendor.MinOrderAmount} دينار)");
+                    errors.Add($"الطلب من «{vendor.NameAr ?? vendor.Name}» أقل من الحد الأدنى ({vendor.MinOrderAmount:N0} د.ع) — أضف {vendor.MinOrderAmount - vendorSubtotal:N0} د.ع");
             }
 
-            if (errors.Any()) throw new BusinessRuleException(string.Join(", ", errors));
+            if (errors.Any()) throw new BusinessRuleException(string.Join("، ", errors));
             var zoneUsed = vendorGroups.Any(g => feeRules.UsesZone(g.First().Product.Vendor));
 
             // إنشاء الطلب كاملاً في معاملة واحدة: إذا فشل أي جزء يُتراجع عن خصم المخزون أيضاً
@@ -202,21 +200,27 @@ namespace ecommerce.Services
             {
                 // إرسال الطلب مرتين معاً (نقرتان، شبكة بطيئة): قفل لكل زبون حتى نهاية المعاملة، ثم التأكد أن السلة
                 // ما زالت كما قُرئت — الطلب الثاني ينتظر الأول فيجد سلته فارغة بدل أن ينشئ طلباً مكرراً
+                var cartItemIds = cart.Items.Select(i => i.Id).ToList();
                 if (_context.Database.IsSqlServer())
                 {
                     var lockResult = (await _context.Database.SqlQuery<int>(
-                        $"DECLARE @r int; EXEC @r = sp_getapplock @Resource = {"checkout:" + userId}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r AS [Value]")
+                        $"DECLARE @r int; EXEC @r = sp_getapplock @Resource = {OrderLock.CartResource(userId)}, @LockMode = 'Exclusive', @LockOwner = 'Transaction', @LockTimeout = 15000; SELECT @r AS [Value]")
                         .ToListAsync()).FirstOrDefault(-1);
                     if (lockResult < 0) throw new ConflictException("طلبك السابق ما زال قيد الإرسال — حاول بعد لحظات");
-                    var cartItemIds = cart.Items.Select(i => i.Id).ToList();
-                    if (await _context.CartItems.CountAsync(ci => cartItemIds.Contains(ci.Id)) != cartItemIds.Count)
+                    var current = await _context.CartItems.AsNoTracking()
+                        .Where(ci => cartItemIds.Contains(ci.Id))
+                        .Select(ci => new { ci.Id, ci.Quantity }).ToListAsync();
+                    if (current.Count != cartItemIds.Count)
                         throw new ConflictException("تم إرسال هذا الطلب مسبقاً — راجع صفحة طلباتك");
+                    // تغيّرت كمية بعد قراءة السلة (من تبويب آخر): لا نرسل طلباً بكمية لم يرها الزبون
+                    if (current.Any(c => c.Quantity != cart.Items.First(i => i.Id == c.Id).Quantity))
+                        throw new ConflictException("تغيّرت سلتك أثناء إرسال الطلب — راجعها ثم أعد المحاولة");
                 }
 
                 // خصم المخزون عند إنشاء الطلب (ذرياً) — يمنع بيع نفس القطعة لزبونين في نفس الوقت
+                // الاسم في رسالة نفاد الكمية للزبون: العربي مع خيار المتغير (المقاس/اللون) لا الرمز الداخلي
                 stockChanges = await _inventoryService.ReserveAsync(cart.Items.Select(i => new StockLine(
-                    i.ProductId, i.VariantId, i.Quantity,
-                    i.Variant != null ? $"{i.Product.Name} ({i.Variant.Sku})" : i.Product.Name)));
+                    i.ProductId, i.VariantId, i.Quantity, CustomerItemName(i))));
 
                 decimal discountAmount = 0;
                 Coupon? appliedCoupon = null;
@@ -245,9 +249,14 @@ namespace ecommerce.Services
                     TotalAmount = totalSubtotal + totalDelivery - discountAmount,
                     CouponCode = dto.CouponCode?.ToUpper(),
                     CouponVendorId = discountAmount > 0 ? appliedCoupon?.VendorId : null,
+                    CouponDiscountType = discountAmount > 0 ? appliedCoupon?.DiscountType : null,
+                    CouponDiscountValue = discountAmount > 0 ? appliedCoupon?.DiscountValue : null,
+                    CouponMaxDiscount = discountAmount > 0 ? appliedCoupon?.MaxDiscountAmount : null,
+                    CouponOriginalAmount = discountAmount,
+                    OriginalTotalAmount = totalSubtotal + totalDelivery - discountAmount,
                     PaymentMethod = PaymentMethods.COD,
                     PaymentStatus = PaymentStatus.Pending,
-                    CustomerNotes = dto.CustomerNotes,
+                    CustomerNotes = dto.CustomerNotes ?? "",
                     DeliveryLatitude = address.Latitude,
                     DeliveryLongitude = address.Longitude,
                     DeliveryZoneId = zoneUsed ? feeRules.Zone!.Id : null,
@@ -327,7 +336,15 @@ namespace ecommerce.Services
                     vendorIndex++;
                 }
 
-                await _cartRepository.ClearCartAsync(cart.Id);
+                // نصيب كل متجر من الكوبون يُحفظ على طلبه الفرعي
+                if (discountAmount > 0)
+                {
+                    OrderTotals.Recalculate(order, createdSubOrders);
+                    await _context.SaveChangesAsync();
+                }
+
+                // تُحذف القطع التي دخلت الطلب فقط: ما أُضيف للسلة أثناء الإرسال يبقى فيها ولا يضيع
+                await _cartRepository.RemoveItemsAsync(cart.Id, cartItemIds);
 
                 await transaction.CommitAsync();
             }
@@ -344,7 +361,7 @@ namespace ecommerce.Services
                 await _notificationService.NotifyNewOrderAsync(order.Id, order.OrderNumber);
                 foreach (var subOrder in createdSubOrders)
                     await _notificationService.NotifyNewSubOrderAsync(subOrder.Id, subOrder.SubOrderNumber, subOrder.VendorId);
-                await _notificationService.NotifyCustomerAsync(userId, "تم إنشاء طلبك بنجاح", new { orderId = order.Id, orderNumber = order.OrderNumber });
+                await _notificationService.NotifyCustomerAsync(userId, $"تم إنشاء طلبك {order.OrderNumber} بنجاح", new { orderId = order.Id, orderNumber = order.OrderNumber });
             }
             catch (Exception ex)
             {
@@ -398,7 +415,7 @@ namespace ecommerce.Services
                 .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null) throw new NotFoundException("الطلب غير موجود");
-            if (!isAdmin && order.CustomerId != customerId) throw new UnauthorizedAccessException("ليس لديك صلاحية لعرض هذا الطلب");
+            if (!isAdmin && order.CustomerId != customerId) throw new NotFoundException("الطلب غير موجود");
 
             var allStatuses = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED };
             var statusArMap = new Dictionary<string, (string ar, string desc)>
@@ -412,22 +429,58 @@ namespace ecommerce.Services
                 { OrderStatus.CANCELLED,            ("ملغي",            "تم إلغاء الطلب") },
             };
 
-            var completedStatuses = order.StatusLogs.Where(l => l.OrderId == orderId).Select(l => l.NewStatus).ToHashSet();
-            var timeline = allStatuses.Select(status =>
+            // الخطوات الأساسية، ثم ما حدث خارج المسار: محاولة توصيل فاشلة (بسببها) وإلغاء (بسببه)
+            List<TrackingTimelineDto> Build(List<OrderStatusLog> logs, string current, string? cancelReason)
             {
-                var log = order.StatusLogs.Where(l => l.OrderId == orderId && l.NewStatus == status).OrderBy(l => l.CreatedAt).FirstOrDefault();
-                var (ar, desc) = statusArMap.GetValueOrDefault(status, (status, ""));
-                return new TrackingTimelineDto { Status = status, StatusAr = ar, Description = desc, OccurredAt = log?.CreatedAt, IsCompleted = completedStatuses.Contains(status), IsCurrent = order.Status == status };
-            }).ToList();
+                static string Main(string s) => s == OrderStatus.PARTIALLY_CONFIRMED ? OrderStatus.CONFIRMED : s;
+                current = Main(current);
+                // آخر خطوة وصلها الطلب فعلاً (لا أبعد خطوة): سُحب من السائق قبل الاستلام فعاد «جاهز» — «في الطريق» لم يحدث.
+                // وكل ما قبلها منجز (طلب متعدد المتاجر قد ينتقل من «مؤكد جزئياً» إلى «قيد التحضير» مباشرة)
+                var lastMain = logs.Where(l => allStatuses.Contains(Main(l.NewStatus))).OrderBy(l => l.CreatedAt).LastOrDefault();
+                var reached = lastMain == null ? -1 : Array.IndexOf(allStatuses, Main(lastMain.NewStatus));
+                var steps = allStatuses.Select((status, i) =>
+                {
+                    var log = logs.Where(l => Main(l.NewStatus) == status).OrderBy(l => l.CreatedAt).FirstOrDefault();
+                    var (ar, desc) = statusArMap.GetValueOrDefault(status, (status, ""));
+                    return new TrackingTimelineDto { Status = status, StatusAr = ar, Description = desc, OccurredAt = i <= reached ? log?.CreatedAt : null, IsCompleted = i <= reached, IsCurrent = current == status };
+                }).ToList();
+                // طلب أُلغي أو تعذّر تسليمه (لا إعادة محاولة): لا تُعرض خطوات لن تحدث (مثل «تم التسليم»)
+                if (current is OrderStatus.CANCELLED or OrderStatus.DELIVERY_FAILED) steps.RemoveAll(t => !t.IsCompleted);
+
+                var failedAt = steps.FindIndex(t => t.Status == OrderStatus.OUT_FOR_DELIVERY) + 1;
+                if (failedAt == 0) failedAt = steps.Count;
+                // محاولة التوصيل الفاشلة من سجل الجزء نفسه (سجل الطلب الرئيسي تحديث تلقائي بنص داخلي)
+                foreach (var f in logs.Where(l => l.NewStatus == OrderStatus.DELIVERY_FAILED && l.SubOrderId != null).OrderByDescending(l => l.CreatedAt))
+                    steps.Insert(failedAt, new TrackingTimelineDto
+                    {
+                        Status = OrderStatus.DELIVERY_FAILED, StatusAr = "تعذّر التسليم",
+                        Description = string.IsNullOrWhiteSpace(f.Reason) ? "لم يتمكن السائق من تسليم الطلب" : $"لم يتمكن السائق من التسليم: {f.Reason}",
+                        OccurredAt = f.CreatedAt, IsCompleted = true, IsCurrent = current == OrderStatus.DELIVERY_FAILED,
+                    });
+
+                if (current == OrderStatus.CANCELLED)
+                {
+                    var c = logs.Where(l => l.NewStatus == OrderStatus.CANCELLED).OrderBy(l => l.CreatedAt).FirstOrDefault();
+                    var reason = cancelReason ?? c?.Reason;
+                    steps.Add(new TrackingTimelineDto
+                    {
+                        Status = OrderStatus.CANCELLED, StatusAr = "ملغي",
+                        Description = string.IsNullOrWhiteSpace(reason) ? "تم إلغاء الطلب" : $"تم إلغاء الطلب: {reason}",
+                        OccurredAt = c?.CreatedAt, IsCompleted = true, IsCurrent = true,
+                    });
+                }
+                return steps;
+            }
+
+            // محاولة التوصيل الفاشلة مسجّلة على أجزاء الطلب — تظهر في مسار الطلب كله أيضاً
+            var orderLogs = order.StatusLogs.Where(l => l.OrderId == orderId)
+                .Concat(order.SubOrders.SelectMany(so => so.StatusLogs ?? new List<OrderStatusLog>()).Where(l => l.NewStatus == OrderStatus.DELIVERY_FAILED))
+                .ToList();
+            var timeline = Build(orderLogs, order.Status, order.CancellationReason);
 
             var subOrdersTracking = order.SubOrders.Select(so =>
             {
-                var subTimeline = allStatuses.Select(status =>
-                {
-                    var log = so.StatusLogs?.Where(l => l.SubOrderId == so.Id && l.NewStatus == status).OrderBy(l => l.CreatedAt).FirstOrDefault();
-                    var (ar, desc) = statusArMap.GetValueOrDefault(status, (status, ""));
-                    return new TrackingTimelineDto { Status = status, StatusAr = ar, Description = desc, OccurredAt = log?.CreatedAt, IsCompleted = so.StatusLogs?.Any(l => l.SubOrderId == so.Id && l.NewStatus == status) == true, IsCurrent = so.Status == status };
-                }).ToList();
+                var subTimeline = Build((so.StatusLogs ?? new List<OrderStatusLog>()).Where(l => l.SubOrderId == so.Id).ToList(), so.Status, so.CancellationReason);
 
                 DriverTrackingDto? driverDto = so.Driver == null ? null : new DriverTrackingDto { DriverId = so.Driver.Id, DriverName = so.Driver.FullName, DriverPhone = so.Driver.Phone, VehicleType = so.Driver.VehicleType };
                 return new SubOrderTrackingDto { SubOrderId = so.Id, SubOrderNumber = so.SubOrderNumber, VendorName = so.Vendor?.Name ?? "", Status = so.Status, Driver = driverDto, Timeline = subTimeline };
@@ -438,29 +491,40 @@ namespace ecommerce.Services
 
         public async Task<OrderResponseDto> CancelOrderAsync(Guid orderId, Guid customerId, CancelOrderDto dto)
         {
+            // إلغاء الزبون مع قبول/رفض المتجر في نفس اللحظة: واحد فقط ينجح
+            await using var orderLock = await OrderLock.ForOrderAsync(_context, orderId);
+            // ضغطة إلغاء ثانية (أو من تبويب آخر): الطلب ملغى أصلاً — نفس النتيجة بلا خطأ
+            var currentStatus = await _context.Orders.AsNoTracking().Where(o => o.Id == orderId && o.CustomerId == customerId)
+                .Select(o => o.Status).FirstOrDefaultAsync();
+            if (currentStatus == OrderStatus.CANCELLED) return await GetOrderByIdAsync(orderId);
+            List<SubOrder> cancelled;
+            Guid orderCustomerId;
+            string oldOrderStatus, orderNumber;
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
                 var order = await _context.Orders.Include(o => o.SubOrders).FirstOrDefaultAsync(o => o.Id == orderId);
                 if (order == null) throw new NotFoundException("الطلب غير موجود");
-                if (order.CustomerId != customerId) throw new UnauthorizedAccessException("ليس لديك صلاحية لإلغاء هذا الطلب");
+                if (order.CustomerId != customerId) throw new NotFoundException("الطلب غير موجود");
 
-                var cancellable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED };
-                if (!cancellable.Contains(order.Status))
-                    throw new BusinessRuleException($"لا يمكن إلغاء الطلب وهو «{OrderStatusText.Ar(order.Status)}»، الإلغاء متاح فقط قبل بدء التحضير");
+                var cancellable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.PARTIALLY_CONFIRMED, OrderStatus.CONFIRMED };
+                // متجر بدأ التحضير (وآخر لم يؤكد بعد فالطلب «مؤكد جزئياً»): الإلغاء متاح قبل بدء التحضير فقط
+                var started = order.SubOrders.Any(so => so.Status != OrderStatus.CANCELLED
+                    && so.Status != OrderStatus.PENDING_CONFIRMATION && so.Status != OrderStatus.CONFIRMED);
+                if (!cancellable.Contains(order.Status) || started)
+                    throw new BusinessRuleException($"لا يمكن إلغاء الطلب وهو «{OrderStatusText.Ar(started ? OrderStatus.PREPARING : order.Status)}»، الإلغاء متاح فقط قبل بدء التحضير");
 
                 var oldStatus = order.Status;
                 order.Status = OrderStatus.CANCELLED;
                 order.CancellationReason = dto.Reason;
                 order.UpdatedAt = DateTime.UtcNow;
 
-                var cancelledSubOrderIds = order.SubOrders
-                    .Where(so => so.Status != OrderStatus.CANCELLED)
-                    .Select(so => so.Id)
-                    .ToList();
+                cancelled = order.SubOrders.Where(so => so.Status != OrderStatus.CANCELLED).ToList();
+                var cancelledSubOrderIds = cancelled.Select(so => so.Id).ToList();
 
-                foreach (var subOrder in order.SubOrders.Where(so => so.Status != OrderStatus.CANCELLED))
+                foreach (var subOrder in cancelled)
                 {
+                    _context.OrderStatusLogs.Add(new OrderStatusLog { SubOrderId = subOrder.Id, OldStatus = subOrder.Status, NewStatus = OrderStatus.CANCELLED, ChangedBy = customerId, Reason = dto.Reason, Notes = "إلغاء من قِبل العميل" });
                     subOrder.Status = OrderStatus.CANCELLED;
                     subOrder.CancellationReason = dto.Reason;
                     subOrder.CancelledBy = customerId;
@@ -469,6 +533,7 @@ namespace ecommerce.Services
                 }
 
                 await _context.OrderStatusLogs.AddAsync(new OrderStatusLog { OrderId = order.Id, OldStatus = oldStatus, NewStatus = OrderStatus.CANCELLED, ChangedBy = customerId, Reason = dto.Reason, Notes = "إلغاء من قِبل العميل" });
+                OrderTotals.SyncCancelled(order, order.SubOrders);
                 await _context.SaveChangesAsync();
 
                 // إعادة مخزون الطلبات الفرعية التي أُلغيت الآن (داخل نفس المعاملة)
@@ -476,10 +541,30 @@ namespace ecommerce.Services
 
                 await _loyaltyService.CancelRedemptionAsync(orderId);
                 await transaction.CommitAsync();
-
-                return await GetOrderByIdAsync(orderId);
+                oldOrderStatus = oldStatus;
+                orderNumber = order.OrderNumber;
+                orderCustomerId = order.CustomerId;
             }
             catch { await transaction.RollbackAsync(); throw; }
+
+            // بعد الحفظ فقط: المتجر (حتى لو قبل الطلب وبدأ يجهّزه) والعمليات يعرفون بالإلغاء. فشل الإشعار لا يُفشل الإلغاء
+            try
+            {
+                foreach (var so in cancelled)
+                    await _notificationService.NotifySubOrderCancelledAsync(so.Id, so.SubOrderNumber, $"ألغى الزبون الطلب: {dto.Reason}", so.VendorId);
+                await _notificationService.NotifyOrderStatusChangedAsync(orderId, oldOrderStatus, OrderStatus.CANCELLED, orderNumber);
+                // تأكيد للزبون في قائمة إشعاراته (السبب، وعودة النقاط إن استخدمها)
+                await _notificationService.NotifyCustomerOrderStatusAsync(orderCustomerId, orderId, orderNumber, OrderStatus.CANCELLED);
+                // محفوظ في قائمة العمليات (البث اللحظي أعلاه يضيع إن لم تكن الصفحة مفتوحة)
+                await _notificationService.NotifyOpsAsync(NotificationCategory.NewOrders, NotificationType.ORDER_STATUS,
+                    $"ألغى الزبون الطلب {orderNumber}: {dto.Reason}", new { orderId });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Order {OrderNumber} cancelled by customer but notifications failed", orderNumber);
+            }
+
+            return await GetOrderByIdAsync(orderId);
         }
 
         private async Task LogOrderStatusChangeAsync(Guid orderId, string oldStatus, string newStatus, Guid? changedBy, string reason = null, string notes = null)
@@ -490,6 +575,15 @@ namespace ecommerce.Services
         private async Task LogSubOrderStatusChangeAsync(Guid subOrderId, string oldStatus, string newStatus, Guid? changedBy, string reason = null, string notes = null)
         {
             await _orderStatusLogRepository.CreateAsync(new OrderStatusLog { SubOrderId = subOrderId, OldStatus = oldStatus, NewStatus = newStatus, ChangedBy = changedBy, Reason = reason, Notes = notes });
+        }
+
+        private static string CustomerItemName(CartItem i)
+        {
+            var name = i.Product.NameAr ?? i.Product.Name;
+            var options = i.Variant?.AttributeValues?
+                .Select(av => av.AttributeValue?.ValueAr ?? av.AttributeValue?.Value)
+                .Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
+            return options is { Count: > 0 } ? $"{name} ({string.Join(" · ", options)})" : name;
         }
 
         private OrderResponseDto MapToDto(Order order)
@@ -511,7 +605,9 @@ namespace ecommerce.Services
                 ConfirmedByName = so.ConfirmedByUser?.FullName,
                 ConfirmedAt = so.ConfirmedAt,
                 ConfirmationDeadline = so.ConfirmationDeadline,
-                MinutesRemaining = so.ConfirmationDeadline.HasValue ? (int)Math.Max(0, (so.ConfirmationDeadline.Value - DateTime.UtcNow).TotalMinutes) : null,
+                // العدّاد لما ينتظر تأكيد المتجر فقط — بعد التأكيد أو الإلغاء لا عدّ تنازلي
+                MinutesRemaining = so.ConfirmationDeadline.HasValue && so.Status == SubOrderStatus.PendingConfirmation
+                    ? (int)Math.Max(0, (so.ConfirmationDeadline.Value - DateTime.UtcNow).TotalMinutes) : null,
                 CancellationReason = so.CancellationReason,
                 FailureReason = so.FailureReason,
                 FailureReasonAr = so.FailureReason == null ? null : DeliveryFailureReason.Ar(so.FailureReason),
@@ -537,6 +633,7 @@ namespace ecommerce.Services
                     WeightStepKg = i.WeightStepKg,
                     ReplacesItemId = i.ReplacesItemId,
                     UnavailableQuantity = i.UnavailableQuantity,
+                    RefusedQuantity = i.RefusedQuantity,
                     // ✅ Variant
                     VariantId = i.VariantId,
                     VariantSku = i.Variant?.Sku,
@@ -569,7 +666,14 @@ namespace ecommerce.Services
                 DeliveryFees = order.DeliveryFees,
                 DeliveryZoneName = order.DeliveryZoneName,
                 DiscountAmount = order.DiscountAmount,
+                CouponDiscountAmount = OrderTotals.CouponDiscount(order),
+                PointsDiscountAmount = order.PointsDiscountAmount,
                 TotalAmount = order.TotalAmount,
+                RefusedAmount = order.SubOrders?.SelectMany(so => so.Items ?? new List<SubOrderItem>()).Sum(i => i.UnitPrice * i.RefusedQuantity) ?? 0,
+                OriginalTotalAmount = order.OriginalTotalAmount,
+                RefusalFeeAmount = order.RefusalFeeAmount,
+                RefusalFeePayer = order.RefusalFeePayer,
+                CashCollectedAmount = order.CashCollectedAmount,
                 CouponCode = order.CouponCode,
                 DeliverySlotStart = order.DeliverySlotStart,
                 DeliverySlotEnd = order.DeliverySlotEnd,

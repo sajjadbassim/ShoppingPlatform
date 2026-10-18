@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import {
   RotateCcw, Check, X, RefreshCw, Package,
-  AlertCircle, Clock, Eye, PackagePlus, PackageCheck, Info,
+  AlertCircle, Clock, Eye, PackagePlus, PackageCheck, Info, Truck,
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
@@ -10,6 +10,7 @@ import { useToast } from '../../components/common/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { ReturnPickupFeeChip } from '../../components/common/FeePayerException'
 
 // ===========================
 // Helpers
@@ -140,13 +141,13 @@ const ReviewModal = ({ ret, onClose, onSaved }) => {
               </div>
             </div>
 
-            {/* تنبيه: القبول لا يعيد المخزون */}
+            {/* بعد القبول: سائق يأخذ القطع من الزبون، ثم المتجر يؤكد استلامها، ثم ردّ المال */}
             {decision === 'approved' && (
               <div className="flex gap-2 bg-blue-50 border border-blue-100 rounded-lg p-3">
                 <Info size={15} className="text-blue-500 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-700 leading-relaxed">
-                  القبول لا يعيد الكمية إلى المخزون تلقائياً. بعد استلام البضاعة وفحصها،
-                  استخدم زر <span className="font-semibold">"تحديث المخزون"</span> في قائمة الإرجاعات.
+                  بعد القبول عيّن <span className="font-semibold">سائقاً يأخذ القطع من الزبون</span> ويوصلها للمتجر.
+                  حين يؤكد المتجر استلامها تعود للمخزون وتُخصم قيمتها من المتجر، ثم يُفتح زر ردّ المبلغ للزبون.
                 </p>
               </div>
             )}
@@ -188,8 +189,10 @@ const ReviewModal = ({ ret, onClose, onSaved }) => {
 // Restock Modal
 // ===========================
 
+// الرفض عند الباب والإرجاع الذي يأخذه السائق من الزبون (له أجرة استلام محددة): مخزونهما يعود تلقائياً
+// حين يستلم المتجر البضاعة من السائق — اليدوي لإرجاعات قديمة فقط
 const canRestock = (ret) =>
-  ['APPROVED', 'COMPLETED'].includes(ret.status?.toUpperCase()) && !ret.isRestocked
+  ['APPROVED', 'COMPLETED'].includes(ret.status?.toUpperCase()) && !ret.isRestocked && !ret.isDoorRefusal && !ret.pickupFeePayer
 
 const RestockModal = ({ ret, onClose, onSaved }) => {
   const { success: showSuccess, error: showError } = useToast()
@@ -265,10 +268,122 @@ const RestockModal = ({ ret, onClose, onSaved }) => {
 }
 
 // ===========================
+// استلام القطع من الزبون: سائق يأخذها ويوصلها للمتجر — ردّ المال بعد وصولها فقط
+// ===========================
+const PICKUP_TONE = {
+  AWAITING_DRIVER: 'bg-amber-50 text-amber-800',
+  DRIVER_ASSIGNED: 'bg-violet-50 text-violet-800',
+  WITH_DRIVER: 'bg-purple-50 text-purple-800',
+  RECEIVED: 'bg-green-50 text-green-700',
+}
+
+const AssignPickupModal = ({ ret, onClose, onSaved }) => {
+  const { success: showSuccess, error: showError } = useToast()
+  const [driverId, setDriverId] = useState('')
+  const { data: drivers = [], isLoading } = useQuery({
+    queryKey: ['drivers-available'],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.DRIVERS.AVAILABLE); return r.data?.data ?? [] },
+    staleTime: 30 * 1000,
+  })
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: () => apiPost(API_ENDPOINTS.RETURNS.ASSIGN_DRIVER(ret.id), { driverId }),
+  })
+  const submit = async () => {
+    try { await mutateAsync(); showSuccess('تم تعيين السائق لاستلام القطع'); onSaved(); onClose() }
+    catch (err) { showError(err.message || 'تعذّر تعيين السائق') }
+  }
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-md w-full max-h-[92dvh] overflow-y-auto">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
+          <h3 className="font-bold text-lg flex items-center gap-2"><Truck size={20} className="text-primary" />سائق لاستلام المرتجع</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-sm text-gray-600">
+            يأخذ السائق قطع الإرجاع <span className="font-semibold text-gray-900">#{ret.returnNumber}</span> من الزبون
+            {ret.customerName ? ` (${ret.customerName})` : ''} ويوصلها لمتجرها.
+          </p>
+          {isLoading ? <Skeleton className="h-24 rounded-xl" /> : drivers.length === 0 ? (
+            <p className="p-4 rounded-xl bg-amber-50 text-amber-800 text-sm text-center">لا يوجد سائق متصل الآن</p>
+          ) : (
+            <div className="space-y-2">
+              {drivers.map(d => (
+                <button key={d.id} type="button" onClick={() => setDriverId(d.id)}
+                  className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-right ${driverId === d.id ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <span>
+                    <span className="block text-sm font-bold text-gray-900">{d.fullName}</span>
+                    <span className="block text-xs text-gray-500">{d.activeOrders > 0 ? `معه ${d.activeOrders === 1 ? 'طلب' : `${d.activeOrders} طلبات`}` : 'متاح'}</span>
+                  </span>
+                  {driverId === d.id && <Check size={18} className="text-primary" />}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button variant="ghost" fullWidth onClick={onClose}>إلغاء</Button>
+            <Button variant="primary" fullWidth onClick={submit} loading={isPending} disabled={!driverId}>تعيين</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const PickupCell = ({ ret, onAssign, onSaved }) => {
+  const { success: showSuccess, error: showError } = useToast()
+  const { mutateAsync: unassign, isPending } = useMutation({
+    mutationFn: () => apiPost(API_ENDPOINTS.RETURNS.UNASSIGN_DRIVER(ret.id)),
+  })
+  if (!ret.pickupStatus || ret.isDoorRefusal) return null
+  const handleUnassign = async () => {
+    if (!window.confirm(`سحب استلام المرتجع من ${ret.pickupDriverName || 'السائق'}؟`)) return
+    try { await unassign(); showSuccess('سُحب الاستلام من السائق'); onSaved() }
+    catch (err) { showError(err.message || 'تعذّر السحب') }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full whitespace-nowrap ${PICKUP_TONE[ret.pickupStatus] || 'bg-gray-100 text-gray-600'}`}>
+        <Truck size={12} />{ret.pickupStatusAr}{ret.pickupDriverName && ret.pickupStatus !== 'RECEIVED' ? ` — ${ret.pickupDriverName}` : ''}
+      </span>
+      {ret.pickupStatus === 'AWAITING_DRIVER' && ret.status?.toUpperCase() === 'APPROVED' && (
+        <Button variant="primary" size="sm" onClick={() => onAssign(ret)}><Truck size={13} className="ml-1" />تعيين سائق</Button>
+      )}
+      {ret.pickupStatus === 'DRIVER_ASSIGNED' && (
+        <Button variant="ghost" size="sm" onClick={handleUnassign} disabled={isPending}>سحب من السائق</Button>
+      )}
+    </div>
+  )
+}
+
+// ===========================
 // Return Row
 // ===========================
 
-const ReturnRow = ({ ret, onReview, onRestock }) => (
+// ردّ المبلغ للزبون بعد الموافقة — الإرجاع يصبح «مكتمل» (الرفض عند الباب لم يُدفع ثمنه أصلاً)
+const RefundButton = ({ ret, onSaved }) => {
+  const { success: showSuccess, error: showError } = useToast()
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: () => apiPost(API_ENDPOINTS.RETURNS.REFUNDED(ret.id)),
+  })
+  const amount = (ret.refundAmount ?? 0).toLocaleString('en-US')
+  const handle = async () => {
+    const note = ret.pointsDeductionAmount > 0
+      ? `
+(بعد خصم ${ret.pointsDeductionAmount.toLocaleString('en-US')} د.ع قيمة نقاط صرفها الزبون من هذه القطع)` : ''
+    if (!window.confirm(`تأكيد ردّ ${amount} د.ع للزبون؟${note}`)) return
+    try { await mutateAsync(); showSuccess('تم تسجيل ردّ المبلغ'); onSaved() }
+    catch (err) { showError(err.message || 'فشل تسجيل ردّ المبلغ') }
+  }
+  return (
+    <Button variant="outline" size="sm" onClick={handle} disabled={isPending}
+      title="سجّل أنك أعدت المبلغ للزبون">
+      <Check size={13} className="ml-1" />تم ردّ {amount} د.ع
+    </Button>
+  )
+}
+
+const ReturnRow = ({ ret, onReview, onRestock, onAssign, onSaved }) => (
   <tr className="hover:bg-gray-50">
     <td className="px-4 py-3 font-medium text-primary text-sm">
       #{ret.returnNumber || ret.id?.slice(0,8)}
@@ -305,6 +420,22 @@ const ReturnRow = ({ ret, onReview, onRestock }) => (
           <Eye size={13} className="ml-1" />مراجعة
         </Button>
       )}
+      <PickupCell ret={ret} onAssign={onAssign} onSaved={onSaved} />
+      {/* ردّ المال بعد وصول القطع للمتجر فقط */}
+      {ret.status?.toUpperCase() === 'APPROVED' && !ret.isDoorRefusal && ret.canRefund && <RefundButton ret={ret} onSaved={onSaved} />}
+      {/* من يتحمّل أجرة الاستلام — العمليات/الأدمن تغيّرها لهذا الإرجاع قبل وصول القطع للمتجر */}
+      <ReturnPickupFeeChip ret={ret} onChanged={onSaved} />
+      {ret.status?.toUpperCase() === 'COMPLETED' && ret.refundAmount != null && (
+        <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-1 rounded-full whitespace-nowrap">
+          <Check size={12} />رُدّ {ret.refundAmount.toLocaleString('en-US')} د.ع
+        </span>
+      )}
+      {ret.pointsDeductionAmount > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs text-amber-800 bg-amber-50 px-2 py-1 rounded-full whitespace-nowrap"
+          title="الزبون صرف نقاط هذه القطع قبل إرجاعها">
+          خُصم {ret.pointsDeductionAmount.toLocaleString('en-US')} د.ع نقاط
+        </span>
+      )}
       {canRestock(ret) && (
         <Button variant="outline" size="sm" onClick={() => onRestock(ret)}
           title="إعادة الكميات المرتجعة إلى المخزون بعد استلامها وفحصها">
@@ -329,6 +460,7 @@ const AdminReturns = () => {
   const queryClient = useQueryClient()
   const [selectedReturn, setSelectedReturn] = useState(null)
   const [restockTarget, setRestockTarget]   = useState(null)
+  const [assignTarget, setAssignTarget]     = useState(null)
   const [statusFilter, setStatusFilter]     = useState('')
   const [page, setPage]                     = useState(1)
 
@@ -356,9 +488,12 @@ const AdminReturns = () => {
         apiGet(API_ENDPOINTS.RETURNS.PAGED, { status: 'COMPLETED', pageNumber: 1, pageSize: 200 }),
       ])
       const done = [...(approvedRes.data?.data ?? []), ...(completedRes.data?.data ?? [])]
+      const approved = approvedRes.data?.data ?? []
       return {
         pending: pendingRes.data?.pagination?.total ?? 0,
         awaitingRestock: done.filter(canRestock).length,
+        awaitingDriver: approved.filter(r => r.pickupStatus === 'AWAITING_DRIVER').length,
+        readyToRefund: approved.filter(r => r.canRefund).length,
       }
     },
     staleTime: 60 * 1000,
@@ -368,6 +503,8 @@ const AdminReturns = () => {
   const totalPages = data?.totalPages ?? 1
   const pending    = alerts?.pending ?? 0
   const awaitingRestock = alerts?.awaitingRestock ?? 0
+  const awaitingDriver = alerts?.awaitingDriver ?? 0
+  const readyToRefund = alerts?.readyToRefund ?? 0
 
   const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['admin-returns'] })
@@ -393,6 +530,18 @@ const AdminReturns = () => {
           <p className="text-sm text-yellow-700 font-medium">
             يوجد {pending} طلب إرجاع يحتاج مراجعة
           </p>
+        </div>
+      )}
+
+      {/* استلام القطع من الزبون: بانتظار سائق، أو وصلت وبانتظار ردّ المال */}
+      {(awaitingDriver > 0 || readyToRefund > 0) && (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 flex items-start gap-3">
+          <Truck size={18} className="text-violet-500 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-violet-800 space-y-0.5">
+            {awaitingDriver > 0 && <p className="font-medium">{awaitingDriver} إرجاع بانتظار تعيين سائق يأخذ القطع من الزبون</p>}
+            {readyToRefund > 0 && <p className="font-medium">{readyToRefund} إرجاع وصلت قطعه للمتجر — ردّ المبلغ للزبون</p>}
+            <p className="text-xs text-violet-600">يُردّ المال ويُخصم من المتجر ويعود المخزون بعد أن يؤكد المتجر استلام القطع.</p>
+          </div>
         </div>
       )}
 
@@ -453,7 +602,7 @@ const AdminReturns = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {returns.map(ret => (
-                  <ReturnRow key={ret.id} ret={ret} onReview={setSelectedReturn} onRestock={setRestockTarget} />
+                  <ReturnRow key={ret.id} ret={ret} onReview={setSelectedReturn} onRestock={setRestockTarget} onAssign={setAssignTarget} onSaved={handleSaved} />
                 ))}
               </tbody>
             </table>
@@ -484,6 +633,10 @@ const AdminReturns = () => {
           onClose={() => setSelectedReturn(null)}
           onSaved={handleSaved}
         />
+      )}
+
+      {assignTarget && (
+        <AssignPickupModal ret={assignTarget} onClose={() => setAssignTarget(null)} onSaved={handleSaved} />
       )}
 
       {restockTarget && (

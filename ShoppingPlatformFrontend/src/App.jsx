@@ -76,11 +76,14 @@ const AdminReports = lazy(() => import('./pages/admin/AdminReports'))
 const AdminFinance = lazy(() => import('./pages/admin/AdminFinance'))
 const AdminDeliveryZones = lazy(() => import('./pages/admin/AdminDeliveryZones'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const ActivityPage = lazy(() => import('./pages/activity/ActivityPage'))
+const StaffPage = lazy(() => import('./pages/activity/StaffPage'))
 const OperationsDashboard = lazy(() => import('./pages/operations/OperationsDashboard'))
 const OperationsDrivers = lazy(() => import('./pages/operations/OperationsDrivers'))
 const OperationsOrders = lazy(() => import('./pages/operations/OperationsOrders'))
 const OperationsTracking = lazy(() => import('./pages/operations/OperationsTracking'))
 const OperationsReports = lazy(() => import('./pages/operations/OperationsReports'))
+const OperationsReturnTrips = lazy(() => import('./pages/operations/OperationsReturnTrips'))
 const OperationsSettings = lazy(() => import('./pages/operations/OperationsSettings'))
 
 // الإطار المشترك لكل الصفحات داخل الموجّه
@@ -151,6 +154,8 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="reviews" element={<VendorReviews />} />
       <Route path="reports" element={<VendorReports />} />
       <Route path="earnings" element={<VendorEarnings />} />
+      <Route path="staff" element={<StaffPage />} />
+      <Route path="activity" element={<ActivityPage />} />
       <Route path="settings" element={<VendorSettings />} />
       <Route path="social" element={<VendorSocialAccounts />} />
       <Route path="promotions" element={<VendorPromotions />} />
@@ -168,10 +173,11 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="returns" element={<AdminReturns />} />
       <Route path="orders" element={<AdminOrders />} />
       <Route path="orders/:id" element={<AdminOrderDetails />} />
-      <Route path="orders/:id" element={<AdminOrderDetails />} />
       <Route path="reports" element={<AdminReports />} />
       <Route path="finance" element={<AdminFinance />} />
       <Route path="delivery-zones" element={<AdminDeliveryZones />} />
+      <Route path="staff" element={<StaffPage />} />
+      <Route path="activity" element={<ActivityPage />} />
       <Route path="settings" element={<AdminSettings />} />
     </Route>
 
@@ -181,6 +187,9 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="orders" element={<OperationsOrders />} />
       <Route path="tracking" element={<OperationsTracking />} />
       <Route path="reports" element={<OperationsReports />} />
+      <Route path="returns" element={<OperationsReturnTrips />} />
+      <Route path="customer-returns" element={<AdminReturns />} />
+      <Route path="activity" element={<ActivityPage />} />
       <Route path="settings" element={<OperationsSettings />} />
     </Route>
 
@@ -199,10 +208,12 @@ function App() {
   // الخروج (أو انتهاء الجلسة): مسح السلة والمفضلة والكوبون والإشعارات المحفوظة على الجهاز
   // حتى لا يراها من يستخدم الجهاز بعده
   const userId = useAuthStore((s) => s.user?.id)
+  const role = useAuthStore((s) => s.user?.role)
   useEffect(() => {
     if (isAuthenticated) {
       fetchNotifications()
-      useCartStore.getState().fetchCart().catch(() => {})
+      // السلة للزبائن فقط (حسابات المتاجر والطاقم لا تشتري)
+      if (role === 'CUSTOMER') useCartStore.getState().fetchCart().catch(() => {})
       useWishlistStore.getState().fetchWishlist().catch(() => {})
     } else {
       useCartStore.getState().clearLocalCart()
@@ -211,7 +222,7 @@ function App() {
       useNotificationsStore.setState({ notifications: [], unreadCount: 0 })
       try { localStorage.removeItem('recentSearches') } catch { /* التخزين محجوب */ }
     }
-  }, [isAuthenticated, userId])
+  }, [isAuthenticated, userId, role])
 
   // الجهاز الذي فعّل الإشعارات سابقاً يُربط بالحساب الداخل حالياً
   useEffect(() => {

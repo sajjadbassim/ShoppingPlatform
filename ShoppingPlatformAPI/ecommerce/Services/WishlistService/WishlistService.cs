@@ -50,7 +50,8 @@ namespace ecommerce.Services
         {
             // التحقق من وجود المنتج
             var product = await _productRepository.GetByIdAsync(dto.ProductId);
-            if (product == null)
+            // منتج موقوف أو محذوف لا يظهر للزبائن — فلا يُضاف للمفضلة
+            if (product == null || !product.IsActive || product.IsDeleted)
                 throw new NotFoundException("المنتج غير موجود");
 
             // التحقق من عدم وجود المنتج مسبقاً في المفضلة

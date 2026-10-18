@@ -33,6 +33,7 @@ namespace ecommerce.Services.NotificationService
 
         // الأدمن
         Task NotifyAdminsAsync(NotificationCategory category, string type, string message, object? data = null);
+        Task NotifyOpsAsync(NotificationCategory category, string type, string message, object? data = null);
 
         // المخزون (البائع + الأدمن)
         Task NotifyLowStockAsync(Guid productId, string productName, Guid vendorId, int stockQuantity);

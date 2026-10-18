@@ -10,6 +10,7 @@ using ecommerce.Repositories;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using ecommerce.Core.Exceptions;
+using ecommerce.Services.FinanceService;
 
 namespace ecommerce.Services.AdminService
 {
@@ -37,8 +38,9 @@ namespace ecommerce.Services.AdminService
 
         public async Task<DashboardStatsDto> GetDashboardStatsAsync()
         {
-            var today = DateTime.UtcNow.Date;
-            var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            // «اليوم» و«الشهر» بتوقيت بغداد (طلبات منتصف الليل حتى الثالثة كانت تُحسب لليوم السابق)
+            var today = IraqTime.TodayStartUtc;
+            var monthStart = IraqTime.MonthStartUtc;
 
             var stats = new DashboardStatsDto
             {
@@ -47,7 +49,7 @@ namespace ecommerce.Services.AdminService
                 TotalCustomers = await _context.Users.CountAsync(u => u.Role == UserRoles.Customer),
                 TotalOps = await _context.Users.CountAsync(u => u.Role == UserRoles.Ops),
                 ActiveUsers = await _context.Users.CountAsync(u => u.IsActive),
-                NewUsersToday = await _context.Users.CountAsync(u => u.CreatedAt.Date == today),
+                NewUsersToday = await _context.Users.CountAsync(u => u.CreatedAt >= today),
 
                 // Vendors
                 TotalVendors = await _context.Vendors.CountAsync(),
@@ -62,20 +64,19 @@ namespace ecommerce.Services.AdminService
                 // Orders
                 TotalOrders = await _context.Orders.CountAsync(),
                 PendingOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.PENDING_CONFIRMATION),
-                ConfirmedOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.CONFIRMED),
+                // «مؤكدة» = قيد التنفيذ (قبلها متجر ولم تُسلَّم بعد)
+                ConfirmedOrders = await _context.Orders.CountAsync(o => InProgress.Contains(o.Status)),
+                DeliveredOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.DELIVERED),
                 CancelledOrders = await _context.Orders.CountAsync(o => o.Status == OrderStatus.CANCELLED),
-                TodayOrders = await _context.Orders.CountAsync(o => o.CreatedAt.Date == today),
+                TodayOrders = await _context.Orders.CountAsync(o => o.CreatedAt >= today),
 
-                // Revenue
-                TotalRevenue = await _context.Orders
-                    .Where(o => o.Status != OrderStatus.CANCELLED)
-                    .SumAsync(o => o.TotalAmount),
-                TodayRevenue = await _context.Orders
-                    .Where(o => o.CreatedAt.Date == today && o.Status != OrderStatus.CANCELLED)
-                    .SumAsync(o => o.TotalAmount),
-                MonthRevenue = await _context.Orders
-                    .Where(o => o.CreatedAt >= monthStart && o.Status != OrderStatus.CANCELLED)
-                    .SumAsync(o => o.TotalAmount),
+                // الإيراد = مبيعات ما سُلّم فعلاً (دفتر المتاجر: بلا المرفوض عند الباب، ناقص المُرجَع) — نفس أرقام المالية
+                TotalRevenue = await SalesEntries().SumAsync(e => (decimal?)e.Amount) ?? 0,
+                TodayRevenue = await SalesEntries().Where(e => e.CreatedAt >= today).SumAsync(e => (decimal?)e.Amount) ?? 0,
+                MonthRevenue = await SalesEntries().Where(e => e.CreatedAt >= monthStart).SumAsync(e => (decimal?)e.Amount) ?? 0,
+                // قيمة الطلبات التي لم تُسلَّم بعد (لا تُحسب إيراداً)
+                InProgressValue = await _context.Orders.Where(o => InProgress.Contains(o.Status) || o.Status == OrderStatus.PENDING_CONFIRMATION)
+                    .SumAsync(o => (decimal?)o.TotalAmount) ?? 0,
 
                 // SubOrders
                 PendingSubOrders = await _context.SubOrders
@@ -201,11 +202,12 @@ namespace ecommerce.Services.AdminService
             };
         }
 
-        public async Task<bool> ToggleUserStatusAsync(Guid userId)
+        public async Task<bool> ToggleUserStatusAsync(Guid userId, Guid actingUserId)
         {
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new NotFoundException("المستخدم غير موجود");
+            if (user.IsActive) await AdminAccountGuard.EnsureCanDisableAsync(_userRepository, user, actingUserId);
 
             user.IsActive = !user.IsActive;
             await _userRepository.UpdateAsync(user);
@@ -213,8 +215,11 @@ namespace ecommerce.Services.AdminService
             return user.IsActive;
         }
 
-        public async Task<bool> DeleteUserAsync(Guid userId)
+        public async Task<bool> DeleteUserAsync(Guid userId, Guid actingUserId)
         {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null) return false;
+            if (user.IsActive) await AdminAccountGuard.EnsureCanDisableAsync(_userRepository, user, actingUserId);
             return await _userRepository.DeleteAsync(userId);
         }
 
@@ -325,69 +330,130 @@ namespace ecommerce.Services.AdminService
             await _context.SaveChangesAsync();
             return true;
         }
+        private static readonly string[] InProgress =
+        {
+            OrderStatus.CONFIRMED, OrderStatus.PARTIALLY_CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY,
+        };
+
+        // قيود المبيعات في دفتر المتاجر: بيع ما سُلّم (+) وما أُرجع بعده (−)
+        private IQueryable<VendorLedgerEntry> SalesEntries() => _context.VendorLedgerEntries
+            .Where(e => e.Type == LedgerType.Sale || e.Type == LedgerType.Return);
+
         public async Task<object> GetSalesReportAsync(DateTime startDate, DateTime endDate)
         {
-            // ✅ تأكد أن endDate يغطي نهاية اليوم كاملاً
-            endDate = endDate.Date.AddDays(1).AddSeconds(-1);
+            // التاريخان أيام بتوقيت بغداد: من بداية يوم البداية حتى نهاية يوم النهاية، والتجميع بيوم بغداد
+            var fromUtc = IraqTime.DayStartUtc(startDate);
+            var toUtc = IraqTime.DayStartUtc(endDate).AddDays(1);
+            var offsetHours = (int)IraqTime.Offset.TotalHours;
 
             var orders = await _context.Orders
-                .Where(o => o.CreatedAt >= startDate && o.CreatedAt <= endDate)
-                .GroupBy(o => o.CreatedAt.Date)
+                .Where(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc)
+                .GroupBy(o => o.CreatedAt.AddHours(offsetHours).Date)
                 .Select(g => new
                 {
                     Date = g.Key,
                     TotalOrders = g.Count(),
-                    TotalRevenue = g.Sum(o => o.TotalAmount),
-                    ConfirmedOrders = g.Count(o => o.Status == OrderStatus.CONFIRMED),
+                    ConfirmedOrders = g.Count(o => InProgress.Contains(o.Status)),
+                    DeliveredOrders = g.Count(o => o.Status == OrderStatus.DELIVERED),
                     CancelledOrders = g.Count(o => o.Status == OrderStatus.CANCELLED)
                 })
-                .OrderBy(x => x.Date)
                 .ToListAsync();
+
+            // الإيراد بيوم التسليم (لا يوم الطلب) ومن ما سُلّم فعلاً
+            var revenue = await SalesEntries()
+                .Where(e => e.CreatedAt >= fromUtc && e.CreatedAt < toUtc)
+                .GroupBy(e => e.CreatedAt.AddHours(offsetHours).Date)
+                .Select(g => new { Date = g.Key, Revenue = g.Sum(e => e.Amount) })
+                .ToListAsync();
+
+            var daily = orders.Select(o => o.Date).Union(revenue.Select(r => r.Date)).OrderBy(d => d)
+                .Select(d =>
+                {
+                    var o = orders.FirstOrDefault(x => x.Date == d);
+                    return new
+                    {
+                        Date = d,
+                        TotalOrders = o?.TotalOrders ?? 0,
+                        TotalRevenue = revenue.FirstOrDefault(r => r.Date == d)?.Revenue ?? 0,
+                        ConfirmedOrders = o?.ConfirmedOrders ?? 0,
+                        DeliveredOrders = o?.DeliveredOrders ?? 0,
+                        CancelledOrders = o?.CancelledOrders ?? 0,
+                    };
+                })
+                .ToList();
 
             return new
             {
                 startDate,
                 endDate,
-                totalOrders = orders.Sum(x => x.TotalOrders),
-                totalRevenue = orders.Sum(x => x.TotalRevenue),
-                dailyStats = orders
+                totalOrders = daily.Sum(x => x.TotalOrders),
+                totalRevenue = daily.Sum(x => x.TotalRevenue),
+                dailyStats = daily
             };
         }
         public async Task<object> GetTopVendorsAsync(int count = 10)
         {
-            var topVendors = await _context.SubOrders
-                .Where(so => so.Status == SubOrderStatus.Confirmed || so.Status == SubOrderStatus.Delivered)
-                .GroupBy(so => new { so.VendorId, so.Vendor.Name })
+            // مبيعات كل متجر مما سُلّم (بلا التوصيل ولا المرفوض، ناقص المُرجَع)
+            var sales = await SalesEntries()
+                .GroupBy(e => e.VendorId)
                 .Select(g => new
                 {
-                    VendorId = g.Key.VendorId,
-                    VendorName = g.Key.Name,
-                    TotalOrders = g.Count(),
-                    TotalRevenue = g.Sum(so => so.Subtotal + so.DeliveryFee)
+                    VendorId = g.Key,
+                    TotalOrders = g.Where(e => e.Type == LedgerType.Sale).Select(e => e.SubOrderId).Distinct().Count(),
+                    TotalRevenue = g.Sum(e => e.Amount)
                 })
                 .OrderByDescending(x => x.TotalRevenue)
                 .Take(count)
                 .ToListAsync();
 
-            return topVendors;
+            var ids = sales.Select(s => s.VendorId).ToList();
+            var names = await _context.Vendors.Where(v => ids.Contains(v.Id)).ToDictionaryAsync(v => v.Id, v => v.Name);
+            return sales.Select(s => new
+            {
+                s.VendorId,
+                VendorName = names.GetValueOrDefault(s.VendorId),
+                s.TotalOrders,
+                s.TotalRevenue
+            }).ToList();
         }
 
         public async Task<object> GetTopProductsAsync(int count = 10)
         {
-            var topProducts = await _context.SubOrderItems
+            // القطع التي وصلت الزبون فعلاً: من متاجر سُلّمت، بلا المرفوض عند الباب، ناقص ما أُرجع بعد الاستلام
+            var sold = await _context.SubOrderItems
+                .Where(i => i.SubOrder.Status == OrderStatus.DELIVERED)
                 .GroupBy(i => new { i.ProductId, i.ProductName })
                 .Select(g => new
                 {
-                    ProductId = g.Key.ProductId,
-                    ProductName = g.Key.ProductName,
-                    TotalQuantity = g.Sum(i => i.Quantity),
-                    TotalRevenue = g.Sum(i => i.Subtotal)
+                    g.Key.ProductId,
+                    g.Key.ProductName,
+                    Quantity = g.Sum(i => i.Quantity - i.RefusedQuantity),
+                    Revenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity))
                 })
-                .OrderByDescending(x => x.TotalQuantity)
-                .Take(count)
                 .ToListAsync();
 
-            return topProducts;
+            var returned = await _context.ReturnItems
+                .Where(ri => !ri.Return.IsDoorRefusal && (ri.Return.Status == ReturnStatus.APPROVED || ri.Return.Status == ReturnStatus.COMPLETED))
+                .GroupBy(ri => ri.ProductId)
+                .Select(g => new { ProductId = g.Key, Quantity = g.Sum(ri => ri.Quantity), Value = g.Sum(ri => ri.UnitPrice * ri.Quantity) })
+                .ToDictionaryAsync(x => x.ProductId);
+
+            return sold
+                .Select(p =>
+                {
+                    var r = returned.GetValueOrDefault(p.ProductId);
+                    return new
+                    {
+                        p.ProductId,
+                        p.ProductName,
+                        TotalQuantity = p.Quantity - (r?.Quantity ?? 0),
+                        TotalRevenue = p.Revenue - (r?.Value ?? 0)
+                    };
+                })
+                .Where(p => p.TotalQuantity > 0)
+                .OrderByDescending(x => x.TotalQuantity)
+                .Take(count)
+                .ToList();
         }
 
         public async Task<string> ChangeUserRoleAsync(Guid userId, string newRole)

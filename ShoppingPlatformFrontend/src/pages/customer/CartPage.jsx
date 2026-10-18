@@ -268,14 +268,15 @@ const CartPage = () => {
   const totalSavings = allItems.reduce((sum, i) =>
     sum + (i.originalPrice > i.price ? (i.originalPrice - i.price) * i.quantity : 0), 0)
 
-  // تقدير النقاط التشجيعية التي سيكسبها هذا الطلب
+  // تقدير النقاط التشجيعية التي سيكسبها هذا الطلب — تُمنح على ما يدفعه فعلاً بعد خصم الكوبون (بلا التوصيل)
+  const pointsBase = Math.max(0, subtotal - discount)
   const { data: loyaltyEstimate } = useQuery({
-    queryKey: ['loyalty-estimate', subtotal],
+    queryKey: ['loyalty-estimate', pointsBase],
     queryFn: async () => {
-      const r = await apiGet(API_ENDPOINTS.LOYALTY.ESTIMATE, { orderAmount: subtotal })
+      const r = await apiGet(API_ENDPOINTS.LOYALTY.ESTIMATE, { orderAmount: pointsBase })
       return r.data.data || r.data
     },
-    enabled: isAuthenticated && subtotal > 0,
+    enabled: isAuthenticated && pointsBase > 0,
     staleTime: 60 * 1000,
   })
   const pointsToEarn = loyaltyEstimate?.pointsToEarn || 0

@@ -98,6 +98,22 @@ namespace ecommerce.Data.Configurations
         }
     }
 
+    public class ReturnTripConfiguration : IEntityTypeConfiguration<ReturnTrip>
+    {
+        public void Configure(EntityTypeBuilder<ReturnTrip> entity)
+        {
+            entity.HasIndex(e => new { e.DriverId, e.Status }).HasDatabaseName("idx_return_trips_driver_status");
+            entity.HasIndex(e => new { e.VendorId, e.Status }).HasDatabaseName("idx_return_trips_vendor_status");
+            entity.HasIndex(e => e.SubOrderId).HasDatabaseName("idx_return_trips_suborder");
+            entity.HasOne(e => e.Order).WithMany().HasForeignKey(e => e.OrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.SubOrder).WithMany().HasForeignKey(e => e.SubOrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Vendor).WithMany().HasForeignKey(e => e.VendorId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Driver).WithMany().HasForeignKey(e => e.DriverId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(e => e.Return).WithMany().HasForeignKey(e => e.ReturnId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(e => e.Items).WithOne(i => i.ReturnTrip).HasForeignKey(i => i.ReturnTripId).OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+
     // ===================================
     // تكوين جدول SubOrders
     // ===================================

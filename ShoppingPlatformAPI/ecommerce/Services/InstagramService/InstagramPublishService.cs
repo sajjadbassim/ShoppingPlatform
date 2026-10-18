@@ -518,7 +518,7 @@ namespace ecommerce.Services.InstagramService
             ?? throw new NotFoundException("المنتج غير موجود في متجرك");
 
         private async Task<Guid> GetVendorIdAsync(Guid userId, CancellationToken ct) =>
-            await _context.Vendors.Where(v => v.OwnerId == userId).Select(v => (Guid?)v.Id).FirstOrDefaultAsync(ct)
+            await ecommerce.Core.Constants.VendorMembership.VendorIdOfAsync(_context, userId, ct)
             ?? throw new ForbiddenException("هذا الحساب غير مرتبط بمتجر");
 
         private async Task<InstagramPost> GetOwnedPostAsync(Guid userId, Guid postId, CancellationToken ct)

@@ -159,6 +159,59 @@ namespace ecommerce.Tests.Services
 
             Assert.Equal(100, (await Account()).Balance);
         }
+
+        [Fact]
+        public async Task ApprovedReturn_ReversesPointsOfReturnedItems_Once()
+        {
+            // جزء بقيمة 20,000 (15,000 + 5,000) كسب 200 نقطة — إرجاع قطعة 5,000 يخصم ربعها بقيد عكسي
+            var keep = Guid.NewGuid(); var back = Guid.NewGuid();
+            var sub = new SubOrder { OrderId = _order, Status = OrderStatus.DELIVERED, SubOrderNumber = "S",
+                Items = new List<SubOrderItem> { new() { ProductId = keep, UnitPrice = 15000, Quantity = 1 }, new() { ProductId = back, UnitPrice = 5000, Quantity = 1 } } };
+            _context.SubOrders.Add(sub);
+            await _context.SaveChangesAsync();
+            await _service.EarnPointsAsync(_customer, _order, sub.Id, 20000);
+
+            var ret = new Return { ReturnNumber = "RET-1", OrderId = _order, CustomerId = _customer, Status = ReturnStatus.APPROVED, Reason = "defective",
+                Items = new List<ReturnItem> { new() { ProductId = back, ProductName = "x", Quantity = 1, UnitPrice = 5000 } } };
+            _context.Returns.Add(ret);
+            await _context.SaveChangesAsync();
+
+            Assert.Equal(50, (await _service.ReverseReturnPointsAsync(ret.Id)).Deducted);
+            Assert.Equal(0, (await _service.ReverseReturnPointsAsync(ret.Id)).Deducted);   // مرة واحدة فقط
+
+            var account = await Account();
+            Assert.Equal(150, account.Balance);
+            Assert.Equal(150, account.TotalEarned);
+            var reversal = await _context.LoyaltyTransactions.SingleAsync(t => t.ReferenceKey == $"return:{ret.Id}");
+            Assert.Equal(-50, reversal.Points);
+        }
+
+        [Fact]
+        public async Task ReverseReturnPoints_SpentPoints_ReportedAsShortfallValue()
+        {
+            // كسب 200 نقطة ثم صرف معظمها (بقي 10)، ثم أرجع قطعة نقاطها 50: يُخصم 10 والباقي 40 نقطة قيمتها تُخصم من الاسترجاع
+            _context.LoyaltySettings.Single().PointValue = 5;
+            var back = Guid.NewGuid();
+            var sub = new SubOrder { OrderId = _order, Status = OrderStatus.DELIVERED, SubOrderNumber = "S",
+                Items = new List<SubOrderItem> { new() { ProductId = Guid.NewGuid(), UnitPrice = 15000, Quantity = 1 }, new() { ProductId = back, UnitPrice = 5000, Quantity = 1 } } };
+            _context.SubOrders.Add(sub);
+            await _context.SaveChangesAsync();
+            await _service.EarnPointsAsync(_customer, _order, sub.Id, 20000);
+            _context.LoyaltyAccounts.Single(a => a.UserId == _customer).Balance = 10;
+            await _context.SaveChangesAsync();
+
+            var ret = new Return { ReturnNumber = "RET-2", OrderId = _order, CustomerId = _customer, Status = ReturnStatus.APPROVED, Reason = "defective",
+                Items = new List<ReturnItem> { new() { ProductId = back, ProductName = "x", Quantity = 1, UnitPrice = 5000 } } };
+            _context.Returns.Add(ret);
+            await _context.SaveChangesAsync();
+
+            var result = await _service.ReverseReturnPointsAsync(ret.Id);
+            Assert.Equal(new ReturnPointsReversal(10, 40, 200), result);
+            var account = await Account();
+            Assert.Equal(0, account.Balance);
+            Assert.Equal(150, account.TotalEarned);   // كل نقاط القطعة (50) تخرج من المستوى، لا ما خُصم من الرصيد فقط
+            Assert.Contains("صُرفت سابقاً", (await _context.LoyaltyTransactions.SingleAsync(t => t.ReferenceKey == $"return:{ret.Id}")).Description);
+        }
     }
 
     // أرقام الطلبات اليومية تكمل بعد آخر رقم موجود (مسار InMemory؛ مسار SQL Server عبر عدّاد MERGE)
@@ -172,7 +225,7 @@ namespace ecommerce.Tests.Services
         [Fact]
         public async Task ContinuesAfterLastNumberOfToday_IgnoringOtherDays()
         {
-            var today = DateTime.UtcNow.ToString("yyyyMMdd");
+            var today = ecommerce.Core.Constants.IraqTime.FromUtc(DateTime.UtcNow).ToString("yyyyMMdd");
             _context.Orders.AddRange(
                 new Order { OrderNumber = $"ORD-{today}-0007" },
                 new Order { OrderNumber = "ORD-20200101-0099" });

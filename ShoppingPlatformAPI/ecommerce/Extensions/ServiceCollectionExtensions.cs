@@ -40,12 +40,15 @@ namespace ecommerce.Extensions
             services.AddMemoryCache();
             services.AddSingleton<ecommerce.Services.AuthService.IUserSessionValidator, ecommerce.Services.AuthService.UserSessionValidator>();
             services.AddSingleton<UserSessionInterceptor>();
+            services.AddHttpContextAccessor();
+            services.AddSingleton<ActivityChangeInterceptor>();
 
             services.AddDbContext<AppDbContext>((sp, options) =>
                 options.UseSqlServer(config.GetConnectionString("DefaultConnection"))
                        .AddInterceptors(
                            sp.GetRequiredService<AuditableEntityInterceptor>(),
-                           sp.GetRequiredService<UserSessionInterceptor>()));
+                           sp.GetRequiredService<UserSessionInterceptor>(),
+                           sp.GetRequiredService<ActivityChangeInterceptor>()));
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
             return services;
@@ -55,6 +58,9 @@ namespace ecommerce.Extensions
         {
             services.AddHttpContextAccessor();
             services.AddScoped<ICurrentUserService, CurrentUserService>();
+            services.AddScoped<ecommerce.Services.ActivityLogService.IActivityLogService, ecommerce.Services.ActivityLogService.ActivityLogService>();
+            services.AddHostedService<ecommerce.Services.ActivityLogService.ActivityLogRetentionService>();
+            services.AddScoped<ecommerce.Services.StaffService.IStaffService, ecommerce.Services.StaffService.StaffService>();
             services.AddScoped<IVendorAccessService, VendorAccessService>();
             services.AddScoped<IDriverTrackingService, DriverTrackingService>();
             services.AddScoped<ecommerce.Services.FinanceService.IFinanceService, ecommerce.Services.FinanceService.FinanceService>();
@@ -64,6 +70,9 @@ namespace ecommerce.Extensions
             services.AddSingleton<ecommerce.Services.AuthService.IGoogleTokenValidator, ecommerce.Services.AuthService.GoogleTokenValidator>();
             services.AddScoped<ecommerce.Services.AuthService.IGoogleAuthService, ecommerce.Services.AuthService.GoogleAuthService>();
             services.AddScoped<ecommerce.Services.OrderSettingsService.IOrderSettingsService, ecommerce.Services.OrderSettingsService.OrderSettingsService>();
+            // تأخر تأكيد المتجر: إشعار واحد للمتجر والعمليات (بلا إلغاء تلقائي)
+            services.AddScoped<ecommerce.Services.OrderSettingsService.IOverdueConfirmationNotifier, ecommerce.Services.OrderSettingsService.OverdueConfirmationNotifier>();
+            services.AddHostedService<ecommerce.Services.OrderSettingsService.OverdueConfirmationBackgroundService>();
             services.AddScoped<ecommerce.Services.OrderTimingService.IOrderTimingService, ecommerce.Services.OrderTimingService.OrderTimingService>();
             services.AddScoped<ecommerce.Services.DeliverySlotService.IDeliverySlotService, ecommerce.Services.DeliverySlotService.DeliverySlotService>();
 
@@ -104,6 +113,7 @@ namespace ecommerce.Extensions
             services.AddScoped<IOrderService, OrderService>();
 
             services.AddScoped<IOpsService, OpsService>();
+            services.AddScoped<ecommerce.Services.ReturnTripService.IReturnTripService, ecommerce.Services.ReturnTripService.ReturnTripService>();
 
             services.AddScoped<IOrderStatusLogRepository, OrderStatusLogRepository>();
 

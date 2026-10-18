@@ -105,6 +105,9 @@ namespace ecommerce.Controllers
             // تفعيل/تعطيل المتجر قرار إداري — صاحب المتجر لا يعيد تفعيل متجر أوقفته الإدارة
             if (dto.IsActive.HasValue && !User.IsInRole("ADMIN") && !User.IsInRole("OPS"))
                 throw new ForbiddenException("تفعيل أو تعطيل المتجر من صلاحية الإدارة فقط");
+            // أجرة التوصيل تذهب للمنصة (سائقوها) — يحددها الأدمن؛ تُتجاهل من غيره (نسخ قديمة من الواجهة ترسلها)
+            if (!User.IsInRole(UserRoles.Admin))
+                dto.DeliveryFee = null;
 
             try
             {

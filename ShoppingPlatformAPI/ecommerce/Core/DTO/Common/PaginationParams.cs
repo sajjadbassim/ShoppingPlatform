@@ -8,15 +8,19 @@ namespace ecommerce.Core.DTO.Common
     {
         private const int MaxPageSize = 100;
         private int _pageSize = 20;
+        private int _pageNumber = 1;
 
-        [Range(1, int.MaxValue, ErrorMessage = "رقم الصفحة يجب أن يكون أكبر من 0")]
-        public int PageNumber { get; set; } = 1;
+        // قيمة خارج المدى تُستبدل بأقرب قيمة صالحة (مثل باقي الواجهات — PagingClampFilter) بدل رد 400
+        public int PageNumber
+        {
+            get => _pageNumber;
+            set => _pageNumber = Math.Max(1, value);
+        }
 
-        [Range(1, 100, ErrorMessage = "حجم الصفحة يجب أن يكون بين 1 و 100")]
         public int PageSize
         {
             get => _pageSize;
-            set => _pageSize = value > MaxPageSize ? MaxPageSize : value;
+            set => _pageSize = Math.Clamp(value, 1, MaxPageSize);
         }
         [BindNever]
         public int Skip => (PageNumber - 1) * PageSize;

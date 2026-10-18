@@ -715,6 +715,10 @@ const ProductDetailsContent = () => {
     : isVariantFullySelected
       ? (selectedVariant ? selectedVariant.isAvailable && selectedVariant.stockQuantity > 0 : false)
       : productIsAvailable  // قبل الاختيار — استخدم حالة المنتج الأساسي
+  // سطر «التوفر» في التفاصيل: ذو الخيارات قبل الاختيار متوفر إن كان أي خيار مفعّلاً وفي المخزون
+  const inStockLabel = hasVariants && !isVariantFullySelected
+    ? variants.some(v => v.isAvailable && v.stockQuantity > 0)
+    : isAvailable
 
   const handleSelectAttribute = (attrNameAr, valueAr) => {
     setSelectedValues(prev => ({ ...prev, [attrNameAr]: valueAr }))
@@ -1105,8 +1109,9 @@ const ProductDetailsContent = () => {
                 )}
                 <div className="flex justify-between py-3 border-b border-gray-100">
                   <span className="text-gray-500">التوفر</span>
-                  <span className={`font-medium ${product.isAvailable ? 'text-green-600' : 'text-red-600'}`}>
-                    {product.isAvailable ? 'متوفر' : 'غير متوفر'}
+                  {/* متوفر = مفعّل وفي المخزون (المنتج ذو الخيارات: الخيار المختار، أو أي خيار قبل الاختيار) */}
+                  <span className={`font-medium ${inStockLabel ? 'text-green-600' : 'text-red-600'}`}>
+                    {inStockLabel ? 'متوفر' : 'غير متوفر'}
                   </span>
                 </div>
                 <div className="flex justify-between py-3 border-b border-gray-100">

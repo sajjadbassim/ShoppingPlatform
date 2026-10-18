@@ -27,5 +27,12 @@ namespace ecommerce.Core.Constants
         public const string None = "NONE";
 
         public static readonly string[] All = { Customer, Vendor, None };
+
+        public static string Ar(string? payer) => payer switch
+        {
+            Vendor => "المتجر",
+            None => "المنصة",
+            _ => "الزبون",
+        };
     }
 }

@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.Models;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
 using static Azure.Core.HttpHeader;
@@ -48,6 +49,9 @@ namespace ecommerce.Data
         public DbSet<OrderDriverRating> OrderDriverRatings { get; set; }
         public DbSet<VendorLedgerEntry> VendorLedgerEntries { get; set; }
         public DbSet<DriverCashEntry> DriverCashEntries { get; set; }
+        public DbSet<ReturnTrip> ReturnTrips { get; set; }
+        public DbSet<ActivityLog> ActivityLogs { get; set; }
+        public DbSet<ReturnTripItem> ReturnTripItems { get; set; }
 
         public DbSet<PasswordResetOtp> PasswordResetOtps { get; set; }
 
@@ -86,13 +90,36 @@ namespace ecommerce.Data
         public override int SaveChanges()
         {
             UpdateTimestamps();
+            foreach (var (usage, order) in CouponUsagesToSync(ids => CouponUsages.Where(u => ids.Contains(u.OrderId)).ToList()))
+                usage.DiscountAmount = OrderTotals.CouponDiscount(order);
             return base.SaveChanges();
         }
 
-        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             UpdateTimestamps();
-            return base.SaveChangesAsync(cancellationToken);
+            var changed = ChangedCouponOrders();
+            if (changed.Count > 0)
+            {
+                var ids = changed.Keys.ToList();
+                foreach (var usage in await CouponUsages.Where(u => ids.Contains(u.OrderId)).ToListAsync(cancellationToken))
+                    usage.DiscountAmount = OrderTotals.CouponDiscount(changed[usage.OrderId]);
+            }
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        // خصم الكوبون الفعلي في سجل استخدامه يتبع الطلب حين يُعاد حسابه (سقوط جزء). الطلب الملغى كلياً
+        // يحتفظ بخصمه الأصلي — الكوبون يبقى مستهلَكاً
+        private Dictionary<Guid, Order> ChangedCouponOrders() => ChangeTracker.Entries<Order>()
+            .Where(e => e.State == EntityState.Modified && e.Property(o => o.DiscountAmount).IsModified
+                && e.Entity.CouponCode != null && e.Entity.Status != OrderStatus.CANCELLED)
+            .ToDictionary(e => e.Entity.Id, e => e.Entity);
+
+        private IEnumerable<(CouponUsage, Order)> CouponUsagesToSync(Func<List<Guid>, List<CouponUsage>> load)
+        {
+            var changed = ChangedCouponOrders();
+            if (changed.Count == 0) return Enumerable.Empty<(CouponUsage, Order)>();
+            return load(changed.Keys.ToList()).Select(u => (u, changed[u.OrderId])).ToList();
         }
 
         private void UpdateTimestamps()

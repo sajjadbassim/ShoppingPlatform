@@ -34,5 +34,6 @@ namespace ecommerce.Services
         Task<IReadOnlyDictionary<Guid, decimal>> CalculateFinalPricesAsync(IEnumerable<PriceQuery> items);
     }
 
-    public record PriceQuery(Guid ProductId, Guid? CategoryId, Guid VendorId, decimal Price);
+    // Key: مفتاح النتيجة (بند السلة/المتغير) حين يتكرر المنتج بأسعار مختلفة — وإلا ProductId
+    public record PriceQuery(Guid ProductId, Guid? CategoryId, Guid VendorId, decimal Price, Guid? Key = null);
 }

@@ -47,8 +47,13 @@ namespace ecommerce.Services
 
         public async Task<IEnumerable<DriverDto>> GetAvailableDriversAsync()
         {
-            var drivers = await _driverRepository.GetAvailableDriversAsync();
-            return drivers.Select(MapToDto);
+            var drivers = (await _driverRepository.GetAvailableDriversAsync()).ToList();
+            var load = await _driverRepository.GetActiveOrderCountsAsync(drivers.Select(d => d.Id));
+            // الأقل حملاً أولاً
+            return drivers
+                .Select(d => { var dto = MapToDto(d); dto.ActiveOrders = load.GetValueOrDefault(d.Id); return dto; })
+                .OrderBy(d => d.ActiveOrders).ThenBy(d => d.FullName)
+                .ToList();
         }
 
         public async Task<DriverDto> CreateDriverAsync(CreateDriverDto dto)

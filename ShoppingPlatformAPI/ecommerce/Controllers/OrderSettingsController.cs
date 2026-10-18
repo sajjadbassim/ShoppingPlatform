@@ -31,15 +31,13 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<OrderSettingsDto>>> Get(CancellationToken ct)
             => Ok(ApiResponse<OrderSettingsDto>.Ok(await _settings.GetAsync(ct)));
 
-        // PUT: api/order-settings/confirmation-timeout — الأدمن فقط
+        // PUT: api/order-settings/confirmation-timeout — إعداد تشغيلي: العمليات (والأدمن)
         [HttpPut("confirmation-timeout")]
-        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<ActionResult<ApiResponse<OrderSettingsDto>>> SetTimeout([FromBody] SetTimeoutDto dto, CancellationToken ct)
             => Ok(ApiResponse<OrderSettingsDto>.Ok(await _settings.SetConfirmationTimeoutAsync(dto.Minutes, UserId, ct), "تم حفظ المهلة"));
 
-        // PUT: api/order-settings/delivery-thresholds — حدود ألوان سرعة التوصيل (الأدمن فقط)
+        // PUT: api/order-settings/delivery-thresholds — حدود ألوان سرعة التوصيل (العمليات والأدمن)
         [HttpPut("delivery-thresholds")]
-        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<ActionResult<ApiResponse<OrderSettingsDto>>> SetThresholds([FromBody] SetThresholdsDto dto, CancellationToken ct)
             => Ok(ApiResponse<OrderSettingsDto>.Ok(await _settings.SetDeliveryThresholdsAsync(dto.FastMinutes, dto.SlowMinutes, UserId, ct), "تم حفظ الحدود"));
 
@@ -48,9 +46,8 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<GrocerySlotSettingsDto>>> GetGrocerySlots(CancellationToken ct)
             => Ok(ApiResponse<GrocerySlotSettingsDto>.Ok(await _slots.GetSettingsAsync(ct)));
 
-        // PUT: api/order-settings/grocery-slots — الأدمن فقط
+        // PUT: api/order-settings/grocery-slots — العمليات والأدمن
         [HttpPut("grocery-slots")]
-        [Authorize(Policy = PolicyNames.AdminOnly)]
         public async Task<ActionResult<ApiResponse<GrocerySlotSettingsDto>>> SetGrocerySlots([FromBody] GrocerySlotSettingsDto dto, CancellationToken ct)
             => Ok(ApiResponse<GrocerySlotSettingsDto>.Ok(await _slots.SaveSettingsAsync(dto, UserId, ct), "تم حفظ مواعيد التوصيل"));
 

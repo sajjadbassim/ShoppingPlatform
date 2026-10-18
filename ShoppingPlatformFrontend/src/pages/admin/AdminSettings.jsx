@@ -8,9 +8,6 @@ import {
   SettingsSection, SettingsToggle, AppearanceSection,
 } from '../../components/settings/SettingsSection'
 import DeliveryFeePolicy from '../../components/settings/DeliveryFeePolicy'
-import ConfirmationTimeoutSetting from '../../components/settings/ConfirmationTimeoutSetting'
-import DeliverySpeedThresholds from '../../components/settings/DeliverySpeedThresholds'
-import GrocerySlotsSetting from '../../components/settings/GrocerySlotsSetting'
 
 const ROLE_LABELS = {
   ADMIN: 'مدير النظام',
@@ -20,7 +17,7 @@ const ROLE_LABELS = {
 }
 
 const NOTIFICATION_KEYS = [
-  'notifyNewOrders', 'notifyReturns', 'notifyNewUsers', 'notifyLowStock', 'notifyNewVendors',
+  'notifyNewOrders', 'notifyReturns', 'notifyNewUsers', 'notifyNewVendors',
 ]
 
 const AdminSettings = () => {
@@ -70,14 +67,12 @@ const AdminSettings = () => {
         saving={isSaving} saveDisabled={!isDirty(NOTIFICATION_KEYS)}>
         {isLoading ? loadingBlock : isError || !draft ? errorBlock : (
           <div>
-            <SettingsToggle label="طلبات جديدة" desc="إشعار عند وصول طلب جديد"
+            <SettingsToggle label="الطلبات" desc="طلب جديد أو تعذّر تسليمه"
               checked={draft.notifyNewOrders} onChange={v => set('notifyNewOrders', v)} />
-            <SettingsToggle label="طلبات الإرجاع" desc="إشعار عند تقديم طلب إرجاع جديد"
+            <SettingsToggle label="الإرجاع" desc="طلب إرجاع جديد، ورفض بعض القطع عند الباب"
               checked={draft.notifyReturns} onChange={v => set('notifyReturns', v)} />
             <SettingsToggle label="مستخدمين جدد" desc="إشعار عند تسجيل مستخدم جديد"
               checked={draft.notifyNewUsers} onChange={v => set('notifyNewUsers', v)} />
-            <SettingsToggle label="نقص المخزون" desc="إشعار عند انخفاض أو نفاد مخزون منتج"
-              checked={draft.notifyLowStock} onChange={v => set('notifyLowStock', v)} />
             <SettingsToggle label="متاجر جديدة" desc="إشعار عند تسجيل متجر جديد يحتاج تفعيل"
               checked={draft.notifyNewVendors} onChange={v => set('notifyNewVendors', v)} />
           </div>
@@ -87,13 +82,10 @@ const AdminSettings = () => {
       {/* المظهر */}
       <AppearanceSection />
 
-      {/* معلومات النظام */}
-      <ConfirmationTimeoutSetting editable />
-
-      <DeliverySpeedThresholds editable />
-      <GrocerySlotsSetting editable />
-
+      {/* مهلة التأكيد وسرعة التوصيل ومواعيد السوبرماركت انتقلت لإعدادات العمليات */}
       <DeliveryFeePolicy />
+
+      {/* معلومات النظام */}
 
       <SettingsSection icon={Info} title="معلومات النظام">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

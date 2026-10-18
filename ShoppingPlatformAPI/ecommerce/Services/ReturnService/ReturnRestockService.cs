@@ -40,6 +40,14 @@ namespace ecommerce.Services
             if (returnRequest.IsRestocked)
                 throw new ConflictException("تم تحديث المخزون لهذا الإرجاع مسبقاً");
 
+            // الرفض عند الباب والإرجاع بعد الاستلام (يأخذه السائق من الزبون — له أجرة استلام محددة عند الموافقة):
+            // المخزون يعود تلقائياً حين يؤكد كل متجر استلام قطعه — الإعادة اليدوية هنا تُضاعفه.
+            // اليدوي يبقى لإرجاعات قديمة وافقت عليها الإدارة قبل نظام الاستلام
+            if (returnRequest.PickupFeePayer != null)
+                throw new BusinessRuleException("يعود المخزون تلقائياً حين يؤكد المتجر استلام القطع من السائق");
+            if (returnRequest.IsDoorRefusal)
+                throw new BusinessRuleException("رفض عند الاستلام — يعود المخزون تلقائياً حين يؤكد المتجر استلام البضاعة من السائق");
+
             var lines = returnRequest.Items
                 .GroupBy(i => new { i.ProductId, i.VariantId })
                 .Select(g => new StockLineQuantity(g.Key.ProductId, g.Key.VariantId, g.Sum(i => i.Quantity)))

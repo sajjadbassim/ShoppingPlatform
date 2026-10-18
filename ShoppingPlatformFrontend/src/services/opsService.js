@@ -78,6 +78,12 @@ export const opsService = {
    * @param {string} orderId
    * @param {Object} data - { driverId, opsUserId }
    */
+  // سحب الجزء من السائق قبل استلامه من المتجر
+  unassignDriver: async (id, reason) => {
+    const response = await apiPost(API_ENDPOINTS.OPS.UNASSIGN_DRIVER(id), { reason });
+    return response.data.data;
+  },
+
   assignDriverToOrder: async (orderId, data) => {
     const response = await apiPut(API_ENDPOINTS.OPS.ASSIGN_DRIVER_TO_ORDER(orderId), data);
     return response.data.data;

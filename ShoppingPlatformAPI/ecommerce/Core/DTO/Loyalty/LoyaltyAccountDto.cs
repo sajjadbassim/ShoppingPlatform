@@ -74,6 +74,9 @@ namespace ecommerce.Core.DTO.Loyalty
         public decimal MaxDiscountAmount { get; set; }  // أقصى خصم ممكن
         public int CurrentBalance { get; set; }
         public decimal PointValue { get; set; }
+        // نقاط لكل دينار بعد مضاعف المستوى — الواجهة تحسب بها ما سيُكسب على ما يُدفع فعلاً
+        // (بعد الكوبون والنقاط، بلا التوصيل) دون طلب جديد كلما تغيّر الخصم
+        public decimal EarnRate { get; set; }
     }
 
     // ===================================
@@ -100,13 +103,14 @@ namespace ecommerce.Core.DTO.Loyalty
         [Range(0.01, 100)]
         public decimal? PointsPerCurrencyUnit { get; set; }
 
-        [Range(0.001, 1)]
+        // بالدينار العراقي: قيمة النقطة قد تتجاوز ديناراً (مثلاً 1000 نقطة = 5000 د.ع → 5)
+        [Range(0.001, 1000)]
         public decimal? PointValue { get; set; }
 
         [Range(1, 10000)]
         public int? MinRedemptionPoints { get; set; }
 
-        [Range(1, 100)]
+        [Range(typeof(decimal), "1", "100")]
         public decimal? MaxRedemptionPercentage { get; set; }
 
         [Range(1, 3650)]

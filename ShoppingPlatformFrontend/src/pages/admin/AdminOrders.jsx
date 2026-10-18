@@ -163,9 +163,9 @@ const OrderDetailModal = ({ orderId, onClose }) => {
               <CreditCard size={15} className="text-gray-400" />
               <span>طريقة الدفع: {order.paymentMethod === 'COD' ? 'عند الاستلام' : order.paymentMethod}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full ${
-                order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : order.paymentStatus === 'CANCELLED' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
               }`}>
-                {order.paymentStatus === 'PAID' ? 'مدفوع' : 'معلق'}
+                {order.paymentStatus === 'PAID' ? 'مدفوع' : order.paymentStatus === 'CANCELLED' ? 'لا دفع (ملغى)' : 'معلق'}
               </span>
             </div>
           </div>

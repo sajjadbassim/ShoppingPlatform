@@ -22,5 +22,7 @@ namespace ecommerce.Services
             int pageSize = 20);
 
         Task<ReturnResponseDto> ReviewAsync(Guid returnId, Guid reviewedBy, ReviewReturnDto dto);
+        Task<ReturnResponseDto> MarkRefundedAsync(Guid returnId, Guid refundedBy);
+        Task<ReturnResponseDto> SetPickupFeePayerAsync(Guid returnId, string payer, string? reason, Guid userId);
     }
 }

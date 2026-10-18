@@ -61,10 +61,16 @@ const OperationsDashboard = () => {
 
   // أرقام اليوم — كل بطاقة تفتح الطلبات المطابقة
   const todayCards = [
+    // كل بطاقة تعدّ الطلبات بنفس حالة القائمة التي تفتحها
     { label: 'بانتظار التأكيد', value: stats?.pendingConfirmation ?? pendingOrders.length, icon: Clock, tone: 'bg-amber-100 text-amber-700', to: 'PENDING_CONFIRMATION', urgent: true },
-    { label: 'قيد التحضير', value: (stats?.confirmed ?? confirmedOrders.length) + (stats?.preparing ?? preparingOrders.length), icon: Package, tone: 'bg-indigo-100 text-indigo-700', to: 'PREPARING' },
-    { label: 'جاهز للاستلام', value: stats?.ready ?? readyOrders.length, icon: CheckCircle, tone: 'bg-teal-100 text-teal-700', to: 'READY', urgent: true },
+    ...(stats?.partiallyConfirmed ? [{ label: 'متجر لم يؤكد بعد', value: stats.partiallyConfirmed, icon: Clock, tone: 'bg-amber-50 text-amber-700', to: 'PARTIALLY_CONFIRMED', urgent: true }] : []),
+    ...((stats?.confirmed ?? confirmedOrders.length) ? [{ label: 'مؤكد — لم يبدأ التحضير', value: stats?.confirmed ?? confirmedOrders.length, icon: CheckCircle, tone: 'bg-blue-100 text-blue-700', to: 'CONFIRMED' }] : []),
+    { label: 'قيد التحضير', value: stats?.preparing ?? preparingOrders.length, icon: Package, tone: 'bg-indigo-100 text-indigo-700', to: 'PREPARING' },
+    { label: 'جاهز — يحتاج سائقاً', value: stats?.ready ?? readyOrders.length, icon: CheckCircle, tone: 'bg-teal-100 text-teal-700', to: 'READY', urgent: true },
+    // عُيّن له سائق ولم يستلمه من المتجر بعد (الحالة تبقى «جاهز للاستلام» حتى الاستلام)
+    ...(stats?.awaitingPickup ? [{ label: 'بانتظار استلام السائق', value: stats.awaitingPickup, icon: Truck, tone: 'bg-violet-100 text-violet-700', to: 'READY' }] : []),
     { label: 'مع السائق', value: stats?.outForDelivery ?? shippedOrders.length, icon: Truck, tone: 'bg-purple-100 text-purple-700', to: 'OUT_FOR_DELIVERY' },
+    ...(stats?.deliveryFailed ? [{ label: 'تعذّر التسليم', value: stats.deliveryFailed, icon: AlertTriangle, tone: 'bg-orange-100 text-orange-700', to: 'DELIVERY_FAILED', urgent: true }] : []),
     { label: 'تم التوصيل', value: stats?.delivered ?? deliveredOrders.length, icon: CheckCircle, tone: 'bg-green-100 text-green-700', to: 'DELIVERED' },
   ]
   const cancelledToday = stats?.cancelled ?? cancelledOrders.length
@@ -90,6 +96,32 @@ const OperationsDashboard = () => {
       <OverdueConfirmationsAlert
         orderLink={(o) => `/operations/orders?order=${o.orderId}`}
         allLink="/operations/orders?status=PENDING_CONFIRMATION" />
+
+      {/* طلبات مع السائق منذ ساعات — عالقة أو نسي السائق تسجيل التسليم */}
+      {stats?.staleDeliveries > 0 && (
+        <Link to="/operations/orders?status=OUT_FOR_DELIVERY"
+          className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 border border-orange-200 hover:bg-orange-100/70">
+          <span className="w-11 h-11 rounded-full bg-orange-500 text-white flex items-center justify-center flex-shrink-0"><Truck size={20} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-bold text-orange-900">{stats.staleDeliveries} طلب مع السائق منذ أكثر من 3 ساعات</span>
+            <span className="block text-xs text-orange-800/80">تواصل مع السائق — قد يكون الطلب عالقاً أو نسي تسجيل التسليم</span>
+          </span>
+          <ArrowLeft size={18} className="text-orange-700" />
+        </Link>
+      )}
+
+      {/* بضاعة لم تُسلَّم مع السائقين في طريقها لمتاجرها */}
+      {stats?.openReturnTrips > 0 && (
+        <Link to="/operations/returns"
+          className="flex items-center gap-3 p-4 rounded-2xl bg-sky-50 border border-sky-200 hover:bg-sky-100/70">
+          <span className="w-11 h-11 rounded-full bg-sky-500 text-white flex items-center justify-center flex-shrink-0"><Package size={20} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block font-bold text-sky-900">{stats.openReturnTrips} مرتجع مع السائقين</span>
+            <span className="block text-xs text-sky-800/80">بضاعة لم تُسلَّم في طريقها لمتاجرها — تنتظر تأكيد المتجر</span>
+          </span>
+          <ArrowLeft size={18} className="text-sky-700" />
+        </Link>
+      )}
 
       {/* ما يحتاج تدخلاً الآن */}
       {pendingOrders.length > 0 && (

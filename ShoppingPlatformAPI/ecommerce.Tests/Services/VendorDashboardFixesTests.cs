@@ -99,7 +99,7 @@ namespace ecommerce.Tests.Services
 
             Assert.Equal(3, counts.Total);
             Assert.Equal(2, counts.ByStatus[SubOrderStatus.PendingConfirmation]);
-            Assert.Equal(24000, counts.PendingValue);   // 2 × (10000 + 2000 توصيل)
+            Assert.Equal(20000, counts.PendingValue);   // 2 × 10000 — أجرة التوصيل ليست للمتجر
         }
 
         [Fact]

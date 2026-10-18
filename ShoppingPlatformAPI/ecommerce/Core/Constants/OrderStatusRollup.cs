@@ -23,6 +23,9 @@
             if (delivered == active) return OrderStatus.DELIVERED;
             // «في الطريق» فقط حين خرج كل ما بقي — جزء مع السائق وجزء ما زال في متجره ليس «في الطريق» بعد
             if (outForDel > 0 && outForDel + delivered + failed == active) return OrderStatus.OUT_FOR_DELIVERY;
+            // متجر لم يؤكد بعد بينما بدأ غيره: الطلب «مؤكد جزئياً» لا «قيد التحضير» — وإلا يختفي أن متجراً لم يرد
+            var pending = Count(OrderStatus.PENDING_CONFIRMATION);
+            if (pending > 0 && pending < active) return OrderStatus.PARTIALLY_CONFIRMED;
             if (ready > 0 && ready + outForDel + delivered == active) return OrderStatus.READY;     // كل المتاجر (الباقية) جهّزت
             if (ready > 0 || preparing > 0 || outForDel > 0) return OrderStatus.PREPARING;          // بعضها ما زال يحضّر
             if (confirmed == active) return OrderStatus.CONFIRMED;

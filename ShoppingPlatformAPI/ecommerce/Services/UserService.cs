@@ -103,8 +103,11 @@ namespace ecommerce.Services
             return MapToDto(updatedUser);
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(Guid id, Guid actingUserId)
         {
+            var user = await _userRepository.GetByIdAsync(id);
+            if (user == null) return false;
+            if (user.IsActive) await ecommerce.Services.AdminService.AdminAccountGuard.EnsureCanDisableAsync(_userRepository, user, actingUserId);
             return await _userRepository.DeleteAsync(id);
         }
 

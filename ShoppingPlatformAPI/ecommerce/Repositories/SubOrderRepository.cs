@@ -73,6 +73,10 @@ namespace ecommerce.Repositories
             return await GetByIdAsync(subOrder.Id);
         }
 
+        public async Task<IAsyncDisposable> LockOrderAsync(Guid orderId) => await OrderLock.ForOrderAsync(_context, orderId);
+
+        public async Task<IAsyncDisposable?> LockOrderOfSubOrderAsync(Guid subOrderId) => await OrderLock.ForSubOrderAsync(_context, subOrderId);
+
         public async Task<SubOrder> UpdateAsync(SubOrder subOrder)
         {
             subOrder.UpdatedAt = DateTime.UtcNow;
@@ -116,24 +120,46 @@ namespace ecommerce.Repositories
             return (items, total);
         }
 
+        // مع السائق أكثر من هذا = تنبيه في لوحة التشغيل (طلب عالق أو سائق نسي تسجيل التسليم)
+        public static readonly TimeSpan StaleDeliveryAge = TimeSpan.FromHours(3);
+
         public async Task<OpsDashboardStatsDto> GetDashboardStatsAsync()
         {
-            var today = DateTime.UtcNow.Date;
-            var subOrders = await _context.SubOrders
-                .Where(so => so.CreatedAt.Date == today)
+            // «اليوم» بتوقيت بغداد. الحالات المفتوحة تُعدّ كلها مهما كان يوم إنشائها (طلب الأمس المعلّق ما زال عملاً)،
+            // والمنتهية (مسلّم/ملغى) ما انتهى اليوم فقط
+            // بالطلبات وحالتها (لا بطلبات المتاجر): كل بطاقة تفتح قائمة الطلبات بنفس الحالة فيتطابق الرقمان
+            var todayStart = IraqTime.TodayStartUtc;
+            var staleBefore = DateTime.UtcNow - StaleDeliveryAge;
+            var open = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.PARTIALLY_CONFIRMED, OrderStatus.CONFIRMED, OrderStatus.PREPARING,
+                OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERY_FAILED };
+            var orders = await _context.Orders.AsNoTracking()
+                .Where(o => open.Contains(o.Status) || o.UpdatedAt >= todayStart || o.CreatedAt >= todayStart)
+                .Select(o => new
+                {
+                    o.Status, o.CreatedAt, o.UpdatedAt,
+                    // جاهز وفيه جزء بلا سائق = يحتاج تعييناً؛ كله معيَّن ولم يُستلم = بانتظار استلام السائق
+                    NeedsDriver = o.SubOrders.Any(so => so.Status == OrderStatus.READY && so.DriverId == null),
+                    Stale = o.SubOrders.Any(so => so.DriverId != null && DriverTrip.Statuses.Contains(so.Status) && (so.AssignedAt ?? so.UpdatedAt) < staleBefore),
+                })
                 .ToListAsync();
+            int Open(string status) => orders.Count(o => o.Status == status);
+            int EndedToday(string status) => orders.Count(o => o.Status == status && o.UpdatedAt >= todayStart);
 
             return new OpsDashboardStatsDto
             {
-                PendingConfirmation = subOrders.Count(so => so.Status == OrderStatus.PENDING_CONFIRMATION),
-                Confirmed = subOrders.Count(so => so.Status == OrderStatus.CONFIRMED),
-                PartiallyConfirmed = subOrders.Count(so => so.Status == OrderStatus.PARTIALLY_CONFIRMED),
-                Preparing = subOrders.Count(so => so.Status == OrderStatus.PREPARING),
-                Ready = subOrders.Count(so => so.Status == OrderStatus.READY),
-                OutForDelivery = subOrders.Count(so => so.Status == OrderStatus.OUT_FOR_DELIVERY),
-                Delivered = subOrders.Count(so => so.Status == OrderStatus.DELIVERED),
-                Cancelled = subOrders.Count(so => so.Status == OrderStatus.CANCELLED),
-                TotalToday = subOrders.Count
+                PendingConfirmation = Open(OrderStatus.PENDING_CONFIRMATION),
+                Confirmed = Open(OrderStatus.CONFIRMED),
+                PartiallyConfirmed = Open(OrderStatus.PARTIALLY_CONFIRMED),
+                Preparing = Open(OrderStatus.PREPARING),
+                Ready = orders.Count(o => o.Status == OrderStatus.READY && o.NeedsDriver),
+                AwaitingPickup = orders.Count(o => o.Status == OrderStatus.READY && !o.NeedsDriver),
+                OutForDelivery = Open(OrderStatus.OUT_FOR_DELIVERY),
+                DeliveryFailed = Open(OrderStatus.DELIVERY_FAILED),
+                OpenReturnTrips = await _context.ReturnTrips.CountAsync(t => t.Status == ReturnTripStatus.WithDriver),
+                StaleDeliveries = orders.Count(o => o.Stale),
+                Delivered = EndedToday(OrderStatus.DELIVERED),
+                Cancelled = EndedToday(OrderStatus.CANCELLED),
+                TotalToday = orders.Count(o => o.CreatedAt >= todayStart)
             };
         }
 
@@ -176,26 +202,21 @@ namespace ecommerce.Repositories
             var ids = orderIds.Distinct().ToList();
             var orders = await _context.Orders.AsNoTracking()
                 .Where(o => ids.Contains(o.Id) && o.DiscountAmount > 0)
-                .Select(o => new { o.Id, o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId })
-                .ToListAsync();
-            if (orders.Count == 0) return new();
-
-            var withDiscount = orders.Select(o => o.Id).ToList();
-            var lines = await _context.SubOrders.AsNoTracking()
-                .Where(so => withDiscount.Contains(so.OrderId))
-                .Select(so => new { so.OrderId, Line = new OrderTotals.Line(so.Id, so.VendorId, so.Status, so.Subtotal, so.DeliveryFee) })
+                .Include(o => o.SubOrders)
                 .ToListAsync();
 
             var result = new Dictionary<Guid, decimal>();
             foreach (var o in orders)
-                foreach (var (subId, share) in OrderTotals.DiscountShares(o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId,
-                             lines.Where(l => l.OrderId == o.Id).Select(l => l.Line)))
+                foreach (var (subId, share) in OrderTotals.DiscountShares(o, o.SubOrders))
                     result[subId] = share;
             return result;
         }
 
+        public Task<bool> HasOpenReturnTripAsync(Guid subOrderId) =>
+            _context.ReturnTrips.AnyAsync(t => t.SubOrderId == subOrderId && t.Status == ReturnTripStatus.WithDriver && t.ReturnId == null);
+
         public Task<bool> HasActiveDeliveryAsync(Guid driverId, Guid? exceptSubOrderId = null) =>
-            _context.SubOrders.AnyAsync(so => so.DriverId == driverId && so.Status == OrderStatus.OUT_FOR_DELIVERY
+            _context.SubOrders.AnyAsync(so => so.DriverId == driverId && DriverTrip.Statuses.Contains(so.Status)
                 && (exceptSubOrderId == null || so.Id != exceptSubOrderId));
 
         public async Task<DriverStatsDto> GetDriverStatsAsync(Guid driverId)
@@ -203,16 +224,20 @@ namespace ecommerce.Repositories
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == driverId);
             if (driver == null) throw new NotFoundException("السائق غير موجود");
 
-            var today = DateTime.UtcNow.Date;
+            // الأيام بتوقيت بغداد
+            var today = IraqTime.FromUtc(DateTime.UtcNow).Date;
             var weekStart = today.AddDays(-(int)today.DayOfWeek);
             var monthStart = new DateTime(today.Year, today.Month, 1);
+            static DateTime Day(DateTime utc) => IraqTime.FromUtc(utc).Date;
 
             var allOrders = await _context.SubOrders
                 .Where(so => so.DriverId == driverId)
                 .ToListAsync();
 
-            var totalDeliveries = allOrders.Count(so => so.Status == OrderStatus.DELIVERED);
-            var totalCancelled = allOrders.Count(so => so.Status == OrderStatus.CANCELLED);
+            // العدّ بالطلبات لا بأجزائها (طلب من متجرين = توصيلة واحدة)، مثل TotalDeliveries على السائق وتقرير العمليات
+            int Orders(Func<SubOrder, bool> filter) => allOrders.Where(filter).Select(so => so.OrderId).Distinct().Count();
+            var totalDeliveries = Orders(so => so.Status == OrderStatus.DELIVERED);
+            var totalCancelled = Orders(so => so.Status == OrderStatus.CANCELLED);
             var total = totalDeliveries + totalCancelled;
 
             return new DriverStatsDto
@@ -224,11 +249,11 @@ namespace ecommerce.Repositories
                 TotalDeliveries = totalDeliveries,
                 TotalCancelled = totalCancelled,
                 SuccessRate = total > 0 ? Math.Round((decimal)totalDeliveries / total * 100, 1) : 0,
-                DeliveriesToday = allOrders.Count(so => so.Status == OrderStatus.DELIVERED && so.UpdatedAt.Date == today),
-                CancelledToday = allOrders.Count(so => so.Status == OrderStatus.CANCELLED && so.UpdatedAt.Date == today),
-                DeliveriesThisWeek = allOrders.Count(so => so.Status == OrderStatus.DELIVERED && so.UpdatedAt.Date >= weekStart),
-                DeliveriesThisMonth = allOrders.Count(so => so.Status == OrderStatus.DELIVERED && so.UpdatedAt.Date >= monthStart),
-                ActiveOrders = allOrders.Count(so => so.Status == OrderStatus.OUT_FOR_DELIVERY),
+                DeliveriesToday = Orders(so => so.Status == OrderStatus.DELIVERED && Day(so.UpdatedAt) == today),
+                CancelledToday = Orders(so => so.Status == OrderStatus.CANCELLED && Day(so.UpdatedAt) == today),
+                DeliveriesThisWeek = Orders(so => so.Status == OrderStatus.DELIVERED && Day(so.UpdatedAt) >= weekStart),
+                DeliveriesThisMonth = Orders(so => so.Status == OrderStatus.DELIVERED && Day(so.UpdatedAt) >= monthStart),
+                ActiveOrders = Orders(DriverTrip.IsOpen),
             };
         }
     }

@@ -40,11 +40,16 @@ namespace ecommerce.Services.InvoiceService
 
             // التحقق من الصلاحية
             if (!isAdmin && order.CustomerId != requestingUserId)
-                throw new UnauthorizedAccessException("ليس لديك صلاحية لعرض هذه الفاتورة");
+                throw new NotFoundException("الطلب غير موجود");
 
             // التحقق من أن الطلب مكتمل
             if (order.Status != OrderStatus.DELIVERED)
                 throw new BusinessRuleException("الفاتورة متاحة فقط للطلبات المسلّمة");
+
+            // أجرة توصيل جزء رفض الزبون استلامه (جُمعت نقداً) — ليست ضمن الإجمالي لأن الجزء أُلغي
+            var failedFee = await _context.DriverCashEntries.AsNoTracking()
+                .Where(e => e.OrderId == orderId && e.Kind == DriverCashKind.RefusalFee)
+                .SumAsync(e => (decimal?)e.Amount) ?? 0;
 
             // إعداد QuestPDF
             QuestPDF.Settings.License = LicenseType.Community;
@@ -59,7 +64,7 @@ namespace ecommerce.Services.InvoiceService
                     page.DefaultTextStyle(x => x.FontFamily("Arial").FontSize(10));
 
                     page.Header().Element(ComposeHeader(order));
-                    page.Content().Element(ComposeContent(order));
+                    page.Content().Element(ComposeContent(order, failedFee));
                     page.Footer().Element(ComposeFooter(order));
                 });
             }).GeneratePdf();
@@ -80,11 +85,11 @@ namespace ecommerce.Services.InvoiceService
                     row.RelativeItem().Column(inner =>
                     {
                         inner.Item()
-                            .Text("فاتورة ضريبية")
+                            .Text("فاتورة")
                             .Bold().FontSize(22).FontColor("#ffffff").DirectionFromRightToLeft();
 
                         inner.Item()
-                            .Text("TAX INVOICE")
+                            .Text("INVOICE")
                             .FontSize(12).FontColor("#aaaacc");
                     });
 
@@ -102,7 +107,7 @@ namespace ecommerce.Services.InvoiceService
 
                         inner.Item()
                             .AlignRight()
-                            .Text(order.CreatedAt.ToString("yyyy/MM/dd"))
+                            .Text(IraqTime.FromUtc(order.CreatedAt).ToString("yyyy/MM/dd"))
                             .FontSize(10).FontColor("#ccccee");
                     });
                 });
@@ -175,13 +180,29 @@ namespace ecommerce.Services.InvoiceService
         // ===================================
         // Content — جدول المنتجات
         // ===================================
-        private static Action<IContainer> ComposeContent(Order order) => container =>
+        private static Action<IContainer> ComposeContent(Order order, decimal failedFee) => container =>
         {
             container.Column(col =>
             {
                 // جدول المنتجات لكل متجر
                 foreach (var subOrder in order.SubOrders.OrderBy(so => so.SubOrderNumber))
                 {
+                    // متجر رفض طلبه أو أُلغي: يظهر للتوضيح فقط بلا بنود، وليس ضمن الإجمالي
+                    if (subOrder.Status == OrderStatus.CANCELLED)
+                    {
+                        col.Item().Background("#fdecea").Padding(8).Row(row =>
+                        {
+                            row.RelativeItem()
+                                .Text($"المتجر: {subOrder.Vendor?.DisplayName ?? "—"} — ملغى، غير محتسب في الفاتورة"
+                                      + (string.IsNullOrWhiteSpace(subOrder.CancellationReason) ? "" : $" ({subOrder.CancellationReason})"))
+                                .FontSize(10).FontColor("#c0392b").DirectionFromRightToLeft();
+                            row.ConstantItem(120).AlignRight()
+                                .Text(subOrder.SubOrderNumber).FontSize(9).FontColor("#888888");
+                        });
+                        col.Item().Height(15);
+                        continue;
+                    }
+
                     // اسم المتجر
                     col.Item()
                         .Background("#f0f0f8")
@@ -189,7 +210,7 @@ namespace ecommerce.Services.InvoiceService
                         .Row(row =>
                         {
                             row.RelativeItem()
-                                .Text($"المتجر: {subOrder.Vendor?.Name ?? "—"}")
+                                .Text($"المتجر: {subOrder.Vendor?.DisplayName ?? "—"}")
                                 .Bold().FontSize(11).FontColor("#1a1a2e").DirectionFromRightToLeft();
 
                             row.ConstantItem(120)
@@ -246,16 +267,26 @@ namespace ecommerce.Services.InvoiceService
                                 if (!string.IsNullOrEmpty(item.ProductName) && item.ProductNameAr != item.ProductName)
                                     c.Item().Text(item.ProductName)
                                         .FontSize(8).FontColor("#888888");
+
+                                if (item.RefusedQuantity > 0)
+                                    c.Item().Text($"رُفض عند الاستلام: {item.RefusedQuantity} (- {item.UnitPrice * item.RefusedQuantity:N0})")
+                                        .FontSize(8).FontColor("#e74c3c").DirectionFromRightToLeft();
+
+                                if (item.UnavailableQuantity > 0)
+                                    c.Item().Text(item.Quantity == 0
+                                            ? "غير متوفر — أزاله المتجر ولم يُحتسب"
+                                            : $"غير متوفر: {item.UnavailableQuantity} — أُزيل ولم يُحتسب")
+                                        .FontSize(8).FontColor("#e67e22").DirectionFromRightToLeft();
                             });
 
                             table.Cell().Background(bgColor).Padding(6)
-                                .AlignRight().Text($"{item.UnitPrice:F2}").FontSize(10);
+                                .AlignRight().Text($"{item.UnitPrice:N0}").FontSize(10);
 
                             table.Cell().Background(bgColor).Padding(6)
                                 .AlignCenter().Text(item.Quantity.ToString()).FontSize(10);
 
                             table.Cell().Background(bgColor).Padding(6)
-                                .AlignRight().Text($"{item.Subtotal:F2}").Bold().FontSize(10);
+                                .AlignRight().Text($"{item.Subtotal:N0}").Bold().FontSize(10);
 
                             rowIndex++;
                         }
@@ -272,7 +303,7 @@ namespace ecommerce.Services.InvoiceService
                                     r.RelativeItem().Text("المجموع الفرعي:")
                                         .FontSize(9).FontColor("#555555").DirectionFromRightToLeft();
                                     r.ConstantItem(80).AlignRight()
-                                        .Text($"{subOrder.Subtotal:F2}").FontSize(9);
+                                        .Text($"{subOrder.Subtotal:N0}").FontSize(9);
                                 });
 
                                 inner.Item().Row(r =>
@@ -280,7 +311,7 @@ namespace ecommerce.Services.InvoiceService
                                     r.RelativeItem().Text("رسوم التوصيل:")
                                         .FontSize(9).FontColor("#555555").DirectionFromRightToLeft();
                                     r.ConstantItem(80).AlignRight()
-                                        .Text($"{subOrder.DeliveryFee:F2}").FontSize(9);
+                                        .Text($"{subOrder.DeliveryFee:N0}").FontSize(9);
                                 });
                             });
                         });
@@ -304,7 +335,7 @@ namespace ecommerce.Services.InvoiceService
                                     r.RelativeItem().Text("المجموع الفرعي")
                                         .FontSize(10).DirectionFromRightToLeft();
                                     r.ConstantItem(90).AlignRight()
-                                        .Text($"{order.Subtotal:F2}").FontSize(10);
+                                        .Text($"{order.Subtotal:N0}").FontSize(10);
                                 });
 
                                 // رسوم التوصيل
@@ -313,29 +344,27 @@ namespace ecommerce.Services.InvoiceService
                                     r.RelativeItem().Text("رسوم التوصيل")
                                         .FontSize(10).DirectionFromRightToLeft();
                                     r.ConstantItem(90).AlignRight()
-                                        .Text($"{order.DeliveryFees:F2}").FontSize(10);
+                                        .Text($"{order.DeliveryFees:N0}").FontSize(10);
                                 });
 
-                                // الخصم (إن وجد)
-                                if (order.DiscountAmount > 0)
-                                {
+                                // الخصم (إن وجد): الكوبون والنقاط كلٌّ بسطره
+                                var couponDiscount = OrderTotals.CouponDiscount(order);
+                                if (couponDiscount > 0)
                                     inner.Item().Padding(3).Row(r =>
                                     {
-                                        r.RelativeItem().Column(c =>
-                                        {
-                                            c.Item().Text("الخصم")
-                                                .FontSize(10).FontColor("#e74c3c").DirectionFromRightToLeft();
-
-                                            if (!string.IsNullOrEmpty(order.CouponCode))
-                                                c.Item().Text($"كوبون: {order.CouponCode}")
-                                                    .FontSize(8).FontColor("#e74c3c");
-                                        });
-
+                                        r.RelativeItem().Text(string.IsNullOrEmpty(order.CouponCode) ? "خصم الكوبون" : $"خصم الكوبون ({order.CouponCode})")
+                                            .FontSize(10).FontColor("#e74c3c").DirectionFromRightToLeft();
                                         r.ConstantItem(90).AlignRight()
-                                            .Text($"- {order.DiscountAmount:F2}")
-                                            .FontSize(10).FontColor("#e74c3c");
+                                            .Text($"- {couponDiscount:N0}").FontSize(10).FontColor("#e74c3c");
                                     });
-                                }
+                                if (order.PointsDiscountAmount > 0)
+                                    inner.Item().Padding(3).Row(r =>
+                                    {
+                                        r.RelativeItem().Text("خصم النقاط")
+                                            .FontSize(10).FontColor("#e74c3c").DirectionFromRightToLeft();
+                                        r.ConstantItem(90).AlignRight()
+                                            .Text($"- {order.PointsDiscountAmount:N0}").FontSize(10).FontColor("#e74c3c");
+                                    });
 
                                 // الفاصل
                                 inner.Item().BorderTop(1).BorderColor("#cccccc").Height(1);
@@ -347,9 +376,49 @@ namespace ecommerce.Services.InvoiceService
                                         .Bold().FontSize(12).FontColor("#ffffff").DirectionFromRightToLeft();
 
                                     r.ConstantItem(90).AlignRight()
-                                        .Text($"{order.TotalAmount:F2} د.ك")
+                                        .Text($"{order.TotalAmount:N0} د.ع")
                                         .Bold().FontSize(12).FontColor("#ffffff");
                                 });
+
+                                // الرفض عند الباب: الإجمالي أعلاه = ما دفعه الزبون (بلا المرفوض)؛ هنا للتوضيح فقط، لا يُطرح
+                                var refusedAmount = order.SubOrders.SelectMany(so => so.Items).Sum(i => i.UnitPrice * i.RefusedQuantity);
+                                if (refusedAmount > 0)
+                                {
+                                    inner.Item().Padding(3).Row(r =>
+                                    {
+                                        r.RelativeItem().Text("قطع رُفضت عند الاستلام (غير محتسبة)")
+                                            .FontSize(9).FontColor("#888888").DirectionFromRightToLeft();
+                                        r.ConstantItem(90).AlignRight()
+                                            .Text($"{refusedAmount:N0}").FontSize(9).FontColor("#888888");
+                                    });
+                                    if (order.SubOrders.Any(so => so.RefusalFeeWaived))
+                                        inner.Item().Padding(3).Text("أجرة التوصيل لم تُحتسب عليك بسبب الرفض")
+                                            .FontSize(9).FontColor("#888888").DirectionFromRightToLeft();
+                                    if (order.OriginalTotalAmount > 0 && order.OriginalTotalAmount != order.TotalAmount)
+                                        inner.Item().Padding(3).Row(r =>
+                                        {
+                                            r.RelativeItem().Text("قيمة الطلب عند الشراء")
+                                                .FontSize(9).FontColor("#888888").DirectionFromRightToLeft();
+                                            r.ConstantItem(90).AlignRight()
+                                                .Text($"{order.OriginalTotalAmount:N0}").FontSize(9).FontColor("#888888");
+                                        });
+                                }
+                                if (failedFee > 0)
+                                    inner.Item().Padding(3).Row(r =>
+                                    {
+                                        r.RelativeItem().Text("أجرة توصيل جزء رُفض استلامه")
+                                            .FontSize(10).DirectionFromRightToLeft();
+                                        r.ConstantItem(90).AlignRight()
+                                            .Text($"+ {failedFee:N0}").FontSize(10);
+                                    });
+                                if (order.CashCollectedAmount is decimal paid && paid != order.TotalAmount)
+                                    inner.Item().Background("#e8f5e9").Padding(6).Row(r =>
+                                    {
+                                        r.RelativeItem().Text("المبلغ المدفوع")
+                                            .Bold().FontSize(11).DirectionFromRightToLeft();
+                                        r.ConstantItem(90).AlignRight()
+                                            .Text($"{paid:N0} د.ع").Bold().FontSize(11);
+                                    });
 
                                 // طريقة الدفع
                                 inner.Item().Padding(4).Row(r =>
@@ -389,7 +458,7 @@ namespace ecommerce.Services.InvoiceService
                 col.Item().Row(row =>
                 {
                     row.RelativeItem()
-                        .Text($"تاريخ الإصدار: {DateTime.UtcNow:yyyy/MM/dd HH:mm}")
+                        .Text($"تاريخ الإصدار: {IraqTime.FromUtc(DateTime.UtcNow):yyyy/MM/dd HH:mm}")
                         .FontSize(8).FontColor("#999999");
 
                     row.RelativeItem().AlignRight()

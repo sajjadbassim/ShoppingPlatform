@@ -142,9 +142,12 @@ namespace ecommerce.Services
                     TotalSold = g.Sum(i => i.Quantity - i.RefusedQuantity),
                     TotalRevenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)),
                 })
-                .OrderByDescending(p => p.TotalSold)
-                .Take(5)
                 .ToListAsync();
+            // ناقص ما أُرجع بعد الاستلام (نفس حساب صفحة مبيعات المنتجات)
+            var sales = (await GetProductSalesAsync(vendorId)).ToDictionary(s => s.ProductId);
+            foreach (var tp in topProducts)
+                if (sales.TryGetValue(tp.ProductId, out var s)) { tp.TotalSold = s.Sold; tp.TotalRevenue = s.Revenue; }
+            topProducts = topProducts.Where(p => p.TotalSold > 0).OrderByDescending(p => p.TotalSold).Take(5).ToList();
 
             // السعر الحالي والصورة والمخزون (استعلام واحد للخمسة)
             var topIds = topProducts.Select(p => p.ProductId).ToList();
@@ -351,7 +354,7 @@ namespace ecommerce.Services
                 {
                     r.Id, r.OrderId, r.ReturnNumber, r.Status, r.Reason, r.Details, r.IsDoorRefusal, r.CreatedAt,
                     Items = r.Items.Where(i => i.Product.VendorId == vendorId)
-                        .Select(i => new { i.ProductId, i.VariantId, i.Quantity }).ToList()
+                        .Select(i => new { i.ProductId, i.VariantId, i.Quantity, i.ProductName }).ToList()
                 })
                 .ToListAsync();
             if (returns.Count == 0) return;
@@ -363,6 +366,8 @@ namespace ecommerce.Services
                 {
                     Id = r.Id, ReturnNumber = r.ReturnNumber, Status = r.Status, Reason = r.Reason,
                     Details = r.Details, IsDoorRefusal = r.IsDoorRefusal, CreatedAt = r.CreatedAt,
+                    // ما يُرجَع من قطع هذا المتجر — يراه قبل الموافقة ليستعد لاستلامه
+                    Items = r.Items.Select(i => new VendorOrderReturnItemDto { ProductName = i.ProductName, Quantity = i.Quantity }).ToList(),
                 }).ToList();
 
                 var accepted = mine.Where(r => !r.IsDoorRefusal && (r.Status == ReturnStatus.APPROVED || r.Status == ReturnStatus.COMPLETED));
@@ -379,6 +384,7 @@ namespace ecommerce.Services
         public async Task<VendorOrderDto> ConfirmOrderAsync(Guid vendorId, Guid subOrderId, Guid opsUserId,
             IReadOnlyList<UnavailableItemDto>? unavailable = null)
         {
+            await using var orderLock = await OrderLock.ForSubOrderAsync(_context, subOrderId);
             var subOrder = await _context.SubOrders
                 .Include(so => so.Order)
                 .Include(so => so.Items)
@@ -387,6 +393,9 @@ namespace ecommerce.Services
             if (subOrder == null)
                 throw new NotFoundException("الطلب غير موجود");
 
+            // ضغطة مكررة على «قبول» (الأولى نُفّذت قبلها) — لا سجل ولا إشعار ثانٍ
+            if (subOrder.Status == SubOrderStatus.Confirmed && !(unavailable?.Any(l => l.Quantity > 0) ?? false))
+                return await GetOrderByIdAsync(vendorId, subOrderId);
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
                 throw new BusinessRuleException($"لا يمكن تأكيد الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
 
@@ -394,10 +403,12 @@ namespace ecommerce.Services
 
             // القبول الجزئي: تُزال القطع غير المتوفرة من الطلب ويُعاد مخزونها، ويُعاد حساب مبلغ الطلب.
             // وإن اختار الزبون «استبدله بمشابه» يمكن للمتجر إضافة بديل من منتجاته (لا يدفع الزبون أكثر من الأصلي)
+            var keptBefore = OrderTotals.Kept(subOrder);
             var removed = ApplyUnavailable(subOrder, unavailable);
             var replacements = await ApplyReplacementsAsync(subOrder, removed, unavailable);
             if (removed.Count > 0)
             {
+                OrderTotals.ReducePointsForRemoved(subOrder, keptBefore);
                 var siblings = await _context.SubOrders
                     .Where(so => so.OrderId == subOrder.OrderId && so.Id != subOrder.Id).ToListAsync();
                 OrderTotals.Recalculate(subOrder.Order, siblings.Append(subOrder));
@@ -444,7 +455,11 @@ namespace ecommerce.Services
             {
                 await _inventoryService.RestockAsync(removed.Select(r =>
                     new StockLineQuantity(r.Item.ProductId, r.Item.VariantId, r.Quantity)));
-                await NotifyPartialAsync(subOrder, removed, replacements);
+                // نقاط القطع غير المتوفرة تعود لرصيد الزبون
+                var pointsReturned = OrderTotals.UnusedPoints(subOrder.Order);
+                if (_loyalty != null && pointsReturned > 0)
+                    await _loyalty.RefundUnusedPointsAsync(subOrder.OrderId);
+                await NotifyPartialAsync(subOrder, removed, replacements, _loyalty != null ? pointsReturned : 0);
             }
             await NotifyAsync(subOrder, SubOrderStatus.Confirmed, parent, pushToOps: false);
 
@@ -540,7 +555,7 @@ namespace ecommerce.Services
         }
 
         private async Task NotifyPartialAsync(SubOrder subOrder, List<(SubOrderItem Item, int Quantity)> removed,
-            List<(SubOrderItem Original, SubOrderItem Replacement)> replacements)
+            List<(SubOrderItem Original, SubOrderItem Replacement)> replacements, decimal pointsReturned = 0)
         {
             if (_notifications == null) return;
             try
@@ -553,6 +568,7 @@ namespace ecommerce.Services
                     : $"بعض منتجات طلبك {order.OrderNumber} غير متوفرة — استُبدل {DescribeReplacements(replacements)}" +
                       (removedOnly.Count > 0 ? $"، وأُزيل ({DescribeRemoved(removedOnly)})" : "") +
                       $" — أصبح المبلغ {order.TotalAmount:N0} د.ع";
+                message += OrderTotals.PointsReturnedNote(pointsReturned);
                 await _notifications.NotifyCustomerAsync(order.CustomerId, message,
                     new { orderId = order.Id, orderNumber = order.OrderNumber });
             }
@@ -570,6 +586,7 @@ namespace ecommerce.Services
 
         private async Task<VendorOrderDto> AdvanceAsync(Guid vendorId, Guid subOrderId, Guid userId, string from, string to, string note)
         {
+            await using var orderLock = await OrderLock.ForSubOrderAsync(_context, subOrderId);
             var subOrder = await _context.SubOrders
                 .Include(so => so.Order)
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId)
@@ -611,6 +628,8 @@ namespace ecommerce.Services
                 OrderId = order.Id, OldStatus = oldStatus, NewStatus = newStatus, ChangedBy = userId,
                 Notes = $"تحديث تلقائي بعد {cause}",
             });
+            if (newStatus == OrderStatus.CANCELLED)
+                OrderTotals.SyncCancelled(order, await _context.SubOrders.Where(so => so.OrderId == order.Id).ToListAsync());
             return (oldStatus, newStatus);
         }
 
@@ -637,6 +656,7 @@ namespace ecommerce.Services
         public async Task<VendorOrderDto> RejectOrderAsync(
             Guid vendorId, Guid subOrderId, Guid opsUserId, string reason)
         {
+            await using var orderLock = await OrderLock.ForSubOrderAsync(_context, subOrderId);
             var subOrder = await _context.SubOrders
                 .Include(so => so.Order)
                 .FirstOrDefaultAsync(so => so.Id == subOrderId && so.VendorId == vendorId);
@@ -672,9 +692,37 @@ namespace ecommerce.Services
             // الزبون يدفع ثمن المتاجر الباقية فقط
             OrderTotals.Recalculate(subOrder.Order, await _context.SubOrders.Where(so => so.OrderId == subOrder.OrderId).ToListAsync());
             await _context.SaveChangesAsync();
+            var pointsReturned = _loyalty != null && subOrder.Order.Status != OrderStatus.CANCELLED ? OrderTotals.UnusedPoints(subOrder.Order) : 0;
             if (subOrder.Order.Status == OrderStatus.CANCELLED && _loyalty != null)
                 await _loyalty.CancelRedemptionAsync(subOrder.OrderId);
+            else if (_loyalty != null)
+                await _loyalty.RefundUnusedPointsAsync(subOrder.OrderId);
             await NotifyAsync(subOrder, SubOrderStatus.Cancelled, parent, pushToOps: false);
+            // رفض متجر واحد من طلب متعدد المتاجر: الطلب مستمر، فيعرف الزبون ما سقط والمبلغ الجديد
+            // (رفض الطلب كله يصله من تحديث حالة الطلب أعلاه)
+            if (subOrder.Order.Status != OrderStatus.CANCELLED && _notifications != null)
+            {
+                try
+                {
+                    var vendorName = await _context.Vendors.Where(v => v.Id == vendorId).Select(v => v.NameAr ?? v.Name).FirstOrDefaultAsync();
+                    await _notifications.NotifyCustomerAsync(subOrder.Order.CustomerId,
+                        $"اعتذر المتجر «{vendorName}» عن جزء من طلبك {subOrder.Order.OrderNumber}: {reason} — المبلغ الجديد {subOrder.Order.TotalAmount:N0} د.ع"
+                        + OrderTotals.PointsReturnedNote(pointsReturned),
+                        new { orderId = subOrder.OrderId, subOrderId = subOrder.Id });
+                }
+                catch { /* الإشعار لا يُفشل الرفض */ }
+            }
+
+            if (_notifications != null)
+            {
+                try
+                {
+                    var name = await _context.Vendors.Where(v => v.Id == vendorId).Select(v => v.NameAr ?? v.Name).FirstOrDefaultAsync();
+                    await _notifications.NotifyOpsAsync(NotificationCategory.NewOrders, NotificationType.ORDER_STATUS,
+                        $"اعتذر المتجر «{name}» عن الطلب {subOrder.SubOrderNumber}: {reason}", new { orderId = subOrder.OrderId, subOrderId = subOrder.Id });
+                }
+                catch { /* الإشعار لا يُفشل الرفض */ }
+            }
 
             // إعادة مخزون بنود الطلب المرفوض
             await _inventoryService.RestoreForSubOrdersAsync(new[] { subOrderId });
@@ -709,11 +757,10 @@ namespace ecommerce.Services
 
             // تجميعات في قاعدة البيانات لمنتجات الصفحة فقط (بدل تحميل كل عناصر الطلبات والمراجعات)
             var ids = products.Select(p => p.Id).ToList();
-            var sales = await _context.SubOrderItems
-                .Where(i => ids.Contains(i.ProductId) && i.SubOrder.Status == SubOrderStatus.Delivered)
-                .GroupBy(i => i.ProductId)
-                .Select(g => new { ProductId = g.Key, Sold = g.Sum(i => i.Quantity - i.RefusedQuantity), Revenue = g.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)) })
-                .ToDictionaryAsync(x => x.ProductId);
+            // نفس حساب صفحة المبيعات: ناقص ما أُرجع بعد الاستلام
+            var sales = (await GetProductSalesAsync(vendorId))
+                .Where(s => ids.Contains(s.ProductId))
+                .ToDictionary(s => s.ProductId);
             var ratings = await _context.Reviews
                 .Where(r => ids.Contains(r.ProductId) && r.IsApproved)
                 .GroupBy(r => r.ProductId)
@@ -793,10 +840,11 @@ namespace ecommerce.Services
             _context.Reviews.CountAsync(r => r.Product.VendorId == vendorId && r.IsApproved && (r.VendorReply == null || r.VendorReply == ""));
 
         // ===================================
-        // GetProductSalesAsync — القطع المبيعة وقيمتها لكل منتج (دون المرفوض عند الباب)
+        // GetProductSalesAsync — القطع المبيعة وقيمتها لكل منتج (دون المرفوض عند الباب، وناقص المُرجَع بعد الاستلام)
         // ===================================
-        public Task<List<VendorProductSalesDto>> GetProductSalesAsync(Guid vendorId) =>
-            _context.SubOrderItems.AsNoTracking()
+        public async Task<List<VendorProductSalesDto>> GetProductSalesAsync(Guid vendorId)
+        {
+            var sales = await _context.SubOrderItems.AsNoTracking()
                 .Where(i => i.SubOrder.VendorId == vendorId && i.SubOrder.Status == SubOrderStatus.Delivered)
                 .GroupBy(i => i.ProductId)
                 .Select(g => new VendorProductSalesDto
@@ -807,6 +855,21 @@ namespace ecommerce.Services
                 })
                 .ToListAsync();
 
+            var returned = await _context.ReturnItems.AsNoTracking()
+                .Where(ri => ri.Product.VendorId == vendorId && !ri.Return.IsDoorRefusal
+                    && (ri.Return.Status == ReturnStatus.APPROVED || ri.Return.Status == ReturnStatus.COMPLETED))
+                .GroupBy(ri => ri.ProductId)
+                .Select(g => new { ProductId = g.Key, Quantity = g.Sum(ri => ri.Quantity), Value = g.Sum(ri => ri.UnitPrice * ri.Quantity) })
+                .ToDictionaryAsync(x => x.ProductId);
+            foreach (var s in sales)
+                if (returned.TryGetValue(s.ProductId, out var r))
+                {
+                    s.Sold = Math.Max(0, s.Sold - r.Quantity);
+                    s.Revenue = Math.Max(0, s.Revenue - r.Value);
+                }
+            return sales;
+        }
+
         // ===================================
         // GetOrderCountsAsync — أعداد كل حالة وقيمة ما ينتظر القرار (بدل تحميل كل الطلبات في الواجهة)
         // ===================================
@@ -815,7 +878,7 @@ namespace ecommerce.Services
             var byStatus = await CountByStatusAsync(vendorId);
             var pendingValue = await _context.SubOrders.AsNoTracking()
                 .Where(so => so.VendorId == vendorId && so.Status == SubOrderStatus.PendingConfirmation)
-                .SumAsync(so => so.Subtotal + so.DeliveryFee);
+                .SumAsync(so => so.Subtotal);
 
             return new VendorOrderCountsDto
             {
@@ -893,7 +956,7 @@ namespace ecommerce.Services
                 Status = so.Status,
                 CancellationReason = so.CancellationReason,
                 ConfirmationDeadline = so.ConfirmationDeadline,
-                MinutesRemaining = so.ConfirmationDeadline.HasValue
+                MinutesRemaining = so.ConfirmationDeadline.HasValue && so.Status == SubOrderStatus.PendingConfirmation
                     ? (int)Math.Max(0, (so.ConfirmationDeadline.Value - DateTime.UtcNow).TotalMinutes)
                     : null,
                 Items = so.Items?.Select(i => new VendorOrderItemDto

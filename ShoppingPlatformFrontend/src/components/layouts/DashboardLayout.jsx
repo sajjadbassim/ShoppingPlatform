@@ -9,11 +9,12 @@ import { useOpsNotifications } from '../../hooks/useOpsNotifications'
 import { useVendorLiveOrders } from '../../hooks/useVendorLiveOrders'
 import UserAvatar from '../common/UserAvatar'
 import BackButton from '../common/BackButton'
+import { can, isStoreOwner, isFullAdmin } from '../../utils/permissions'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Store,
   BarChart3, Settings, LogOut, Menu, X, ChevronLeft, Wallet,
   Star, Tag, Zap, RotateCcw, Image,
-  Link2, Home, MapPinned,
+  Link2, Home, MapPinned, History, UserCog, ShieldCheck, Lock,
 } from 'lucide-react'
 
 const DashboardLayout = ({ type = 'vendor' }) => {
@@ -36,32 +37,35 @@ const DashboardLayout = ({ type = 'vendor' }) => {
     if (type === 'vendor') {
       return [
         { icon: LayoutDashboard, label: 'الرئيسية',  path: '/vendor' },
-        { icon: Package,         label: 'المنتجات',  path: '/vendor/products' },
-        { icon: ShoppingCart,    label: 'الطلبات',   path: '/vendor/orders' },
-      
-        { icon: Star, label: 'التقييمات', path: '/vendor/reviews' },
-        { icon: Tag,             label: 'العروض والكوبونات', path: '/vendor/promotions' },
-        { icon: BarChart3,       label: 'التقارير',  path: '/vendor/reports' },
-        { icon: Wallet,          label: 'أرباحي',    path: '/vendor/earnings' },
-        { icon: Link2,           label: 'ربط الحسابات', path: '/vendor/social' },
-        { icon: Settings,        label: 'الإعدادات', path: '/vendor/settings' },
+        { icon: Package,         label: 'المنتجات',  path: '/vendor/products', perm: 'products' },
+        { icon: ShoppingCart,    label: 'الطلبات',   path: '/vendor/orders', perm: 'orders' },
+        { icon: Star,            label: 'التقييمات', path: '/vendor/reviews', perm: 'reviews' },
+        { icon: Tag,             label: 'العروض والكوبونات', path: '/vendor/promotions', perm: 'marketing' },
+        { icon: BarChart3,       label: 'التقارير',  path: '/vendor/reports', perm: 'reports' },
+        { icon: Wallet,          label: 'أرباحي',    path: '/vendor/earnings', perm: 'finance' },
+        { icon: Link2,           label: 'ربط الحسابات', path: '/vendor/social', perm: 'social' },
+        { icon: UserCog,         label: 'الموظفون',  path: '/vendor/staff', ownerOnly: true },
+        { icon: History,         label: 'سجل النشاط', path: '/vendor/activity' },
+        { icon: Settings,        label: 'الإعدادات', path: '/vendor/settings', perm: 'settings' },
         ]
     } else if (type === 'admin') {
       return [
         { icon: LayoutDashboard, label: 'الرئيسية',    path: '/admin'            },
-        { icon: Users,           label: 'المستخدمين',  path: '/admin/users'      },
-        { icon: Store,           label: 'المتاجر',     path: '/admin/stores'     },
-        { icon: Package,         label: 'الفئات',      path: '/admin/categories' },
-        { icon: Image,           label: 'الصفحة الرئيسية', path: '/admin/homepage' },
-        { icon: ShoppingCart,    label: 'الطلبات',     path: '/admin/orders'     },
-        { icon: Star,            label: 'التقييمات',   path: '/admin/reviews'    },
-        { icon: Tag,             label: 'الكوبونات',   path: '/admin/coupons'    },
-        { icon: Zap,             label: 'النقاط التشجيعية', path: '/admin/loyalty'    },
-        { icon: RotateCcw,       label: 'الإرجاع',     path: '/admin/returns'    },
-        { icon: BarChart3,       label: 'التقارير',    path: '/admin/reports'    },
-        { icon: Wallet,          label: 'المستحقات',   path: '/admin/finance'    },
-        { icon: MapPinned,       label: 'مناطق التوصيل', path: '/admin/delivery-zones' },
-        { icon: Settings,        label: 'الإعدادات',   path: '/admin/settings'   },
+        { icon: Users,           label: 'المستخدمين',  path: '/admin/users',      perm: 'users' },
+        { icon: Store,           label: 'المتاجر',     path: '/admin/stores',     perm: 'stores' },
+        { icon: Package,         label: 'الفئات',      path: '/admin/categories', perm: 'categories' },
+        { icon: Image,           label: 'الصفحة الرئيسية', path: '/admin/homepage', perm: 'homepage' },
+        { icon: ShoppingCart,    label: 'الطلبات',     path: '/admin/orders',     perm: 'orders' },
+        { icon: Star,            label: 'التقييمات',   path: '/admin/reviews',    perm: 'reviews' },
+        { icon: Tag,             label: 'الكوبونات',   path: '/admin/coupons',    perm: 'coupons' },
+        { icon: Zap,             label: 'النقاط التشجيعية', path: '/admin/loyalty', perm: 'loyalty' },
+        { icon: RotateCcw,       label: 'الإرجاع',     path: '/admin/returns',    perm: 'returns' },
+        { icon: BarChart3,       label: 'التقارير',    path: '/admin/reports',    perm: 'reports' },
+        { icon: Wallet,          label: 'المستحقات',   path: '/admin/finance',    perm: 'finance' },
+        { icon: MapPinned,       label: 'مناطق التوصيل', path: '/admin/delivery-zones', perm: 'zones' },
+        { icon: ShieldCheck,     label: 'المسؤولون',   path: '/admin/staff',      fullAdminOnly: true },
+        { icon: History,         label: 'سجل النشاط',  path: '/admin/activity'   },
+        { icon: Settings,        label: 'الإعدادات',   path: '/admin/settings',   perm: 'settings' },
       ]
     } else if (type === 'operations') {
       return [
@@ -69,14 +73,25 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         { icon: ShoppingCart,    label: 'الطلبات',        path: '/operations/orders' },
         { icon: Users,           label: 'عمال التوصيل',   path: '/operations/drivers' },
         { icon: Store,           label: 'التتبع المباشر', path: '/operations/tracking' },
+        { icon: RotateCcw,       label: 'رحلات الإرجاع',  path: '/operations/returns' },
+        { icon: RotateCcw,       label: 'طلبات الإرجاع',  path: '/operations/customer-returns' },
         { icon: BarChart3,       label: 'التقارير',       path: '/operations/reports' },
+        { icon: History,         label: 'سجل النشاط',     path: '/operations/activity' },
         { icon: Settings,        label: 'الإعدادات',      path: '/operations/settings' },
       ]
     }
     return []
   }
 
-  const menuItems = getMenuItems()
+  // الحساب المساعد يرى أقسام صلاحياته فقط
+  const allowed = (item) => can(user, item.perm)
+    && (!item.ownerOnly || isStoreOwner(user))
+    && (!item.fullAdminOnly || isFullAdmin(user))
+  const allItems = getMenuItems()
+  const menuItems = allItems.filter(allowed)
+  // فتح قسم غير مسموح من رابط مباشر/إشعار: رسالة بدل صفحة تفشل طلباتها
+  const blocked = allItems.find(i => i.path !== allItems[0]?.path && !allowed(i)
+    && (pathname === i.path || pathname.startsWith(i.path + '/')))
 
   const getTitle = () => {
     switch (type) {
@@ -196,7 +211,13 @@ const DashboardLayout = ({ type = 'vendor' }) => {
         <div className="p-4 lg:p-6">
           <PushPrompt className="mb-4" text="فعّل الإشعارات لتصلك الطلبات الجديدة فوراً حتى والتطبيق مغلق" />
           <Suspense fallback={<PageLoader />}>
-            <Outlet />
+            {blocked ? (
+              <div className="max-w-md mx-auto mt-16 text-center bg-white rounded-2xl border border-gray-200 p-8">
+                <Lock size={36} className="mx-auto text-gray-300" />
+                <p className="mt-3 font-bold text-gray-900">لا تملك صلاحية «{blocked.label}»</p>
+                <p className="mt-1 text-sm text-gray-500">اطلبها من {type === 'vendor' ? 'صاحب المتجر' : 'مدير النظام'}.</p>
+              </div>
+            ) : <Outlet />}
           </Suspense>
         </div>
       </main>

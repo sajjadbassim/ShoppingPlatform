@@ -22,8 +22,9 @@ namespace ecommerce.Controllers
         private Guid GetCurrentUserId() =>
             Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+        // الأدمن والعمليات يرون فاتورة أي طلب
         private bool IsAdmin() =>
-            User.IsInRole("ADMIN");
+            User.IsInRole("ADMIN") || User.IsInRole("OPS");
 
         // ===================================
         // GET: api/invoice/{orderId}
@@ -50,7 +51,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = ex.Message });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -77,7 +78,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = ex.Message });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

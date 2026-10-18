@@ -177,6 +177,7 @@ namespace ecommerce.Services.OrderRatingService
         // ===================================
         public async Task<OrderRatingDto?> GetRatingByOrderIdAsync(Guid orderId, Guid customerId)
         {
+            await EnsureOwnOrderAsync(orderId, customerId);
             var rating = await _context.OrderRatings
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.OrderId == orderId && r.CustomerId == customerId);
@@ -197,6 +198,7 @@ namespace ecommerce.Services.OrderRatingService
 
         public async Task<OrderRatingStatusDto> GetRatingStatusAsync(Guid orderId, Guid customerId)
         {
+            await EnsureOwnOrderAsync(orderId, customerId);
             var rating = await _context.OrderRatings
                 .AsNoTracking()
                 .Where(r => r.OrderId == orderId && r.CustomerId == customerId)
@@ -210,6 +212,13 @@ namespace ecommerce.Services.OrderRatingService
             };
         }
 
+        // طلب زبون آخر (أو غير موجود): «غير موجود» كما في التقييم نفسه وتفاصيل الطلب — لا «لم يُقيَّم بعد»
+        private async Task EnsureOwnOrderAsync(Guid orderId, Guid customerId)
+        {
+            if (!await _context.Orders.AnyAsync(o => o.Id == orderId && o.CustomerId == customerId))
+                throw new NotFoundException("الطلب غير موجود");
+        }
+
         // ===================================
         // GetOverallStatsAsync
         // ===================================
@@ -217,11 +226,16 @@ namespace ecommerce.Services.OrderRatingService
         {
             var ratings = await _context.OrderRatings
                 .Include(r => r.SubOrderRatings)
+                .Include(r => r.DriverRatings)
                 .AsNoTracking()
                 .ToListAsync();
 
             if (!ratings.Any())
                 return new RatingStatsDto();
+            // تقييم السائق: الجديد (لكل سائق في الطلب) + القديم المحفوظ على تقييم المتجر
+            var driverScores = ratings.SelectMany(r => r.DriverRatings).Select(d => (double)d.Rating)
+                .Concat(ratings.SelectMany(r => r.SubOrderRatings).Where(sr => sr.DriverRating.HasValue).Select(sr => (double)sr.DriverRating!.Value))
+                .ToList();
 
             var subRatings = ratings.SelectMany(r => r.SubOrderRatings).ToList();
 
@@ -247,9 +261,7 @@ namespace ecommerce.Services.OrderRatingService
                 AverageVendorRating = subRatings.Any()
                                             ? subRatings.Average(sr => sr.VendorRating)
                                             : 0,
-                AverageDriverRating = subRatings.Where(sr => sr.DriverRating.HasValue).Any()
-                                            ? subRatings.Where(sr => sr.DriverRating.HasValue).Average(sr => sr.DriverRating!.Value)
-                                            : 0,
+                AverageDriverRating = driverScores.Count > 0 ? driverScores.Average() : 0,
                 RecommendCount = recommendCount,
                 RecommendPercentage = ratings.Any(r => r.WouldRecommend.HasValue)
                                             ? Math.Round((double)recommendCount / ratings.Count(r => r.WouldRecommend.HasValue) * 100, 1)
@@ -347,8 +359,15 @@ namespace ecommerce.Services.OrderRatingService
                     .ThenInclude(sr => sr.SubOrder)
                 .Include(r => r.SubOrderRatings)
                     .ThenInclude(sr => sr.Driver)
+                .Include(r => r.DriverRatings)
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == ratingId);
+
+            // تقييم السائق يُحفظ لكل سائق في الطلب (لا على تقييم المتجر): يظهر على جزء كل سائق
+            var driverIds = rating!.DriverRatings.Select(d => d.DriverId)
+                .Concat(rating.SubOrderRatings.Where(sr => sr.SubOrder?.DriverId != null).Select(sr => sr.SubOrder!.DriverId!.Value)).Distinct().ToList();
+            var driverNames = await _context.Drivers.AsNoTracking().Where(d => driverIds.Contains(d.Id))
+                .ToDictionaryAsync(d => d.Id, d => d.FullName);
 
             // حساب المتوسط الكلي
             var scores = new List<double>();
@@ -379,8 +398,8 @@ namespace ecommerce.Services.OrderRatingService
                     VendorName = sr.Vendor?.Name ?? "—",
                     VendorRating = sr.VendorRating,
                     VendorComment = sr.VendorComment,
-                    DriverRating = sr.DriverRating,
-                    DriverName = sr.Driver?.FullName
+                    DriverRating = sr.DriverRating ?? rating.DriverRatings.FirstOrDefault(d => d.DriverId == sr.SubOrder?.DriverId)?.Rating,
+                    DriverName = sr.Driver?.FullName ?? (sr.SubOrder?.DriverId is Guid did ? driverNames.GetValueOrDefault(did) : null)
                 }).ToList()
             };
         }

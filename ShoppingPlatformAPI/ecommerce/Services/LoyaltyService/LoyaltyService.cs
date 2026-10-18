@@ -113,6 +113,7 @@ namespace ecommerce.Services.LoyaltyService
             var settings = await GetSettingsEntityAsync();
             if (!settings.IsActive) return;
 
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, userId);
             var account = await EnsureAccountAsync(userId);
 
             var referenceKey = $"suborder:{subOrderId}";
@@ -147,8 +148,8 @@ namespace ecommerce.Services.LoyaltyService
                 Type = LoyaltyTransactionType.Earned,
                 Points = pointsToEarn,
                 BalanceAfter = account.Balance,
-                Description = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:F2}",
-                DescriptionAr = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:F2}",
+                Description = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:N0} د.ع",
+                DescriptionAr = $"نقاط مكتسبة من الطلب — قيمة {orderAmount:N0} د.ع",
                 OrderId = orderId,
                 ReferenceKey = referenceKey,
                 ExpiresAt = expiresAt
@@ -318,7 +319,7 @@ namespace ecommerce.Services.LoyaltyService
                 Type = LoyaltyTransactionType.Earned,
                 Points = points,
                 BalanceAfter = account.Balance,
-                Description = "Points earned for writing a review",
+                Description = "نقاط مكتسبة من كتابة تقييم",
                 DescriptionAr = "نقاط مكتسبة من كتابة تقييم",
                 ReferenceKey = referenceKey,
                 ExpiresAt = expiresAt
@@ -360,7 +361,8 @@ namespace ecommerce.Services.LoyaltyService
                 MaxRedeemablePoints = maxRedeemable,
                 MaxDiscountAmount = maxRedeemable * settings.PointValue,
                 CurrentBalance = currentBalance,
-                PointValue = settings.PointValue
+                PointValue = settings.PointValue,
+                EarnRate = settings.PointsPerCurrencyUnit * multiplier,
             };
         }
 
@@ -373,18 +375,14 @@ namespace ecommerce.Services.LoyaltyService
             if (!settings.IsActive)
                 throw new BusinessRuleException("نظام النقاط غير مفعّل حالياً");
 
-            var account = await EnsureAccountAsync(userId);
-
-            // التحقق من الحد الأدنى
             if (dto.Points < settings.MinRedemptionPoints)
                 throw new BusinessRuleException($"الحد الأدنى للاسترداد هو {settings.MinRedemptionPoints} نقطة");
 
-            // التحقق من الرصيد
-            if (dto.Points > account.Balance)
-                throw new BusinessRuleException($"رصيد النقاط غير كافٍ. رصيدك الحالي: {account.Balance}");
+            // طلبان متزامنان (نقرتان، تبويبان): الطلب ثم حساب النقاط — نفس الترتيب دائماً، والقراءة بعد القفل
+            await using var orderLock = await OrderLock.ForOrderAsync(_context, dto.OrderId);
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, userId);
 
-            // التحقق من الطلب
-            var order = await _context.Orders
+            var order = await _context.Orders.Include(o => o.SubOrders)
                 .FirstOrDefaultAsync(o => o.Id == dto.OrderId && o.CustomerId == userId);
             if (order == null)
                 throw new NotFoundException("الطلب غير موجود");
@@ -393,15 +391,20 @@ namespace ecommerce.Services.LoyaltyService
             var redeemable = new[] { OrderStatus.PENDING_CONFIRMATION, OrderStatus.PARTIALLY_CONFIRMED, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY };
             if (!redeemable.Contains(order.Status) || order.PaymentStatus == PaymentStatus.Paid)
                 throw new BusinessRuleException($"لا يمكن استخدام النقاط على طلب «{OrderStatusText.Ar(order.Status)}»");
+            // الخصم يُحمَّل على الأجزاء التي لم تخرج مع السائق بعد
+            var open = order.SubOrders.Where(s => s.Status != OrderStatus.CANCELLED && !OrderTotals.IsFrozen(s)).ToList();
+            if (open.Count == 0)
+                throw new BusinessRuleException("خرج طلبك مع السائق — لا يمكن استخدام النقاط عليه الآن");
 
-            // التحقق أنه لم يتم استرداد نقاط لهذا الطلب من قبل
-            var alreadyRedeemed = await _context.LoyaltyTransactions
-                .AnyAsync(t => t.OrderId == dto.OrderId && t.Type == LoyaltyTransactionType.Redeemed);
-            if (alreadyRedeemed)
+            if (await _context.LoyaltyTransactions.AnyAsync(t => t.OrderId == dto.OrderId && t.Type == LoyaltyTransactionType.Redeemed))
                 throw new BusinessRuleException("تم استخدام نقاط لهذا الطلب مسبقاً");
 
-            // التحقق من الحد الأقصى كنسبة من الطلب
-            var maxDiscount = order.TotalAmount * (settings.MaxRedemptionPercentage / 100m);
+            var account = await EnsureAccountAsync(userId);
+            if (dto.Points > account.Balance)
+                throw new BusinessRuleException($"رصيد النقاط غير كافٍ. رصيدك الحالي: {account.Balance}");
+
+            // الحد الأقصى كنسبة مما بقي على الأجزاء المفتوحة
+            var maxDiscount = Math.Round(open.Sum(OrderTotals.DueFor) * (settings.MaxRedemptionPercentage / 100m), 2);
             var requestedDiscount = dto.Points * settings.PointValue;
 
             int pointsToUse;
@@ -417,14 +420,14 @@ namespace ecommerce.Services.LoyaltyService
                 discountAmount = requestedDiscount;
                 pointsToUse = dto.Points;
             }
+            if (pointsToUse <= 0 || discountAmount <= 0)
+                throw new BusinessRuleException("لا يمكن استخدام نقاط على هذا الطلب");
 
-            // تطبيق الخصم على الطلب
-            order.DiscountAmount += discountAmount;
-            order.PointsDiscountAmount += discountAmount;   // تتحمّله المنصة لا المتجر
-            order.TotalAmount -= discountAmount;
-            if (order.TotalAmount < 0) order.TotalAmount = 0;
+            // الخصم تتحمّله المنصة لا المتجر، ويُوزَّع على الأجزاء المفتوحة
+            order.PointsRedeemedAmount += discountAmount;
+            OrderTotals.SpreadPoints(order, order.SubOrders, discountAmount);
+            OrderTotals.Recalculate(order, order.SubOrders);
 
-            // خصم النقاط
             account.Balance -= pointsToUse;
             account.TotalRedeemed += pointsToUse;
             account.UpdatedAt = DateTime.UtcNow;
@@ -435,58 +438,169 @@ namespace ecommerce.Services.LoyaltyService
                 Type = LoyaltyTransactionType.Redeemed,
                 Points = -pointsToUse,
                 BalanceAfter = account.Balance,
-                Description = $"استرداد {pointsToUse} نقطة على الطلب — خصم {discountAmount:F2}",
-                DescriptionAr = $"استرداد {pointsToUse} نقطة على الطلب — خصم {discountAmount:F2}",
-                OrderId = dto.OrderId
+                Description = $"استرداد {pointsToUse} نقطة على الطلب — خصم {discountAmount:N0} د.ع",
+                DescriptionAr = $"استرداد {pointsToUse} نقطة على الطلب — خصم {discountAmount:N0} د.ع",
+                OrderId = dto.OrderId,
+                ReferenceKey = $"redeem:{dto.OrderId}"
             };
 
             await _context.LoyaltyTransactions.AddAsync(transaction);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is SqlException { Number: 2601 or 2627 })
+            {
+                throw new BusinessRuleException("تم استخدام نقاط لهذا الطلب مسبقاً");
+            }
 
             return new RedeemPointsResultDto
             {
                 PointsUsed = pointsToUse,
                 DiscountAmount = discountAmount,
                 RemainingBalance = account.Balance,
-                Message = $"تم خصم {discountAmount:F2} من قيمة طلبك"
+                Message = $"تم خصم {discountAmount:N0} د.ع من قيمة طلبك"
             };
         }
 
         // ===================================
-        // CancelRedemptionAsync — إعادة النقاط عند الإلغاء
+        // CancelRedemptionAsync — إلغاء الطلب كله: تُعاد كل النقاط المستبدلة عليه (ناقص ما أُعيد سابقاً)
         // ===================================
         public async Task CancelRedemptionAsync(Guid orderId)
         {
-            var redemption = await _context.LoyaltyTransactions
-                .Include(t => t.Account)
-                .FirstOrDefaultAsync(t => t.OrderId == orderId && t.Type == LoyaltyTransactionType.Redeemed);
+            var customerId = await _context.Orders.Where(o => o.Id == orderId).Select(o => (Guid?)o.CustomerId).FirstOrDefaultAsync();
+            if (customerId == null) return;
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, customerId.Value);
 
-            if (redemption == null) return;
-            // أُعيدت مسبقاً (إلغاء متكرر أو إلغاء آخر متجر بعد إلغاء الطلب)
+            var refundKey = $"redeem-cancel:{orderId}";
+            var txs = await _context.LoyaltyTransactions.AsNoTracking()
+                .Where(t => t.OrderId == orderId && (t.Type == LoyaltyTransactionType.Redeemed
+                    || t.Type == LoyaltyTransactionType.Adjusted && t.ReferenceKey != null && t.ReferenceKey.StartsWith("redeem-")))
+                .ToListAsync();
+            if (!txs.Any(t => t.Type == LoyaltyTransactionType.Redeemed) || txs.Any(t => t.ReferenceKey == refundKey)) return;
+            // السجلات القديمة: إعادة بلا مفتاح بنفس الوصف
             if (await _context.LoyaltyTransactions.AnyAsync(t => t.OrderId == orderId && t.Type == LoyaltyTransactionType.Adjusted
-                    && t.Points > 0 && t.Description == "إعادة نقاط بسبب إلغاء الطلب"))
+                    && t.Points > 0 && t.ReferenceKey == null && t.Description == "إعادة نقاط بسبب إلغاء الطلب"))
                 return;
 
-            var pointsToReturn = Math.Abs(redemption.Points);
-            redemption.Account.Balance += pointsToReturn;
-            redemption.Account.TotalRedeemed -= pointsToReturn;
-            if (redemption.Account.TotalRedeemed < 0)
-                redemption.Account.TotalRedeemed = 0;
-            redemption.Account.UpdatedAt = DateTime.UtcNow;
+            var pointsToReturn = -txs.Where(t => t.Type == LoyaltyTransactionType.Redeemed).Sum(t => t.Points)
+                                 - txs.Where(t => t.Type == LoyaltyTransactionType.Adjusted).Sum(t => t.Points);
+            if (pointsToReturn <= 0) return;
 
-            var refundTransaction = new LoyaltyTransaction
+            await RefundPointsAsync(customerId.Value, orderId, pointsToReturn, refundKey, "إعادة نقاط بسبب إلغاء الطلب");
+        }
+
+        // ===================================
+        // RefundUnusedPointsAsync — سقط جزء يحمل خصم نقاط (أو أزال المتجر قطعاً منه): نصيبه لا ينتقل لجزء آخر،
+        // يُعاد للزبون نقاطاً. يُستدعى بعد OrderTotals.Recalculate وحفظه
+        // ===================================
+        public async Task RefundUnusedPointsAsync(Guid orderId)
+        {
+            var customerId = await _context.Orders.Where(o => o.Id == orderId).Select(o => (Guid?)o.CustomerId).FirstOrDefaultAsync();
+            if (customerId == null) return;
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, customerId.Value);
+
+            var order = await _context.Orders.FirstAsync(o => o.Id == orderId);
+            if (order.Status == OrderStatus.CANCELLED) return;   // الإلغاء الكامل يعيد كل شيء عبر CancelRedemptionAsync
+            var unused = OrderTotals.UnusedPoints(order);
+            if (unused <= 0) return;
+
+            var settings = await GetSettingsEntityAsync();
+            var points = settings.PointValue > 0 ? (int)Math.Floor(unused / settings.PointValue) : 0;
+            order.PointsRedeemedAmount = order.PointsDiscountAmount;
+            if (points <= 0) { await _context.SaveChangesAsync(); return; }
+
+            await RefundPointsAsync(customerId.Value, orderId, points, $"redeem-unused:{orderId}:{DateTime.UtcNow.Ticks}",
+                "إعادة نقاط جزء أُلغي من الطلب");
+        }
+
+        private async Task RefundPointsAsync(Guid userId, Guid orderId, int points, string referenceKey, string description)
+        {
+            var account = await EnsureAccountAsync(userId);
+            account.Balance += points;
+            account.TotalRedeemed = Math.Max(0, account.TotalRedeemed - points);
+            account.UpdatedAt = DateTime.UtcNow;
+
+            _context.LoyaltyTransactions.Add(new LoyaltyTransaction
             {
-                AccountId = redemption.AccountId,
+                AccountId = account.Id,
                 Type = LoyaltyTransactionType.Adjusted,
-                Points = pointsToReturn,
-                BalanceAfter = redemption.Account.Balance,
-                Description = "إعادة نقاط بسبب إلغاء الطلب",
-                DescriptionAr = "إعادة نقاط بسبب إلغاء الطلب",
-                OrderId = orderId
-            };
-
-            await _context.LoyaltyTransactions.AddAsync(refundTransaction);
+                Points = points,
+                BalanceAfter = account.Balance,
+                Description = description,
+                DescriptionAr = description,
+                OrderId = orderId,
+                ReferenceKey = referenceKey,
+            });
             await _context.SaveChangesAsync();
+        }
+
+        // ===================================
+        // ReverseReturnPointsAsync — قبول إرجاع بعد الاستلام: قيد عكسي يخصم نقاط القطع المُرجعة
+        // من نقاط طلبها الفرعي بنسبة قيمتها (النقاط مُنحت على ما دُفع بعد الخصم، والنسبة تحفظ ذلك).
+        // مرة واحدة لكل إرجاع. الرصيد لا يصبح سالباً: ما صرفه الزبون من هذه النقاط يُعاد كقيمة (Shortfall)
+        // يخصمها المتصل من مبلغ الاسترجاع
+        // ===================================
+        public async Task<ReturnPointsReversal> ReverseReturnPointsAsync(Guid returnId)
+        {
+            var referenceKey = $"return:{returnId}";
+            if (await _context.LoyaltyTransactions.AnyAsync(t => t.ReferenceKey == referenceKey)) return ReturnPointsReversal.None;
+
+            var ret = await _context.Returns.AsNoTracking().Include(r => r.Items)
+                .FirstOrDefaultAsync(r => r.Id == returnId);
+            if (ret == null || ret.IsDoorRefusal) return ReturnPointsReversal.None;   // الرفض عند الباب لم تُمنح عليه نقاط أصلاً
+
+            var subOrders = await _context.SubOrders.AsNoTracking().Include(so => so.Items)
+                .Where(so => so.OrderId == ret.OrderId && so.Status == OrderStatus.DELIVERED).ToListAsync();
+            var earnedKeys = subOrders.Select(so => $"suborder:{so.Id}").ToList();
+            var earned = await _context.LoyaltyTransactions.AsNoTracking()
+                .Where(t => t.Type == LoyaltyTransactionType.Earned && t.ReferenceKey != null && earnedKeys.Contains(t.ReferenceKey))
+                .ToDictionaryAsync(t => t.ReferenceKey!, t => t.Points);
+
+            var points = 0m;
+            foreach (var item in ret.Items)
+            {
+                var so = subOrders.FirstOrDefault(s => s.Items.Any(i => i.ProductId == item.ProductId && i.VariantId == item.VariantId));
+                if (so == null || !earned.TryGetValue($"suborder:{so.Id}", out var soPoints)) continue;
+                var soValue = so.Items.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity));
+                if (soValue <= 0) continue;
+                points += soPoints * Math.Min(1m, item.UnitPrice * item.Quantity / soValue);
+            }
+
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, ret.CustomerId);
+            var account = await _context.LoyaltyAccounts.FirstOrDefaultAsync(a => a.UserId == ret.CustomerId);
+            if (account != null && _context.Entry(account).State == EntityState.Unchanged) await _context.Entry(account).ReloadAsync();
+            var owed = (int)Math.Round(points);
+            if (owed <= 0) return ReturnPointsReversal.None;
+            var settings = await GetSettingsEntityAsync();
+            var toDeduct = Math.Min(owed, Math.Max(0, account?.Balance ?? 0));
+            var shortfall = owed - toDeduct;
+            var result = new ReturnPointsReversal(toDeduct, shortfall, shortfall * settings.PointValue);
+            if (account == null) return result;
+
+            // النقاط مُنحت على قطع أُرجعت: تخرج كلها من «مجموع المكتسب» (المستوى) حتى ما صُرف منها —
+            // المصروف تُخصم قيمته من مبلغ الاسترجاع، ويُسجَّل القيد في سجل الزبون حتى لو لم يُخصم من الرصيد شيء
+            account.Balance -= toDeduct;
+            account.TotalEarned = Math.Max(0, account.TotalEarned - owed);
+            account.Tier = CalculateTier(account.TotalEarned, settings);
+            account.UpdatedAt = DateTime.UtcNow;
+
+            var text = $"خصم نقاط الإرجاع {ret.ReturnNumber}" + (shortfall > 0
+                ? $" — {owed:N0} نقطة: {toDeduct:N0} من الرصيد، و{shortfall:N0} صُرفت سابقاً فخُصمت قيمتها ({result.ShortfallValue:N0} د.ع) من مبلغ الاسترجاع"
+                : "");
+            _context.LoyaltyTransactions.Add(new LoyaltyTransaction
+            {
+                AccountId = account.Id,
+                Type = LoyaltyTransactionType.Adjusted,
+                Points = -toDeduct,
+                BalanceAfter = account.Balance,
+                Description = text,
+                DescriptionAr = text,
+                OrderId = ret.OrderId,
+                ReferenceKey = referenceKey,
+            });
+            await _context.SaveChangesAsync();
+            return result;
         }
 
         // ===================================
@@ -494,6 +608,12 @@ namespace ecommerce.Services.LoyaltyService
         // ===================================
         public async Task<LoyaltyAccountDto> AdminAdjustPointsAsync(AdminAdjustPointsDto dto)
         {
+            var role = await _context.Users.Where(u => u.Id == dto.UserId).Select(u => u.Role).FirstOrDefaultAsync()
+                ?? throw new NotFoundException("المستخدم غير موجود");
+            if (role != UserRoles.Customer)
+                throw new BusinessRuleException("النقاط للزبائن فقط");
+
+            await using var loyaltyLock = await OrderLock.ForLoyaltyAsync(_context, dto.UserId);
             var account = await EnsureAccountAsync(dto.UserId);
             var settings = await GetSettingsEntityAsync();
 
@@ -569,6 +689,9 @@ namespace ecommerce.Services.LoyaltyService
         {
             var account = await _context.LoyaltyAccounts
                 .FirstOrDefaultAsync(a => a.UserId == userId);
+            // كيان متتبَّع من قبل في نفس الطلب قد يحمل رصيداً قديماً — يُقرأ من القاعدة (بعد قفل الحساب)
+            if (account != null && _context.Entry(account).State == EntityState.Unchanged)
+                await _context.Entry(account).ReloadAsync();
 
             if (account == null)
             {
@@ -616,13 +739,18 @@ namespace ecommerce.Services.LoyaltyService
             _ => "برونزي"
         };
 
-        private static string GetTransactionTypeAr(string type) => type switch
+        // «تعديل» آلي (إعادة نقاط إلغاء، خصم نقاط إرجاع، دعوة، تقييم) له مفتاح مرجعي — اليدوي من الأدمن بلا مفتاح
+        private static string GetTransactionTypeAr(LoyaltyTransaction t) => t.Type switch
         {
             LoyaltyTransactionType.Earned => "نقاط مكتسبة",
             LoyaltyTransactionType.Redeemed => "نقاط مستردة",
             LoyaltyTransactionType.Expired => "نقاط منتهية الصلاحية",
-            LoyaltyTransactionType.Adjusted => "تعديل يدوي",
-            _ => type
+            LoyaltyTransactionType.Adjusted when t.ReferenceKey?.StartsWith("return:") == true => "خصم نقاط إرجاع",
+            LoyaltyTransactionType.Adjusted when t.ReferenceKey?.StartsWith("redeem-") == true
+                || t.ReferenceKey == null && t.Description == "إعادة نقاط بسبب إلغاء الطلب" => "إعادة نقاط",
+            LoyaltyTransactionType.Adjusted when t.ReferenceKey != null => t.Points >= 0 ? "نقاط مكافأة" : "خصم نقاط",
+            LoyaltyTransactionType.Adjusted => "تعديل من الإدارة",
+            _ => t.Type
         };
 
         private static LoyaltyAccountDto MapToDto(LoyaltyAccount account, LoyaltySettings settings)
@@ -665,7 +793,7 @@ namespace ecommerce.Services.LoyaltyService
         {
             Id = t.Id,
             Type = t.Type,
-            TypeAr = GetTransactionTypeAr(t.Type),
+            TypeAr = GetTransactionTypeAr(t),
             Points = t.Points,
             BalanceAfter = t.BalanceAfter,
             Description = t.Description,

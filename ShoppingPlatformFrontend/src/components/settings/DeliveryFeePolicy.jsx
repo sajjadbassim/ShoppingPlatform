@@ -1,5 +1,5 @@
 // إعداد: من يدفع أجرة التوصيل عندما يرفض الزبون الطلب عند الباب — للعمليات والإدارة
-// سؤالان منفصلان: الرفض الكامل، ورفض بعض القطع
+// سؤالان منفصلان: الرفض الكامل، ورفض بعض القطع. وثالث: أجرة استلام المرتجع من الزبون بعد الاستلام
 import { Truck } from 'lucide-react'
 import { SettingsSection } from './SettingsSection'
 import { useToast } from '../common/Toast'
@@ -12,6 +12,13 @@ const FULL_OPTIONS = [
 ]
 
 const SHORT = { CUSTOMER: 'الزبون', VENDOR: 'المتجر', NONE: 'المنصة' }
+
+// إرجاع بعد الاستلام: السائق يأخذ القطع من الزبون ويوصلها للمتجر — أجرة توصيل متاجرها في الطلب
+const RETURN_OPTIONS = [
+  { value: 'CUSTOMER', title: 'الزبون يدفعها', desc: 'تُخصم من المبلغ الذي يُردّ له' },
+  { value: 'VENDOR', title: 'المتجر يتحمّلها', desc: 'تُسجَّل على المتجر عند استلامه القطع' },
+  { value: 'NONE', title: 'المنصة تتحمّلها', desc: 'يُردّ للزبون ثمن القطع كاملاً' },
+]
 
 const Option = ({ selected, title, desc, onClick, disabled }) => (
   <button type="button" onClick={onClick} disabled={disabled}
@@ -26,21 +33,23 @@ const Option = ({ selected, title, desc, onClick, disabled }) => (
   </button>
 )
 
-const DeliveryFeePolicy = () => {
+// readOnly: العمليات ترى الإعداد ولا تغيّره (للأدمن فقط)
+const DeliveryFeePolicy = ({ readOnly = false }) => {
   const { success, error } = useToast()
   const { data, isLoading } = useDeliverySettings()
   const { mutateAsync: save, isPending } = useUpdateDeliverySettings()
   const full = data?.refusalFeePayer || 'CUSTOMER'
   const partialOnCustomer = !!data?.partialRefusalCustomerPays
-  const busy = isLoading || isPending
+  const returnPayer = data?.returnPickupFeePayer || 'CUSTOMER'
+  const busy = isLoading || isPending || readOnly
 
   const update = async (patch, message) => {
-    try { await save({ refusalFeePayer: full, partialRefusalCustomerPays: partialOnCustomer, ...patch }); success(message) }
+    try { await save({ refusalFeePayer: full, partialRefusalCustomerPays: partialOnCustomer, returnPickupFeePayer: returnPayer, ...patch }); success(message) }
     catch (e) { error(e.message || 'تعذّر الحفظ') }
   }
 
   return (
-    <SettingsSection icon={Truck} title="أجرة التوصيل عند الرفض">
+    <SettingsSection icon={Truck} title="أجرة التوصيل عند الرفض والإرجاع">
       <p className="text-sm text-gray-500 mb-4">إذا رفض الزبون الطلب عند الباب، من يدفع أجرة التوصيل؟</p>
 
       <div className="space-y-5">
@@ -71,9 +80,24 @@ const DeliveryFeePolicy = () => {
               onClick={() => partialOnCustomer && update({ partialRefusalCustomerPays: false }, 'رفض بعض القطع: مثل الرفض الكامل')} />
           </div>
         </div>
+
+        {/* إرجاع بعد الاستلام */}
+        <div>
+          <p className="text-sm font-bold text-gray-800 mb-1">أجرة استلام المرتجع من الزبون</p>
+          <p className="text-xs text-gray-500 mb-2">بعد الموافقة على إرجاع، يأخذ السائق القطع من الزبون ويوصلها للمتجر</p>
+          <div className="space-y-2">
+            {RETURN_OPTIONS.map(o => (
+              <Option key={o.value} selected={returnPayer === o.value} title={o.title} desc={o.desc} disabled={busy}
+                onClick={() => returnPayer !== o.value && update({ returnPickupFeePayer: o.value }, `أجرة استلام المرتجع: ${o.title}`)} />
+            ))}
+          </div>
+        </div>
       </div>
 
-      <p className="text-xs text-gray-400 mt-4">يُطبَّق على عمليات الرفض الجديدة، ويُحفظ على كل طلب من تحمّل أجرته.</p>
+      <p className="text-xs text-gray-400 mt-4">
+        يُطبَّق على عمليات الرفض والإرجاع الجديدة، ويُحفظ على كل طلب وإرجاع من تحمّل أجرته.
+        {readOnly && ' يغيّره الأدمن فقط.'}
+      </p>
     </SettingsSection>
   )
 }

@@ -22,6 +22,94 @@ namespace ecommerce.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ecommerce.Core.Models.ActivityLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<string>("ActorRole")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("actor_role");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid?>("ActorVendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("actor_vendor_id");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("details");
+
+                    b.Property<string>("HttpMethod")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("http_method");
+
+                    b.Property<string>("Ip")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("ip");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Path")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("summary");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("user_agent");
+
+                    b.Property<string>("VendorIds")
+                        .HasMaxLength(800)
+                        .HasColumnType("nvarchar(800)")
+                        .HasColumnName("vendor_ids");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.HasIndex("ActorUserId", "At");
+
+                    b.HasIndex("ActorVendorId", "At");
+
+                    b.ToTable("activity_logs");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.Address", b =>
                 {
                     b.Property<Guid>("Id")
@@ -249,7 +337,8 @@ namespace ecommerce.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("carts");
                 });
@@ -287,11 +376,13 @@ namespace ecommerce.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CartId");
-
                     b.HasIndex("ProductId");
 
                     b.HasIndex("VariantId");
+
+                    b.HasIndex("CartId", "ProductId", "VariantId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_cart_items_cart_product_variant");
 
                     b.ToTable("cart_items");
                 });
@@ -587,6 +678,12 @@ namespace ecommerce.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("refusal_fee_payer");
+
+                    b.Property<string>("ReturnPickupFeePayer")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("return_pickup_fee_payer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2")
@@ -1772,6 +1869,23 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("coupon_code");
 
+                    b.Property<string>("CouponDiscountType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("coupon_discount_type");
+
+                    b.Property<decimal?>("CouponDiscountValue")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("coupon_discount_value");
+
+                    b.Property<decimal?>("CouponMaxDiscount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("coupon_max_discount");
+
+                    b.Property<decimal>("CouponOriginalAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("coupon_original_amount");
+
                     b.Property<Guid?>("CouponVendorId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("coupon_vendor_id");
@@ -1830,6 +1944,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("order_number");
 
+                    b.Property<decimal>("OriginalTotalAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("original_total_amount");
+
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1850,14 +1968,36 @@ namespace ecommerce.Migrations
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("points_discount_amount");
 
+                    b.Property<decimal>("PointsRedeemedAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("points_redeemed_amount");
+
                     b.Property<decimal?>("RefusalFeeAmount")
                         .HasColumnType("decimal(10,2)")
                         .HasColumnName("refusal_fee_amount");
+
+                    b.Property<DateTime?>("RefusalFeeOverrideAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("refusal_fee_override_at");
+
+                    b.Property<Guid?>("RefusalFeeOverrideBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("refusal_fee_override_by");
+
+                    b.Property<string>("RefusalFeeOverrideReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("refusal_fee_override_reason");
 
                     b.Property<string>("RefusalFeePayer")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
                         .HasColumnName("refusal_fee_payer");
+
+                    b.Property<string>("RefusalFeePayerOverride")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("refusal_fee_payer_override");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -2621,15 +2761,49 @@ namespace ecommerce.Migrations
                         .HasColumnType("bit")
                         .HasColumnName("is_restocked");
 
+                    b.Property<DateTime?>("ItemsReceivedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("items_received_at");
+
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("order_id");
+
+                    b.Property<decimal>("PickupFeeAmount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("pickup_fee_amount");
+
+                    b.Property<string>("PickupFeeOverrideReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("pickup_fee_override_reason");
+
+                    b.Property<string>("PickupFeePayer")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("pickup_fee_payer");
+
+                    b.Property<decimal?>("PointsDeductionAmount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("points_deduction_amount");
 
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("reason");
+
+                    b.Property<decimal?>("RefundAmount")
+                        .HasColumnType("decimal(18,2)")
+                        .HasColumnName("refund_amount");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("refunded_at");
+
+                    b.Property<Guid?>("RefundedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("refunded_by");
 
                     b.Property<string>("RejectionReason")
                         .HasColumnType("nvarchar(max)")
@@ -2771,6 +2945,123 @@ namespace ecommerce.Migrations
                     b.HasIndex("VariantId");
 
                     b.ToTable("return_items", (string)null);
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.ReturnTrip", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("DeliveryFee")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("delivery_fee");
+
+                    b.Property<Guid>("DriverId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("driver_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("order_id");
+
+                    b.Property<DateTime?>("PickedUpAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("picked_up_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("received_at");
+
+                    b.Property<Guid?>("ReceivedBy")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("received_by");
+
+                    b.Property<Guid?>("ReturnId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("return_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubOrderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("sub_order_id");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ReturnId");
+
+                    b.HasIndex("SubOrderId")
+                        .HasDatabaseName("idx_return_trips_suborder");
+
+                    b.HasIndex("DriverId", "Status")
+                        .HasDatabaseName("idx_return_trips_driver_status");
+
+                    b.HasIndex("VendorId", "Status")
+                        .HasDatabaseName("idx_return_trips_vendor_status");
+
+                    b.ToTable("return_trips");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.ReturnTripItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("product_name");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("int")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("ReturnTripId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("return_trip_id");
+
+                    b.Property<Guid>("SubOrderItemId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("sub_order_item_id");
+
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("variant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReturnTripId");
+
+                    b.ToTable("return_trip_items");
                 });
 
             modelBuilder.Entity("ecommerce.Core.Models.Review", b =>
@@ -3048,6 +3339,10 @@ namespace ecommerce.Migrations
                         .HasColumnType("datetime2")
                         .HasColumnName("confirmation_deadline");
 
+                    b.Property<DateTime?>("ConfirmationOverdueNotifiedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("confirmation_overdue_notified_at");
+
                     b.Property<DateTime?>("ConfirmedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("confirmed_at");
@@ -3055,6 +3350,10 @@ namespace ecommerce.Migrations
                     b.Property<Guid?>("ConfirmedBy")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("confirmed_by");
+
+                    b.Property<decimal>("CouponShare")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("coupon_share");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2")
@@ -3091,6 +3390,18 @@ namespace ecommerce.Migrations
                     b.Property<DateTime?>("PickedUpAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("picked_up_at");
+
+                    b.Property<decimal>("PointsShare")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("points_share");
+
+                    b.Property<bool>("RefusalFeeWaived")
+                        .HasColumnType("bit")
+                        .HasColumnName("refusal_fee_waived");
+
+                    b.Property<decimal>("RefusedAmount")
+                        .HasColumnType("decimal(10,2)")
+                        .HasColumnName("refused_amount");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -3579,6 +3890,11 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(500)")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("Permissions")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("permissions");
+
                     b.Property<string>("Phone")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)")
@@ -3605,6 +3921,10 @@ namespace ecommerce.Migrations
 
                     b.Property<DateTime?>("SessionsRevokedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("StaffVendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("staff_vendor_id");
 
                     b.Property<int>("TokenVersion")
                         .HasColumnType("int");
@@ -3640,6 +3960,8 @@ namespace ecommerce.Migrations
 
                     b.HasIndex("Role")
                         .HasDatabaseName("idx_users_role");
+
+                    b.HasIndex("StaffVendorId");
 
                     b.ToTable("users", (string)null);
                 });
@@ -4475,6 +4797,59 @@ namespace ecommerce.Migrations
                     b.Navigation("Variant");
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.ReturnTrip", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Driver", "Driver")
+                        .WithMany()
+                        .HasForeignKey("DriverId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Return", "Return")
+                        .WithMany()
+                        .HasForeignKey("ReturnId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ecommerce.Core.Models.SubOrder", "SubOrder")
+                        .WithMany()
+                        .HasForeignKey("SubOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ecommerce.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Driver");
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Return");
+
+                    b.Navigation("SubOrder");
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.ReturnTripItem", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.ReturnTrip", "ReturnTrip")
+                        .WithMany("Items")
+                        .HasForeignKey("ReturnTripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ReturnTrip");
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.Review", b =>
                 {
                     b.HasOne("ecommerce.Core.Models.Order", "Order")
@@ -4834,6 +5209,11 @@ namespace ecommerce.Migrations
                 {
                     b.Navigation("Images");
 
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.ReturnTrip", b =>
+                {
                     b.Navigation("Items");
                 });
 

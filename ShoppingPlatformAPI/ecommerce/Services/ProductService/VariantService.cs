@@ -188,7 +188,9 @@ namespace ecommerce.Services.ProductService
                     .ToListAsync();
 
                 var basePrice = await GetEffectiveBasePriceAsync(product);
-                return variants.Select(v => MapVariantToDto(v, basePrice)).ToList();
+                var finalPrices = await _promotionService.CalculateFinalPricesAsync(variants.Select(v =>
+                    new PriceQuery(product.Id, product.CategoryId, product.VendorId, product.Price + v.PriceAdjustment, v.Id)));
+                return variants.Select(v => MapVariantToDto(v, basePrice, finalPrices[v.Id])).ToList();
             }
 
             // ===================================
@@ -207,7 +209,9 @@ namespace ecommerce.Services.ProductService
                 if (variant == null)
                     throw new NotFoundException("المتغير غير موجود");
 
-                return MapVariantToDto(variant, await GetEffectiveBasePriceAsync(variant.Product));
+                var p = variant.Product;
+                var final = await _promotionService.CalculateFinalPriceAsync(p.Id, p.CategoryId ?? Guid.Empty, p.VendorId, p.Price + variant.PriceAdjustment);
+                return MapVariantToDto(variant, await GetEffectiveBasePriceAsync(p), final);
             }
 
             // ===================================
@@ -385,14 +389,15 @@ namespace ecommerce.Services.ProductService
                 DisplayOrder = v.DisplayOrder
             };
 
-            private static ProductVariantDto MapVariantToDto(ProductVariant v, decimal basePrice) => new()
+            // finalPrice: العرض مطبّق على سعر المتغير الكامل (لا على الأساسي فقط ثم يُضاف الفرق)
+            private static ProductVariantDto MapVariantToDto(ProductVariant v, decimal basePrice, decimal finalPrice) => new()
             {
                 Id = v.Id,
                 ProductId = v.ProductId,
                 Sku = v.Sku,
                 BasePrice = basePrice,
                 PriceAdjustment = v.PriceAdjustment,
-                FinalPrice = basePrice + v.PriceAdjustment,
+                FinalPrice = finalPrice,
                 StockQuantity = v.StockQuantity,
                 IsAvailable = v.IsAvailable,
                 ImageUrl = v.ImageUrl,

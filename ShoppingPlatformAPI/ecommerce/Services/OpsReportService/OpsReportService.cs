@@ -65,8 +65,8 @@ namespace ecommerce.Services.OpsReportService
                 {
                     Date = d,
                     Orders = list.Select(s => s.OrderId).Distinct().Count(),
-                    Delivered = list.Count(s => s.Status == OrderStatus.DELIVERED),
-                    Cancelled = list.Count(s => s.Status == OrderStatus.CANCELLED),
+                    Delivered = DeliveredOrders(list),
+                    Cancelled = CancelledOrders(list),
                     Revenue = list.Where(s => s.Status == OrderStatus.DELIVERED).Sum(s => s.Total),
                 });
             }
@@ -177,12 +177,11 @@ namespace ecommerce.Services.OpsReportService
             var orderIds = subs.Select(s => s.OrderId).Distinct().ToList();
             var discounted = await _context.Orders.AsNoTracking()
                 .Where(o => orderIds.Contains(o.Id) && o.DiscountAmount > 0)
-                .Select(o => new { o.Id, o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId })
+                .Include(o => o.SubOrders)
                 .ToListAsync(ct);
             var shares = new Dictionary<Guid, decimal>();
             foreach (var o in discounted)
-                foreach (var (subId, share) in OrderTotals.DiscountShares(o.DiscountAmount, o.PointsDiscountAmount, o.CouponVendorId,
-                             subs.Where(s => s.OrderId == o.Id).Select(s => new OrderTotals.Line(s.Id, s.VendorId, s.Status, s.Subtotal, s.DeliveryFee))))
+                foreach (var (subId, share) in OrderTotals.DiscountShares(o, o.SubOrders))
                     shares[subId] = share;
 
             // أوقات الخروج والتسليم من سجل الحالات
@@ -237,6 +236,13 @@ namespace ecommerce.Services.OpsReportService
             return fees.Concat(returns).ToList();
         }
 
+        // طلب مُسلّم = وصل منه شيء للزبون؛ ملغى = أُلغيت كل أجزائه
+        private static int DeliveredOrders(IEnumerable<Row> rows) =>
+            rows.GroupBy(r => r.OrderId).Count(g => g.Any(r => r.Status == OrderStatus.DELIVERED));
+
+        private static int CancelledOrders(IEnumerable<Row> rows) =>
+            rows.GroupBy(r => r.OrderId).Count(g => g.All(r => r.Status == OrderStatus.CANCELLED));
+
         private static OpsReportSummaryDto Summarize(List<Row> rows, IEnumerable<Extra> extras)
         {
             var extra = extras.ToList();
@@ -244,15 +250,17 @@ namespace ecommerce.Services.OpsReportService
             var revenue = delivered.Sum(r => r.Total);
             var refusalFees = extra.Sum(e => e.RefusalFee);
             var returnsAmount = extra.Sum(e => e.ReturnAmount);
-            var deliveredOrders = delivered.Select(r => r.OrderId).Distinct().Count();
-            var cancelled = rows.Count(r => r.Status == OrderStatus.CANCELLED);
+            var deliveredOrders = DeliveredOrders(rows);
+            var cancelled = CancelledOrders(rows);
+            var orders = rows.Select(r => r.OrderId).Distinct().Count();
+            // بالطلبات (لا بطلبات المتاجر) مثل «الطلبات»: طلب من متجرين سُلّم = طلب مُسلّم واحد
             return new OpsReportSummaryDto
             {
-                Orders = rows.Select(r => r.OrderId).Distinct().Count(),
+                Orders = orders,
                 StoreOrders = rows.Count,
-                Delivered = delivered.Count,
+                Delivered = deliveredOrders,
                 Cancelled = cancelled,
-                CancellationRate = rows.Count == 0 ? 0 : Math.Round((double)cancelled / rows.Count, 4),
+                CancellationRate = orders == 0 ? 0 : Math.Round((double)cancelled / orders, 4),
                 Revenue = revenue,
                 Discounts = delivered.Sum(r => r.Discount),
                 RefusalFees = refusalFees,

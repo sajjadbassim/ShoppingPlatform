@@ -165,6 +165,13 @@
         public string? Details { get; set; }
         public bool IsDoorRefusal { get; set; }
         public DateTime CreatedAt { get; set; }
+        public List<VendorOrderReturnItemDto> Items { get; set; } = new();
+    }
+
+    public class VendorOrderReturnItemDto
+    {
+        public string ProductName { get; set; } = "";
+        public int Quantity { get; set; }
     }
 
     // القبول الجزئي: القطع غير المتوفرة (تُزال من الطلب ويُعاد مخزونها)

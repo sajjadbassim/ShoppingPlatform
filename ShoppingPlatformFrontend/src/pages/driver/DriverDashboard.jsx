@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Phone, MapPin, Navigation, Package, CheckCircle2, Store, Banknote, LogOut,
-  Bell, Radio, RefreshCw, Clock, Star, ChevronDown, ChevronUp, StickyNote,
+  Bell, Radio, RefreshCw, Clock, Star, ChevronDown, ChevronUp, StickyNote, History,
 } from 'lucide-react'
 import Modal from '../../components/common/Modal'
+import ActivityLogView from '../../components/activity/ActivityLogView'
 import PushPrompt, { PushDeviceRow } from '../../components/common/PushPrompt'
 import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
@@ -18,7 +19,8 @@ import { useNotificationsStore } from '../../stores/notificationsStore'
 import DeliverySlot from '../../components/common/DeliverySlot'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  useDriverProfile, useMyDriverOrders, useSetDriverWorkStatus, usePickUpStop, useDeliverOrder, useFailOrder,
+  useDriverProfile, useMyDriverOrders, useSetDriverWorkStatus, usePickUpStop, useDeliverOrder, useFailOrder, useMyDriverCash, useMyReturnTrips,
+  useCollectReturn, useFailReturnPickup,
 } from '../../hooks/useDriverApp'
 
 const money = (n) => `${Math.round(n || 0).toLocaleString('en-US')} د.ع`
@@ -171,9 +173,18 @@ const DeliverSheet = ({ order, onClose, onFullRefusal }) => {
 
   useEffect(() => { setCash(false); setRefuseMode(false); setRefused({}); setReason('') }, [order?.orderId])
 
-  const items = (order?.stores || []).flatMap(s => s.items.map(i => ({ ...i, vendorName: s.vendorName })))
+  const items = (order?.stores || []).flatMap(s => s.items.map(i => ({ ...i, vendorName: s.vendorName, storeId: s.subOrderId })))
   const refusedLines = Object.entries(refused).filter(([, q]) => q > 0)
-  const refusedValue = refusedLines.reduce((sum, [id, q]) => sum + (items.find(i => i.subOrderItemId === id)?.unitPrice || 0) * q, 0)
+  // القطع المرفوضة تُطرح بقيمتها بعد نصيبها من خصم متجرها (نفس حساب الخادم)
+  const refusedValue = (order?.stores || []).reduce((sum, s) => {
+    const value = refusedLines.reduce((v, [id, q]) => {
+      const it = items.find(i => i.subOrderItemId === id)
+      return it?.storeId === s.subOrderId ? v + it.unitPrice * q : v
+    }, 0)
+    if (!value) return sum
+    const ratio = s.keptAmount > 0 ? Math.min(1, value / s.keptAmount) : 1
+    return sum + value - Math.round((s.couponShare || 0) * ratio) - Math.round((s.pointsShare || 0) * ratio)
+  }, 0)
   const remainingPieces = items.reduce((n, i) => n + i.quantity - i.refusedQuantity, 0) - refusedLines.reduce((n, [, q]) => n + q, 0)
   const refusesAll = refusedLines.length > 0 && remainingPieces <= 0
   const hasRefusal = refuseMode && refusedLines.length > 0
@@ -377,6 +388,8 @@ const DriverDashboard = () => {
   const { logout } = useAuthStore()
   const { success, error: showError, info } = useToast()
   const [tab, setTab] = useState('active')
+  const [cashOpen, setCashOpen] = useState(false)
+  const [activityOpen, setActivityOpen] = useState(false)
   const [delivering, setDelivering] = useState(null)
   const [failing, setFailing] = useState(null)   // { order, reason? }
 
@@ -485,11 +498,14 @@ const DriverDashboard = () => {
             <p className="text-2xl font-extrabold text-gray-900">{me?.deliveredToday ?? '—'}</p>
             <p className="text-xs text-gray-500">سلّمت اليوم</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-200 p-3 text-center">
+          <button onClick={() => setCashOpen(true)} className="bg-white rounded-2xl border border-gray-200 p-3 text-center hover:bg-gray-50">
             <p className="text-base font-extrabold text-gray-900 leading-8 truncate">{me ? money(me.cashInHand) : '—'}</p>
-            <p className="text-xs text-gray-500">نقد معك</p>
-          </div>
+            <p className="text-xs text-primary font-medium">نقد معك · التفاصيل</p>
+          </button>
         </section>
+
+        {/* بضاعة لم تُسلَّم: تعود لمتاجرها حين يتاح له (قبل إنهاء العمل) */}
+        {me?.openReturnTrips > 0 && <ReturnTripsSection />}
 
         {/* مشاركة الموقع */}
         <section className={`rounded-2xl border p-3 flex items-center gap-3 ${location.sharing ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
@@ -505,6 +521,12 @@ const DriverDashboard = () => {
             {location.sharing ? 'إيقاف' : 'تشغيل'}
           </button>
         </section>
+
+        {/* سجل نشاطي: دخولي وما سجّلته (استلام، تسليم، تعذّر، حالتي) */}
+        <button type="button" onClick={() => setActivityOpen(true)}
+          className="w-full h-10 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 inline-flex items-center justify-center gap-2">
+          <History size={16} />سجل نشاطي
+        </button>
 
         {/* التبويبات */}
         <div className="flex items-center gap-2">
@@ -572,7 +594,119 @@ const DriverDashboard = () => {
       <DeliverSheet order={delivering} onClose={() => setDelivering(null)}
         onFullRefusal={(order) => { setDelivering(null); setFailing({ order, reason: 'customer_refused' }) }} />
       <FailSheet target={failing} onClose={() => setFailing(null)} />
+      <CashSheet open={cashOpen} onClose={() => setCashOpen(false)} />
+      <Modal isOpen={activityOpen} onClose={() => setActivityOpen(false)} title="سجل نشاطي" size="sm">
+        {activityOpen && <div className="max-h-[70vh] overflow-y-auto"><ActivityLogView role="DRIVER" compact /></div>}
+      </Modal>
     </div>
+  )
+}
+
+// مرتجع بعد الاستلام: يأخذ القطع من الزبون أولاً (مهمة لكل متجر، تُعرض كزيارة واحدة للزبون)
+const CustomerPickupCard = ({ trips }) => {
+  const t = trips[0]
+  const { success, error } = useToast()
+  const { mutateAsync: collect, isPending: collecting } = useCollectReturn()
+  const { mutateAsync: fail, isPending: failing } = useFailReturnPickup()
+  const items = trips.flatMap(x => x.items)
+  const busy = collecting || failing
+  const onCollect = async () => {
+    if (!window.confirm(`أخذت كل القطع (${items.reduce((s, i) => s + i.quantity, 0)}) من الزبون؟`)) return
+    try { await collect(t.returnId); success('سجّلنا أخذ القطع — أوصلها للمتجر') } catch (e) { error(e.message || 'تعذّر التسجيل') }
+  }
+  const onFail = async () => {
+    const note = window.prompt('لماذا تعذّر الاستلام؟ (لا يرد، غير موجود، رفض التسليم...)')
+    if (note === null) return
+    try { await fail({ returnId: t.returnId, note }); success('أُبلغت العمليات') } catch (e) { error(e.message || 'تعذّر التسجيل') }
+  }
+  return (
+    <div className="bg-white rounded-xl border border-violet-200 p-3 text-sm space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-violet-800 bg-violet-50 px-2 py-0.5 rounded-full">استلام من الزبون</span>
+        <span className="text-xs text-gray-400" dir="ltr">{t.returnNumber}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="font-bold text-gray-900 truncate">{t.customerName || 'الزبون'}</span>
+        {t.customerPhone && <a href={`tel:${t.customerPhone}`} className="mr-auto text-xs text-primary" dir="ltr">{t.customerPhone}</a>}
+      </div>
+      {t.customerAddress && (
+        <a href={mapsUrl({ latitude: t.latitude, longitude: t.longitude, address: t.customerAddress })} target="_blank" rel="noreferrer"
+          className="block text-xs text-primary underline underline-offset-2">{t.customerAddress}</a>
+      )}
+      <div className="flex flex-wrap gap-1">
+        {items.map((i, k) => <span key={k} className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{i.productName} ×{i.quantity}</span>)}
+      </div>
+      <p className="text-xs text-gray-500">ثم أوصلها إلى: {[...new Set(trips.map(x => x.vendorName))].join('، ')}</p>
+      <div className="grid grid-cols-2 gap-2 pt-1">
+        <button onClick={onFail} disabled={busy} className="h-9 rounded-lg border border-gray-200 text-gray-600 text-sm font-bold disabled:opacity-50">تعذّر الاستلام</button>
+        <button onClick={onCollect} disabled={busy} className="h-9 rounded-lg bg-violet-600 text-white text-sm font-bold disabled:opacity-50">أخذت القطع</button>
+      </div>
+    </div>
+  )
+}
+
+// مرتجعات معه: محطة لكل متجر — يسلّمها للمتجر والمتجر يؤكد الاستلام
+const ReturnTripsSection = () => {
+  const { data: all = [] } = useMyReturnTrips(true)
+  if (all.length === 0) return null
+  const pickups = Object.values(all.filter(t => t.status === 'AT_CUSTOMER')
+    .reduce((g, t) => ({ ...g, [t.returnId]: [...(g[t.returnId] || []), t] }), {}))
+  const trips = all.filter(t => t.status !== 'AT_CUSTOMER')
+  return (
+    <section className="rounded-2xl border border-sky-200 bg-sky-50 p-3 space-y-2">
+      <div>
+        <p className="font-bold text-sky-900">مرتجعات ({all.length})</p>
+        <p className="text-xs text-sky-800/80">خذ القطع من الزبون ثم أرجعها لمتاجرها حين تتفرغ — لا يمكنك إنهاء العمل قبلها. المتجر يؤكد الاستلام.</p>
+      </div>
+      {pickups.map(group => <CustomerPickupCard key={group[0].returnId} trips={group} />)}
+      {trips.map(t => (
+        <div key={t.id} className="bg-white rounded-xl border border-sky-100 p-3 text-sm space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-900 truncate">{t.vendorName}</span>
+            {t.vendorPhone && <a href={`tel:${t.vendorPhone}`} className="mr-auto text-xs text-primary" dir="ltr">{t.vendorPhone}</a>}
+          </div>
+          {t.vendorAddress && <p className="text-xs text-gray-500">{t.vendorAddress}</p>}
+          <p className="text-xs text-gray-500">{t.reasonAr} · <span dir="ltr">{t.subOrderNumber}</span></p>
+          <div className="flex flex-wrap gap-1">
+            {t.items.map((i, k) => <span key={k} className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{i.productName} ×{i.quantity}</span>)}
+          </div>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+// تفصيل النقد الذي بعهدة السائق: لكل طلب مبلغه — نفس ما تراه العمليات عند استلام النقد منه
+const CashSheet = ({ open, onClose }) => {
+  const { data, isLoading } = useMyDriverCash(open)
+  const items = data?.items || []
+  return (
+    <Modal isOpen={open} onClose={onClose} title="النقد الذي معك" size="sm">
+      {isLoading ? (
+        <p className="text-sm text-gray-500 text-center py-6">جاري التحميل...</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-6">لا يوجد نقد بعهدتك — سلّمت كل شيء للعمليات</p>
+      ) : (
+        <div className="space-y-3">
+          <ul className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+            {items.map(i => (
+              <li key={i.orderId} className="flex items-center justify-between py-2.5 text-sm">
+                <span className="min-w-0">
+                  <span className="block font-medium text-gray-900" dir="ltr">{i.orderNumber}</span>
+                  <span className="block text-xs text-gray-400">{new Date(i.collectedAt).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                </span>
+                <span className="font-bold text-gray-900 whitespace-nowrap">{money(i.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+            <span className="font-bold">المجموع ({items.length} طلب)</span>
+            <span className="font-extrabold text-primary">{money(data.total)}</span>
+          </div>
+          <p className="text-xs text-gray-500">سلّم هذا المبلغ للعمليات — إن وجدت فرقاً عمّا معك فعلاً أخبرهم قبل التسوية.</p>
+        </div>
+      )}
+    </Modal>
   )
 }
 

@@ -64,6 +64,12 @@ builder.Services.AddControllers(options =>
         .Build();
 
     options.Filters.Add(new AuthorizeFilter(policy));
+    options.Filters.Add(new ecommerce.Filters.PagingClampFilter());
+    // صلاحيات موظفي المتاجر والمسؤولين المحدودين (قبل أي إجراء)
+    // قبل التحقق من صحة الطلب (ModelStateInvalidFilter = -2000): من لا يملك الصلاحية يُرفض قبل أي شيء
+    options.Filters.Add<ecommerce.Filters.StaffPermissionFilter>(-3000);
+    // سجل النشاط لكل الأدوار عدا الزبون
+    options.Filters.Add<ecommerce.Filters.ActivityLogFilter>();
 })
 .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new ecommerce.Common.UtcDateTimeConverter()));
 
@@ -72,17 +78,40 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
     options.InvalidModelStateResponseFactory = context =>
     {
-        // رسائل الإطار الافتراضية بالإنجليزية ← عربية مفهومة (رسائلنا العربية تبقى كما هي)
-        static string Arabic(string m) =>
+        // رسائل الإطار الافتراضية بالإنجليزية ← عربية مفهومة تسمّي الحقل (رسائلنا العربية تبقى كما هي)
+        static string FieldName(string key)
+        {
+            var last = key.Split('.', '[').Last().Trim(']', '$');
+            var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["customerNotes"] = "ملاحظات الطلب", ["notes"] = "الملاحظات", ["addressId"] = "العنوان",
+                ["streetAddress"] = "الشارع", ["area"] = "المنطقة", ["city"] = "المدينة",
+                ["buildingNumber"] = "رقم البناية", ["floorNumber"] = "رقم الطابق", ["apartmentNumber"] = "رقم الشقة",
+                ["fullName"] = "الاسم", ["email"] = "البريد الإلكتروني", ["phone"] = "رقم الهاتف", ["password"] = "كلمة المرور",
+                ["reason"] = "السبب", ["quantity"] = "الكمية", ["productId"] = "المنتج",
+                ["code"] = "رمز الكوبون", ["couponCode"] = "رمز الكوبون", ["label"] = "اسم العنوان",
+                ["name"] = "الاسم", ["nameAr"] = "الاسم بالعربية", ["description"] = "الوصف", ["descriptionAr"] = "الوصف بالعربية",
+                ["title"] = "العنوان", ["comment"] = "التعليق", ["details"] = "التفاصيل", ["amount"] = "المبلغ",
+                ["reference"] = "رقم المرجع", ["price"] = "السعر", ["discountValue"] = "قيمة الخصم",
+                ["cancellationReason"] = "سبب الإلغاء", ["refusalReason"] = "سبب الرفض", ["rating"] = "التقييم",
+                ["latitude"] = "موقع الخريطة", ["longitude"] = "موقع الخريطة", ["variantId"] = "الخيار",
+                ["deliverySlotStart"] = "موعد التوصيل", ["identifier"] = "رقم الهاتف أو البريد",
+            };
+            // حقل لم نسمّه بعد: «أحد الحقول» بدل اسمه البرمجي بالإنجليزية
+            return names.TryGetValue(last, out var ar) ? ar : "أحد الحقول";
+        }
+        static string Arabic(string key, string m) =>
             System.Text.RegularExpressions.Regex.IsMatch(m, "[؀-ۿ]") ? m
-            : m.Contains("is required") ? "يرجى تعبئة كل الحقول المطلوبة"
+            : m.Contains("is required") ? (string.IsNullOrEmpty(key) || key == "dto" || FieldName(key) == "أحد الحقول" ? "يرجى تعبئة كل الحقول المطلوبة" : $"الحقل «{FieldName(key)}» مطلوب")
             : m.Contains("not a valid e-mail") || m.Contains("valid email") ? "البريد الإلكتروني غير صحيح"
-            : m.Contains("maximum length") || m.Contains("minimum length") ? "طول أحد الحقول غير مسموح"
-            : "بيانات غير صالحة — تحقق من الحقول وأعد المحاولة";
+            : m.Contains("maximum length") || m.Contains("minimum length") ? Field("طول", key, "غير مسموح")
+            : string.IsNullOrEmpty(key) ? "بيانات غير صالحة — تحقق من الحقول وأعد المحاولة" : Field("قيمة", key, "غير صالحة");
+        static string Field(string what, string key, string tail) =>
+            FieldName(key) is "أحد الحقول" ? $"{what} أحد الحقول {tail}" : $"{what} الحقل «{FieldName(key)}» {tail}";
 
-        var message = string.Join(" | ", context.ModelState.Values
-            .SelectMany(v => v.Errors)
-            .Select(e => Arabic(string.IsNullOrEmpty(e.ErrorMessage) ? e.Exception?.Message ?? "" : e.ErrorMessage))
+        var message = string.Join(" | ", context.ModelState
+            .SelectMany(kv => kv.Value!.Errors.Select(e => Arabic(kv.Key,
+                string.IsNullOrEmpty(e.ErrorMessage) ? e.Exception?.Message ?? "" : e.ErrorMessage)))
             .Distinct());
 
         return new BadRequestObjectResult(
@@ -240,13 +269,13 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(10),
             QueueLimit = 0,
         }));
-    // تسجيل الدخول: قفل الحساب بعد 5 أخطاء (AuthThrottle) لا يمنع تجربة كلمة مرور واحدة على حسابات كثيرة؛
-    // هذا الحد لكل عنوان IP. أوسع من auth-ip لأن مشتركي شبكات الموبايل قد يتشاركون عنواناً واحداً
+    // تسجيل الدخول: تجربة كلمة مرور على حسابات كثيرة يمنعها عدّ المحاولات الخاطئة لكل عنوان (AuthThrottle) —
+    // هذا الحد للإغراق فقط، واسع لأن مشتركي شبكة موبايل واحدة يتشاركون عنواناً ويدخلون بنجاح
     options.AddPolicy("login-ip", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
         {
-            PermitLimit = 30,
+            PermitLimit = 150,
             Window = TimeSpan.FromMinutes(5),
             QueueLimit = 0,
         }));
@@ -319,6 +348,23 @@ var app = builder.Build();
 
 app.UseForwardedHeaders();
 app.UseAppExceptionHandling();
+
+// ردود بلا نص (رفض الصلاحية 403، عدم تسجيل الدخول 401، مسار غير موجود): رسالة عربية بنفس شكل باقي الردود
+app.UseStatusCodePages(async ctx =>
+{
+    var http = ctx.HttpContext;
+    if (!http.Request.Path.StartsWithSegments("/api")) return;
+    var message = http.Response.StatusCode switch
+    {
+        StatusCodes.Status401Unauthorized => "سجّل الدخول أولاً — انتهت الجلسة أو لم تسجّل الدخول",
+        StatusCodes.Status403Forbidden => "ليس لديك صلاحية لهذا الإجراء",
+        StatusCodes.Status404NotFound => "غير موجود",
+        StatusCodes.Status405MethodNotAllowed => "طريقة الطلب غير مدعومة",
+        _ => "تعذّر تنفيذ الطلب",
+    };
+    http.Response.ContentType = "application/json; charset=utf-8";
+    await http.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new { success = false, message }));
+});
 
 app.UseStaticFiles();
 

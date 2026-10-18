@@ -14,6 +14,7 @@ namespace ecommerce.Services.FinanceService
         public const string RefusalFee = "REFUSAL_FEE";           // − أجرة توصيل على المتجر عند الرفض
         public const string Return = "RETURN";                    // − قطع أُرجعت بعد الاستلام
         public const string ReturnCommission = "RETURN_COMMISSION"; // + العمولة عن القطع المُرجعة
+        public const string ReturnPickupFee = "RETURN_PICKUP_FEE";  // − أجرة استلام المرتجع من الزبون (إن كانت على المتجر)
         public const string Payout = "PAYOUT";                    // − ما حوّلته الإدارة للمتجر
         public const string Adjustment = "ADJUSTMENT";            // ± تسوية يدوية
 
@@ -25,6 +26,7 @@ namespace ecommerce.Services.FinanceService
             RefusalFee => "أجرة توصيل (رفض)",
             Return => "إرجاع",
             ReturnCommission => "استرداد عمولة",
+            ReturnPickupFee => "أجرة استلام مرتجع",
             Payout => "دفعة للمتجر",
             Adjustment => "تسوية",
             _ => t,
@@ -224,13 +226,15 @@ namespace ecommerce.Services.FinanceService
             await SaveAsync(add, ct);
         }
 
-        // إرجاع بعد الاستلام (موافق عليه): تُخصم قيمته من متجر كل قطعة وتُستردّ عمولتها بنفس نسبة الطلب
+        // إرجاع بعد الاستلام (موافق عليه ووصلت قطعه للمتجر): تُخصم قيمته من متجر كل قطعة وتُستردّ عمولتها
+        // بنفس نسبة الطلب، وأجرة استلامه من الزبون إن كانت على المتجر
         public async Task EnsureReturnEntriesAsync(Guid returnId, CancellationToken ct = default)
         {
             var ret = await _context.Returns.Include(r => r.Items).Include(r => r.Order)
                 .FirstOrDefaultAsync(r => r.Id == returnId, ct);
             if (ret == null || ret.IsDoorRefusal) return;   // الرفض عند الباب مستثنى من المبيعات أصلاً
             if (ret.Status != ReturnStatus.APPROVED && ret.Status != ReturnStatus.COMPLETED) return;
+            if (ret.ItemsReceivedAt == null) return;   // لا يُخصم من المتجر قبل أن تصله القطع
 
             var productIds = ret.Items.Select(i => i.ProductId).Distinct().ToList();
             var vendorOf = await _context.Products.AsNoTracking().Where(p => productIds.Contains(p.Id))
@@ -249,6 +253,11 @@ namespace ecommerce.Services.FinanceService
 
                 if (!existing.Any(e => e.VendorId == g.Key && e.Type == LedgerType.Return))
                     add.Add(new VendorLedgerEntry { VendorId = g.Key, Type = LedgerType.Return, Amount = -Money(value), OrderId = ret.OrderId, SubOrderId = sub?.Id, ReturnId = ret.Id, Description = label });
+
+                // أجرة استلام المرتجع على المتجر: أجرة توصيله في هذا الطلب
+                if (ret.PickupFeePayer == RefusalFeePayer.Vendor && sub != null && sub.DeliveryFee > 0
+                    && !existing.Any(e => e.VendorId == g.Key && e.Type == LedgerType.ReturnPickupFee))
+                    add.Add(new VendorLedgerEntry { VendorId = g.Key, Type = LedgerType.ReturnPickupFee, Amount = -Money(sub.DeliveryFee), OrderId = ret.OrderId, SubOrderId = sub.Id, ReturnId = ret.Id, Description = $"{label} — أجرة استلام المرتجع" });
 
                 // العمولة المُستردّة بنسبة ما أُخذ فعلاً على هذا الطلب
                 if (sub != null && !existing.Any(e => e.VendorId == g.Key && e.Type == LedgerType.ReturnCommission))
@@ -319,7 +328,7 @@ namespace ecommerce.Services.FinanceService
                     VendorName = v.NameAr ?? v.Name,
                     Sales = S(LedgerType.Sale),
                     Commission = -(S(LedgerType.Commission) + S(LedgerType.ReturnCommission)),
-                    Deductions = -(S(LedgerType.VendorCoupon) + S(LedgerType.RefusalFee) + S(LedgerType.Return) + Math.Min(0, adjustments)),
+                    Deductions = -(S(LedgerType.VendorCoupon) + S(LedgerType.RefusalFee) + S(LedgerType.Return) + S(LedgerType.ReturnPickupFee) + Math.Min(0, adjustments)),
                     Payouts = -S(LedgerType.Payout),
                     Balance = sums.Where(x => x.VendorId == v.Id).Sum(x => x.Sum),
                     LastPayoutAt = lastPayout.TryGetValue(v.Id, out var at) ? at : null,
@@ -368,28 +377,48 @@ namespace ecommerce.Services.FinanceService
         // ===================================
         // الدفعات والتسويات (الإدارة)
         // ===================================
+        // أقصى مبلغ لحركة يدوية واحدة (عمود المبلغ decimal(12,2))
+        private const decimal MaxManualAmount = 1_000_000_000;
+
         public async Task<LedgerEntryDto> RecordPayoutAsync(Guid vendorId, decimal amount, string? reference, string? note, Guid adminId, CancellationToken ct = default)
         {
+            amount = Money(amount);
             if (amount <= 0) throw new BusinessRuleException("المبلغ يجب أن يكون أكبر من صفر");
+            if (amount > MaxManualAmount) throw new BusinessRuleException("المبلغ أكبر من الحد المسموح");
             if (!await _context.Vendors.AnyAsync(v => v.Id == vendorId, ct)) throw new NotFoundException("المتجر غير موجود");
-            return await AddManualAsync(vendorId, LedgerType.Payout, -Money(amount),
-                string.IsNullOrWhiteSpace(note) ? "دفعة للمتجر" : note.Trim(), reference?.Trim(), adminId, ct);
+
+            await using var _ = await OrderLock.ForVendorLedgerAsync(_context, vendorId, ct);
+            var balance = await BalanceAsync(vendorId, ct);
+            if (amount > balance)
+                throw new BusinessRuleException(balance > 0
+                    ? $"الدفعة أكبر من مستحقات المتجر — المستحق الآن {balance:N0} د.ع"
+                    : "لا توجد مستحقات للمتجر الآن");
+            return await AddManualAsync(vendorId, LedgerType.Payout, -amount,
+                string.IsNullOrWhiteSpace(note) ? "دفعة للمتجر" : note.Trim(), reference?.Trim(), adminId, balance, ct);
         }
 
         public async Task<LedgerEntryDto> RecordAdjustmentAsync(Guid vendorId, decimal amount, string note, Guid adminId, CancellationToken ct = default)
         {
+            amount = Money(amount);
             if (amount == 0) throw new BusinessRuleException("المبلغ لا يمكن أن يكون صفراً");
+            if (Math.Abs(amount) > MaxManualAmount) throw new BusinessRuleException("المبلغ أكبر من الحد المسموح");
             if (string.IsNullOrWhiteSpace(note)) throw new BusinessRuleException("اكتب سبب التسوية");
             if (!await _context.Vendors.AnyAsync(v => v.Id == vendorId, ct)) throw new NotFoundException("المتجر غير موجود");
-            return await AddManualAsync(vendorId, LedgerType.Adjustment, Money(amount), note.Trim(), null, adminId, ct);
+
+            await using var _ = await OrderLock.ForVendorLedgerAsync(_context, vendorId, ct);
+            var balance = await BalanceAsync(vendorId, ct);
+            return await AddManualAsync(vendorId, LedgerType.Adjustment, amount, note.Trim(), null, adminId, balance, ct);
         }
 
-        private async Task<LedgerEntryDto> AddManualAsync(Guid vendorId, string type, decimal amount, string description, string? reference, Guid adminId, CancellationToken ct)
+        private Task<decimal> BalanceAsync(Guid vendorId, CancellationToken ct)
+            => _context.VendorLedgerEntries.AsNoTracking().Where(e => e.VendorId == vendorId).SumAsync(e => e.Amount, ct);
+
+        private async Task<LedgerEntryDto> AddManualAsync(Guid vendorId, string type, decimal amount, string description, string? reference, Guid adminId, decimal balanceBefore, CancellationToken ct)
         {
             var e = new VendorLedgerEntry { VendorId = vendorId, Type = type, Amount = amount, Description = description, Reference = reference, CreatedBy = adminId };
             _context.VendorLedgerEntries.Add(e);
             await _context.SaveChangesAsync(ct);
-            return new LedgerEntryDto { Id = e.Id, Type = type, TypeAr = LedgerType.Ar(type), Amount = amount, Description = description, Reference = reference, CreatedAt = e.CreatedAt };
+            return new LedgerEntryDto { Id = e.Id, Type = type, TypeAr = LedgerType.Ar(type), Amount = amount, RunningBalance = balanceBefore + amount, Description = description, Reference = reference, CreatedAt = e.CreatedAt };
         }
     }
 }

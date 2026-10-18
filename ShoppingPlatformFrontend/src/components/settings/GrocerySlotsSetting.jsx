@@ -1,4 +1,4 @@
-// مواعيد توصيل السوبرماركت — الأدمن يحدد ساعات التوصيل وطول الفترة، والزبون يختار فترة عند الدفع
+// مواعيد توصيل السوبرماركت — العمليات تحدد ساعات التوصيل وطول الفترة، والزبون يختار فترة عند الدفع
 import { useEffect, useState } from 'react'
 import { ShoppingBasket } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'

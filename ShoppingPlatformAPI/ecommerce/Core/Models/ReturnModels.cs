@@ -64,6 +64,39 @@ namespace ecommerce.Core.Models
         [Column("restocked_by")]
         public Guid? RestockedBy { get; set; }
 
+        // الاسترداد: المبلغ المستحق للزبون يُحسب عند القبول (قيمة القطع ناقص نصيبها من الخصم)،
+        // ويصبح الإرجاع «مكتمل» حين تُسجّل الإدارة أنها ردّت المبلغ
+        [Column("refund_amount", TypeName = "decimal(18,2)")]
+        public decimal? RefundAmount { get; set; }
+
+        [Column("refunded_at")]
+        public DateTime? RefundedAt { get; set; }
+
+        // قيمة نقاط القطع المُرجعة التي صرفها الزبون قبل الإرجاع — خُصمت من RefundAmount
+        [Column("points_deduction_amount", TypeName = "decimal(18,2)")]
+        public decimal? PointsDeductionAmount { get; set; }
+
+        [Column("refunded_by")]
+        public Guid? RefundedBy { get; set; }
+
+        // إرجاع بعد الاستلام: السائق يأخذ القطع من الزبون إلى متجرها (ReturnTrip). يُردّ المال، ويُخصم من المتجر،
+        // ويعود المخزون — بعد أن تؤكد كل المتاجر استلام قطعها فقط
+        [Column("items_received_at")]
+        public DateTime? ItemsReceivedAt { get; set; }
+
+        // أجرة استلام القطع من الزبون (أجرة توصيل متاجرها) ومن يتحمّلها — CUSTOMER تُخصم من المبلغ المردود
+        [Column("pickup_fee_amount", TypeName = "decimal(18,2)")]
+        public decimal PickupFeeAmount { get; set; }
+
+        [MaxLength(20)]
+        [Column("pickup_fee_payer")]
+        public string? PickupFeePayer { get; set; }
+
+        // سبب تغيير العمليات لمن يتحمّل أجرة الاستلام (استثناء لهذا الإرجاع عن إعداد الأدمن)
+        [MaxLength(300)]
+        [Column("pickup_fee_override_reason")]
+        public string? PickupFeeOverrideReason { get; set; }
+
         [Column("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

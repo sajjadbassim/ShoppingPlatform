@@ -77,6 +77,7 @@ namespace ecommerce.Core.DTO.Ops
         public double? Longitude { get; set; }
         public List<string> Stores { get; set; } = new();
         public Guid? DriverId { get; set; }
+        public List<Guid> DriverIds { get; set; } = new();   // كل سائقي الطلب (الموزّع على أكثر من سائق)
         public string? DriverName { get; set; }
         public decimal Total { get; set; }
         public DateTime CreatedAt { get; set; }

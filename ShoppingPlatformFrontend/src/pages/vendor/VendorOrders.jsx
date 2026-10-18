@@ -83,6 +83,51 @@ const useVendorOrders = (vendorId, params = {}) => useQuery({
   refetchInterval: 60 * 1000, // الطلبات الجديدة تظهر وحدها
 })
 
+// بضاعة لم تُسلَّم للزبون في طريقها للمتجر مع السائق — المتجر يؤكد استلامها فتعود للمخزون
+const IncomingReturns = ({ vendorId }) => {
+  const qc = useQueryClient()
+  const { success, error } = useToast()
+  const { data: trips = [] } = useQuery({
+    queryKey: ['vendor-return-trips', vendorId],
+    queryFn: async () => (await apiGet(API_ENDPOINTS.VENDOR_DASHBOARD.RETURN_TRIPS(vendorId))).data?.data || [],
+    enabled: !!vendorId,
+    refetchInterval: 60 * 1000,
+  })
+  const { mutateAsync, isPending } = useMutation({
+    mutationFn: (id) => apiPost(API_ENDPOINTS.VENDOR_DASHBOARD.RETURN_TRIP_RECEIVED(vendorId, id)),
+  })
+  if (trips.length === 0) return null
+  const receive = async (t) => {
+    if (!window.confirm('استلمت هذه البضاعة من السائق؟ ستعود القطع للمخزون.')) return
+    try {
+      await mutateAsync(t.id)
+      success('تم تأكيد الاستلام وإعادة القطع للمخزون')
+      qc.invalidateQueries({ queryKey: ['vendor-return-trips', vendorId] })
+      qc.invalidateQueries({ queryKey: ['vendor-orders', vendorId] })
+    } catch (e) { error(e.message || 'فشل تأكيد الاستلام') }
+  }
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-sky-50 p-3 space-y-2">
+      <p className="font-bold text-sky-900 flex items-center gap-1.5"><RotateCcw size={16} />بضاعة عائدة إليك ({trips.length})</p>
+      <p className="text-xs text-sky-800/80">لم تُسلَّم للزبون، أو أرجعها الزبون بعد الاستلام — تعود مع السائق. أكّد حين تستلمها (تعود للمخزون؛ أي نقص يعوّضه المتجر).</p>
+      {trips.map(t => (
+        <div key={t.id} className="bg-white rounded-xl border border-sky-100 p-3 text-sm flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex-1 min-w-0 space-y-1">
+            <p className="font-bold text-gray-900"><span dir="ltr">{t.subOrderNumber}</span> · <span className="font-normal text-gray-500">{t.reasonAr}</span></p>
+            <p className="text-xs text-gray-500">السائق: {t.driverName}{t.driverPhone && <> · <a href={`tel:${t.driverPhone}`} className="text-primary" dir="ltr">{t.driverPhone}</a></>}</p>
+            <div className="flex flex-wrap gap-1">
+              {t.items.map((i, k) => <span key={k} className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">{i.productName} ×{i.quantity}</span>)}
+            </div>
+          </div>
+          {t.status === 'AT_CUSTOMER'
+            ? <span className="text-xs text-violet-700 bg-violet-50 px-2 py-1 rounded-full whitespace-nowrap">السائق يأخذها من الزبون</span>
+            : <Button size="sm" onClick={() => receive(t)} disabled={isPending}><CheckCircle size={14} className="ml-1" />استلمتها</Button>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // أعداد كل حالة وقيمة ما ينتظر القرار — من الخادم بدل تحميل كل الطلبات
 const useVendorOrderCounts = (vendorId) => useQuery({
   queryKey: ['vendor-orders', vendorId, 'counts'],
@@ -373,6 +418,9 @@ const OrderSheet = ({ order, vendorId, storeName, onClose, onAccept, onReject, o
                     <span className="text-xs text-gray-500">{r.isDoorRefusal ? 'رفض عند الباب' : RETURN_STATUS_AR[r.status] || r.status}</span>
                   </div>
                   <p className="text-xs text-gray-600 mt-1">{returnReasonAr(r.reason)}{r.details ? ` — ${r.details}` : ''}</p>
+                  {r.items?.length > 0 && (
+                    <p className="text-xs text-gray-800 mt-1">{r.items.map(i => `${i.productName} ×${i.quantity}`).join('، ')}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -596,6 +644,8 @@ const VendorOrders = () => {
           <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
         </button>
       </div>
+
+      <IncomingReturns vendorId={vendorId} />
 
       {/* ما يحتاج قراراً */}
       {pendingCount > 0 && statusFilter !== PENDING && (

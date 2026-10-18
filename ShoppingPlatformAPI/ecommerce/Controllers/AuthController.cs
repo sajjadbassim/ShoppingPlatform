@@ -13,10 +13,12 @@ namespace ecommerce.Controllers
     public class AuthController : Controller
     {
         private readonly IAuthService _authService;
+        private readonly ecommerce.Services.AuthService.IAuthThrottle? _throttle;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ecommerce.Services.AuthService.IAuthThrottle? throttle = null)
         {
             _authService = authService;
+            _throttle = throttle;
         }
 
         // POST: api/auth/register
@@ -48,9 +50,20 @@ namespace ecommerce.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             try
             {
-                var result = await _authService.LoginAsync(dto);
+                _throttle?.EnsureIpLoginAllowed(ip);
+            }
+            catch (TooManyAttemptsException ex)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { success = false, message = ex.Message });
+            }
+            try
+            {
+                LoginResponseDto result;
+                try { result = await _authService.LoginAsync(dto); }
+                catch (AppException) { _throttle?.IpLoginFailed(ip); throw; }
                 return Ok(new
                 {
                     success = true,

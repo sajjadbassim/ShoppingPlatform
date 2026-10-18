@@ -51,6 +51,7 @@ namespace ecommerce.Services
 
         public async Task<CartResponseDto> AddToCartAsync(Guid userId, AddToCartDto dto)
         {
+            await using var cartLock = await OrderLock.ForCartAsync(_context, userId);
             var user = await _userRepository.GetByIdAsync(userId);
             if (user == null)
                 throw new NotFoundException("المستخدم غير موجود");
@@ -146,6 +147,7 @@ namespace ecommerce.Services
 
         public async Task<CartResponseDto> UpdateQuantityAsync(Guid userId, UpdateCartItemDto dto)
         {
+            await using var cartLock = await OrderLock.ForCartAsync(_context, userId);
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null)
                 throw new BusinessRuleException("السلة فارغة");
@@ -183,6 +185,7 @@ namespace ecommerce.Services
 
         public async Task<CartResponseDto> RemoveFromCartAsync(Guid userId, Guid productId, Guid? variantId = null)
         {
+            await using var cartLock = await OrderLock.ForCartAsync(_context, userId);
             var cart = await _cartRepository.GetByUserIdAsync(userId);
             if (cart == null)
                 throw new BusinessRuleException("السلة فارغة");
@@ -259,21 +262,19 @@ namespace ecommerce.Services
                 .ToHashSet();
             var hiddenCategoryIds = await CategoryVisibility.GetHiddenCategoryIdsAsync(_context);
             var groceryIds = await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
+            // العرض على السعر الكامل للمتغير (الأساسي + فرق المتغير) — كما في الطلب
             var promoPrices = await _promotionService.CalculateFinalPricesAsync(cart.Items.Select(i =>
-                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId, i.Product.Price)));
+                new PriceQuery(i.ProductId, i.Product.CategoryId, i.Product.VendorId,
+                    i.Product.Price + (i.Variant?.PriceAdjustment ?? 0), i.Id)));
 
             foreach (var item in cart.Items)
             {
                 // ─── السعر النهائي (بعد تطبيق أفضل عرض فعّال على المنتج) ─────
-                var promoPrice = promoPrices[item.ProductId];
-
                 var originalUnitPrice = item.Variant != null
                     ? item.Product.Price + item.Variant.PriceAdjustment
                     : item.Product.Price;
 
-                var finalPrice = item.Variant != null
-                    ? promoPrice + item.Variant.PriceAdjustment
-                    : promoPrice;
+                var finalPrice = promoPrices[item.Id];
 
                 var hasPromoDiscount = finalPrice < originalUnitPrice;
 

@@ -36,6 +36,21 @@ namespace ecommerce.Core.Models
         [Column("delivery_fee", TypeName = "decimal(10,2)")]
         public decimal DeliveryFee { get; set; } = 0;
 
+        // نصيب هذا الجزء من خصم الطلب — يُحفظ ولا يُعاد توزيعه بعد خروج الجزء مع السائق (انظر OrderTotals)
+        [Column("coupon_share", TypeName = "decimal(10,2)")]
+        public decimal CouponShare { get; set; } = 0;
+
+        [Column("points_share", TypeName = "decimal(10,2)")]
+        public decimal PointsShare { get; set; } = 0;
+
+        // قيمة القطع التي رفضها الزبون عند الباب (بسعرها) — الخصم يُحسب على ما احتفظ به فقط
+        [Column("refused_amount", TypeName = "decimal(10,2)")]
+        public decimal RefusedAmount { get; set; } = 0;
+
+        // رفض جزئي والأجرة على المتجر/المنصة حسب الإعداد: أجرة توصيل هذا الجزء لا تُحتسب على الزبون
+        [Column("refusal_fee_waived")]
+        public bool RefusalFeeWaived { get; set; } = false;
+
         [Column("confirmed_by")]
         public Guid? ConfirmedBy { get; set; }
 
@@ -44,6 +59,10 @@ namespace ecommerce.Core.Models
 
         [Column("confirmation_deadline")]
         public DateTime? ConfirmationDeadline { get; set; }
+
+        // أُرسل إشعار تأخر التأكيد (مرة واحدة — المهلة لا تُلغي الطلب)
+        [Column("confirmation_overdue_notified_at")]
+        public DateTime? ConfirmationOverdueNotifiedAt { get; set; }
 
         [Column("cancellation_reason")]
         public string? CancellationReason { get; set; }

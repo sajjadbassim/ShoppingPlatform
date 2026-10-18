@@ -1,4 +1,4 @@
-// إعداد مهلة تأكيد المتجر للطلب الجديد — الأدمن يعدّلها، والعمليات تراها فقط
+// إعداد مهلة تأكيد المتجر للطلب الجديد — فريق العمليات يعدّلها (إعداد تشغيلي)
 import { useEffect, useState } from 'react'
 import { AlarmClock } from 'lucide-react'
 import { SettingsSection } from './SettingsSection'
@@ -25,7 +25,7 @@ const ConfirmationTimeoutSetting = ({ editable = false }) => {
   return (
     <SettingsSection icon={AlarmClock} title="مهلة تأكيد المتجر للطلب">
       {!editable ? (
-        <p className="text-sm text-gray-600">المهلة الحالية: <b className="text-gray-900">{isLoading ? '…' : `${current} دقيقة`}</b> — يغيّرها مدير النظام.</p>
+        <p className="text-sm text-gray-600">المهلة الحالية: <b className="text-gray-900">{isLoading ? '…' : `${current} دقيقة`}</b> — يغيّرها فريق العمليات.</p>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-gray-500">الوقت المسموح للمتجر ليؤكد الطلب الجديد. بعده يظهر الطلب كتحذير في الشاشة الرئيسية للعمليات والإدارة.</p>

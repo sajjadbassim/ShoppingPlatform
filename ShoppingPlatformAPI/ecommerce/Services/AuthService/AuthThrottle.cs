@@ -12,12 +12,17 @@ namespace ecommerce.Services.AuthService
         void LoginFailed(string phone);
         void LoginSucceeded(string phone);
         void EnsureOtpRequestAllowed(string phone);
+        void EnsureIpLoginAllowed(string ip);
+        void IpLoginFailed(string ip);
     }
 
     public class AuthThrottle : IAuthThrottle
     {
         public const int MaxLoginFailures = 5;
         public const int MaxOtpRequests = 3;
+        // محاولات دخول خاطئة من عنوان واحد (تجربة كلمة مرور على حسابات كثيرة). الناجحة لا تُعدّ:
+        // مشتركو شبكة موبايل واحدة يتشاركون العنوان ويدخلون بلا عائق
+        public const int MaxIpLoginFailures = 30;
         public static readonly TimeSpan Window = TimeSpan.FromMinutes(15);
 
         private readonly IMemoryCache _cache;
@@ -69,6 +74,21 @@ namespace ecommerce.Services.AuthService
         }
 
         public void LoginSucceeded(string phone) => _cache.Remove($"login:{phone}");
+
+        public void EnsureIpLoginAllowed(string ip)
+        {
+            lock (_lock)
+            {
+                var c = Get($"login-ip:{ip}");
+                if (c.Count >= MaxIpLoginFailures)
+                    throw new TooManyAttemptsException($"محاولات دخول خاطئة كثيرة من هذا الجهاز — حاول بعد {Wait(c)}");
+            }
+        }
+
+        public void IpLoginFailed(string ip)
+        {
+            lock (_lock) { Get($"login-ip:{ip}").Count++; }
+        }
 
         public void EnsureOtpRequestAllowed(string phone)
         {

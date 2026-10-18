@@ -73,7 +73,7 @@ namespace ecommerce.Services.OrderTimingService
 
             var subIds = subs.Select(s => s.Id).ToList();
             var logs = await _context.OrderStatusLogs.AsNoTracking()
-                .Where(l => l.SubOrderId != null && subIds.Contains(l.SubOrderId.Value)
+                .Where(l => l.SubOrderId != null && subIds.Contains(l.SubOrderId.Value) && l.OldStatus != l.NewStatus
                     && (l.NewStatus == OrderStatus.PREPARING || l.NewStatus == OrderStatus.READY || l.NewStatus == OrderStatus.OUT_FOR_DELIVERY || l.NewStatus == OrderStatus.DELIVERED))
                 .Select(l => new { SubOrderId = l.SubOrderId!.Value, l.NewStatus, l.CreatedAt })
                 .ToListAsync(ct);
@@ -98,7 +98,8 @@ namespace ecommerce.Services.OrderTimingService
                 var confirmed = Last(id => mine.First(s => s.Id == id).ConfirmedAt);
                 var preparing = Last(id => Log(id, OrderStatus.PREPARING));
                 var ready = Last(id => Log(id, OrderStatus.READY));
-                var assigned = Last(id => Log(id, OrderStatus.OUT_FOR_DELIVERY) ?? mine.First(s => s.Id == id).AssignedAt);
+                // التعيين لا يغيّر الحالة (يبقى «جاهز») — وقته من AssignedAt؛ «في الطريق» يُسجَّل عند الاستلام
+                var assigned = Last(id => mine.First(s => s.Id == id).AssignedAt ?? Log(id, OrderStatus.OUT_FOR_DELIVERY));
                 var pickedUp = Last(id => mine.First(s => s.Id == id).PickedUpAt);
                 var isDelivered = o.Status == OrderStatus.DELIVERED;
                 var delivered = isDelivered ? Last(id => Log(id, OrderStatus.DELIVERED)) : null;

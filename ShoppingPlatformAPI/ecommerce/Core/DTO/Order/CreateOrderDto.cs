@@ -8,7 +8,7 @@ namespace ecommerce.Core.DTO.Order
         public Guid AddressId { get; set; }
 
         [MaxLength(500)]
-        public string CustomerNotes { get; set; }
+        public string? CustomerNotes { get; set; }
 
         // ✅ جديد: كوبون الخصم (اختياري)
         [MaxLength(50)]

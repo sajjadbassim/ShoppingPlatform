@@ -15,5 +15,9 @@
         public Guid? VendorId { get; set; }
         public string? AvatarUrl { get; set; }
 
+        // الحساب المساعد: صلاحياته (null = بلا قيود — صاحب متجر أو أدمن كامل)، وهل هو موظف في متجر غيره
+        public List<string>? Permissions { get; set; }
+        public bool IsStoreStaff { get; set; }
+
     }
 }

@@ -9,7 +9,7 @@ import { StatusBadge } from '../../components/common/Badge'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
-import { useOrderByNumber, useCancelOrder, useOrderTracking, useInvoice, useOrderRatingStatus, useCreateOrderRating, useRateOrderStores } from '../../hooks/useOrders'
+import { useOrderByNumber, useCancelOrder, useOrderTracking, useOrderRatingStatus, useCreateOrderRating, useRateOrderStores } from '../../hooks/useOrders'
 import { getImageUrl } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
 import { useState, useEffect } from 'react'
@@ -244,10 +244,7 @@ const OrderDetailsPage = () => {
   // ✅ جديد — جلب بيانات التتبع من الـ API (فقط إذا كان الطلب موجود)
   const { data: trackingData } = useOrderTracking(order?.id)
 
-  // ✅ جديد — جلب بيانات الفاتورة (فقط إذا تم التوصيل)
-  const { data: invoiceData, isLoading: invoiceLoading } = useInvoice(
-    orderService.isDelivered(order?.status) ? order?.id : null
-  )
+  const [invoiceLoading, setInvoiceLoading] = useState(false)
 
   // ✅ جديد — إلغاء الطلب بـ API
   const { mutateAsync: cancelOrder } = useCancelOrder()
@@ -318,13 +315,12 @@ const OrderDetailsPage = () => {
     }
   }
 
-  // ✅ فتح الفاتورة في تاب جديد
-  const handleViewInvoice = () => {
-    if (invoiceData?.previewUrl) {
-      window.open(invoiceData.previewUrl, '_blank')
-    } else {
-      navigate(`/orders/${order.orderNumber}/invoice`)
-    }
+  // فتح الفاتورة (PDF) في تبويب جديد
+  const handleViewInvoice = async () => {
+    setInvoiceLoading(true)
+    try { await orderService.openInvoice(order.id) }
+    catch (e) { error(e.message || 'تعذّر فتح الفاتورة') }
+    finally { setInvoiceLoading(false) }
   }
 
   const breadcrumbItems = [
@@ -511,7 +507,7 @@ const OrderDetailsPage = () => {
                 <AlertCircle className="text-orange-500 w-5 h-5 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-bold text-orange-900">تعذّر تسليم طلبك</p>
-                  <p className="text-sm text-orange-800 mt-0.5">لم يتمكن السائق من تسليم الطلب. سيتواصل معك فريقنا لإعادة المحاولة أو إلغاء الطلب.</p>
+                  <p className="text-sm text-orange-800 mt-0.5">لم يتمكن السائق من تسليم الطلب، فتعود البضاعة إلى المتجر ولا تدفع ثمنها. يمكنك طلبها من جديد متى شئت.</p>
                 </div>
               </div>
             )}
@@ -596,6 +592,9 @@ const OrderDetailsPage = () => {
                         {item.unavailableQuantity > 0 && (
                           <p className="text-xs text-amber-700">غير متوفر: {formatQuantity(item.unavailableQuantity, item.weightStepKg)} — أُزيل من الطلب</p>
                         )}
+                        {item.refusedQuantity > 0 && (
+                          <p className="text-xs text-red-600">رُفض عند الاستلام: {formatQuantity(item.refusedQuantity, item.weightStepKg)} — لم يُحتسب عليك</p>
+                        )}
                         <p className="font-bold text-primary mt-1">
                           {formatPrice(item.unitPrice || 0, item.weightStepKg)}
                         </p>
@@ -651,7 +650,10 @@ const OrderDetailsPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">حالة الدفع</span>
-                <StatusBadge status={order.paymentStatus || 'PENDING'} />
+                {/* طلب ملغى: لا دفع مستحق — «قيد الانتظار» توحي بأن عليه مبلغاً */}
+                {order.status === 'CANCELLED'
+                  ? <span className="text-sm text-gray-500">لا يوجد دفع</span>
+                  : <StatusBadge status={order.paymentStatus || 'PENDING'} />}
               </div>
             </div>
 
@@ -667,7 +669,23 @@ const OrderDetailsPage = () => {
                   <span className="text-gray-600">الشحن</span>
                   <span>{shipping === 0 ? 'مجاني' : `${shipping.toLocaleString('en-US')} د.ع`}</span>
                 </div>
-                {discount > 0 && (
+                {/* الكوبون والنقاط كلٌّ في سطر (الطلبات القديمة بلا تفصيل: سطر «الخصم» واحد) */}
+                {discount > 0 && (order.couponDiscountAmount > 0 || order.pointsDiscountAmount > 0) ? (
+                  <>
+                    {order.couponDiscountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>خصم الكوبون{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+                        <span>-{order.couponDiscountAmount.toLocaleString('en-US')} د.ع</span>
+                      </div>
+                    )}
+                    {order.pointsDiscountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>خصم النقاط</span>
+                        <span>-{order.pointsDiscountAmount.toLocaleString('en-US')} د.ع</span>
+                      </div>
+                    )}
+                  </>
+                ) : discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>الخصم</span>
                     <span>-{discount.toLocaleString('en-US')} د.ع</span>
@@ -678,6 +696,30 @@ const OrderDetailsPage = () => {
                 <span className="font-bold">الإجمالي</span>
                 <span className="font-bold text-primary">{total.toLocaleString('en-US')} د.ع</span>
               </div>
+              {/* رفض عند الباب: الإجمالي أعلاه = ما دفعته (بلا المرفوض) — هنا للتوضيح فقط */}
+              {order.refusedAmount > 0 && (
+                <div className="space-y-1.5 text-xs text-gray-500 mt-2">
+                  <div className="flex justify-between">
+                    <span>قطع رُفضت عند الاستلام (غير محتسبة)</span>
+                    <span>{order.refusedAmount.toLocaleString('en-US')} د.ع</span>
+                  </div>
+                  {order.refusalFeeAmount > 0 && order.refusalFeePayer !== 'CUSTOMER' && (
+                    <p>أجرة التوصيل لم تُحتسب عليك بسبب الرفض</p>
+                  )}
+                  {order.originalTotalAmount > 0 && order.originalTotalAmount !== total && (
+                    <div className="flex justify-between">
+                      <span>قيمة الطلب عند الشراء</span>
+                      <span>{order.originalTotalAmount.toLocaleString('en-US')} د.ع</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {order.cashCollectedAmount != null && order.cashCollectedAmount !== total && (
+                <div className="flex justify-between pt-3 mt-3 border-t border-gray-200">
+                  <span className="font-bold">المبلغ المدفوع</span>
+                  <span className="font-bold text-green-700">{order.cashCollectedAmount.toLocaleString('en-US')} د.ع</span>
+                </div>
+              )}
             </div>
 
             {/* Actions */}

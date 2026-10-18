@@ -14,6 +14,7 @@ namespace ecommerce.Repositories
         Task<User> CreateAsync(User user);
         Task<User> UpdateAsync(User user);
         Task<bool> DeleteAsync(Guid id);
+        Task<int> CountActiveAdminsAsync();
         Task<bool> ExistsAsync(string phone);
 
         //  Pagination

@@ -30,6 +30,8 @@ namespace ecommerce.Services
         Task<LoyaltyEstimateDto> GetEstimateAsync(Guid userId, decimal orderAmount);
         Task<RedeemPointsResultDto> RedeemPointsAsync(Guid userId, RedeemPointsDto dto);
         Task CancelRedemptionAsync(Guid orderId); // عند إلغاء الطلب — تُعاد النقاط
+        Task RefundUnusedPointsAsync(Guid orderId); // سقط جزء ولم يبقَ جزء مفتوح يحمل خصم النقاط — يُعاد للزبون
+        Task<ReturnPointsReversal> ReverseReturnPointsAsync(Guid returnId); // عند قبول إرجاع — قيد عكسي لنقاط القطع المُرجعة
 
         // ادعُ صديقاً: رمز المستخدم وإحصاءاته، ومن صاحب الرمز (عند التسجيل)، والمكافأة عند أول طلب مُسلَّم للمدعو
         Task<ReferralInfoDto> GetReferralAsync(Guid userId);
@@ -42,5 +44,12 @@ namespace ecommerce.Services
         Task<LoyaltyAccountDto> AdminAdjustPointsAsync(AdminAdjustPointsDto dto);
         Task<LoyaltySettingsDto> GetSettingsAsync();
         Task<LoyaltySettingsDto> UpdateSettingsAsync(UpdateLoyaltySettingsDto dto);
+    }
+
+    // نقاط القطع المُرجعة: ما خُصم من الرصيد، وما لم يُخصم لأن الزبون صرفه (Shortfall) وقيمته بالدينار
+    // — القيمة تُخصم من مبلغ الاسترجاع حتى لا يربح الزبون خصماً على قطعة أرجعها
+    public record ReturnPointsReversal(int Deducted, int Shortfall, decimal ShortfallValue)
+    {
+        public static readonly ReturnPointsReversal None = new(0, 0, 0);
     }
 }

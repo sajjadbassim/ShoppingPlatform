@@ -413,7 +413,7 @@ const VendorProductForm = () => {
                 className="flex items-center justify-center gap-2 h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-800 hover:bg-gray-50">
                 <Send size={16} />نشر المنتج على حساباتك
               </Link>
-              <Link to={`/products/${id}`} target="_blank" className="block text-center text-sm text-gray-500 hover:text-primary">عرض المنتج كما يراه الزبون ↗</Link>
+              <Link to={`/products/${id}`} className="block text-center text-sm text-gray-500 hover:text-primary">عرض المنتج كما يراه الزبون</Link>
             </>
           )}
         </div>

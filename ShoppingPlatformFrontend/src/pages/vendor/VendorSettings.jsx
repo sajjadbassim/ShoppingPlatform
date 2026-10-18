@@ -51,7 +51,7 @@ const VendorSettings = () => {
   // ===== Store Info Form =====
   const [storeForm, setStoreForm] = useState({
     Name: '', NameAr: '', Description: '', Phone: '',
-    Address: '', MinOrderAmount: '', DeliveryFee: '', EstimatedPrepTime: '',
+    Address: '', MinOrderAmount: '', EstimatedPrepTime: '',
   })
   const [logoFile, setLogoFile]     = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
@@ -67,7 +67,6 @@ const VendorSettings = () => {
         Phone:              vendor.phone             || '',
         Address:            vendor.address           || '',
         MinOrderAmount:     vendor.minOrderAmount?.toString() || '',
-        DeliveryFee:        vendor.deliveryFee?.toString()    || '',
         EstimatedPrepTime:  vendor.estimatedPrepTime?.toString() || '',
       })
       setLogoPreview(getImageUrl(vendor.logoUrl) || vendor.logoUrl || null)
@@ -227,7 +226,11 @@ const VendorSettings = () => {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-1">رسوم التوصيل</label>
-                <input type="number" value={storeForm.DeliveryFee} onChange={e => setStoreForm({...storeForm, DeliveryFee: e.target.value})} className={inputCls} placeholder="0 د.ع" />
+                {/* أجرة التوصيل للمنصة (سائقوها) — يحددها الأدمن، والمتجر يراها فقط */}
+                <div className="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700 flex items-center">
+                  {vendor?.deliveryFee != null ? `${Number(vendor.deliveryFee).toLocaleString('en-US')} د.ع` : '—'}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">تحددها إدارة المنصة</p>
                 {vendorUsesZones(zonesCfg, vendor?.id || vendorId) && (
                   <p className="text-xs text-blue-600 mt-1">متجرك يتبع مناطق التوصيل: الزبون يدفع سعر منطقته، وهذا السعر يُستخدم فقط للعناوين بلا منطقة</p>
                 )}

@@ -1,14 +1,31 @@
 // src/pages/operations/OperationsSettings.jsx
-import { Shield } from 'lucide-react'
+import { Shield, Bell } from 'lucide-react'
+import { Skeleton } from '../../components/common/Loading'
+import { useToast } from '../../components/common/Toast'
 import { useAuthStore } from '../../stores/authStore'
-import { SettingsSection, AppearanceSection } from '../../components/settings/SettingsSection'
+import { usePreferencesDraft } from '../../hooks/usePreferences'
+import { SettingsSection, SettingsToggle, AppearanceSection } from '../../components/settings/SettingsSection'
 import DeliveryFeePolicy from '../../components/settings/DeliveryFeePolicy'
 import ConfirmationTimeoutSetting from '../../components/settings/ConfirmationTimeoutSetting'
 import DeliverySpeedThresholds from '../../components/settings/DeliverySpeedThresholds'
 import GrocerySlotsSetting from '../../components/settings/GrocerySlotsSetting'
 
+// العمليات تستلم إشعارات محفوظة لهاتين الفئتين فقط (NotifyOpsAsync)
+const NOTIFICATION_KEYS = ['notifyNewOrders', 'notifyReturns']
+
 const OperationsSettings = () => {
+  const { success, error: showError } = useToast()
   const { user } = useAuthStore()
+  const { draft, set, save, isDirty, isLoading, isError, isSaving } = usePreferencesDraft()
+
+  const saveNotifications = async () => {
+    try {
+      await save(NOTIFICATION_KEYS)
+      success('تم حفظ إعدادات الإشعارات')
+    } catch (err) {
+      showError(err.message || 'فشل حفظ الإعدادات')
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -34,12 +51,29 @@ const OperationsSettings = () => {
         </div>
       </SettingsSection>
 
-      <ConfirmationTimeoutSetting />
+      {/* الإشعارات */}
+      <SettingsSection icon={Bell} title="إعدادات الإشعارات"
+        onSave={saveNotifications} saving={isSaving} saveDisabled={!isDirty(NOTIFICATION_KEYS)}>
+        {isLoading ? (
+          <div className="space-y-3">{[1, 2].map(i => <Skeleton key={i} className="h-10" />)}</div>
+        ) : isError || !draft ? (
+          <p className="text-sm text-red-500">تعذّر تحميل الإعدادات من الخادم</p>
+        ) : (
+          <div>
+            <SettingsToggle label="مشاكل الطلبات" desc="تعذّر التسليم، إلغاء الزبون، رفض المتجر، وتأخر تأكيد المتجر"
+              checked={draft.notifyNewOrders} onChange={v => set('notifyNewOrders', v)} />
+            <SettingsToggle label="الإرجاع" desc="طلب إرجاع جديد، إرجاع ينتظر سائقاً، تعذّر استلام مرتجع، ووصول القطع للمتجر"
+              checked={draft.notifyReturns} onChange={v => set('notifyReturns', v)} />
+          </div>
+        )}
+      </SettingsSection>
 
-      <DeliverySpeedThresholds />
-      <GrocerySlotsSetting />
+      {/* إعدادات التشغيل — يعدّلها فريق العمليات */}
+      <ConfirmationTimeoutSetting editable />
+      <DeliverySpeedThresholds editable />
+      <GrocerySlotsSetting editable />
 
-      <DeliveryFeePolicy />
+      <DeliveryFeePolicy readOnly />
 
       {/* المظهر */}
       <AppearanceSection />

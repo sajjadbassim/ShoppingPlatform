@@ -358,6 +358,15 @@ const AdminOrderDetails = () => {
                 <span>الإجمالي</span>
                 <span className="text-primary">{order.totalAmount.toLocaleString('en-US')} د.ع</span>
               </div>
+              {/* رفض عند الباب: الإجمالي = ما دفعه الزبون؛ المرفوض والقيمة الأصلية للتوضيح */}
+              {order.refusedAmount > 0 && (
+                <div className="space-y-1 text-xs text-gray-500">
+                  <div className="flex justify-between"><span>قطع رُفضت عند الاستلام (غير محتسبة)</span><span>{order.refusedAmount.toLocaleString('en-US')} د.ع</span></div>
+                  {order.originalTotalAmount > 0 && order.originalTotalAmount !== order.totalAmount && (
+                    <div className="flex justify-between"><span>قيمة الطلب عند الشراء</span><span>{order.originalTotalAmount.toLocaleString('en-US')} د.ع</span></div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Payment */}
@@ -368,9 +377,9 @@ const AdminOrderDetails = () => {
                   <span>{order.paymentMethod === 'COD' ? 'الدفع عند الاستلام' : order.paymentMethod}</span>
                 </div>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  order.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : order.paymentStatus === 'CANCELLED' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
                 }`}>
-                  {order.paymentStatus === 'PAID' ? 'مدفوع' : 'معلق'}
+                  {order.paymentStatus === 'PAID' ? 'مدفوع' : order.paymentStatus === 'CANCELLED' ? 'لا دفع (ملغى)' : 'معلق'}
                 </span>
               </div>
               {order.couponCode && (

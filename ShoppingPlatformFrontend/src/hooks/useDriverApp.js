@@ -18,6 +18,21 @@ export const useDriverProfile = () => useQuery({
   refetchInterval: 30000,
 })
 
+// بضاعة مرتجعة معه لم تُسلَّم لمتاجرها — محطة لكل متجر
+export const useMyReturnTrips = (enabled) => useQuery({
+  queryKey: [...driverKeys.me, 'returns'],
+  queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.DRIVER_APP.MY_RETURNS)),
+  enabled,
+  refetchInterval: 60000,
+})
+
+// تفصيل النقد الذي بعهدة السائق لكل طلب — يُحمَّل عند فتحه فقط
+export const useMyDriverCash = (enabled) => useQuery({
+  queryKey: [...driverKeys.me, 'cash'],
+  queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.DRIVER_APP.MY_CASH)),
+  enabled,
+})
+
 // الطلبات الحالية تتحدث كل 20 ثانية ليرى السائق الطلبات الجديدة دون تحديث الصفحة
 export const useMyDriverOrders = (history = false) => useQuery({
   queryKey: driverKeys.orders(history),
@@ -38,6 +53,13 @@ export const useSetDriverWorkStatus = () =>
 
 export const usePickUpStop = () =>
   useDriverMutation(async (subOrderId) => unwrap(await apiPost(API_ENDPOINTS.DRIVER_APP.PICKED_UP(subOrderId))))
+
+// مرتجع بعد الاستلام: أخذ القطع من الزبون، أو تعذّر أخذها
+export const useCollectReturn = () =>
+  useDriverMutation(async (returnId) => unwrap(await apiPost(API_ENDPOINTS.DRIVER_APP.RETURN_PICKED_UP(returnId))))
+
+export const useFailReturnPickup = () =>
+  useDriverMutation(async ({ returnId, note }) => unwrap(await apiPost(API_ENDPOINTS.DRIVER_APP.RETURN_PICKUP_FAILED(returnId), { note })))
 
 export const useDeliverOrder = () =>
   useDriverMutation(async ({ orderId, ...body }) =>
@@ -78,8 +100,10 @@ export const useDriverCash = (driverId) => useQuery({
 export const useSettleDriverCash = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (driverId) => unwrap(await apiPost(API_ENDPOINTS.DRIVERS.SETTLE_CASH(driverId))),
-    onSuccess: (_, driverId) => {
+    // المبلغ المعروض يُرسل مع الطلب: إن تغيّر نقد السائق أثناء فتح النافذة يرفض الخادم (409)
+    mutationFn: async ({ driverId, expectedAmount }) => unwrap(await apiPost(API_ENDPOINTS.DRIVERS.SETTLE_CASH(driverId), { expectedAmount })),
+    onError: (_, { driverId }) => qc.invalidateQueries({ queryKey: driverKeys.cash(driverId) }),
+    onSuccess: (_, { driverId }) => {
       qc.invalidateQueries({ queryKey: driverKeys.cash(driverId) })
       qc.invalidateQueries({ queryKey: ['drivers'] })
     },

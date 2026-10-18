@@ -146,6 +146,7 @@ namespace ecommerce.Services
             if (opsUser == null) throw new NotFoundException("المستخدم غير موجود");
             if (opsUser.Role != UserRoles.Ops && opsUser.Role != UserRoles.Admin) throw new BusinessRuleException("المستخدم ليس لديه صلاحية Ops");
 
+            await using var orderLock = await _subOrderRepository.LockOrderOfSubOrderAsync(subOrderId);
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
             if (subOrder.Status != SubOrderStatus.PendingConfirmation) throw new BusinessRuleException($"لا يمكن تأكيد الطلب. الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
@@ -159,8 +160,10 @@ namespace ecommerce.Services
             await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, SubOrderStatus.Confirmed, dto.OpsUserId, "تأكيد الطلب الفرعي", dto.Notes);
             await _notificationService.NotifySubOrderConfirmedAsync(subOrder.Id, subOrder.SubOrderNumber, subOrder.VendorId);
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.SUB_ORDER, $"تم تأكيد الطلب الفرعي: {subOrder.SubOrderNumber}", new { subOrderId = subOrder.Id, subOrderNumber = subOrder.SubOrderNumber });
-            await _notificationService.NotifyCustomerAsync(subOrder.Order.CustomerId, $"تم تأكيد جزء من طلبك ({subOrder.Vendor.Name})", new { subOrderId = subOrder.Id });
-            await UpdateMainOrderStatusAsync(subOrder.OrderId);
+            // طلب من متجر واحد: يصل الزبون إشعار «تم تأكيد طلبك» من تحديث حالة الطلب أدناه — «جزء» فقط لمتعدد المتاجر
+            if ((await _subOrderRepository.GetByOrderIdAsync(subOrder.OrderId)).Count(s => s.Status != OrderStatus.CANCELLED) > 1)
+                await _notificationService.NotifyCustomerAsync(subOrder.Order.CustomerId, $"تم تأكيد جزء من طلبك ({subOrder.Vendor.DisplayName})", new { subOrderId = subOrder.Id });
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, dto.OpsUserId);
 
             return await MapToDtoAsync(subOrder);
         }
@@ -174,16 +177,22 @@ namespace ecommerce.Services
             if (opsUser == null) throw new NotFoundException("المستخدم غير موجود");
             if (opsUser.Role != UserRoles.Ops && opsUser.Role != UserRoles.Admin) throw new BusinessRuleException("المستخدم ليس لديه صلاحية Ops");
 
+            await using var orderLock = await _subOrderRepository.LockOrderOfSubOrderAsync(subOrderId);
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
             // يُلغى في أي مرحلة قبل خروجه مع السائق (مثلاً المتجر اكتشف نقصاً بعد التأكيد)
             var cancellable = new[] { SubOrderStatus.PendingConfirmation, SubOrderStatus.Confirmed, SubOrderStatus.Preparing, SubOrderStatus.Ready, SubOrderStatus.DeliveryFailed };
             if (subOrder.Status == SubOrderStatus.OutForDelivery)
-                throw new BusinessRuleException("الطلب مع السائق الآن — سجّل «تعذّر التسليم» من تطبيق السائق أولاً ثم ألغِه لإرجاع القطع للمخزون");
+                throw new BusinessRuleException("الطلب مع السائق الآن — يسجّل السائق «تعذّر التسليم» فتعود البضاعة للمتجر ويُغلق الطلب تلقائياً حين يؤكد المتجر استلامها");
             if (!cancellable.Contains(subOrder.Status))
                 throw new BusinessRuleException($"لا يمكن إلغاء الطلب. الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
+            // البضاعة مع السائق في طريقها للمتجر: الإلغاء الآن يُعيد مخزوناً لم يصل بعد
+            if (subOrder.Status == SubOrderStatus.DeliveryFailed && await _subOrderRepository.HasOpenReturnTripAsync(subOrder.Id))
+                throw new BusinessRuleException("البضاعة مع السائق في طريقها للمتجر — يُغلق الطلب تلقائياً حين يؤكد المتجر استلامها");
 
             var oldStatus = subOrder.Status;
+            // معيَّن لسائق لم يستلمه بعد: يُلغى مباشرة ويُبلَّغ السائق ألا يذهب للمتجر
+            var assignedDriverId = DriverTrip.AwaitingPickup(subOrder) ? subOrder.DriverId : null;
             subOrder.Status = SubOrderStatus.Cancelled;
             subOrder.CancellationReason = dto.CancellationReason;
             subOrder.CancelledBy = dto.OpsUserId;
@@ -194,6 +203,7 @@ namespace ecommerce.Services
             await _inventoryService.RestoreForSubOrdersAsync(new[] { subOrder.Id });
 
             await UpdateDriverWorkStatusAsync(subOrder, OrderStatus.CANCELLED);
+            if (assignedDriverId is Guid cancelledDriverId) await NotifyDriverRemovedAsync(cancelledDriverId, subOrder, "أُلغي");
             await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, SubOrderStatus.Cancelled, dto.OpsUserId, dto.CancellationReason);
             await _notificationService.NotifySubOrderCancelledAsync(subOrder.Id, subOrder.SubOrderNumber, dto.CancellationReason, subOrder.VendorId);
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.SUB_ORDER, $"تم إلغاء الطلب الفرعي: {subOrder.SubOrderNumber} — {dto.CancellationReason}", new { subOrderId = subOrder.Id, reason = dto.CancellationReason });
@@ -202,14 +212,21 @@ namespace ecommerce.Services
             var order = await _orderRepository.GetByIdAsync(subOrder.OrderId);
             if (OrderTotals.Recalculate(order, order.SubOrders)) await _orderRepository.UpdateAsync(order);
             var wholeOrderCancelled = order.SubOrders.All(s => s.Status == OrderStatus.CANCELLED);
+            if (wholeOrderCancelled && string.IsNullOrWhiteSpace(order.CancellationReason))
+            {
+                order.CancellationReason = dto.CancellationReason;
+                await _orderRepository.UpdateAsync(order);
+            }
 
             // إلغاء جزئي: الزبون يعرف ما أُلغي والمبلغ الجديد. الإلغاء الكامل يصله من تحديث حالة الطلب أدناه
             if (!wholeOrderCancelled)
                 await _notificationService.NotifyCustomerAsync(order.CustomerId,
-                    $"تم إلغاء جزء من طلبك {order.OrderNumber} ({subOrder.Vendor.Name}): {dto.CancellationReason} — المبلغ الجديد {order.TotalAmount:N0} د.ع",
+                    $"تم إلغاء جزء من طلبك {order.OrderNumber} ({subOrder.Vendor.DisplayName}): {dto.CancellationReason} — المبلغ الجديد {order.TotalAmount:N0} د.ع"
+                    + OrderTotals.PointsReturnedNote(OrderTotals.UnusedPoints(order)),
                     new { orderId = order.Id, subOrderId = subOrder.Id });
-            await UpdateMainOrderStatusAsync(subOrder.OrderId);
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, dto.OpsUserId);
             if (wholeOrderCancelled) await _loyaltyService.CancelRedemptionAsync(order.Id);   // النقاط المستخدمة ترجع للزبون
+            else await _loyaltyService.RefundUnusedPointsAsync(order.Id);   // نصيب الجزء الملغى من النقاط إن لم يبقَ جزء مفتوح يحمله
 
             return await MapToDtoAsync(subOrder);
         }
@@ -223,6 +240,7 @@ namespace ecommerce.Services
             if (opsUser == null) throw new NotFoundException("المستخدم غير موجود");
             if (opsUser.Role != UserRoles.Ops && opsUser.Role != UserRoles.Admin) throw new BusinessRuleException("المستخدم ليس لديه صلاحية Ops");
 
+            await using var orderLock = await _subOrderRepository.LockOrderOfSubOrderAsync(subOrderId);
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
 
@@ -231,15 +249,16 @@ namespace ecommerce.Services
                 { OrderStatus.CONFIRMED,  new[] { OrderStatus.PREPARING } },
                 { OrderStatus.PREPARING,  new[] { OrderStatus.READY } },          // جاهز للاستلام (احتياط إن نسي المتجر)
                 { OrderStatus.READY,      new[] { OrderStatus.PREPARING } },      // تراجع: ليس جاهزاً بعد
-                { OrderStatus.OUT_FOR_DELIVERY, new[] { OrderStatus.DELIVERED } },
-                { OrderStatus.DELIVERY_FAILED, new[] { OrderStatus.READY } },     // إعادة المحاولة: البضاعة محضّرة أصلاً
+                // تعذّر التسليم: لا إعادة محاولة — البضاعة تعود مع السائق لمتجرها ويُغلق الجزء عند استلامه
             };
 
-            if (subOrder.Status == OrderStatus.DELIVERY_FAILED && subOrder.FailureReason == DeliveryFailureReason.CustomerRefused)
-                throw new BusinessRuleException("رفض الزبون الطلب — لا يمكن إعادة المحاولة، ألغِه لإرجاع البضاعة للمخزون");
-
+            if (!KnownStatuses.Contains(dto.NewStatus ?? ""))
+                throw new BusinessRuleException("حالة غير صالحة");
             if (!allowedTransitions.ContainsKey(subOrder.Status) || !allowedTransitions[subOrder.Status].Contains(dto.NewStatus))
                 throw new BusinessRuleException($"لا يمكن الانتقال من «{OrderStatusText.Ar(subOrder.Status)}» إلى «{OrderStatusText.Ar(dto.NewStatus)}»");
+
+            if (DriverTrip.AwaitingPickup(subOrder))
+                throw new BusinessRuleException("الطلب معيَّن لسائق — اسحبه من السائق أولاً ثم أعده للتحضير");
 
             var oldStatus = subOrder.Status;
             subOrder.Status = dto.NewStatus;
@@ -257,18 +276,15 @@ namespace ecommerce.Services
             await _notificationService.NotifySubOrderStatusChangedAsync(subOrder.Id, subOrder.SubOrderNumber, subOrder.OrderId, dto.NewStatus, pushToOps: false);
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.ORDER_STATUS, OrderStatusText.StaffMessage(dto.NewStatus, subOrder.SubOrderNumber), new { subOrderId = subOrder.Id, oldStatus, newStatus = dto.NewStatus });
 
-            // ✅ كسب النقاط عند التسليم
-            if (dto.NewStatus == OrderStatus.DELIVERED && subOrder.Order != null)
-            {
-                var amount = subOrder.Items?.Sum(i => i.UnitPrice * i.Quantity) ?? subOrder.Subtotal;
-                await _loyaltyService.EarnPointsAsync(subOrder.Order.CustomerId, subOrder.OrderId, subOrder.Id, amount);
-            }
-
-            await UpdateMainOrderStatusAsync(subOrder.OrderId);
-            if (dto.NewStatus == OrderStatus.DELIVERED && _finance != null)
-                await _finance.EnsureSubOrderEntriesAsync(subOrder.Id);
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, dto.OpsUserId);
             return await MapToDtoAsync(subOrder);
         }
+        private static readonly string[] KnownStatuses =
+        {
+            OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY,
+            OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.DELIVERY_FAILED,
+        };
+
         public async Task<IEnumerable<SubOrderDto>> AssignDriverToOrderAsync(Guid orderId, AssignDriverToOrderDto dto)
         {
             var opsUser = await _userRepository.GetByIdAsync(dto.OpsUserId);
@@ -276,33 +292,41 @@ namespace ecommerce.Services
             if (opsUser.Role != UserRoles.Ops && opsUser.Role != UserRoles.Admin)
                 throw new BusinessRuleException("المستخدم ليس لديه صلاحية Ops");
 
+            await using var orderLock = await _subOrderRepository.LockOrderAsync(orderId);
+            await using var driverLock = await _driverRepository.LockAsync(dto.DriverId);
             var allSubOrders = (await _subOrderRepository.GetByOrderIdAsync(orderId)).ToList();
             var activeSubOrders = allSubOrders.Where(so => so.Status != OrderStatus.CANCELLED).ToList();
 
             if (!activeSubOrders.Any())
                 throw new BusinessRuleException("لا توجد طلبات فرعية فعالة بهذا الطلب");
 
-            // الشرط الأساسي: كل المتاجر «جاهز للاستلام» (نفس شرط AssignDriverAsync أدناه)
-            var notReady = activeSubOrders.Where(so => so.Status != OrderStatus.READY).ToList();
+            // الشرط الأساسي: كل المتاجر «جاهز للاستلام» (نفس شرط AssignDriverAsync أدناه).
+            // ما مع نفس السائق (معيَّن أو استلمه) أو سُلّم لا يمنع — يأخذ السائق الباقي إلى نفس التوصيلة
+            var onOtherDriver = activeSubOrders.Where(so => DriverTrip.IsOpen(so) && so.DriverId != dto.DriverId).ToList();
+            if (onOtherDriver.Any())
+                throw new BusinessRuleException(
+                    $"جزء من الطلب معيَّن لسائق آخر: {string.Join("، ", onOtherDriver.Select(so => so.SubOrderNumber))} — اسحبه منه أولاً أو عيّن السائق نفسه");
+            var notReady = activeSubOrders.Where(so => so.Status != OrderStatus.DELIVERED && !DriverTrip.Statuses.Contains(so.Status)).ToList();
             if (notReady.Any())
                 throw new BusinessRuleException(
                     $"لا يمكن تعيين سائق قبل أن تجهز كل المتاجر. غير جاهز: {string.Join("، ", notReady.Select(so => $"{so.SubOrderNumber} ({OrderStatusText.Ar(so.Status)})"))}");
+            var toAssign = activeSubOrders.Where(so => so.Status == OrderStatus.READY && so.DriverId == null).ToList();
+            if (toAssign.Count == 0)
+                throw new BusinessRuleException("لا يوجد في هذا الطلب جزء جاهز بانتظار سائق");
 
             var driver = await _driverRepository.GetByIdAsync(dto.DriverId);
             if (driver == null) throw new NotFoundException("السائق غير موجود");
-            if (driver.Status != DriverStatus.Active) throw new BusinessRuleException("السائق غير نشط");
-            if (driver.WorkStatus != DriverWorkStatus.Available) throw new BusinessRuleException("السائق غير متاح حالياً");
+            await EnsureDriverCanTakeAsync(driver, orderId);
 
-            // ✅ تعيين موحّد على كل الـ SubOrders دفعة وحدة
-            foreach (var subOrder in activeSubOrders)
+            // ✅ تعيين موحّد على كل الـ SubOrders الجاهزة دفعة وحدة
+            // الحالة تبقى «جاهز للاستلام» حتى يستلمه السائق من المتجر (DriverTrip)
+            foreach (var subOrder in toAssign)
             {
-                var oldStatus = subOrder.Status;
                 subOrder.DriverId = dto.DriverId;
                 subOrder.AssignedAt = DateTime.UtcNow;
-                subOrder.Status = OrderStatus.OUT_FOR_DELIVERY;
                 await _subOrderRepository.UpdateAsync(subOrder);
 
-                await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, OrderStatus.OUT_FOR_DELIVERY,
+                await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.READY, OrderStatus.READY,
                     dto.OpsUserId, $"تعيين سائق موحّد لكامل الطلب: {driver.FullName}");
             }
 
@@ -315,9 +339,9 @@ namespace ecommerce.Services
             await NotifyDriverAssignedAsync(driver, orderId);
             await _notificationService.NotifyDriverUpdatedAsync(driver.Id, driver.WorkStatus, "assigned");
 
-            await UpdateMainOrderStatusAsync(orderId);
+            await UpdateMainOrderStatusAsync(orderId, dto.OpsUserId);
 
-            return await MapToDtosAsync(activeSubOrders);
+            return await MapToDtosAsync(toAssign);
         }
         // ─────────────────────────────────────────────────────────────────────
         // ASSIGN DRIVER
@@ -328,29 +352,67 @@ namespace ecommerce.Services
             if (opsUser == null) throw new NotFoundException("المستخدم غير موجود");
             if (opsUser.Role != UserRoles.Ops && opsUser.Role != UserRoles.Admin) throw new BusinessRuleException("المستخدم ليس لديه صلاحية Ops");
 
+            // الطلب ثم السائق (نفس الترتيب دائماً): تعيينان متزامنان لنفس الجزء أو لنفس السائق لا ينجحان معاً
+            await using var orderLock = await _subOrderRepository.LockOrderOfSubOrderAsync(subOrderId);
+            await using var driverLock = await _driverRepository.LockAsync(dto.DriverId);
             var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
             if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
             if (subOrder.Status != OrderStatus.READY) throw new BusinessRuleException($"لا يمكن تعيين سائق قبل أن يصبح الطلب «جاهز للاستلام». الحالة الحالية: {OrderStatusText.Ar(subOrder.Status)}");
+            if (subOrder.DriverId != null) throw new BusinessRuleException("الطلب معيَّن لسائق — اسحبه منه أولاً لتعيين غيره");
 
             var driver = await _driverRepository.GetByIdAsync(dto.DriverId);
             if (driver == null) throw new NotFoundException("السائق غير موجود");
-            if (driver.Status != DriverStatus.Active) throw new BusinessRuleException("السائق غير نشط");
-            if (driver.WorkStatus != DriverWorkStatus.Available) throw new BusinessRuleException("السائق غير متاح حالياً");
+            await EnsureDriverCanTakeAsync(driver, subOrder.OrderId);
 
-            var oldStatus = subOrder.Status;
             subOrder.DriverId = dto.DriverId;
             subOrder.AssignedAt = DateTime.UtcNow;
-            subOrder.Status = OrderStatus.OUT_FOR_DELIVERY;
             subOrder = await _subOrderRepository.UpdateAsync(subOrder);
 
             driver.WorkStatus = DriverWorkStatus.Delivering;
             await _driverRepository.UpdateAsync(driver);
 
-            await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, OrderStatus.OUT_FOR_DELIVERY, dto.OpsUserId, $"تم تعيين السائق: {driver.FullName} وتحويل الحالة تلقائياً");
+            await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.READY, OrderStatus.READY, dto.OpsUserId, $"تم تعيين السائق: {driver.FullName}");
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.ORDER_STATUS, $"تم تعيين السائق {driver.FullName} للطلب {subOrder.SubOrderNumber}", new { subOrderId = subOrder.Id, driverName = driver.FullName });
             await NotifyDriverAssignedAsync(driver, subOrder.OrderId);
             await _notificationService.NotifyDriverUpdatedAsync(driver.Id, driver.WorkStatus, "assigned");
-            await UpdateMainOrderStatusAsync(subOrder.OrderId);
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, dto.OpsUserId);
+
+            return await MapToDtoAsync(subOrder);
+        }
+
+        // ─────────────────────────────────────────────────────────────────────
+        // UNASSIGN: سحب الجزء من السائق قبل أن يستلمه من المتجر — يعود «جاهز للاستلام» ويُعيَّن لغيره.
+        // بعد الاستلام البضاعة مع السائق: الطريق هو «تعذّر التسليم» ومهمة الإرجاع
+        // ─────────────────────────────────────────────────────────────────────
+        public async Task<SubOrderDto> UnassignDriverAsync(Guid subOrderId, Guid opsUserId, string? reason)
+        {
+            await using var orderLock = await _subOrderRepository.LockOrderOfSubOrderAsync(subOrderId);
+            var subOrder = await _subOrderRepository.GetByIdAsync(subOrderId);
+            if (subOrder == null) throw new NotFoundException("الطلب الفرعي غير موجود");
+            if (subOrder.Status == OrderStatus.OUT_FOR_DELIVERY)
+                throw new BusinessRuleException("استلم السائق الطلب من المتجر — لا يمكن سحبه. يسجّل السائق «تعذّر التسليم» فتُنشأ مهمة إرجاع");
+            if (!DriverTrip.AwaitingPickup(subOrder) || subOrder.DriverId is not Guid driverId)
+                throw new BusinessRuleException($"لا يوجد سائق لسحب الطلب منه — الحالة: {OrderStatusText.Ar(subOrder.Status)}");
+
+            // الطلب ثم السائق (نفس ترتيب التعيين)
+            await using var driverLock = await _driverRepository.LockAsync(driverId);
+            subOrder.DriverId = null;
+            subOrder.AssignedAt = null;
+            subOrder = await _subOrderRepository.UpdateAsync(subOrder);
+
+            var driver = await _driverRepository.GetByIdAsync(driverId);
+            if (driver != null && driver.WorkStatus == DriverWorkStatus.Delivering && !await _subOrderRepository.HasActiveDeliveryAsync(driverId))
+            {
+                driver.WorkStatus = DriverWorkStatus.Available;
+                await _driverRepository.UpdateAsync(driver);
+            }
+
+            var note = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+            await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.READY, OrderStatus.READY, opsUserId,
+                note, $"سُحب الطلب من السائق {driver?.FullName}");
+            await NotifyDriverRemovedAsync(driverId, subOrder, "سُحب منك");
+            if (driver != null) await _notificationService.NotifyDriverUpdatedAsync(driver.Id, driver.WorkStatus, "unassigned");
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, opsUserId);
 
             return await MapToDtoAsync(subOrder);
         }
@@ -418,7 +480,7 @@ namespace ecommerce.Services
                 ConfirmedByName = so.ConfirmedByUser?.FullName,
                 ConfirmedAt = so.ConfirmedAt,
                 ConfirmationDeadline = so.ConfirmationDeadline,
-                MinutesRemaining = (int)Math.Max(0, timeRemaining.TotalMinutes),
+                MinutesRemaining = so.Status == OrderStatus.PENDING_CONFIRMATION ? (int)Math.Max(0, timeRemaining.TotalMinutes) : null,
                 CancellationReason = so.CancellationReason,
                 FailureReason = so.FailureReason,
                 FailureReasonAr = so.FailureReason == null ? null : DeliveryFailureReason.Ar(so.FailureReason),
@@ -445,6 +507,7 @@ namespace ecommerce.Services
                     WeightStepKg = i.WeightStepKg,
                     ReplacesItemId = i.ReplacesItemId,
                     UnavailableQuantity = i.UnavailableQuantity,
+                    RefusedQuantity = i.RefusedQuantity,
                     VariantId = i.VariantId,
                     VariantSku = i.Variant?.Sku,
                     VariantAttributes = i.Variant?.AttributeValues?
@@ -468,24 +531,30 @@ namespace ecommerce.Services
         // ─────────────────────────────────────────────────────────────────────
         public async Task<IReadOnlyList<SubOrder>> MarkDeliveredByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId)
         {
-            var mine = (await _subOrderRepository.GetByOrderIdAsync(orderId))
-                .Where(so => so.DriverId == driverId && so.Status == OrderStatus.OUT_FOR_DELIVERY)
-                .ToList();
+            var all = (await _subOrderRepository.GetByOrderIdAsync(orderId)).ToList();
+            var mine = all.Where(so => so.DriverId == driverId && DriverTrip.Statuses.Contains(so.Status)).ToList();
             if (mine.Count == 0)
                 throw new BusinessRuleException("لا يوجد في هذا الطلب ما يمكنك تسليمه");
+            // النقاط على ما دفعه الزبون فعلاً: قيمة القطع المستلمة ناقص نصيب الجزء من الخصم (كوبون/نقاط)
+            var order = await _orderRepository.GetByIdAsync(orderId);
+            var shares = order != null ? OrderTotals.DiscountShares(order, all) : new Dictionary<Guid, decimal>();
+            // التوصيلة تُحسب للسائق مرة لكل طلب، لا لكل رحلة (طلب متعدد المتاجر قد يُسلَّم على رحلات)
+            var firstTripForOrder = !all.Any(so => so.DriverId == driverId && so.Status == OrderStatus.DELIVERED);
 
             var now = DateTime.UtcNow;
             foreach (var subOrder in mine)
             {
+                var oldStatus = subOrder.Status;
                 subOrder.Status = OrderStatus.DELIVERED;
                 subOrder.PickedUpAt ??= now;
                 await _subOrderRepository.UpdateAsync(subOrder);
-                await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED, driverUserId, "سلّمه السائق للزبون");
+                await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, OrderStatus.DELIVERED, driverUserId, "سلّمه السائق للزبون");
 
-                if (subOrder.Order != null)
+                if (order != null)
                 {
                     var amount = subOrder.Items?.Sum(i => i.UnitPrice * (i.Quantity - i.RefusedQuantity)) ?? subOrder.Subtotal;
-                    await _loyaltyService.EarnPointsAsync(subOrder.Order.CustomerId, subOrder.OrderId, subOrder.Id, amount);
+                    amount = Math.Max(0, amount - shares.GetValueOrDefault(subOrder.Id));
+                    await _loyaltyService.EarnPointsAsync(order.CustomerId, subOrder.OrderId, subOrder.Id, amount);
                 }
             }
 
@@ -493,20 +562,30 @@ namespace ecommerce.Services
             var driver = await _driverRepository.GetByIdAsync(driverId);
             if (driver != null)
             {
-                driver.TotalDeliveries += 1;
+                if (firstTripForOrder) driver.TotalDeliveries += 1;
                 if (!await _subOrderRepository.HasActiveDeliveryAsync(driverId)) driver.WorkStatus = DriverWorkStatus.Available;
                 await _driverRepository.UpdateAsync(driver);
             }
 
-            await UpdateMainOrderStatusAsync(orderId);
+            await UpdateMainOrderStatusAsync(orderId, driverUserId);
             return mine;
+        }
+
+        // DRIVER: استلم الجزء من المتجر — الآن فقط «في الطريق» (التعيين يبقيه «جاهز للاستلام»)
+        public async Task MarkPickedUpByDriverAsync(SubOrder subOrder, Guid driverUserId)
+        {
+            subOrder.PickedUpAt = DateTime.UtcNow;
+            subOrder.Status = OrderStatus.OUT_FOR_DELIVERY;
+            await _subOrderRepository.UpdateAsync(subOrder);
+            await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, driverUserId, "استلمه السائق من المتجر");
+            await UpdateMainOrderStatusAsync(subOrder.OrderId, driverUserId);
         }
 
         // DRIVER: تعذّر التسليم — أجزاء الطلب التي مع السائق تصبح «تعذّر التسليم» وتنتظر قرار العمليات
         public async Task<IReadOnlyList<SubOrder>> MarkFailedByDriverAsync(Guid orderId, Guid driverId, Guid driverUserId, string reason, string? note)
         {
             var mine = (await _subOrderRepository.GetByOrderIdAsync(orderId))
-                .Where(so => so.DriverId == driverId && so.Status == OrderStatus.OUT_FOR_DELIVERY)
+                .Where(so => so.DriverId == driverId && DriverTrip.Statuses.Contains(so.Status))
                 .ToList();
             if (mine.Count == 0)
                 throw new BusinessRuleException("لا يوجد في هذا الطلب ما يمكنك إغلاقه");
@@ -514,12 +593,13 @@ namespace ecommerce.Services
             var now = DateTime.UtcNow;
             foreach (var subOrder in mine)
             {
+                var oldStatus = subOrder.Status;
                 subOrder.Status = OrderStatus.DELIVERY_FAILED;
                 subOrder.FailureReason = reason;
                 subOrder.FailureNote = note;
                 subOrder.FailedAt = now;
                 await _subOrderRepository.UpdateAsync(subOrder);
-                await LogSubOrderStatusChangeAsync(subOrder.Id, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERY_FAILED, driverUserId,
+                await LogSubOrderStatusChangeAsync(subOrder.Id, oldStatus, OrderStatus.DELIVERY_FAILED, driverUserId,
                     DeliveryFailureReason.Ar(reason), note);
             }
 
@@ -530,8 +610,28 @@ namespace ecommerce.Services
                 await _driverRepository.UpdateAsync(driver);
             }
 
-            await UpdateMainOrderStatusAsync(orderId);
+            await UpdateMainOrderStatusAsync(orderId, driverUserId);
             return mine;
+        }
+
+        // متاح أو يوصل الآن: السائق يحمل أكثر من طلب في جولته (طبيعي في التوصيل). الاستراحة وعدم الاتصال يمنعان
+        private static Task EnsureDriverCanTakeAsync(Driver driver, Guid orderId)
+        {
+            if (driver.Status != DriverStatus.Active) throw new BusinessRuleException("السائق غير نشط — فعّل حسابه أولاً");
+            if (driver.WorkStatus == DriverWorkStatus.Available || driver.WorkStatus == DriverWorkStatus.Delivering) return Task.CompletedTask;
+            throw new BusinessRuleException(driver.WorkStatus == DriverWorkStatus.Break
+                ? "السائق في استراحة الآن — اختر سائقاً آخر"
+                : "السائق غير متصل الآن — اختر سائقاً آخر");
+        }
+
+        // جزء أُلغي أو سُحب قبل أن يستلمه السائق: لا يذهب للمتجر لأجله
+        private async Task NotifyDriverRemovedAsync(Guid driverId, SubOrder subOrder, string what)
+        {
+            var driver = await _driverRepository.GetByIdAsync(driverId);
+            if (driver?.UserId is not Guid driverUserId) return;
+            var orderNumber = subOrder.Order?.OrderNumber ?? (await _orderRepository.GetByIdAsync(subOrder.OrderId))?.OrderNumber;
+            await _notificationService.NotifyCustomerAsync(driverUserId,
+                $"{what} الطلب {orderNumber} ({subOrder.Vendor?.DisplayName}) — لا تستلمه من المتجر", new { orderId = subOrder.OrderId });
         }
 
         private async Task NotifyDriverAssignedAsync(Driver driver, Guid orderId)
@@ -545,7 +645,7 @@ namespace ecommerce.Services
         // ─────────────────────────────────────────────────────────────────────
         // PRIVATE: Helpers
         // ─────────────────────────────────────────────────────────────────────
-        private async Task UpdateMainOrderStatusAsync(Guid orderId)
+        private async Task UpdateMainOrderStatusAsync(Guid orderId, Guid? changedBy = null)
         {
             var order = await _orderRepository.GetByIdAsync(orderId);
             if (order == null) return;
@@ -567,12 +667,18 @@ namespace ecommerce.Services
             if (order.Status == newStatus) return;
 
             order.Status = newStatus;
+            OrderTotals.SyncCancelled(order, subOrders);
             await _orderRepository.UpdateAsync(order);
-            await LogOrderStatusChangeAsync(order.Id, oldStatus, newStatus, null, $"تحديث تلقائي: {confirmed} مؤكد، {preparing} تحضير، {ready} جاهز، {outForDel} توصيل، {delivered} مسلم، {cancelled} ملغي");
+            await LogOrderStatusChangeAsync(order.Id, oldStatus, newStatus, changedBy, $"تحديث تلقائي: {confirmed} مؤكد، {preparing} تحضير، {ready} جاهز، {outForDel} توصيل، {delivered} مسلم، {cancelled} ملغي");
             await _notificationService.NotifyOrderStatusChangedAsync(order.Id, oldStatus, newStatus, order.OrderNumber);
+            // «في الطريق إليك» حين يستلم السائق الطلب من المتجر (DriverAppService.PickUpAsync) لا لحظة تعيينه —
+            // قد يُسحب منه قبل الاستلام، فلا يُبلَّغ الزبون بذهاب وعودة لم يرهما
+            var pickedUp = subOrders.Any(so => so.PickedUpAt != null && so.Status != OrderStatus.CANCELLED);
+            if ((newStatus == OrderStatus.OUT_FOR_DELIVERY || oldStatus == OrderStatus.OUT_FOR_DELIVERY) && !pickedUp) return;
             await _notificationService.NotifyCustomerOrderStatusAsync(order.CustomerId, order.Id, order.OrderNumber, newStatus);
         }
 
+        // سجل لما فعله موظف العمليات نفسه — يُحفظ مقروءاً فلا يضخّم عدّاد غير المقروء بأفعاله هو
         private async Task SaveOpsNotificationAsync(Guid opsUserId, string type, string message, object data)
         {
             await _notificationRepository.CreateAsync(new Notification
@@ -580,7 +686,9 @@ namespace ecommerce.Services
                 UserId = opsUserId,
                 Type = type,
                 Message = message,
-                Data = JsonSerializer.Serialize(data)
+                Data = JsonSerializer.Serialize(data),
+                IsRead = true,
+                ReadAt = DateTime.UtcNow,
             });
         }
 

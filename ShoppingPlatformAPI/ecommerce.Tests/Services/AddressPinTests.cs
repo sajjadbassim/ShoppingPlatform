@@ -49,5 +49,17 @@ namespace ecommerce.Tests.Services
             await Assert.ThrowsAnyAsync<AppException>(() => Service().CreateAsync(dto));
             _repo.Verify(r => r.CreateAsync(It.IsAny<Address>()), Times.Never);
         }
+
+        [Theory]
+        [InlineData(51.5, -0.12)]    // لندن
+        [InlineData(40.7, -74.0)]    // نيويورك
+        public async Task PinOutsideServiceArea_IsRejected(double lat, double lng)
+        {
+            var dto = new AddressCreateDto { UserId = Guid.NewGuid(), StreetAddress = "x", City = "x", Phone = "0770", Latitude = (decimal)lat, Longitude = (decimal)lng };
+            var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Service().CreateAsync(dto));
+            Assert.Contains("خارج منطقة", ex.Message);
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().UpdateAsync(_saved.Id, new AddressUpdateDto { Latitude = (decimal)lat, Longitude = (decimal)lng }));
+            Assert.Equal(32.5051m, _saved.Latitude);
+        }
     }
 }

@@ -2,6 +2,7 @@
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using System.Security.Claims;
 using ecommerce.Core.Exceptions;
 
@@ -24,6 +25,25 @@ namespace ecommerce.Controllers
         {
             var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return claim != null ? Guid.Parse(claim) : Guid.Empty;
+        }
+
+        // عنوان زبون آخر: 403 قبل التحقق من حقول الطلب (يعمل قبل رد 400 التلقائي) — وإلا يرد التحقق على من لا يملكه
+        public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+        {
+            if (context.RouteData.Values.TryGetValue("id", out var raw) && Guid.TryParse(raw?.ToString(), out var id) && !User.IsInRole("ADMIN"))
+            {
+                try
+                {
+                    var existing = await _addressService.GetByIdAsync(id);
+                    if (existing.UserId != GetCurrentUserId())
+                    {
+                        context.Result = StatusCode(StatusCodes.Status403Forbidden, new { success = false, message = "هذا العنوان ليس من عناوينك" });
+                        return;
+                    }
+                }
+                catch (NotFoundException) { /* الإجراء نفسه يرد «غير موجود» */ }
+            }
+            await next();
         }
 
         // GET: api/addresses

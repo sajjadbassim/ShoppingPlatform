@@ -1,15 +1,15 @@
 // src/pages/admin/AdminStores.jsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Store, Search, RefreshCw, Eye, Star, Phone,
   MapPin, Package, TrendingUp, Ban, CheckCircle,
-  Clock, AlertTriangle,
+  Clock, AlertTriangle, Truck,
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPut } from '../../api/axios'
+import { apiGet, apiPut, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo } from '../../utils/imageHelper'
 
@@ -67,6 +67,47 @@ const useToggleStoreStatus = () => {
   })
 }
 
+// أجرة التوصيل تذهب للمنصة (سائقوها) — الأدمن يحددها لكل متجر، والمتجر يراها فقط
+const DeliveryFeeEditor = ({ store }) => {
+  const queryClient = useQueryClient()
+  const { success, error } = useToast()
+  const [saved, setSaved] = useState(store.deliveryFee ?? 0)
+  const [value, setValue] = useState(String(store.deliveryFee ?? 0))
+  useEffect(() => { setSaved(store.deliveryFee ?? 0); setValue(String(store.deliveryFee ?? 0)) }, [store.id, store.deliveryFee])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: (fee) => { const fd = new FormData(); fd.append('DeliveryFee', String(fee)); return apiPutForm(API_ENDPOINTS.VENDORS.BY_ID(store.id), fd) },
+    onSuccess: (_, fee) => {
+      setSaved(fee)
+      success('تم حفظ أجرة التوصيل — تُطبَّق على الطلبات الجديدة')
+      queryClient.invalidateQueries({ queryKey: ['admin-stores'] })
+    },
+    onError: (e) => error(e.message || 'تعذّر الحفظ'),
+  })
+
+  const fee = Number(value)
+  const valid = value !== '' && Number.isFinite(fee) && fee >= 0 && fee <= 1000000
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Truck size={13} className="text-gray-400" />
+        <p className="text-xs text-gray-500">أجرة التوصيل (تحددها الإدارة)</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="number" min={0} step={250} value={value} onChange={e => setValue(e.target.value)}
+          className="w-32 h-9 px-3 border border-gray-300 rounded-lg text-sm text-center bg-white" />
+        <span className="text-sm text-gray-600">د.ع</span>
+        <button type="button" onClick={() => mutate(fee)} disabled={!valid || fee === saved || isPending}
+          className="mr-auto h-9 px-4 rounded-lg bg-primary text-white text-sm font-bold disabled:opacity-50">
+          {isPending ? '...' : 'حفظ'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400 mt-1.5">إن كان المتجر يتبع مناطق التوصيل يدفع الزبون سعر منطقته، وهذه للعناوين بلا منطقة.</p>
+    </div>
+  )
+}
+
 // ===========================
 // Store Detail Modal
 // ===========================
@@ -117,7 +158,6 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
               { icon: Phone,    label: 'الهاتف',            value: store.phone,             dir: 'ltr' },
               { icon: MapPin,   label: 'العنوان',            value: store.address                       },
               { icon: Package,  label: 'الحد الأدنى للطلب', value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString('en-US')} د.ع` : '—' },
-              { icon: TrendingUp, label: 'رسوم التوصيل',   value: store.deliveryFee ? `${store.deliveryFee.toLocaleString('en-US')} د.ع` : '—' },
               { icon: Store,    label: 'وقت التحضير',       value: store.estimatedPrepTime ? `${store.estimatedPrepTime} دقيقة` : '—' },
               { icon: Star,     label: 'التقييم',            value: avgRating ? `${Number(avgRating).toFixed(1)} ⭐` : '—' },
             ].map(({ icon: Icon, label, value, dir }) => (
@@ -130,6 +170,8 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
               </div>
             ))}
           </div>
+
+          <DeliveryFeeEditor store={store} />
 
           {store.description && !store.description.includes('?') && (
             <div className="bg-gray-50 rounded-lg p-3">

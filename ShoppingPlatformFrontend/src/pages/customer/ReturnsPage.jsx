@@ -307,6 +307,30 @@ const ReturnCard = ({ ret }) => {
         </div>
       )}
 
+      {/* استلام القطع: السائق يأخذها منك ويوصلها للمتجر — يُردّ المبلغ بعد وصولها */}
+      {ret.status?.toUpperCase() === 'APPROVED' && ret.pickupStatus && ret.pickupStatus !== 'RECEIVED' && (
+        <div className="rounded-lg p-3 text-xs border bg-violet-50 border-violet-200 text-violet-800">
+          {ret.pickupStatus === 'AWAITING_DRIVER' && 'سنرسل سائقاً لاستلام القطع منك — جهّزها من فضلك'}
+          {ret.pickupStatus === 'DRIVER_ASSIGNED' && `السائق ${ret.pickupDriverName || ''} في طريقه لاستلام القطع`}
+          {ret.pickupStatus === 'WITH_DRIVER' && 'استلم السائق القطع وهي في طريقها للمتجر'}
+        </div>
+      )}
+
+      {/* المبلغ المستحق بعد الموافقة، ثم تأكيد ردّه */}
+      {['APPROVED', 'COMPLETED'].includes(ret.status?.toUpperCase()) && ret.refundAmount > 0 && (
+        <div className={`rounded-lg p-3 text-xs border ${ret.status?.toUpperCase() === 'COMPLETED' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+          {ret.status?.toUpperCase() === 'COMPLETED'
+            ? <>تم ردّ <b>{ret.refundAmount.toLocaleString('en-US')} د.ع</b> إليك{ret.refundedAt && ` بتاريخ ${new Date(ret.refundedAt).toLocaleDateString('ar-IQ-u-nu-latn')}`}</>
+            : <>سيُردّ لك <b>{ret.refundAmount.toLocaleString('en-US')} د.ع</b>{ret.pickupStatus && ret.pickupStatus !== 'RECEIVED' ? ' بعد وصول القطع للمتجر' : ''}</>}
+          {ret.pickupFeePayer === 'CUSTOMER' && ret.pickupFeeAmount > 0 && (
+            <p className="mt-1 opacity-80">خُصمت منه أجرة استلام القطع {ret.pickupFeeAmount.toLocaleString('en-US')} د.ع</p>
+          )}
+          {ret.pointsDeductionAmount > 0 && (
+            <p className="mt-1 opacity-80">خُصم منه {ret.pointsDeductionAmount.toLocaleString('en-US')} د.ع — قيمة النقاط التي كسبتها من هذه القطع واستخدمتها قبل الإرجاع</p>
+          )}
+        </div>
+      )}
+
       {/* رفض */}
       {ret.status?.toUpperCase() === 'REJECTED' && ret.rejectionReason && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">

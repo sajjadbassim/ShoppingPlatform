@@ -28,7 +28,7 @@
             OrderStatus.OUT_FOR_DELIVERY => $"الطلب {orderNumber} خرج للتوصيل 🛵",
             OrderStatus.DELIVERED => $"تم توصيل الطلب {orderNumber} ✅",
             OrderStatus.CANCELLED => $"تم إلغاء الطلب {orderNumber}",
-            OrderStatus.DELIVERY_FAILED => $"تعذّر تسليم الطلب {orderNumber} ⚠️ يحتاج قراراً: إعادة المحاولة أو الإلغاء",
+            OrderStatus.DELIVERY_FAILED => $"تعذّر تسليم الطلب {orderNumber} ⚠️ البضاعة تعود مع السائق للمتجر",
             _ => $"تحديث الطلب {orderNumber}: {Ar(status)}",
         };
 
@@ -42,7 +42,7 @@
             OrderStatus.OUT_FOR_DELIVERY => $"طلبك {orderNumber} في الطريق إليك 🛵",
             OrderStatus.DELIVERED => $"تم توصيل طلبك {orderNumber} 🎉 نتمنى أن ينال إعجابك",
             OrderStatus.CANCELLED => $"تم إلغاء طلبك {orderNumber}",
-            OrderStatus.DELIVERY_FAILED => $"تعذّر تسليم طلبك {orderNumber} — سيتواصل معك فريقنا",
+            OrderStatus.DELIVERY_FAILED => $"تعذّر تسليم طلبك {orderNumber} — تعود البضاعة للمتجر ولا تدفع ثمنها",
             _ => $"تم تحديث طلبك {orderNumber}: {Ar(status)}",
         };
     }

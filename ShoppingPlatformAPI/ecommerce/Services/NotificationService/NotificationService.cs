@@ -1,9 +1,11 @@
 ﻿using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
+using ecommerce.Data;
 using ecommerce.Hubs;
 using ecommerce.Repositories;
 using ecommerce.Services.PushService;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace ecommerce.Services.NotificationService
@@ -19,6 +21,7 @@ namespace ecommerce.Services.NotificationService
         private readonly IUserPreferencesRepository _preferencesRepository;
         private readonly ILogger<NotificationService> _logger;
         private readonly IPushQueue? _push;
+        private readonly AppDbContext? _context;
 
         public NotificationService(
             IHubContext<NotificationHub> notificationHub,
@@ -29,9 +32,11 @@ namespace ecommerce.Services.NotificationService
             IProductRepository productRepository,
             IUserPreferencesRepository preferencesRepository,
             ILogger<NotificationService> logger,
-            IPushQueue? push = null)
+            IPushQueue? push = null,
+            AppDbContext? context = null)
         {
             _push = push;
+            _context = context;
             _notificationHub = notificationHub;
             _opsHub = opsHub;
             _notificationRepository = notificationRepository;
@@ -171,8 +176,9 @@ namespace ecommerce.Services.NotificationService
             if (!await IsEnabledAsync(customerId, NotificationCategory.OrderUpdates)) return;
             // «مؤكد جزئياً» حالة عابرة (متجر أكّد وآخر لم يرد بعد) — الزبون يُبلَّغ حين يكتمل التأكيد
             if (newStatus == OrderStatus.PARTIALLY_CONFIRMED) return;
+            if (await IsRepeatOrBackwardAsync(orderId, newStatus)) return;
 
-            var message = OrderStatusText.CustomerMessage(newStatus, orderNumber);
+            var message = await CustomerStatusMessageAsync(orderId, orderNumber, newStatus);
             var data = new { orderId, orderNumber, status = newStatus };
 
             var notification = new Notification
@@ -197,16 +203,52 @@ namespace ecommerce.Services.NotificationService
             });
         }
 
-        // إشعار صاحب المتجر (إن وُجد له حساب مرتبط) — فشله لا يُفشل العملية التي أطلقته
+        private static readonly string[] CustomerSteps =
+        {
+            OrderStatus.PENDING_CONFIRMATION, OrderStatus.CONFIRMED, OrderStatus.PREPARING,
+            OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED,
+        };
+
+        // خطوة وصلها الطلب من قبل (جاهز ← تحضير ← جاهز) أو رجوع لخطوة سابقة: لا يُبلَّغ الزبون مرة ثانية
+        // ولا برسائل متناقضة. سجل الحالة الجديدة محفوظ قبل الإشعار، فظهورها أكثر من مرة = تكرار
+        private async Task<bool> IsRepeatOrBackwardAsync(Guid orderId, string newStatus)
+        {
+            var rank = Array.IndexOf(CustomerSteps, newStatus);
+            if (_context == null || rank < 0) return false;
+            var reached = await _context.OrderStatusLogs.AsNoTracking()
+                .Where(l => l.OrderId == orderId).Select(l => l.NewStatus).ToListAsync();
+            static string Main(string s) => s == OrderStatus.PARTIALLY_CONFIRMED ? OrderStatus.CONFIRMED : s;
+            return reached.Count(s => s == newStatus) > 1 || reached.Any(s => Array.IndexOf(CustomerSteps, Main(s)) > rank);
+        }
+
+        // الإلغاء: السبب، وأن النقاط المستخدمة رجعت للرصيد
+        private async Task<string> CustomerStatusMessageAsync(Guid orderId, string orderNumber, string status)
+        {
+            if (status != OrderStatus.CANCELLED || _context == null) return OrderStatusText.CustomerMessage(status, orderNumber);
+            var order = await _context.Orders.AsNoTracking().Where(o => o.Id == orderId)
+                .Select(o => new { o.CancellationReason, o.PointsRedeemedAmount }).FirstOrDefaultAsync();
+            return OrderStatusText.CustomerMessage(status, orderNumber)
+                + (string.IsNullOrWhiteSpace(order?.CancellationReason) ? "" : $": {order.CancellationReason.Trim()}")
+                + (order?.PointsRedeemedAmount > 0 ? " — أُعيدت النقاط المستخدمة إلى رصيدك" : "");
+        }
+
+        // إشعار صاحب المتجر (إن وُجد له حساب مرتبط) وموظفيه الذين يملكون صلاحية هذا النوع — فشله لا يُفشل العملية التي أطلقته
         public async Task NotifyVendorAsync(
             Guid vendorId, NotificationCategory category, string type, string message, object? data = null)
         {
             try
             {
                 var vendor = await _vendorRepository.GetByIdAsync(vendorId);
-                if (vendor?.OwnerId == null) return;
+                if (vendor?.OwnerId != null)
+                    await SendToUserAsync(vendor.OwnerId.Value, category, type, message, data);
 
-                await SendToUserAsync(vendor.OwnerId.Value, category, type, message, data);
+                var permission = StaffPermissionFor(category);
+                if (permission == null || _context == null) return;
+                var staff = await _context.Users.AsNoTracking()
+                    .Where(u => u.StaffVendorId == vendorId && u.IsActive && u.Permissions != null)
+                    .Select(u => new { u.Id, u.Permissions }).ToListAsync();
+                foreach (var s in staff.Where(s => StaffPermissions.Parse(s.Permissions).Contains(permission)))
+                    await SendToUserAsync(s.Id, category, type, message, data);
             }
             catch (Exception ex)
             {
@@ -215,13 +257,32 @@ namespace ecommerce.Services.NotificationService
             }
         }
 
+        // أي إشعارات المتجر تصل موظفه — حسب القسم الذي يعمل فيه
+        private static string? StaffPermissionFor(NotificationCategory category) => category switch
+        {
+            NotificationCategory.NewOrders or NotificationCategory.OrderConfirmations
+                or NotificationCategory.OrderUpdates or NotificationCategory.Returns => StaffPermissions.Orders,
+            NotificationCategory.LowStock => StaffPermissions.Products,
+            NotificationCategory.Reviews => StaffPermissions.Reviews,
+            _ => null,
+        };
+
         // كل مستخدمي الأدمن الذين فعّلوا هذه الفئة — فشله لا يُفشل العملية التي أطلقته
-        public async Task NotifyAdminsAsync(
+        public Task NotifyAdminsAsync(
             NotificationCategory category, string type, string message, object? data = null)
+            => NotifyRoleAsync(UserRoles.Admin, category, type, message, data);
+
+        // موظفو العمليات: إشعار محفوظ (يبقى في قائمتهم) لا بثّ لحظي فقط — إلغاء الزبون، فشل التوصيل، طلب إرجاع
+        public Task NotifyOpsAsync(
+            NotificationCategory category, string type, string message, object? data = null)
+            => NotifyRoleAsync(UserRoles.Ops, category, type, message, data);
+
+        private async Task NotifyRoleAsync(
+            string role, NotificationCategory category, string type, string message, object? data)
         {
             try
             {
-                var admins = (await _userRepository.GetByRoleAsync(UserRoles.Admin)).ToList();
+                var admins = (await _userRepository.GetByRoleAsync(role)).ToList();
                 if (admins.Count == 0) return;
 
                 var preferences = (await _preferencesRepository.GetByUserIdsAsync(admins.Select(a => a.Id)))
@@ -239,11 +300,11 @@ namespace ecommerce.Services.NotificationService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Admin notification failed. Category: {Category}", category);
+                _logger.LogWarning(ex, "{Role} notification failed. Category: {Category}", role, category);
             }
         }
 
-        // صاحب المتجر + الأدمن
+        // صاحب المتجر فقط — المخزون من شأن المتجر لا الأدمن
         public async Task NotifyLowStockAsync(Guid productId, string productName, Guid vendorId, int stockQuantity)
         {
             var message = stockQuantity == 0
@@ -252,7 +313,6 @@ namespace ecommerce.Services.NotificationService
             var data = new { productId, vendorId, stockQuantity };
 
             await NotifyVendorAsync(vendorId, NotificationCategory.LowStock, NotificationType.LOW_STOCK, message, data);
-            await NotifyAdminsAsync(NotificationCategory.LowStock, NotificationType.LOW_STOCK, message, data);
         }
 
         // صاحب المتجر: تقييم جديد على أحد منتجاته

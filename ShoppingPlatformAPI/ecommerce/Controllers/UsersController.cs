@@ -116,7 +116,8 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var result = await _userService.DeleteAsync(id);
+                var actingUserId = Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var me) ? me : Guid.Empty;
+                var result = await _userService.DeleteAsync(id, actingUserId);
                 if (result)
                     return Ok(new { success = true, message = "تم حذف المستخدم بنجاح" });
                 else

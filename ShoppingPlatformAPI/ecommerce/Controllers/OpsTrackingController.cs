@@ -1,3 +1,4 @@
+using ecommerce.Core.Exceptions;
 using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Ops;
@@ -44,8 +45,11 @@ namespace ecommerce.Controllers
         // GET: api/ops/reports?from=2026-09-01&to=2026-09-30 — التواريخ بتوقيت العراق
         [HttpGet("reports")]
         public async Task<ActionResult<ApiResponse<OpsReportDto>>> GetReport(
-            [FromQuery] DateOnly from, [FromQuery] DateOnly to, CancellationToken ct)
-            => Ok(ApiResponse<OpsReportDto>.Ok(await _reports.GetReportAsync(from, to, ct)));
+            [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct)
+        {
+            if (from == null || to == null) throw new BusinessRuleException("حدّد تاريخ البداية والنهاية للتقرير");
+            return Ok(ApiResponse<OpsReportDto>.Ok(await _reports.GetReportAsync(from.Value, to.Value, ct)));
+        }
     }
 
     // صفحة السائق — بلا تسجيل دخول، الرمز في الرابط هو الصلاحية

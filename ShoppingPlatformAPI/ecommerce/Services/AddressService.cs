@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.DTO.Addresses;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.DTO.Addresses;
 using ecommerce.Core.Models;
 using ecommerce.Data;
 using ecommerce.Repositories;
@@ -52,6 +53,8 @@ namespace ecommerce.Services
                 throw new BusinessRuleException("موقع الخريطة غير مكتمل");
             if (lat.HasValue && (lat is < -90 or > 90 || lng is < -180 or > 180 || (lat == 0 && lng == 0)))
                 throw new BusinessRuleException("موقع الخريطة غير صالح");
+            if (!ServiceArea.Covers(lat, lng))
+                throw new BusinessRuleException(ServiceArea.OutsideMessage);
         }
 
         public async Task<AddressResponseDto> CreateAsync(AddressCreateDto dto)
@@ -62,15 +65,15 @@ namespace ecommerce.Services
             {
                 ZoneId = zone?.Id,
                 UserId = dto.UserId,
-                Label = dto.Label,
+                Label = dto.Label ?? "",
                 StreetAddress = dto.StreetAddress,
                 Area = dto.Area,
                 City = dto.City,
-                BuildingNumber = dto.BuildingNumber,
-                FloorNumber = dto.FloorNumber,
-                ApartmentNumber = dto.ApartmentNumber,
+                BuildingNumber = dto.BuildingNumber ?? "",
+                FloorNumber = dto.FloorNumber ?? "",
+                ApartmentNumber = dto.ApartmentNumber ?? "",
                 Phone = dto.Phone,
-                Notes = dto.Notes,
+                Notes = dto.Notes ?? "",
                 IsDefault = dto.IsDefault,
                 Latitude = dto.Latitude.HasValue ? Math.Round(dto.Latitude.Value, 7) : null,
                 Longitude = dto.Longitude.HasValue ? Math.Round(dto.Longitude.Value, 7) : null

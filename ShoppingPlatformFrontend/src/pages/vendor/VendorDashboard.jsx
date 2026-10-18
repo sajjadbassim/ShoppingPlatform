@@ -11,6 +11,7 @@ import { StatusBadge } from '../../components/common/Badge'
 import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useAuthStore } from '../../stores/authStore'
+import { can } from '../../utils/permissions'
 import { apiGet, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
@@ -74,6 +75,8 @@ const VendorDashboard = () => {
   const recentOrders = d.recentOrders ?? []
   const topProducts = d.topProducts ?? []
 
+  // أرقام الرئيسية (مبيعات وطلبات وتقييمات) صلاحية مستقلة للموظف
+  const showNumbers = can(user, 'home')
   const stats = [
     { title: 'المبيعات', value: `${totalRevenue > 1000000 ? (totalRevenue/1000000).toFixed(1)+'M' : totalRevenue.toLocaleString('en-US')} د.ع`, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
     { title: 'الطلبات',  value: (d.totalOrders ?? 0).toString(), icon: ShoppingCart, iconBg: 'bg-blue-100',   iconColor: 'text-blue-600' },
@@ -91,7 +94,8 @@ const VendorDashboard = () => {
         </div>
         <div className="flex items-center gap-2">
           {storeState && (
-            <button onClick={() => setAccepting(!accepting)} disabled={switching}
+            // الموظف بلا صلاحية الإعدادات يرى الحالة ولا يغيّرها
+            <button onClick={() => setAccepting(!accepting)} disabled={switching || !can(user, 'settings')}
               title={accepting ? 'اضغط لإيقاف استقبال الطلبات مؤقتاً' : 'اضغط لاستئناف استقبال الطلبات'}
               className={`h-10 px-3 rounded-lg border text-sm font-bold inline-flex items-center gap-1.5 disabled:opacity-60 ${storeState.cls}`}>
               <Power size={15} />{storeState.label}
@@ -118,6 +122,7 @@ const VendorDashboard = () => {
         </div>
       )}
 
+      {showNumbers && (<>
       {/* Stats */}
       {isLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -318,13 +323,15 @@ const VendorDashboard = () => {
         </div>
       </div>
 
+      </>)}
+
       {/* Quick Actions */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { to: '/vendor/products/new', bg: 'bg-blue-50 hover:bg-blue-100',     icon: Package,      color: 'text-blue-600',   title: 'إضافة منتج',      desc: 'أضف منتجات جديدة' },
-          { to: '/vendor/orders',       bg: 'bg-yellow-50 hover:bg-yellow-100', icon: ShoppingCart, color: 'text-yellow-600', title: 'الطلبات المعلقة', desc: `${pendingOrders} طلب` },
-          { to: '/vendor/products',     bg: 'bg-purple-50 hover:bg-purple-100', icon: TrendingUp,   color: 'text-purple-600', title: 'المنتجات',        desc: `${totalProducts} منتج` },
-          { to: '/vendor/reviews',      bg: 'bg-orange-50 hover:bg-orange-100', icon: Star,         color: 'text-orange-500', title: 'التقييمات',       desc: `${avgRating.toFixed(1)} ⭐ متوسط` },
+          { to: '/vendor/orders',       bg: 'bg-yellow-50 hover:bg-yellow-100', icon: ShoppingCart, color: 'text-yellow-600', title: 'الطلبات المعلقة', desc: showNumbers ? `${pendingOrders} طلب` : 'عرض الطلبات' },
+          { to: '/vendor/products',     bg: 'bg-purple-50 hover:bg-purple-100', icon: TrendingUp,   color: 'text-purple-600', title: 'المنتجات',        desc: showNumbers ? `${totalProducts} منتج` : 'عرض المنتجات' },
+          { to: '/vendor/reviews',      bg: 'bg-orange-50 hover:bg-orange-100', icon: Star,         color: 'text-orange-500', title: 'التقييمات',       desc: showNumbers ? `${avgRating.toFixed(1)} ⭐ متوسط` : 'عرض التقييمات' },
         ].map((a, i) => (
           <Link key={i} to={a.to} className={`${a.bg} p-4 rounded-xl transition-colors`}>
             <a.icon size={26} className={`${a.color} mb-2`} />

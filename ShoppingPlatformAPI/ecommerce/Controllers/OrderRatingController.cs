@@ -61,6 +61,10 @@ namespace ecommerce.Controllers
 
                 return Ok(new { success = true, data = rating });
             }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
             catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
@@ -97,6 +101,10 @@ namespace ecommerce.Controllers
             {
                 var status = await _ratingService.GetRatingStatusAsync(orderId, GetCurrentUserId());
                 return Ok(new { success = true, data = status });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
             }
             catch (AppException ex)
             {

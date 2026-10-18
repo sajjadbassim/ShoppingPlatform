@@ -1,4 +1,5 @@
-﻿using ecommerce.Core.DTO.Common;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Loyalty;
 using ecommerce.Repositories;
 using ecommerce.Services;
@@ -159,6 +160,10 @@ namespace ecommerce.Controllers
                 var account = await _loyaltyService.AdminAdjustPointsAsync(dto);
                 return Ok(new { success = true, data = account, message = "تم تعديل النقاط بنجاح" });
             }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
+            }
             catch (AppException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
@@ -175,8 +180,13 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var account = await _loyaltyService.GetOrCreateAccountAsync(userId);
+                // لا يُنشأ حساب نقاط لمستخدم غير موجود أو ليس زبوناً
                 var user = await _userRepository.GetByIdAsync(userId);
+                if (user == null)
+                    return NotFound(new { success = false, message = "المستخدم غير موجود" });
+                if (user.Role != UserRoles.Customer)
+                    return BadRequest(new { success = false, message = "النقاط للزبائن فقط" });
+                var account = await _loyaltyService.GetOrCreateAccountAsync(userId);
                 var recentTransactions = await _loyaltyService.GetTransactionsAsync(
                     userId, new PaginationParams { PageNumber = 1, PageSize = 5 });
 

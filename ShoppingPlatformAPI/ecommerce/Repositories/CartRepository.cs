@@ -127,6 +127,15 @@ namespace ecommerce.Repositories
             return true;
         }
 
+        // حذف قطع بعينها (ما دخل الطلب) — ما أُضيف للسلة بعد قراءتها يبقى
+        public async Task RemoveItemsAsync(Guid cartId, IReadOnlyCollection<Guid> itemIds)
+        {
+            var items = await _context.CartItems.Where(ci => ci.CartId == cartId && itemIds.Contains(ci.Id)).ToListAsync();
+            if (items.Count == 0) return;
+            _context.CartItems.RemoveRange(items);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<bool> ClearCartAsync(Guid cartId)
         {
             var cartItems = await _context.CartItems

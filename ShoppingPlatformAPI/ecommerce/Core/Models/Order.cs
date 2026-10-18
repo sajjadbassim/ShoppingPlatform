@@ -86,6 +86,22 @@ namespace ecommerce.Core.Models
         [Column("refusal_fee_payer")]
         public string? RefusalFeePayer { get; set; }
 
+        // استثناء العمليات لهذا الطلب فقط (قبل أن يسجّل السائق الرفض): من يتحمّل الأجرة إن رفض الزبون —
+        // يتقدّم على إعداد الأدمن العام. مثال: المتجر أرسل قطعة خاطئة فلا ذنب للزبون
+        [MaxLength(20)]
+        [Column("refusal_fee_payer_override")]
+        public string? RefusalFeePayerOverride { get; set; }
+
+        [MaxLength(300)]
+        [Column("refusal_fee_override_reason")]
+        public string? RefusalFeeOverrideReason { get; set; }
+
+        [Column("refusal_fee_override_by")]
+        public Guid? RefusalFeeOverrideBy { get; set; }
+
+        [Column("refusal_fee_override_at")]
+        public DateTime? RefusalFeeOverrideAt { get; set; }
+
         [Column("customer_notes")]
         public string CustomerNotes { get; set; }
 
@@ -123,6 +139,29 @@ namespace ecommerce.Core.Models
         // متجر الكوبون إن كان كوبوناً خاصاً بمتجر (يتحمّله المتجر ويُحسب على طلبه الفرعي فقط) — فارغ = كوبون عام
         [Column("coupon_vendor_id")]
         public Guid? CouponVendorId { get; set; }
+
+        // لقطة من الكوبون وقت الطلب — يُعاد بها حساب الخصم إن سقط جزء من الطلب (الأدمن قد يعدّل الكوبون لاحقاً)
+        [MaxLength(20)]
+        [Column("coupon_discount_type")]
+        public string? CouponDiscountType { get; set; }
+
+        [Column("coupon_discount_value", TypeName = "decimal(10,2)")]
+        public decimal? CouponDiscountValue { get; set; }
+
+        [Column("coupon_max_discount", TypeName = "decimal(10,2)")]
+        public decimal? CouponMaxDiscount { get; set; }
+
+        // خصم الكوبون الأصلي عند الطلب — سقف الكوبون الثابت
+        [Column("coupon_original_amount", TypeName = "decimal(10,2)")]
+        public decimal CouponOriginalAmount { get; set; } = 0;
+
+        // إجمالي الطلب عند الشراء (بعد الكوبون) — للعرض فقط بعد الرفض عند الباب؛ TotalAmount هو ما يدفعه الزبون فعلاً
+        [Column("original_total_amount", TypeName = "decimal(10,2)")]
+        public decimal OriginalTotalAmount { get; set; } = 0;
+
+        // قيمة النقاط المستبدلة على الطلب (ناقص ما أُعيد للزبون) — PointsDiscountAmount هو المطبَّق منها فعلاً
+        [Column("points_redeemed_amount", TypeName = "decimal(10,2)")]
+        public decimal PointsRedeemedAmount { get; set; } = 0;
 
         // موعد التوصيل الذي اختاره الزبون لطلب فيه منتجات سوبرماركت (UTC) — فارغ = في أقرب وقت
         [Column("delivery_slot_start")]

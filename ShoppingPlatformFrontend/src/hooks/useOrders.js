@@ -280,6 +280,19 @@ export const useAssignDriver = () => {
 /**
  * تعيين سائق لكامل الطلب دفعة وحدة
  */
+export const useUnassignDriver = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason }) => opsService.unassignDriver(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: opsKeys.all });
+      queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      queryClient.invalidateQueries({ queryKey: driverKeys.all });
+    },
+  });
+};
+
 export const useAssignDriverToOrder = () => {
   const queryClient = useQueryClient();
 

@@ -143,6 +143,11 @@ namespace ecommerce.Tests.Services
                 Items = { new ReturnItem { ProductId = _shirt.Id, Quantity = 1, UnitPrice = 15_000 } } };
             _context.AddRange(ret, door); _context.SaveChanges();
 
+            // لا يُخصم من المتجر قبل أن تصله القطعة
+            await Service().EnsureReturnEntriesAsync(ret.Id);
+            Assert.Equal(0, Sum(LedgerType.Return));
+            ret.ItemsReceivedAt = DateTime.UtcNow; _context.SaveChanges();
+
             await Service().EnsureReturnEntriesAsync(ret.Id);
             await Service().EnsureReturnEntriesAsync(ret.Id);
             await Service().EnsureReturnEntriesAsync(door.Id);
@@ -165,6 +170,29 @@ namespace ecommerce.Tests.Services
             Assert.Equal(30_000, st.Summary.Payouts);
             Assert.Equal(19_500, st.Entries.First().RunningBalance);   // الأحدث أولاً
             Assert.Equal(0, (await Service().GetBalancesAsync()).Single(b => b.VendorId == _other.Id).Balance);
+        }
+
+        [Fact]
+        public async Task Payout_AboveBalance_IsRejected_AndResponseCarriesNewBalance()
+        {
+            // مستحقات 49,500 (55,000 − عمولة 5,500): دفعة 99,999,999 كانت تُقبل وتجعل الرصيد سالباً
+            await Service().EnsureSubOrderEntriesAsync(Delivered(_vendor).Id);
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RecordPayoutAsync(_vendor.Id, 99_999_999, null, null, Guid.NewGuid()));
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RecordPayoutAsync(_other.Id, 1_000, null, null, Guid.NewGuid()));
+
+            var entry = await Service().RecordPayoutAsync(_vendor.Id, 49_500, null, null, Guid.NewGuid());
+            Assert.Equal(0, entry.RunningBalance);
+            Assert.Equal(0, (await Service().GetBalancesAsync()).Single(b => b.VendorId == _vendor.Id).Balance);
+        }
+
+        [Fact]
+        public async Task Adjustment_BeyondLimit_IsRejected()
+        {
+            // 99,999,999,999 يتجاوز عمود المبلغ وكان يعطي خطأ 500
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RecordAdjustmentAsync(_vendor.Id, 99_999_999_999, "تسوية", Guid.NewGuid()));
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().RecordAdjustmentAsync(_vendor.Id, -99_999_999_999, "تسوية", Guid.NewGuid()));
+            var entry = await Service().RecordAdjustmentAsync(_vendor.Id, 2_000, "تعويض", Guid.NewGuid());
+            Assert.Equal(2_000, entry.RunningBalance);
         }
 
         [Fact]

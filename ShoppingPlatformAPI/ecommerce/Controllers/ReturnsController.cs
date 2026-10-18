@@ -18,15 +18,18 @@ namespace ecommerce.Controllers
         private readonly IReturnService _returnService;
         private readonly IReturnRestockService _returnRestockService;
         private readonly ICurrentUserService _currentUser;
+        private readonly ecommerce.Services.ReturnTripService.IReturnTripService? _trips;
 
         public ReturnsController(
             IReturnService returnService,
             IReturnRestockService returnRestockService,
-            ICurrentUserService currentUser)
+            ICurrentUserService currentUser,
+            ecommerce.Services.ReturnTripService.IReturnTripService? trips = null)
         {
             _returnService = returnService;
             _returnRestockService = returnRestockService;
             _currentUser = currentUser;
+            _trips = trips;
         }
 
         private Guid? GetCurrentUserId()
@@ -133,9 +136,9 @@ namespace ecommerce.Controllers
                 return CreatedAtAction(nameof(GetById), new { id = returnRequest.Id },
                     new { success = true, data = returnRequest, message = "تم تقديم طلب الإرجاع بنجاح، سيتم مراجعته خلال 24 ساعة" });
             }
-            catch (UnauthorizedAccessException)
+            catch (NotFoundException ex)
             {
-                return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لإرجاع هذا الطلب" });
+                return NotFound(new { success = false, message = ex.Message });
             }
             catch (AppException ex)
             {
@@ -160,6 +163,49 @@ namespace ecommerce.Controllers
         }
 
         // ===================================
+        // POST: api/returns/{id}/assign-driver    (Admin/Ops) — سائق يأخذ القطع من الزبون إلى متجرها
+        // ===================================
+        [HttpPost("{id:guid}/assign-driver")]
+        [Authorize(Policy = PolicyNames.OpsOrAdmin)]
+        public async Task<ActionResult<ApiResponse<ReturnResponseDto>>> AssignDriver(Guid id, [FromBody] AssignReturnDriverDto dto, CancellationToken ct)
+        {
+            await _trips!.AssignCustomerReturnAsync(id, dto.DriverId, _currentUser.UserId, ct);
+            return Ok(ApiResponse<ReturnResponseDto>.Ok(await _returnService.GetByIdAsync(id), "تم تعيين السائق لاستلام القطع من الزبون"));
+        }
+
+        // POST: api/returns/{id}/unassign-driver    (Admin/Ops) — قبل أن يأخذ السائق القطع
+        [HttpPost("{id:guid}/unassign-driver")]
+        [Authorize(Policy = PolicyNames.OpsOrAdmin)]
+        public async Task<ActionResult<ApiResponse<ReturnResponseDto>>> UnassignDriver(Guid id, CancellationToken ct)
+        {
+            await _trips!.UnassignCustomerReturnAsync(id, _currentUser.UserId, ct);
+            return Ok(ApiResponse<ReturnResponseDto>.Ok(await _returnService.GetByIdAsync(id), "سُحب الاستلام من السائق"));
+        }
+
+        public record AssignReturnDriverDto(Guid DriverId);
+
+        // POST: api/returns/{id}/pickup-fee    (Admin/Ops) — استثناء: من يتحمّل أجرة استلام هذا المرتجع
+        [HttpPost("{id:guid}/pickup-fee")]
+        [Authorize(Policy = PolicyNames.OpsOrAdmin)]
+        public async Task<ActionResult<ApiResponse<ReturnResponseDto>>> SetPickupFee(Guid id, [FromBody] ecommerce.Core.DTO.Drivers.SetFeePayerOverrideDto dto)
+        {
+            var result = await _returnService.SetPickupFeePayerAsync(id, dto.Payer ?? "", dto.Reason, _currentUser.UserId);
+            return Ok(ApiResponse<ReturnResponseDto>.Ok(result, "تم تغيير أجرة الاستلام"));
+        }
+
+        // ===================================
+        // POST: api/returns/{id}/refunded    (Admin/Ops)
+        // تسجيل ردّ المبلغ للزبون — الإرجاع يصبح «مكتمل»
+        // ===================================
+        [HttpPost("{id:guid}/refunded")]
+        [Authorize(Policy = PolicyNames.OpsOrAdmin)]
+        public async Task<ActionResult<ApiResponse<ReturnResponseDto>>> MarkRefunded(Guid id)
+        {
+            var returnRequest = await _returnService.MarkRefundedAsync(id, _currentUser.UserId);
+            return Ok(ApiResponse<ReturnResponseDto>.Ok(returnRequest, "تم تسجيل ردّ المبلغ للزبون"));
+        }
+
+        // ===================================
         // PUT: api/returns/{id}/review    (Admin/Ops)
         // الموافقة أو رفض طلب الإرجاع
         // ===================================
@@ -180,6 +226,10 @@ namespace ecommerce.Controllers
                     : "تم رفض طلب الإرجاع";
 
                 return Ok(new { success = true, data = returnRequest, message });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { success = false, message = ex.Message });
             }
             catch (AppException ex)
             {

@@ -13,6 +13,7 @@
         public decimal? WeightStepKg { get; set; }     // بالوزن: الكمية × هذا = كغم
         public Guid? ReplacesItemId { get; set; }      // بديل عن قطعة غير متوفرة
         public int UnavailableQuantity { get; set; }
+        public int RefusedQuantity { get; set; }       // رفضها الزبون عند الباب
 
         public Guid? VariantId { get; set; }
         public string? VariantSku { get; set; }

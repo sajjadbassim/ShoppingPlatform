@@ -1,4 +1,4 @@
-// حدود ألوان سرعة التوصيل — الأدمن يعدّلها، والعمليات تراها
+// حدود ألوان سرعة التوصيل — فريق العمليات يعدّلها
 import { useEffect, useState } from 'react'
 import { Timer } from 'lucide-react'
 import { SettingsSection } from './SettingsSection'
@@ -44,7 +44,7 @@ const DeliverySpeedThresholds = ({ editable = false }) => {
         المدة من إنشاء الطلب حتى وصوله للزبون. تحدد لون المدة في قوائم الطلبات والتقارير.
       </p>
       {!editable ? (
-        isLoading ? <div className="h-14 rounded-lg bg-gray-100 animate-pulse" /> : <>{legend}<p className="text-xs text-gray-400 mt-2">يغيّرها مدير النظام.</p></>
+        isLoading ? <div className="h-14 rounded-lg bg-gray-100 animate-pulse" /> : <>{legend}<p className="text-xs text-gray-400 mt-2">يغيّرها فريق العمليات.</p></>
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-gray-700">

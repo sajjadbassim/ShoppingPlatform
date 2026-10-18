@@ -12,6 +12,7 @@ namespace ecommerce.Repositories
         Task<CartItem> UpdateItemAsync(CartItem cartItem);
         Task<bool> RemoveItemAsync(Guid cartId, Guid productId, Guid? variantId = null);
         Task<bool> ClearCartAsync(Guid cartId);
+        Task RemoveItemsAsync(Guid cartId, IReadOnlyCollection<Guid> itemIds);
         Task<IEnumerable<CartItem>> GetCartItemsAsync(Guid cartId);
     }
 }

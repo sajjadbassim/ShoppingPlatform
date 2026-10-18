@@ -16,8 +16,8 @@ namespace ecommerce.Services.AdminService
         Task<IEnumerable<UserManagementDto>> GetAllUsersAsync(string role = null);
         Task<Common.PagedResponse<UserSearchResponseDto>> SearchUsersAsync(string? term, string? role, PaginationParams pagination, CancellationToken ct = default);
         Task<UserResponseDto> CreateOpsUserAsync(CreateOpsUserDto dto);
-        Task<bool> ToggleUserStatusAsync(Guid userId);
-        Task<bool> DeleteUserAsync(Guid userId);
+        Task<bool> ToggleUserStatusAsync(Guid userId, Guid actingUserId);
+        Task<bool> DeleteUserAsync(Guid userId, Guid actingUserId);
 
         // Vendor Management
         Task<IEnumerable<VendorResponseDto>> GetAllVendorsAsync(bool? isActive = null);

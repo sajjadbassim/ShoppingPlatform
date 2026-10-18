@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '../api/axios';
+import api, { apiGet, apiPost } from '../api/axios';
 import { API_ENDPOINTS } from '../api/endpoints';
 
 export const orderService = {
@@ -111,6 +111,26 @@ export const orderService = {
   getInvoicePreview: async (orderId) => {
     const response = await apiGet(API_ENDPOINTS.INVOICE.PREVIEW(orderId));
     return response.data.data || response.data;
+  },
+
+  /**
+   * فتح فاتورة PDF في تبويب جديد (الزبون والعمليات والأدمن).
+   * الفاتورة تحتاج التوكن فلا يكفي رابط مباشر: تُجلب ثم تُفتح من الذاكرة.
+   * التبويب يُفتح فوراً عند النقر كي لا يمنعه المتصفح كنافذة منبثقة.
+   */
+  openInvoice: async (orderId) => {
+    const win = window.open('', '_blank');
+    try {
+      const res = await api.get(API_ENDPOINTS.INVOICE.PREVIEW(orderId), { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      if (win) win.location.href = url; else window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60 * 1000);
+    } catch (e) {
+      win?.close();
+      // رسالة الخطأ تصل كـ Blob مع responseType: 'blob'
+      if (e?.status && typeof Blob !== 'undefined') e.message = e.status === 400 ? 'الفاتورة متاحة فقط للطلبات المسلّمة' : 'تعذّر فتح الفاتورة';
+      throw e;
+    }
   },
 
   // ===========================

@@ -24,6 +24,7 @@ namespace ecommerce.Services.AuthService
         private readonly ISmsSender _smsSender;
         private readonly INotificationService _notificationService;
         private readonly IAuthThrottle _throttle;
+        private readonly ecommerce.Services.ActivityLogService.IActivityLogService? _activity;
         private readonly IRefreshTokenRepository _refreshTokens;
         private readonly ILoyaltyService? _loyalty;
 
@@ -36,8 +37,10 @@ namespace ecommerce.Services.AuthService
             INotificationService notificationService,
             IAuthThrottle throttle,
             IRefreshTokenRepository refreshTokens,
-            ILoyaltyService? loyalty = null)
+            ILoyaltyService? loyalty = null,
+            ecommerce.Services.ActivityLogService.IActivityLogService? activity = null)
         {
+            _activity = activity;
             _loyalty = loyalty;
             _throttle = throttle;
             _refreshTokens = refreshTokens;
@@ -95,7 +98,7 @@ namespace ecommerce.Services.AuthService
         {
             Guid? vendorId = null;
             if (user.Role == UserRoles.Vendor)
-                vendorId = (await _vendorRepository.GetByOwnerIdAsync(user.Id))?.Id;
+                vendorId = user.StaffVendorId ?? (await _vendorRepository.GetByOwnerIdAsync(user.Id))?.Id;
 
             var refreshToken = Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(32));
             var refreshExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenDays > 0 ? _jwtSettings.RefreshTokenDays : 30);
@@ -119,6 +122,8 @@ namespace ecommerce.Services.AuthService
                 RefreshToken = refreshToken,
                 RefreshTokenExpiresAt = refreshExpiresAt,
                 VendorId = vendorId,
+                Permissions = user.Permissions == null ? null : StaffPermissions.Parse(user.Permissions).ToList(),
+                IsStoreStaff = user.StaffVendorId != null,
             };
         }
 
@@ -197,17 +202,24 @@ namespace ecommerce.Services.AuthService
             if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             {
                 _throttle.LoginFailed(key);
+                // سجل النشاط: محاولة فاشلة على حساب موظف/متجر/سائق موجود (الزبائن والأرقام غير المسجّلة لا تُسجَّل)
+                if (user != null && _activity != null) await _activity.RecordLoginAsync(user, success: false);
                 throw new BusinessRuleException("بيانات الدخول أو كلمة المرور غير صحيحة");
             }
             _throttle.LoginSucceeded(key);
 
             if (!user.IsActive)
+            {
+                if (_activity != null) await _activity.RecordLoginAsync(user, success: false, "محاولة دخول لحساب معطّل");
                 throw new BusinessRuleException("الحساب معطل. يرجى التواصل مع الدعم الفني");
+            }
 
             user.LastLogin = DateTime.UtcNow;
             await _userRepository.UpdateAsync(user);
 
-            return await IssueSessionAsync(user);
+            var session = await IssueSessionAsync(user);
+            if (_activity != null) await _activity.RecordLoginAsync(user, success: true);
+            return session;
         }
 
         // ─────────────────────────────────────────────────────────────────────

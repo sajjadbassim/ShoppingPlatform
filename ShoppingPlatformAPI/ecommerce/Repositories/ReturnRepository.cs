@@ -138,7 +138,8 @@ namespace ecommerce.Repositories
             return await _context.Returns
                 .AnyAsync(r =>
                     r.OrderId == orderId &&
-                    r.Status != ReturnStatus.REJECTED);
+                    !r.IsDoorRefusal &&
+                    (r.Status == ReturnStatus.PENDING || r.Status == ReturnStatus.APPROVED && r.RefundedAt == null));
         }
 
         public async Task<bool> IsWithinReturnWindowAsync(Guid orderId, int returnWindowDays = 14)

@@ -96,6 +96,42 @@ namespace ecommerce.Tests.Services
         }
 
         [Fact]
+        public async Task Checkout_CouponSharesStoredPerStore_AndMessageHasOrderNumber()
+        {
+            SetupCoupon();
+            var order = await Checkout("SAVE10");
+
+            var subs = _context.SubOrders.Where(s => s.OrderId == order.Id).ToList();
+            Assert.Equal(4500, subs.Sum(s => s.CouponShare));   // 10% من 45,000 موزّعة على المتجرين
+            Assert.Equal(2000, subs.Single(s => s.VendorId == _storeA.Id).CouponShare);
+            _notify.Verify(n => n.NotifyCustomerAsync(_customer.Id, It.Is<string>(m => m.Contains(order.OrderNumber)), It.IsAny<object>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task Tracking_FailedThenCancelled_ShowsOnlyWhatHappened()
+        {
+            var order = await Checkout();
+            var sub = _context.SubOrders.First(s => s.OrderId == order.Id);
+            var o = _context.Orders.Single(x => x.Id == order.Id);
+            foreach (var st in new[] { OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY, OrderStatus.OUT_FOR_DELIVERY })
+                _context.OrderStatusLogs.Add(new OrderStatusLog { OrderId = o.Id, OldStatus = "", NewStatus = st });
+            // سجل الطلب الرئيسي بنص داخلي، وسجل الجزء بالسبب الفعلي
+            _context.OrderStatusLogs.Add(new OrderStatusLog { OrderId = o.Id, OldStatus = "", NewStatus = OrderStatus.DELIVERY_FAILED, Reason = "تحديث تلقائي: 0 مؤكد" });
+            _context.OrderStatusLogs.Add(new OrderStatusLog { SubOrderId = sub.Id, OldStatus = "", NewStatus = OrderStatus.DELIVERY_FAILED, Reason = "الزبون لا يرد" });
+            _context.OrderStatusLogs.Add(new OrderStatusLog { OrderId = o.Id, OldStatus = "", NewStatus = OrderStatus.CANCELLED });
+            o.Status = OrderStatus.CANCELLED;
+            _context.SaveChanges();
+
+            var tracking = await Service().GetOrderTrackingAsync(o.Id, _customer.Id);
+
+            var failed = Assert.Single(tracking.Timeline, t => t.Status == OrderStatus.DELIVERY_FAILED);
+            Assert.Contains("الزبون لا يرد", failed.Description);
+            Assert.DoesNotContain(tracking.Timeline, t => t.Status == OrderStatus.DELIVERED);
+            Assert.All(tracking.Timeline, t => Assert.True(t.IsCompleted));
+            Assert.Equal(OrderStatus.CANCELLED, tracking.Timeline.Last().Status);
+        }
+
+        [Fact]
         public async Task Checkout_SplitsOrderPerStoreWithServerSidePricesAndFees()
         {
             var order = await Checkout();
@@ -109,7 +145,9 @@ namespace ecommerce.Tests.Services
             Assert.Equal(2, subOrders.Count);
             Assert.Equal(20000, subOrders.Single(s => s.VendorId == _storeA.Id).Subtotal);
             Assert.Equal(25000, subOrders.Single(s => s.VendorId == _storeB.Id).Subtotal);
-            _carts.Verify(r => r.ClearCartAsync(_cart.Id), Times.Once);
+            // تُحذف قطع الطلب فقط (لا السلة كلها): ما أُضيف أثناء الإرسال يبقى
+            _carts.Verify(r => r.RemoveItemsAsync(_cart.Id, It.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == _cart.Items.Count)), Times.Once);
+            _carts.Verify(r => r.ClearCartAsync(It.IsAny<Guid>()), Times.Never);
         }
 
         [Fact]
@@ -153,7 +191,7 @@ namespace ecommerce.Tests.Services
         public async Task Checkout_WhenTransactionFails_SendsNoNotifications()
         {
             // آخر خطوة قبل الحفظ تفشل — الطلب يتراجع ولا يجوز أن يصل المتاجر إشعار عنه
-            _carts.Setup(r => r.ClearCartAsync(_cart.Id)).ThrowsAsync(new InvalidOperationException("db down"));
+            _carts.Setup(r => r.RemoveItemsAsync(_cart.Id, It.IsAny<IReadOnlyCollection<Guid>>())).ThrowsAsync(new InvalidOperationException("db down"));
 
             await Assert.ThrowsAsync<InvalidOperationException>(() => Checkout());
 

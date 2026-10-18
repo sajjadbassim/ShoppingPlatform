@@ -11,7 +11,7 @@ namespace ecommerce.Services
         Task<IEnumerable<UserResponseDto>> GetAllAsync();
         Task<IEnumerable<UserResponseDto>> GetByRoleAsync(string role);
         Task<UserResponseDto> UpdateAsync(Guid id, UpdateUserDto dto);
-        Task<bool> DeleteAsync(Guid id);
+        Task<bool> DeleteAsync(Guid id, Guid actingUserId);
 
         Task<PagedResponse<UserResponseDto>> GetUsersPagedAsync(
           string role = null,

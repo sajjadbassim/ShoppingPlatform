@@ -51,6 +51,7 @@ namespace ecommerce.Services.NotificationService
                     return orderId != null ? $"/admin/orders/{orderId}" : null;
 
                 case "OPS":
+                    if (hasReturn && orderId == null) return "/operations/customer-returns";
                     return orderId != null ? $"/operations/orders?order={orderId}" : null;
 
                 case "DRIVER":
@@ -59,7 +60,7 @@ namespace ecommerce.Services.NotificationService
                 case "VENDOR":
                 {
                     if (hasReview) return "/vendor/reviews";
-                    var vendorId = await _context.Vendors.Where(v => v.OwnerId == userId).Select(v => (Guid?)v.Id).FirstOrDefaultAsync(ct);
+                    var vendorId = await ecommerce.Core.Constants.VendorMembership.VendorIdOfAsync(_context, userId, ct);
                     if (vendorId == null) return null;
                     // الطلب الفرعي الخاص بمتجر هذا البائع فقط
                     var sub = await _context.SubOrders

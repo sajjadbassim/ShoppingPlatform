@@ -105,8 +105,8 @@ const CouponModal = ({ coupon, onClose, onSaved }) => {
         // ✅ عند الإنشاء: MinOrderAmount غير قابل لل null بالباك اند (decimal غير nullable) لذا نرسل 0 كقيمة افتراضية.
         // عند التعديل: null تعني "لا تغيير" بالباك اند (UpdateCouponDto.MinOrderAmount قابل لل null)، فنُبقيها null.
         minOrderAmount:    form.minOrderAmount    ? Number(form.minOrderAmount)    : (isEdit ? null : 0),
-        maxDiscountAmount: form.maxDiscountAmount ? Number(form.maxDiscountAmount) : null,
-        usageLimit:        form.usageLimit        ? Number(form.usageLimit)        : null,
+        maxDiscountAmount: form.maxDiscountAmount ? Number(form.maxDiscountAmount) : (isEdit ? 0 : null),   // عند التعديل: فارغ = إلغاء السقف
+        usageLimit:        form.usageLimit        ? Number(form.usageLimit)        : (isEdit ? 0 : null),   // عند التعديل: فارغ = بلا حد
         userUsageLimit:    form.userUsageLimit     ? Number(form.userUsageLimit)    : 1,
         vendorId:          form.vendorId   || null,
         categoryId:        form.categoryId || null,

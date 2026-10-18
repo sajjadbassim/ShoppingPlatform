@@ -157,6 +157,8 @@ export const API_ENDPOINTS = {
     PRODUCTS: (vendorId) => `/api/vendors/${vendorId}/dashboard/products`,
     PRODUCT_SALES: (vendorId) => `/api/vendors/${vendorId}/dashboard/products/sales`,
     REVIEWS: (vendorId) => `/api/vendors/${vendorId}/dashboard/reviews`,
+    RETURN_TRIPS: (vendorId) => `/api/vendors/${vendorId}/dashboard/return-trips`,
+    RETURN_TRIP_RECEIVED: (vendorId, tripId) => `/api/vendors/${vendorId}/dashboard/return-trips/${tripId}/received`,
   },
 
   // ============ Cart ============
@@ -289,6 +291,16 @@ export const API_ENDPOINTS = {
   },
 
   // ============ Returns ============  ✅ جديد كلياً
+  STAFF: {
+    VENDOR: '/api/vendor-staff',
+    ADMIN: '/api/admin-staff',
+  },
+
+  ACTIVITY: {
+    LIST: '/api/activity',
+    PURGE_OLD: '/api/activity/old',
+  },
+
   RETURNS: {
     BASE: '/api/Returns',
     MY: '/api/Returns/my',
@@ -296,6 +308,10 @@ export const API_ENDPOINTS = {
     BY_ID: (id) => `/api/Returns/${id}`,
     REVIEW: (id) => `/api/Returns/${id}/review`,
     RESTOCK: (id) => `/api/Returns/${id}/restock`,
+    REFUNDED: (id) => `/api/Returns/${id}/refunded`,
+    ASSIGN_DRIVER: (id) => `/api/Returns/${id}/assign-driver`,
+    UNASSIGN_DRIVER: (id) => `/api/Returns/${id}/unassign-driver`,
+    PICKUP_FEE: (id) => `/api/Returns/${id}/pickup-fee`,
   },
 
   // ============ Invoice ============  ✅ جديد كلياً
@@ -334,6 +350,8 @@ export const API_ENDPOINTS = {
 
   // ============ Operations ============
   OPS: {
+    RETURN_TRIPS: '/api/ops/return-trips',
+    RETURN_TRIP_RECEIVED: (id) => `/api/ops/return-trips/${id}/received`,
     PENDING_SUBORDERS: '/api/Ops/suborders/pending',
     SUBORDERS_PAGED: '/api/Ops/suborders/paged',
     SUBORDER_BY_ID: (id) => `/api/Ops/suborders/${id}`,
@@ -341,6 +359,7 @@ export const API_ENDPOINTS = {
     CANCEL_SUBORDER: (id) => `/api/Ops/suborders/${id}/cancel`,
     UPDATE_SUBORDER_STATUS: (id) => `/api/Ops/suborders/${id}/status`,
     ASSIGN_DRIVER: (id) => `/api/Ops/suborders/${id}/assign-driver`,
+    UNASSIGN_DRIVER: (id) => `/api/Ops/suborders/${id}/unassign`,
     ASSIGN_DRIVER_TO_ORDER: (orderId) => `/api/Ops/orders/${orderId}/assign-driver`, // ✅ جديد
     DASHBOARD_STATS: '/api/Ops/dashboard/stats',
     TRACKING: '/api/ops/tracking',
@@ -387,10 +406,14 @@ export const API_ENDPOINTS = {
   // لوحة السائق (حساب بدور DRIVER)
   DRIVER_APP: {
     ME: '/api/driver/me',
+    MY_CASH: '/api/driver/me/cash',
+    MY_RETURNS: '/api/driver/returns',
     WORK_STATUS: '/api/driver/me/work-status',
     LOCATION: '/api/driver/me/location',
     ORDERS: '/api/driver/orders',
     PICKED_UP: (subOrderId) => `/api/driver/stops/${subOrderId}/picked-up`,
+    RETURN_PICKED_UP: (returnId) => `/api/driver/returns/${returnId}/picked-up`,
+    RETURN_PICKUP_FAILED: (returnId) => `/api/driver/returns/${returnId}/pickup-failed`,
     DELIVERED: (orderId) => `/api/driver/orders/${orderId}/delivered`,
     FAILED: (orderId) => `/api/driver/orders/${orderId}/failed`,
   },
@@ -413,6 +436,8 @@ export const API_ENDPOINTS = {
     STATS: (id) => `/api/Drivers/${id}/stats`,
     ACCOUNT: (id) => `/api/ops/drivers/${id}/account`,
     CASH: (id) => `/api/ops/drivers/${id}/cash`,
+    CASH_CUSTODY: '/api/ops/drivers/cash',
+    REFUSAL_FEE: (orderId) => `/api/ops/drivers/orders/${orderId}/refusal-fee`,
     SETTLE_CASH: (id) => `/api/ops/drivers/${id}/cash/settle`,
     DELIVERY_SETTINGS: '/api/ops/drivers/settings',
   },

@@ -1,7 +1,10 @@
 // src/pages/admin/AdminFinance.jsx
 // مستحقات المتاجر: رصيد كل متجر، كشف حسابه، تسجيل الدفعات والتسويات، والعمولات
 import { useEffect, useState } from 'react'
-import { Wallet, Download, RefreshCw, Percent, ChevronLeft, Calculator } from 'lucide-react'
+import { Wallet, Download, RefreshCw, Percent, ChevronLeft, Calculator, Truck } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { apiGet } from '../../api/axios'
+import { API_ENDPOINTS } from '../../api/endpoints'
 import Modal from '../../components/common/Modal'
 import Button from '../../components/common/Button'
 import { useToast } from '../../components/common/Toast'
@@ -130,6 +133,42 @@ const VendorPanel = ({ vendor, onClose }) => {
   )
 }
 
+// نقد استلمه السائقون من الزبائن ولم يسلّموه بعد — عرض فقط؛ الاستلام والتسوية عند العمليات
+const DriverCashCustody = () => {
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['driver-cash-custody'],
+    queryFn: async () => { const r = await apiGet(API_ENDPOINTS.DRIVERS.CASH_CUSTODY); return r.data?.data ?? r.data ?? [] },
+    staleTime: 60 * 1000,
+  })
+  const total = rows.reduce((s, r) => s + r.total, 0)
+
+  return (
+    <div className="rounded-2xl bg-white border border-gray-200 p-4">
+      <div className="flex items-center gap-2">
+        <Truck size={16} className="text-gray-500" />
+        <span className="flex-1 font-bold text-gray-900">نقد بعهدة السائقين</span>
+        <span className={`font-extrabold ${total > 0 ? 'text-amber-600' : 'text-gray-400'}`}>{isLoading ? '…' : money(total)}</span>
+      </div>
+      <p className="text-xs text-gray-500 mt-1">استلموه من الزبائن ولم يسلّموه للمنصة بعد. فريق العمليات يستلمه ويسوّيه.</p>
+      {!isLoading && rows.length > 0 && (
+        <div className="mt-3 divide-y divide-gray-100">
+          {rows.map(r => (
+            <div key={r.driverId} className="flex items-center gap-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{r.driverName}</p>
+                <p className="text-[11px] text-gray-400">
+                  {r.orders} طلب · منذ {new Date(r.oldestCollectedAt).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad' })}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-gray-900">{money(r.total)}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const AdminFinance = () => {
   const { success, error } = useToast()
   const { data: balances = [], isLoading, refetch, isFetching } = useVendorBalances()
@@ -172,6 +211,8 @@ const AdminFinance = () => {
           <p className="text-[11px] text-gray-400 mt-1">حصة المنصة من مبيعات المتاجر</p>
         </div>
       </div>
+
+      <DriverCashCustody />
 
       <div className="rounded-2xl bg-white border border-gray-200 p-4">
         <button type="button" onClick={() => setShowDefault(s => !s)} className="w-full flex items-center justify-between text-right">

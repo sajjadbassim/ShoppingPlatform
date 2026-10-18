@@ -12,6 +12,8 @@ import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useAdminStats, useAdminOrders, useAdminVendors, useAdminUsers } from '../../hooks/useAdmin'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { can } from '../../utils/permissions'
+import { useAuthStore } from '../../stores/authStore'
 import { apiGet, apiPut } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo } from '../../utils/imageHelper'
@@ -22,13 +24,16 @@ const AdminDashboard = () => {
   const [reviewingStore, setReviewingStore] = useState(null)
 
   const { data: statsData, isLoading: statsLoading, refetch: refetchStats } = useAdminStats()
-  const { data: ordersData, isLoading: ordersLoading } = useAdminOrders({ pageSize: 5, pageNumber: 1 })
-  const { data: vendorsData, isLoading: vendorsLoading } = useAdminVendors()
-  const { data: usersData, isLoading: usersLoading } = useAdminUsers()
+  // المسؤول المحدود: لا تُطلب أقسام لا يملكها (ويظهر مكانها فارغاً)
+  const user = useAuthStore(s => s.user)
+  const { data: ordersData, isLoading: ordersLoading } = useAdminOrders({ pageSize: 5, pageNumber: 1 }, { enabled: can(user, 'orders') })
+  const { data: vendorsData, isLoading: vendorsLoading } = useAdminVendors(null, { enabled: can(user, 'stores') })
+  const { data: usersData, isLoading: usersLoading } = useAdminUsers(null, { enabled: can(user, 'users') })
 
   // ✅ إحصائيات التقييمات
   const { data: ratingStats } = useQuery({
     queryKey: ['admin-rating-stats'],
+    enabled: can(user, 'stores'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.RATING_ADMIN.STATS)
       return r.data.data || r.data
@@ -39,6 +44,7 @@ const AdminDashboard = () => {
   // ✅ أفضل المتاجر (API حقيقي)
   const { data: topVendorsData, isLoading: topVendorsLoading } = useQuery({
     queryKey: ['admin-top-vendors'],
+    enabled: can(user, 'reports'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.ADMIN.REPORTS.TOP_VENDORS, { count: 4 })
       return r.data.data || r.data
@@ -50,6 +56,7 @@ const AdminDashboard = () => {
   // ✅ تقرير المبيعات الحقيقي
   const { data: salesReport } = useQuery({
     queryKey: ['admin-sales-report'],
+    enabled: can(user, 'reports'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.ADMIN.REPORTS.SALES)
       return r.data.data || r.data
@@ -62,6 +69,7 @@ const AdminDashboard = () => {
   // ✅ إحصائيات الكوبونات
   const { data: couponsData } = useQuery({
     queryKey: ['admin-coupons-summary'],
+    enabled: can(user, 'coupons'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.COUPONS.PAGED, { pageSize: 100 })
       return r.data.data || r.data
@@ -76,6 +84,7 @@ const AdminDashboard = () => {
   // ✅ إحصائيات النقاط التشجيعية
   const { data: loyaltySettings } = useQuery({
     queryKey: ['loyalty-settings'],
+    enabled: can(user, 'loyalty'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.LOYALTY.SETTINGS)
       return r.data.data || r.data
@@ -86,6 +95,7 @@ const AdminDashboard = () => {
   // ✅ إحصائيات الإرجاع
   const { data: returnsData } = useQuery({
     queryKey: ['admin-returns-summary'],
+    enabled: can(user, 'returns'),
     queryFn: async () => {
       const r = await apiGet(API_ENDPOINTS.RETURNS.PAGED, { pageSize: 100 })
       return r.data.data || r.data
@@ -124,8 +134,11 @@ const AdminDashboard = () => {
   const pendingStores = allVendors.filter(v => !v.isActive)
   const newUsers = Array.isArray(usersData) ? usersData.slice(0,4) : (usersData?.items ?? []).slice(0,4)
 
+  // المبيعات = ما سُلّم فعلاً (بلا الملغى والمرفوض، ناقص المُرجَع)؛ قيمة الطلبات الجارية منفصلة
+  const money = (v) => !v ? '0 د.ع' : v >= 1000000 ? `${(v / 1000000).toFixed(1)}M د.ع` : `${Math.round(v).toLocaleString('en-US')} د.ع`
   const mainStats = [
-    { title: 'إجمالي المبيعات', value: stats.totalRevenue ? `${(stats.totalRevenue / 1000000).toFixed(1)}M د.ع` : '0 د.ع', change: 0, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
+    { title: 'المبيعات المسلَّمة', value: money(stats.totalRevenue), change: 0, icon: DollarSign, iconBg: 'bg-green-100', iconColor: 'text-green-600' },
+    { title: 'قيمة الطلبات الجارية', value: money(stats.inProgressValue), change: 0, icon: ShoppingCart, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
     { title: 'إجمالي الطلبات', value: (stats.totalOrders || 0).toLocaleString('en-US'), change: 0, icon: ShoppingCart, iconBg: 'bg-blue-100', iconColor: 'text-blue-600' },
     { title: 'المستخدمين', value: (stats.totalUsers || 0).toLocaleString('en-US'), change: 0, icon: Users, iconBg: 'bg-purple-100', iconColor: 'text-purple-600' },
     { title: 'المتاجر النشطة', value: (stats.activeVendors || 0).toLocaleString('en-US'), change: 0, icon: Store, iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
@@ -135,6 +148,8 @@ const AdminDashboard = () => {
     { label: 'طلبات جديدة اليوم',      value: stats.todayOrders    || 0,                  color: 'blue'   },
     { label: 'متاجر غير نشطة',          value: stats.inactiveVendors || pendingStores.length, color: 'yellow' },
     { label: 'طلبات معلقة',             value: stats.pendingOrders  || 0,                  color: 'red'    },
+    { label: 'طلبات قيد التنفيذ',       value: stats.confirmedOrders || 0,                 color: 'blue'   },
+    { label: 'طلبات مُسلَّمة',           value: stats.deliveredOrders || 0,                 color: 'green'  },
     { label: 'منتجات نفدت من المخزون', value: stats.outOfStock     || 0,                  color: 'purple' },
   ]
 
@@ -224,17 +239,17 @@ const AdminDashboard = () => {
 
       {/* Main Stats */}
       {statsLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {[1,2,3,4].map(i => <div key={i} className="bg-white rounded-lg border border-gray-200 p-6"><Skeleton className="h-4 w-24 mb-2" /><Skeleton className="h-8 w-32 mb-2" /><Skeleton className="h-3 w-20" /></div>)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           {mainStats.map((stat, i) => <StatCard key={i} {...stat} />)}
         </div>
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {quickStats.map((stat, i) => (
           <div key={i} className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-4">
             <div className={`w-12 h-12 rounded-full bg-${stat.color}-100 flex items-center justify-center`}>

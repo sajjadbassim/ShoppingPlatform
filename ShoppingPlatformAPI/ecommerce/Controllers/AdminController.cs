@@ -88,13 +88,15 @@ namespace ecommerce.Controllers
             }
         }
 
+        private Guid ActingUserId => Guid.TryParse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id) ? id : Guid.Empty;
+
         // PUT: api/admin/users/{id}/toggle-status
         [HttpPut("users/{id}/toggle-status")]
         public async Task<IActionResult> ToggleUserStatus(Guid id)
         {
             try
             {
-                var isActive = await _adminService.ToggleUserStatusAsync(id);
+                var isActive = await _adminService.ToggleUserStatusAsync(id, ActingUserId);
                 var message = isActive ? "تم تفعيل المستخدم" : "تم إيقاف المستخدم";
                 return Ok(new { success = true, isActive, message });
             }
@@ -110,7 +112,7 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var result = await _adminService.DeleteUserAsync(id);
+                var result = await _adminService.DeleteUserAsync(id, ActingUserId);
                 if (result)
                     return Ok(new { success = true, message = "تم حذف المستخدم بنجاح" });
                 else
@@ -222,8 +224,10 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var start = startDate ?? DateTime.UtcNow.AddMonths(-1);
-                var end = endDate ?? DateTime.UtcNow;
+                // أيام بتوقيت بغداد
+                var localToday = IraqTime.FromUtc(DateTime.UtcNow).Date;
+                var start = startDate ?? localToday.AddMonths(-1);
+                var end = endDate ?? localToday;
 
                 var report = await _adminService.GetSalesReportAsync(start, end);
                 return Ok(new { success = true, data = report });

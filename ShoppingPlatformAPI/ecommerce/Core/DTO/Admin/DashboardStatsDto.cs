@@ -22,7 +22,8 @@
         // Orders Stats
         public int TotalOrders { get; set; }
         public int PendingOrders { get; set; }
-        public int ConfirmedOrders { get; set; }
+        public int ConfirmedOrders { get; set; }     // قيد التنفيذ
+        public int DeliveredOrders { get; set; }
         public int CancelledOrders { get; set; }
         public int TodayOrders { get; set; }
 
@@ -30,6 +31,7 @@
         public decimal TotalRevenue { get; set; }
         public decimal TodayRevenue { get; set; }
         public decimal MonthRevenue { get; set; }
+        public decimal InProgressValue { get; set; }  // قيمة الطلبات التي لم تُسلَّم بعد
 
         // SubOrders Stats
         public int PendingSubOrders { get; set; }

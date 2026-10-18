@@ -24,6 +24,16 @@ namespace ecommerce.Controllers
         // الإدارة والعمليات ترى كل الطلبات؛ غيرهم طلباته فقط
         private bool IsStaff => User.IsInRole("ADMIN") || User.IsInRole("OPS");
 
+        // ملاحظة السائق عند تعذّر التسليم نصّ داخلي للعمليات — الزبون يرى السبب فقط
+        private T ForViewer<T>(T orders) where T : class
+        {
+            if (IsStaff) return orders;
+            var list = orders as IEnumerable<OrderResponseDto> ?? (orders is OrderResponseDto one ? new[] { one } : Enumerable.Empty<OrderResponseDto>());
+            foreach (var so in list.SelectMany(o => o.SubOrders ?? new()))
+                so.FailureNote = null;
+            return orders;
+        }
+
         private bool CanView(OrderResponseDto order) =>
             IsStaff || (order != null && order.CustomerId == GetCurrentUserId());
 
@@ -41,7 +51,7 @@ namespace ecommerce.Controllers
         // POST: api/orders
         // ===================================
         [HttpPost]
-        [Authorize]
+        [Authorize(Policy = PolicyNames.CustomerOnly)]
         public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
         {
             try
@@ -74,9 +84,9 @@ namespace ecommerce.Controllers
             {
                 var order = await _orderService.GetOrderByIdAsync(id);
                 if (!CanView(order)) return OrderNotFound();
-                return Ok(new { success = true, data = order });
+                return Ok(new { success = true, data = ForViewer(order) });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 var innerMessage = ex.Message;
                 return BadRequest(new { success = false, message = innerMessage });
@@ -93,7 +103,7 @@ namespace ecommerce.Controllers
             {
                 var order = await _orderService.GetOrderByNumberAsync(orderNumber);
                 if (!CanView(order)) return OrderNotFound();
-                return Ok(new { success = true, data = order });
+                return Ok(new { success = true, data = ForViewer(order) });
             }
             catch (AppException ex)
             {
@@ -112,10 +122,10 @@ namespace ecommerce.Controllers
 
             try
             {
-                var orders = await _orderService.GetCustomerOrdersAsync(customerId);
-                return Ok(new { success = true, data = orders });
+                var orders = (await _orderService.GetCustomerOrdersAsync(customerId)).ToList();
+                return Ok(new { success = true, data = ForViewer(orders) });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -143,11 +153,11 @@ namespace ecommerce.Controllers
                 return Ok(new
                 {
                     success = true,
-                    data = result.Data,
+                    data = ForViewer(result.Data),
                     pagination = result.Pagination
                 });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -185,7 +195,7 @@ namespace ecommerce.Controllers
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لعرض هذا الطلب" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -205,13 +215,13 @@ namespace ecommerce.Controllers
                     return Unauthorized(new { success = false, message = "يجب تسجيل الدخول" });
 
                 var order = await _orderService.CancelOrderAsync(id, customerId.Value, dto);
-                return Ok(new { success = true, data = order, message = "تم إلغاء الطلب بنجاح" });
+                return Ok(new { success = true, data = ForViewer(order), message = "تم إلغاء الطلب بنجاح" });
             }
             catch (UnauthorizedAccessException)
             {
                 return StatusCode(403, new { success = false, message = "ليس لديك صلاحية لإلغاء هذا الطلب" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

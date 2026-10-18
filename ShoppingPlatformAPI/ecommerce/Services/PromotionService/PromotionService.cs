@@ -103,12 +103,12 @@ namespace ecommerce.Services
         // ===================================
         public async Task<IReadOnlyDictionary<Guid, decimal>> CalculateFinalPricesAsync(IEnumerable<PriceQuery> items)
         {
-            var products = items.DistinctBy(i => i.ProductId).ToList();
+            var products = items.DistinctBy(i => i.Key ?? i.ProductId).ToList();
             if (products.Count == 0)
                 return new Dictionary<Guid, decimal>();
 
             var activePromotions = (await _promotionRepository.GetActivePromotionsAsync()).ToList();
-            return products.ToDictionary(i => i.ProductId, i =>
+            return products.ToDictionary(i => i.Key ?? i.ProductId, i =>
             {
                 var promotion = PromotionPricing.SelectBest(activePromotions, i.ProductId, i.CategoryId, i.VendorId);
                 return promotion == null ? i.Price : PromotionPricing.CalculateDiscount(i.Price, promotion).FinalPrice;

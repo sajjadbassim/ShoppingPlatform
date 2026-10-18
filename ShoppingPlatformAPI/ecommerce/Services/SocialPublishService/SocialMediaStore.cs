@@ -43,7 +43,7 @@ namespace ecommerce.Services.SocialPublishService
 
         public async Task<SocialUploadDto> UploadAsync(Guid userId, IFormFile file, CancellationToken ct = default)
         {
-            var vendorId = await _context.Vendors.Where(v => v.OwnerId == userId).Select(v => (Guid?)v.Id).FirstOrDefaultAsync(ct)
+            var vendorId = await ecommerce.Core.Constants.VendorMembership.VendorIdOfAsync(_context, userId, ct)
                 ?? throw new ForbiddenException("هذا الحساب غير مرتبط بمتجر");
 
             if (file == null || file.Length == 0)

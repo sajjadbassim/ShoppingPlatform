@@ -42,10 +42,8 @@ namespace ecommerce.Repositories
         public FacebookRepository(AppDbContext context) => _context = context;
 
         public async Task<Guid?> GetVendorIdByOwnerAsync(Guid userId, CancellationToken ct = default) =>
-            await _context.Vendors
-                .Where(v => v.OwnerId == userId)
-                .Select(v => (Guid?)v.Id)
-                .FirstOrDefaultAsync(ct);
+            // صاحب المتجر أو موظف فيه (صلاحية «ربط الحسابات» يفرضها StaffPermissionFilter)
+            await ecommerce.Core.Constants.VendorMembership.VendorIdOfAsync(_context, userId, ct);
 
         public Task<FacebookConnection?> GetConnectionAsync(Guid vendorId, bool includeMedia, CancellationToken ct = default)
         {

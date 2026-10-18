@@ -8,7 +8,7 @@ namespace ecommerce.Core.DTO.Addresses
         public Guid UserId { get; set; }
 
         [MaxLength(100)]
-        public string Label { get; set; }
+        public string? Label { get; set; }
 
         [Required]
         public string StreetAddress { get; set; }
@@ -21,18 +21,18 @@ namespace ecommerce.Core.DTO.Addresses
         public string City { get; set; }
 
         [MaxLength(50)]
-        public string BuildingNumber { get; set; }
+        public string? BuildingNumber { get; set; }
 
         [MaxLength(50)]
-        public string FloorNumber { get; set; }
+        public string? FloorNumber { get; set; }
 
         [MaxLength(50)]
-        public string ApartmentNumber { get; set; }
+        public string? ApartmentNumber { get; set; }
 
         [MaxLength(20)]
         public string Phone { get; set; }
 
-        public string Notes { get; set; }
+        public string? Notes { get; set; }
 
         public bool IsDefault { get; set; }
 

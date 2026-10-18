@@ -31,7 +31,7 @@ namespace ecommerce.Controllers
                 var subOrders = await _opsService.GetPendingSubOrdersAsync();
                 return Ok(new { success = true, data = subOrders });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -62,7 +62,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.ConfirmSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تأكيد الطلب الفرعي بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -79,7 +79,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.CancelSubOrderAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم إلغاء الطلب الفرعي بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -95,7 +95,7 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.UpdateSubOrderStatusAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تحديث حالة الطلب بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -111,10 +111,10 @@ namespace ecommerce.Controllers
         {
             try
             {
-                var result = await _opsService.GetSubOrdersPagedAsync(pageNumber, pageSize, status);
+                var result = await _opsService.GetSubOrdersPagedAsync(pageNumber, pageSize, status);   // المدى يضبطه PagingClampFilter
                 return Ok(new { success = true, data = result });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -129,7 +129,7 @@ namespace ecommerce.Controllers
                 var stats = await _opsService.GetDashboardStatsAsync();
                 return Ok(new { success = true, data = stats });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -145,11 +145,28 @@ namespace ecommerce.Controllers
                 var subOrder = await _opsService.AssignDriverAsync(id, dto);
                 return Ok(new { success = true, data = subOrder, message = "تم تعيين السائق بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        // POST: api/ops/suborders/{id}/unassign — سحب الجزء من السائق قبل استلامه من المتجر
+        [HttpPost("suborders/{id}/unassign")]
+        public async Task<IActionResult> UnassignDriver(Guid id, [FromBody] UnassignDriverDto? dto)
+        {
+            try
+            {
+                var subOrder = await _opsService.UnassignDriverAsync(id, CurrentUserId, dto?.Reason);
+                return Ok(new { success = true, data = subOrder, message = "سُحب الطلب من السائق وعاد جاهزاً للاستلام" });
+            }
+            catch (BusinessRuleException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        public record UnassignDriverDto(string? Reason);
 
         // PUT: api/ops/orders/{orderId}/assign-driver
         [HttpPut("orders/{orderId}/assign-driver")]
@@ -161,7 +178,7 @@ namespace ecommerce.Controllers
                 var result = await _opsService.AssignDriverToOrderAsync(orderId, dto);
                 return Ok(new { success = true, data = result, message = "تم تعيين السائق لكامل الطلب بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

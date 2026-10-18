@@ -1,4 +1,5 @@
-﻿using ecommerce.Filters;
+﻿using ecommerce.Core.Constants;
+using ecommerce.Filters;
 using ecommerce.Core.DTO.Vendor;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -15,10 +16,36 @@ namespace ecommerce.Controllers
     public class VendorDashboardController : Controller
     {
         private readonly IVendorDashboardService _dashboardService;
+        private readonly ecommerce.Services.ReturnTripService.IReturnTripService _returnTrips;
 
-        public VendorDashboardController(IVendorDashboardService dashboardService)
+        private readonly ecommerce.Services.AuthService.IUserSessionValidator _sessions;
+
+        public VendorDashboardController(IVendorDashboardService dashboardService,
+            ecommerce.Services.ReturnTripService.IReturnTripService returnTrips,
+            ecommerce.Services.AuthService.IUserSessionValidator sessions)
         {
+            _sessions = sessions;
             _dashboardService = dashboardService;
+            _returnTrips = returnTrips;
+        }
+
+        // ===================================
+        // GET: api/vendors/{vendorId}/dashboard/return-trips?open=true
+        // بضاعة لم تُسلَّم للزبون في طريقها للمتجر مع السائق (وآخر 30 يوماً إن open=false)
+        // ===================================
+        [HttpGet("return-trips")]
+        public async Task<IActionResult> ReturnTrips(Guid vendorId, [FromQuery] bool open = true, CancellationToken ct = default)
+            => Ok(new { success = true, data = await _returnTrips.GetForVendorAsync(vendorId, open, ct) });
+
+        // ===================================
+        // POST: api/vendors/{vendorId}/dashboard/return-trips/{tripId}/received
+        // المتجر استلم البضاعة المُرجعة: تعود للمخزون ويُغلق الطلب الفاشل
+        // ===================================
+        [HttpPost("return-trips/{tripId:guid}/received")]
+        public async Task<IActionResult> ReturnTripReceived(Guid vendorId, Guid tripId, CancellationToken ct)
+        {
+            var trip = await _returnTrips.ConfirmReceivedAsync(tripId, GetCurrentUserId(), vendorId, ct);
+            return Ok(new { success = true, data = trip, message = "تم تأكيد الاستلام وإعادة القطع للمخزون" });
         }
 
         private Guid GetCurrentUserId()
@@ -38,9 +65,13 @@ namespace ecommerce.Controllers
             try
             {
                 var dashboard = await _dashboardService.GetDashboardAsync(vendorId);
+                // موظف بلا صلاحية «أرقام الرئيسية»: الاسم فقط، والأرقام لا تغادر الخادم
+                var (permissions, staffVendorId) = await _sessions.GetAccessAsync(GetCurrentUserId());
+                if (staffVendorId != null && !StaffPermissions.Parse(permissions).Contains(StaffPermissions.Home))
+                    return Ok(new { success = true, data = new { vendorName = dashboard.VendorName } });
                 return Ok(new { success = true, data = dashboard });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -66,7 +97,7 @@ namespace ecommerce.Controllers
                 var stats = await _dashboardService.GetSalesStatsAsync(vendorId, period, from, to);
                 return Ok(new { success = true, data = stats });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -94,7 +125,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -162,7 +193,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.ConfirmOrderAsync(vendorId, subOrderId, opsUserId, dto?.UnavailableItems);
                 return Ok(new { success = true, data = order, message = "تم تأكيد الطلب بنجاح" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -177,7 +208,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.StartPreparingAsync(vendorId, subOrderId, GetCurrentUserId());
                 return Ok(new { success = true, data = order, message = "بدأ تحضير الطلب" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -192,7 +223,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.MarkReadyAsync(vendorId, subOrderId, GetCurrentUserId());
                 return Ok(new { success = true, data = order, message = "الطلب جاهز للاستلام — تم إشعار فريق التوصيل" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -217,7 +248,7 @@ namespace ecommerce.Controllers
                 var order = await _dashboardService.RejectOrderAsync(vendorId, subOrderId, opsUserId, dto.Reason);
                 return Ok(new { success = true, data = order, message = "تم رفض الطلب" });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }
@@ -243,7 +274,7 @@ namespace ecommerce.Controllers
                     pagination = result.Pagination
                 });
             }
-            catch (AppException ex)
+            catch (BusinessRuleException ex)
             {
                 return BadRequest(new { success = false, message = ex.Message });
             }

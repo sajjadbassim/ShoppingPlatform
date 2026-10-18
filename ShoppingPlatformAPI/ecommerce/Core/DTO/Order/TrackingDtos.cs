@@ -122,6 +122,19 @@ namespace ecommerce.Core.DTO.Return
         public string? CustomerPhone { get; set; }
         public bool IsRestocked { get; set; }
         public DateTime? RestockedAt { get; set; }
+        public decimal? RefundAmount { get; set; }
+        public decimal? PointsDeductionAmount { get; set; }   // خُصم من الاسترجاع: قيمة نقاط القطع التي صُرفت
+        public bool IsDoorRefusal { get; set; }
+        public DateTime? RefundedAt { get; set; }
+        // استلام القطع من الزبون (إرجاع بعد الاستلام): AWAITING_DRIVER | DRIVER_ASSIGNED | WITH_DRIVER | RECEIVED — null لغير الموافق عليه
+        public string? PickupStatus { get; set; }
+        public string? PickupStatusAr { get; set; }
+        public string? PickupDriverName { get; set; }
+        public DateTime? ItemsReceivedAt { get; set; }
+        public decimal PickupFeeAmount { get; set; }
+        public string? PickupFeePayer { get; set; }        // CUSTOMER (خُصمت من المبلغ) | VENDOR | NONE
+        public string? PickupFeeOverrideReason { get; set; } // سبب تغيير العمليات لمن يتحمّلها (إن غُيّر)
+        public bool CanRefund { get; set; }                // وصلت القطع للمتجر ولم يُردّ المبلغ بعد
         public List<ReturnItemResponseDto> Items { get; set; } = new();
         public List<string> Images { get; set; } = new();
     }

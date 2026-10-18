@@ -27,10 +27,11 @@ export const useAdminDashboard = useAdminStats;
 // ============================================================
 
 // ✅ إصلاح: الـ API يقبل { role } وليس params عشوائي
-export const useAdminUsers = (role = null) => useQuery({
+export const useAdminUsers = (role = null, options = {}) => useQuery({
   queryKey: [...adminKeys.users, role],
   queryFn:  () => adminService.getUsers(role),
   staleTime: 2 * 60 * 1000,
+  ...options,
 });
 
 export const useSearchUsers = ({ term, role, pageSize = 10 } = {}) => useQuery({
@@ -73,10 +74,11 @@ export const useDeleteUser = () => {
 // useAdminVendors()         → جلب الكل
 // useAdminVendors(true)     → النشطة فقط
 // useAdminVendors(false)    → المعطلة فقط
-export const useAdminVendors = (isActive = null) => useQuery({
+export const useAdminVendors = (isActive = null, options = {}) => useQuery({
   queryKey: [...adminKeys.vendors, isActive],
   queryFn:  () => adminService.getVendors(isActive),
   staleTime: 2 * 60 * 1000,
+  ...options,
 });
 
 export const useToggleVendorStatus = () => {
@@ -122,10 +124,11 @@ export const useBulkUpdateProductStatus = () => {
 // ============================================================
 
 // ✅ orderService.getPaged يقبل { pageSize, pageNumber, status, ... }
-export const useAdminOrders = (params = {}) => useQuery({
+export const useAdminOrders = (params = {}, options = {}) => useQuery({
   queryKey: [...adminKeys.orders, params],
   queryFn:  () => orderService.getPaged(params),
   staleTime: 1 * 60 * 1000,
+  ...options,
 });
 
 // ============================================================

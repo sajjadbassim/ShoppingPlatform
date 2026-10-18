@@ -31,7 +31,9 @@ namespace ecommerce.Core.DTO.Product
         public decimal PriceAdjustment { get; set; }  // الفرق
         public decimal FinalPrice { get; set; }        // السعر النهائي
         public int StockQuantity { get; set; }
-        public bool IsAvailable { get; set; }
+        public bool IsAvailable { get; set; }   // مفعّل من البائع (يُحرَّر في نموذج المتغير)
+        // يمكن شراؤه الآن: مفعّل وفي المخزون — للزبون (IsAvailable وحده يبقى true والمخزون صفر)
+        public bool InStock => IsAvailable && StockQuantity > 0;
         public string? ImageUrl { get; set; }
         public int DisplayOrder { get; set; }
         public List<VariantAttributeValueDto> Attributes { get; set; } = new();

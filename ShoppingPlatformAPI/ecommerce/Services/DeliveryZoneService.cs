@@ -51,7 +51,7 @@ namespace ecommerce.Services
         [MaxLength(100, ErrorMessage = "اسم المنطقة طويل جداً")]
         public string Name { get; set; } = "";
 
-        [Range(0, 1_000_000, ErrorMessage = "سعر التوصيل غير صالح")]
+        [Range(typeof(decimal), "0", "1000000", ErrorMessage = "سعر التوصيل غير صالح")]
         public decimal Fee { get; set; }
 
         public bool IsActive { get; set; } = true;

@@ -198,13 +198,16 @@ const CheckoutPage = () => {
     staleTime: 5 * 60 * 1000,
   })
 
+  // حد صرف النقاط على المستحق كما يحسبه الخادم: المنتجات + التوصيل − الكوبون
+  const couponDiscount = appliedCoupon?.discountAmount ?? 0
+  const redeemBase = Math.max(0, subtotal + totalDeliveryFees - couponDiscount)
   const { data: pointsEstimate } = useQuery({
-    queryKey: ['loyalty-estimate', subtotal],
+    queryKey: ['loyalty-estimate', redeemBase],
     queryFn: async () => {
-      const r = await apiGet(API_ENDPOINTS.LOYALTY.ESTIMATE, { orderAmount: subtotal })
+      const r = await apiGet(API_ENDPOINTS.LOYALTY.ESTIMATE, { orderAmount: redeemBase })
       return r.data.data || r.data
     },
-    enabled: subtotal > 0,
+    enabled: redeemBase > 0,
     staleTime: 2 * 60 * 1000,
   })
 
@@ -228,7 +231,6 @@ const CheckoutPage = () => {
   const pointValue      = pointsEstimate?.pointValue ?? loyaltySettings?.pointValue ?? 0
   const minRedemption   = loyaltySettings?.minRedemptionPoints ?? 100
   const maxPoints       = pointsEstimate?.maxRedeemablePoints ?? 0   // الباك يعيد 0 إن كان الرصيد أقل من الحد الأدنى
-  const pointsToEarn    = pointsEstimate?.pointsToEarn ?? 0
   // الحد الأقصى يتغير مع المجموع — لا نبقي اختياراً أكبر منه (ونلغي الاستخدام إن صار دون الحد الأدنى)
   useEffect(() => {
     if (!usePoints || !pointsEstimate) return   // أثناء جلب التقدير الجديد لا نحكم على 0 مؤقت
@@ -236,7 +238,11 @@ const CheckoutPage = () => {
     else if (pointsToRedeem > maxPoints) setPointsToRedeem(maxPoints)
   }, [usePoints, pointsEstimate, maxPoints, minRedemption, pointsToRedeem])
   const pointsDiscount  = usePoints ? Math.round(pointsToRedeem * pointValue) : 0
-  const discountAmount  = appliedCoupon?.discountAmount ?? 0
+  const discountAmount  = couponDiscount
+  // النقاط المكتسبة على ما يدفعه فعلاً من المنتجات (بعد الكوبون والنقاط، بلا التوصيل) — مثل الخادم عند التسليم
+  const pointsToEarn    = pointsEstimate?.earnRate != null
+    ? Math.floor(Math.max(0, subtotal - discountAmount - pointsDiscount) * pointsEstimate.earnRate)
+    : (pointsEstimate?.pointsToEarn ?? 0)
   const totalAmount     = Math.max(0, subtotal + totalDeliveryFees - discountAmount - pointsDiscount)
 
   // ✅ جلب السلة عند التحميل للحصول على variantAttributes

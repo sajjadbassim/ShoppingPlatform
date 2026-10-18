@@ -22,6 +22,12 @@ namespace ecommerce.Core.Models
         [Column("partial_refusal_customer_pays")]
         public bool PartialRefusalCustomerPays { get; set; } = false;
 
+        // من يتحمّل أجرة استلام المرتجع من الزبون (بعد الاستلام): CUSTOMER (تُخصم من المبلغ المردود) | VENDOR | NONE
+        [Required]
+        [MaxLength(20)]
+        [Column("return_pickup_fee_payer")]
+        public string ReturnPickupFeePayer { get; set; } = Constants.RefusalFeePayer.Customer;
+
         // مهلة تأكيد المتجر للطلب الجديد (دقائق) — يغيّرها الأدمن، وتُطبَّق على الطلبات الجديدة
         [Column("confirmation_timeout_minutes")]
         public int ConfirmationTimeoutMinutes { get; set; } = 5;
