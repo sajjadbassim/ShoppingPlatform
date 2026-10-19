@@ -18,7 +18,7 @@ namespace ecommerce.Core.Models
 
         // الصلاحيات المطلوبة — يجب أن تكون مفعّلة للتطبيق في بوابة المطوّرين.
         // أضف user.info.profile,user.info.stats لعرض اسم المستخدم وعدد المتابعين
-        public string Scopes { get; set; } = "user.info.basic,video.list";
+        public string Scopes { get; set; } = "user.info.basic,video.list,video.publish";
 
         // الحد الأقصى للفيديوهات المحفوظة لكل متجر، وفترة المزامنة الدورية
         public int MaxVideos { get; set; } = 60;
@@ -28,6 +28,10 @@ namespace ecommerce.Core.Models
         // فتح فيديوهات المتجر أو صفحة ريلز يزامن الحساب إن مضت هذه المدة على آخر مزامنة.
         // هي الحد الفعلي لطلبات تيك توك من الزوار (مزامنة واحدة لكل متجر خلالها مهما كثر الزوار)
         public int StoreRefreshSeconds { get; set; } = 60;
+
+        // عنوان الخادم العام (HTTPS) الذي تُخدم منه /uploads — تيك توك يسحب الوسائط منه (PULL_FROM_URL)
+        // ويجب التحقق منه في لوحة المطوّرين (URL prefix). فارغ = يُستخدم Instagram:PublicBaseUrl
+        public string PublicBaseUrl { get; set; } = "";
 
         public bool IsConfigured =>
             !string.IsNullOrWhiteSpace(ClientKey) &&

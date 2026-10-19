@@ -77,6 +77,49 @@ namespace ecommerce.Core.Models
         public virtual Product? Product { get; set; }
     }
 
+    // منشور نشره التاجر من المنصة على تيك توك (فيديو واحد أو صور) — Direct Post.
+    // لا جدولة: تيك توك لا يوفّرها عبر الـ API، والنشر فوري بضغطة التاجر نفسه
+    public class TikTokPost : IAuditableEntity
+    {
+        public const string StatusPublishing = "PUBLISHING";
+        public const string StatusPublished = "PUBLISHED";
+        public const string StatusFailed = "FAILED";
+
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public Guid VendorId { get; set; }
+        public Guid? ProductId { get; set; }
+        public Guid CreatedByUserId { get; set; }
+
+        public string Caption { get; set; } = "";
+        // روابط الوسائط المختارة (JSON): فيديو واحد، أو صور (حتى 35)
+        public string SourceMediaJson { get; set; } = "[]";
+        // صور JPEG المجهزة (JSON) — تُحذف بعد النشر
+        public string? PreparedImagesJson { get; set; }
+        public bool IsVideo { get; set; }
+
+        // خيارات يقرّرها التاجر صراحةً (اشتراط تيك توك): الخصوصية بلا قيمة افتراضية
+        public string PrivacyLevel { get; set; } = "";
+        public bool AllowComment { get; set; }
+        public bool AllowDuet { get; set; }
+        public bool AllowStitch { get; set; }
+        // الترويج لنشاطه التجاري (brand_organic_toggle)
+        public bool PromotesOwnBusiness { get; set; }
+
+        public string Status { get; set; } = StatusPublishing;
+        public int Attempts { get; set; }
+        public string? Error { get; set; }
+
+        public string? PublishId { get; set; }
+        public string? ExternalVideoId { get; set; }
+        public DateTime? PublishedAt { get; set; }
+
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+
+        public virtual Vendor Vendor { get; set; } = null!;
+        public virtual Product? Product { get; set; }
+    }
+
     // طلب ربط قيد التنفيذ: يربط state المرسَل لتيك توك بالمتجر، صالح لمرة واحدة ولمدة قصيرة
     public class TikTokOAuthState
     {

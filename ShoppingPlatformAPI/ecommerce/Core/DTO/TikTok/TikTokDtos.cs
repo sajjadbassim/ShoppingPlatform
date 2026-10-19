@@ -7,6 +7,9 @@ namespace ecommerce.Core.DTO.TikTok
     {
         // مفاتيح تيك توك مضبوطة في إعدادات الخادم
         public bool Configured { get; set; }
+        // النشر من المنصة مفعّل في الخادم (PublicBaseUrl مضبوط)، وصلاحية video.publish ممنوحة لهذا الحساب
+        public bool PublishingEnabled { get; set; }
+        public bool CanPublish { get; set; }
         public bool Connected { get; set; }
         public bool NeedsReconnect { get; set; }
         public TikTokAccountDto? Account { get; set; }

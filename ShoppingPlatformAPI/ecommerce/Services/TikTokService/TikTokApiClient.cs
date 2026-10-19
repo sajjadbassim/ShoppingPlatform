@@ -15,6 +15,12 @@ namespace ecommerce.Services.TikTokService
         Task RevokeAsync(string accessToken, CancellationToken ct = default);
         Task<TikTokUser?> GetUserInfoAsync(string accessToken, IEnumerable<string> fields, CancellationToken ct = default);
         Task<TikTokVideoListData> ListVideosAsync(string accessToken, long? cursor, int maxCount, CancellationToken ct = default);
+
+        // Content Posting API (video.publish)
+        Task<TikTokCreatorInfo> QueryCreatorInfoAsync(string accessToken, CancellationToken ct = default);
+        Task<string> InitVideoPostAsync(string accessToken, string title, string videoUrl, TikTokPostSettings settings, CancellationToken ct = default);
+        Task<string> InitPhotoPostAsync(string accessToken, string title, string description, IReadOnlyList<string> imageUrls, TikTokPostSettings settings, CancellationToken ct = default);
+        Task<TikTokPublishStatus> FetchPublishStatusAsync(string accessToken, string publishId, CancellationToken ct = default);
     }
 
     public class TikTokApiClient : ITikTokApiClient
@@ -26,6 +32,10 @@ namespace ecommerce.Services.TikTokService
         private const string RevokeUrl = "https://open.tiktokapis.com/v2/oauth/revoke/";
         private const string UserInfoUrl = "https://open.tiktokapis.com/v2/user/info/";
         private const string VideoListUrl = "https://open.tiktokapis.com/v2/video/list/";
+        private const string CreatorInfoUrl = "https://open.tiktokapis.com/v2/post/publish/creator_info/query/";
+        private const string VideoInitUrl = "https://open.tiktokapis.com/v2/post/publish/video/init/";
+        private const string PhotoInitUrl = "https://open.tiktokapis.com/v2/post/publish/content/init/";
+        private const string PublishStatusUrl = "https://open.tiktokapis.com/v2/post/publish/status/fetch/";
 
         private const string VideoFields =
             "id,title,video_description,cover_image_url,share_url,embed_link,duration,create_time,view_count,like_count";
@@ -124,6 +134,79 @@ namespace ecommerce.Services.TikTokService
         }
 
         // ===================================
+        // Content Posting API
+        // ===================================
+        public async Task<TikTokCreatorInfo> QueryCreatorInfoAsync(string accessToken, CancellationToken ct = default)
+        {
+            // لا يغيّر شيئاً — إعادة المحاولة آمنة
+            using var response = await SendWithRetryAsync(() => PostJson(CreatorInfoUrl, accessToken, new { }), "creator info", ct);
+            var result = await ReadJsonAsync<TikTokCreatorInfoResponse>(response, ct);
+            ThrowIfError(result?.Error, response, "creator info");
+            return result?.Data ?? new TikTokCreatorInfo();
+        }
+
+        public Task<string> InitVideoPostAsync(string accessToken, string title, string videoUrl, TikTokPostSettings s, CancellationToken ct = default) =>
+            InitPostAsync(VideoInitUrl, accessToken, new
+            {
+                post_info = new
+                {
+                    title,
+                    privacy_level = s.PrivacyLevel,
+                    disable_comment = !s.AllowComment,
+                    disable_duet = !s.AllowDuet,
+                    disable_stitch = !s.AllowStitch,
+                    brand_organic_toggle = s.PromotesOwnBusiness
+                },
+                source_info = new { source = "PULL_FROM_URL", video_url = videoUrl }
+            }, "video init", ct);
+
+        public Task<string> InitPhotoPostAsync(string accessToken, string title, string description, IReadOnlyList<string> imageUrls,
+            TikTokPostSettings s, CancellationToken ct = default) =>
+            InitPostAsync(PhotoInitUrl, accessToken, new
+            {
+                post_info = new
+                {
+                    title,
+                    description,
+                    privacy_level = s.PrivacyLevel,
+                    disable_comment = !s.AllowComment,
+                    auto_add_music = true,
+                    brand_organic_toggle = s.PromotesOwnBusiness
+                },
+                source_info = new { source = "PULL_FROM_URL", photo_cover_index = 0, photo_images = imageUrls },
+                post_mode = "DIRECT_POST",
+                media_type = "PHOTO"
+            }, "photo init", ct);
+
+        public async Task<TikTokPublishStatus> FetchPublishStatusAsync(string accessToken, string publishId, CancellationToken ct = default)
+        {
+            using var response = await SendWithRetryAsync(
+                () => PostJson(PublishStatusUrl, accessToken, new { publish_id = publishId }), "publish status", ct);
+            var result = await ReadJsonAsync<TikTokPublishStatusResponse>(response, ct);
+            ThrowIfError(result?.Error, response, "publish status");
+            return result?.Data ?? new TikTokPublishStatus();
+        }
+
+        // إنشاء المنشور لا يُعاد تلقائياً عند انقطاع الاتصال: قد يكون وصل لتيك توك فيُنشر مرتين
+        private async Task<string> InitPostAsync(string url, string accessToken, object body, string operation, CancellationToken ct)
+        {
+            var client = _httpClientFactory.CreateClient(HttpClientName);
+            using var request = PostJson(url, accessToken, body);
+            using var response = await client.SendAsync(request, ct);
+            var result = await ReadJsonAsync<TikTokPublishInitResponse>(response, ct);
+            ThrowIfError(result?.Error, response, operation);
+            return result?.Data?.PublishId
+                ?? throw new TikTokApiException("لم يعد تيك توك معرّف النشر", "no_publish_id");
+        }
+
+        private static HttpRequestMessage PostJson(string url, string accessToken, object body)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            return request;
+        }
+
+        // ===================================
         // Helpers
         // ===================================
 
@@ -179,7 +262,7 @@ namespace ecommerce.Services.TikTokService
 
             var requiresReconnect = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
                                     || (error?.Code is { } c && ReconnectCodes.Contains(c));
-            throw new TikTokApiException($"فشل طلب تيك توك ({operation})", error?.Code, requiresReconnect);
+            throw new TikTokApiException($"فشل طلب تيك توك ({operation})", error?.Code, requiresReconnect) { Detail = error?.Message };
         }
 
         private async Task<T?> ReadJsonAsync<T>(HttpResponseMessage response, CancellationToken ct) where T : class

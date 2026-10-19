@@ -214,6 +214,12 @@ namespace ecommerce.Extensions
         public static IServiceCollection AddTikTokIntegration(this IServiceCollection services, IConfiguration config)
         {
             services.Configure<TikTokOptions>(config.GetSection(TikTokOptions.SectionName));
+            // الوسائط تُسحب من نفس العنوان العام المستخدم لإنستغرام ما لم يُضبط عنوان خاص بتيك توك
+            services.PostConfigure<TikTokOptions>(o =>
+            {
+                if (string.IsNullOrWhiteSpace(o.PublicBaseUrl))
+                    o.PublicBaseUrl = config["Instagram:PublicBaseUrl"] ?? "";
+            });
 
             // مهلة اتصال قصيرة (الشبكة إلى TikTok غير مستقرة أحياناً) — TikTokApiClient يعيد المحاولة مرة
             services.AddHttpClient(TikTokApiClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
@@ -233,6 +239,9 @@ namespace ecommerce.Extensions
             services.AddScoped<ITikTokRepository, TikTokRepository>();
             services.AddScoped<ITikTokService, TikTokService>();
             services.AddHostedService<TikTokSyncBackgroundService>();
+
+            services.AddScoped<ITikTokPublishService, TikTokPublishService>();
+            services.AddHostedService<TikTokPublishBackgroundService>();
 
             return services;
         }

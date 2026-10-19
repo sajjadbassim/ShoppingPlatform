@@ -102,4 +102,44 @@ namespace ecommerce.Data.Configurations
             builder.HasIndex(s => s.ExpiresAt);
         }
     }
+
+    public class TikTokPostConfiguration : IEntityTypeConfiguration<TikTokPost>
+    {
+        public void Configure(EntityTypeBuilder<TikTokPost> builder)
+        {
+            builder.ToTable("tiktok_posts");
+            builder.HasKey(p => p.Id);
+            builder.Property(p => p.Id).HasColumnName("id");
+
+            builder.Property(p => p.VendorId).HasColumnName("vendor_id");
+            builder.HasOne(p => p.Vendor).WithMany().HasForeignKey(p => p.VendorId).OnDelete(DeleteBehavior.Cascade);
+            builder.Property(p => p.ProductId).HasColumnName("product_id");
+            builder.HasOne(p => p.Product).WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.NoAction);
+            builder.Property(p => p.CreatedByUserId).HasColumnName("created_by_user_id");
+
+            builder.Property(p => p.Caption).HasColumnName("caption").HasMaxLength(2200).IsRequired();
+            builder.Property(p => p.SourceMediaJson).HasColumnName("source_media_json").IsRequired();
+            builder.Property(p => p.PreparedImagesJson).HasColumnName("prepared_images_json");
+            builder.Property(p => p.IsVideo).HasColumnName("is_video");
+
+            builder.Property(p => p.PrivacyLevel).HasColumnName("privacy_level").HasMaxLength(40).IsRequired();
+            builder.Property(p => p.AllowComment).HasColumnName("allow_comment");
+            builder.Property(p => p.AllowDuet).HasColumnName("allow_duet");
+            builder.Property(p => p.AllowStitch).HasColumnName("allow_stitch");
+            builder.Property(p => p.PromotesOwnBusiness).HasColumnName("promotes_own_business");
+
+            builder.Property(p => p.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            builder.Property(p => p.Attempts).HasColumnName("attempts");
+            builder.Property(p => p.Error).HasColumnName("error").HasMaxLength(500);
+            builder.HasIndex(p => new { p.Status, p.UpdatedAt });
+            builder.HasIndex(p => new { p.VendorId, p.CreatedAt });
+
+            builder.Property(p => p.PublishId).HasColumnName("publish_id").HasMaxLength(100);
+            builder.Property(p => p.ExternalVideoId).HasColumnName("external_video_id").HasMaxLength(64);
+            builder.Property(p => p.PublishedAt).HasColumnName("published_at").HasColumnType("datetime2");
+
+            builder.Property(p => p.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
+            builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");
+        }
+    }
 }

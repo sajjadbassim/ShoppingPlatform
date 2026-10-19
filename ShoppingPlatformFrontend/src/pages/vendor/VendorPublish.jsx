@@ -1,6 +1,6 @@
 // src/pages/vendor/VendorPublish.jsx
 // نشر منتج على حسابات التواصل المربوطة: التاجر يختار الحسابات والصور والنص، يرى شكل المنشور على كل منصة،
-// ثم يؤكد النشر بنفسه. حالياً النشر الفعلي على إنستغرام (API: /api/integrations/instagram/posts)، وتيك توك وفيسبوك قريباً
+// ثم يؤكد النشر بنفسه. النشر الفعلي على إنستغرام (API: /api/integrations/instagram/posts) وتيك توك (API: /api/tiktok/posts)، وفيسبوك قريباً
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -222,6 +222,12 @@ const buildPlatforms = (ig, tiktok, facebook, store) => {
   else if (!ig.connected) igState = 'connect'
   else if (ig.needsReconnect || !ig.canPublish) igState = 'reconnect'
 
+  let tkState = 'ready'
+  if (!tiktok) tkState = 'soon'
+  else if (!tiktok.publishingEnabled) tkState = 'disabled'
+  else if (!tiktok.connected) tkState = 'connect'
+  else if (tiktok.needsReconnect || !tiktok.canPublish) tkState = 'reconnect'
+
   const tk = tiktok?.account
   return [
     {
@@ -236,11 +242,17 @@ const buildPlatforms = (ig, tiktok, facebook, store) => {
       }[igState],
     },
     {
-      key: 'tiktok', name: 'TikTok', Logo: TikTokLogo, Preview: TikTokPreview, state: 'soon',
+      key: 'tiktok', name: 'TikTok', Logo: TikTokLogo, Preview: TikTokPreview, state: tkState,
       // اسم المستخدم يحتاج صلاحية user.info.profile — بدونها نعرض اسم الحساب الظاهر
       account: { username: tk?.username || tk?.displayName || 'your_account', name: tk?.displayName, avatarUrl: tk?.avatarUrl },
       connected: !!tiktok?.connected,
-      hint: tiktok?.connected ? 'النشر على تيك توك قريباً' : 'الربط والنشر قريباً',
+      hint: {
+        ready: 'فيديو واحد أو صور (حتى 35) — النشر الآن فقط',
+        soon: 'جارٍ التحميل…',
+        disabled: 'النشر غير مفعّل على المنصة بعد',
+        connect: 'غير مربوط',
+        reconnect: tiktok?.needsReconnect ? 'انتهت صلاحية الربط' : 'أعد الربط لمنح صلاحية النشر',
+      }[tkState],
     },
     {
       // الربط متاح (عرض منشورات الصفحة في المتجر) — النشر من المنصة على الصفحة لم يُبنَ بعد
@@ -297,12 +309,108 @@ const AccountOption = ({ p, selected, onToggle }) => {
 // النشر الفعلي لكل منصة — إضافة منصة جديدة = سطر هنا + state: 'ready' في buildPlatforms
 // النشر الآن يتم داخل الطلب (تجهيز الصور + انتظار المنصة) فقد يتجاوز المهلة الافتراضية
 // ===========================
+// create يستقبل (الحمولة المشتركة، إعدادات تيك توك) — لكل منصة شكل طلبها
 const PUBLISHERS = {
   instagram: {
     create: async (body) => unwrap(await api.post(API_ENDPOINTS.INSTAGRAM.POSTS, body, { timeout: 120000 })),
     retry: async (postId) => unwrap(await api.post(API_ENDPOINTS.INSTAGRAM.POST_RETRY(postId), {}, { timeout: 120000 })),
     invalidate: [['instagram-posts'], ['instagram-items']],
   },
+  tiktok: {
+    create: async (body, tt) => unwrap(await api.post(API_ENDPOINTS.TIKTOK.POSTS, {
+      productId: body.productId,
+      media: body.images,
+      caption: body.caption,
+      privacyLevel: tt.privacy,
+      allowComment: tt.comment,
+      allowDuet: tt.duet,
+      allowStitch: tt.stitch,
+      promotesOwnBusiness: tt.promotes,
+      consent: tt.consent,
+    }, { timeout: 120000 })),
+    retry: async (postId) => unwrap(await api.post(API_ENDPOINTS.TIKTOK.POST_RETRY(postId), {}, { timeout: 120000 })),
+    invalidate: [['tiktok-posts'], ['tiktok-videos'], ['tiktok-items'], ['tiktok-status']],
+  },
+}
+
+const PRIVACY_LABELS = {
+  PUBLIC_TO_EVERYONE: 'الجميع',
+  MUTUAL_FOLLOW_FRIENDS: 'الأصدقاء (متابعة متبادلة)',
+  FOLLOWER_OF_CREATOR: 'متابعوك',
+  SELF_ONLY: 'أنا فقط',
+}
+
+// إعدادات تيك توك: الخصوصية بلا قيمة افتراضية (اشتراط تيك توك)، والتفاعل يحدده التاجر
+const TikTokSettings = ({ options, settings, onChange, isVideoPost, durationTooLong }) => {
+  const privacyOptions = options?.privacyOptions || []
+  const onlyPrivate = privacyOptions.length > 0 && privacyOptions.every(o => o === 'SELF_ONLY')
+  const toggles = [
+    { key: 'comment', label: 'السماح بالتعليقات', disabled: options?.commentDisabled },
+    { key: 'duet', label: 'السماح بالدويت', disabled: options?.duetDisabled, videoOnly: true },
+    { key: 'stitch', label: 'السماح بالستيتش', disabled: options?.stitchDisabled, videoOnly: true },
+  ].filter(t => !t.videoOnly || isVideoPost)
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 p-4 space-y-4">
+      <div className="flex items-center gap-2">
+        <TikTokLogo className="w-5 h-5" />
+        <h2 className="font-bold text-gray-900 flex-1">إعدادات تيك توك</h2>
+        {options?.nickname && <span className="text-xs text-gray-500 truncate max-w-[50%]" dir="ltr">{options.nickname}</span>}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-gray-900 mb-2">من يستطيع مشاهدة المنشور؟ <span className="text-red-500">*</span></p>
+        {privacyOptions.length === 0
+          ? <p className="text-xs text-amber-800 bg-amber-50 rounded-xl p-3">تعذّر جلب خيارات الخصوصية من تيك توك — حدّث الصفحة وحاول مرة أخرى</p>
+          : (
+            <div className="grid grid-cols-2 gap-2">
+              {privacyOptions.map(o => (
+                <button key={o} type="button" onClick={() => onChange({ privacy: o })} aria-pressed={settings.privacy === o}
+                  className={`h-11 rounded-xl border text-sm font-bold ${settings.privacy === o ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 text-gray-700'}`}>
+                  {PRIVACY_LABELS[o] || o}
+                </button>
+              ))}
+            </div>
+          )}
+        {onlyPrivate && (
+          <p className="text-xs text-amber-800 bg-amber-50 rounded-xl p-3 mt-2 flex items-start gap-1.5">
+            <Info size={14} className="flex-shrink-0 mt-0.5" />النشر عبر المنصة يظهر الآن لك وحدك فقط، حتى يعتمد تيك توك تطبيق واسط.
+          </p>
+        )}
+      </div>
+
+      <div className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+        {toggles.map(t => (
+          <label key={t.key} className={`flex items-center gap-3 p-3 ${t.disabled ? 'opacity-50' : 'cursor-pointer'}`}>
+            <span className="flex-1 text-sm text-gray-900">{t.label}{t.disabled && <span className="text-xs text-gray-500 mr-1.5">(معطّل في حسابك)</span>}</span>
+            <input type="checkbox" className="w-5 h-5 accent-black" disabled={t.disabled}
+              checked={!!settings[t.key] && !t.disabled} onChange={e => onChange({ [t.key]: e.target.checked })} />
+          </label>
+        ))}
+        <label className="flex items-center gap-3 p-3 cursor-pointer">
+          <span className="flex-1">
+            <span className="block text-sm text-gray-900">هذا المنشور يروّج لمتجري ومنتجاتي</span>
+            <span className="block text-xs text-gray-500 mt-0.5">يظهر على المنشور وسم «ترويج» (محتوى تجاري)</span>
+          </span>
+          <input type="checkbox" className="w-5 h-5 accent-black" checked={!!settings.promotes} onChange={e => onChange({ promotes: e.target.checked })} />
+        </label>
+      </div>
+
+      {durationTooLong && (
+        <p className="text-xs text-red-600">مدة الفيديو أطول من الحد المسموح لحسابك في تيك توك ({options.maxVideoDurationSeconds} ثانية)</p>
+      )}
+
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input type="checkbox" className="w-5 h-5 accent-black mt-0.5 flex-shrink-0" checked={!!settings.consent} onChange={e => onChange({ consent: e.target.checked })} />
+        <span className="text-xs text-gray-600 leading-relaxed">
+          أوافق على نشر هذا المحتوى على حسابي في تيك توك، وأقرّ بموافقتي على{' '}
+          <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener noreferrer" className="underline text-gray-900">تأكيد استخدام الموسيقى</a>
+          {settings.promotes && <>{' '}و<a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener noreferrer" className="underline text-gray-900">سياسة المحتوى التجاري</a></>}
+          {' '}من تيك توك.
+        </span>
+      </label>
+    </section>
+  )
 }
 
 // ===========================
@@ -312,6 +420,7 @@ const ResultRow = ({ platform, post, onRetry, retrying }) => {
   const published = post.status === 'PUBLISHED'
   const failed = post.status === 'FAILED'   // رفضته المنصة، أو فشل الطلب نفسه (requestFailed)
   const delayed = !published && !failed && post.error
+  const processing = post.status === 'PUBLISHING'
   return (
     <div className="flex items-start gap-3 p-4">
       <span className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${published ? 'bg-green-50 text-green-600' : failed ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -323,8 +432,11 @@ const ResultRow = ({ platform, post, onRetry, retrying }) => {
           <span className="font-normal text-sm text-gray-500" dir="ltr">@{platform.account.username}</span>
         </p>
         <p className="text-sm text-gray-600 mt-0.5">
-          {published ? 'تم النشر، وظهر في صفحة متجرك مربوطاً بالمنتج'
+          {published ? (platform.key === 'tiktok'
+              ? (post.privacyLevel === 'SELF_ONLY' ? 'تم النشر على تيك توك بخصوصية «أنا فقط» — تجده في حسابك' : 'تم النشر على تيك توك')
+              : 'تم النشر، وظهر في صفحة متجرك مربوطاً بالمنتج')
             : failed ? post.error
+            : processing ? 'تيك توك يعالج المنشور — سيظهر على حسابك خلال دقائق، ويمكنك متابعته من سجل المنشورات'
             : delayed ? post.error
             : `مجدول — يُنشر تلقائياً في ${formatDate(post.scheduledAt)}`}
         </p>
@@ -366,6 +478,14 @@ const VendorPublish = () => {
     queryKey: ['facebook-status'],
     queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.FACEBOOK.STATUS)),
   })
+  // خيارات حساب تيك توك (الخصوصية والتفاعل) — تُجلب من تيك توك نفسه، فلا تُطلب إلا لحساب جاهز للنشر
+  const tiktokReady = !!(tiktok?.publishingEnabled && tiktok.connected && tiktok.canPublish && !tiktok.needsReconnect)
+  const { data: tiktokOptions } = useQuery({
+    queryKey: ['tiktok-publish-options', id],
+    queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.TIKTOK.PUBLISH_OPTIONS, { productId: id })),
+    enabled: tiktokReady,
+    staleTime: 60 * 1000,
+  })
 
   const [targets, setTargets] = useState([])
   const [previewKey, setPreviewKey] = useState(null)
@@ -378,6 +498,9 @@ const VendorPublish = () => {
   const [uploads, setUploads] = useState([])       // روابط ما رفعه التاجر من الاستوديو
   const [uploading, setUploading] = useState([])   // [{ id, name, preview, video, progress }]
   const [durations, setDurations] = useState({})   // رابط الفيديو ← مدته بالثواني
+  // إعدادات تيك توك — الخصوصية فارغة عمداً: يختارها التاجر بنفسه
+  const [tt, setTt] = useState({ privacy: '', comment: false, duet: false, stitch: false, promotes: true, consent: false })
+  const patchTt = (patch) => setTt(s => ({ ...s, ...patch }))
   const fileInput = useRef(null)
 
   const platforms = ig ? buildPlatforms(ig, tiktok, facebook, { name: ig.storeName, logo: ig.storeLogoUrl }) : []
@@ -470,7 +593,7 @@ const VendorPublish = () => {
     // كل منصة بطلب مستقل وبالتوازي — فشل منصة لا يُلغي النشر على الباقي
     mutationFn: async () => {
       const payload = body()
-      const settled = await Promise.allSettled(targets.map(k => PUBLISHERS[k].create(payload)))
+      const settled = await Promise.allSettled(targets.map(k => PUBLISHERS[k].create(payload, tt)))
       return Object.fromEntries(targets.map((k, i) => [k, settled[i].status === 'fulfilled' ? settled[i].value : requestFailure(settled[i].reason)]))
     },
     onSuccess: (out) => {
@@ -486,7 +609,7 @@ const VendorPublish = () => {
     mutationFn: async (key) => {
       const post = results[key]
       try {
-        return post.requestFailed ? await PUBLISHERS[key].create(body()) : await PUBLISHERS[key].retry(post.id)
+        return post.requestFailed ? await PUBLISHERS[key].create(body(), tt) : await PUBLISHERS[key].retry(post.id)
       } catch (err) {
         return requestFailure(err)
       }
@@ -552,6 +675,12 @@ const VendorPublish = () => {
   const now = new Date()
   const maxDate = new Date(now.getTime() + 30 * 86400000)
   const scheduleInvalid = mode === 'schedule' && (!scheduleAt || new Date(scheduleAt) <= now || new Date(scheduleAt) > maxDate)
+  // قيود تيك توك: فيديو واحد أو صور فقط، النشر الآن، الخصوصية والإقرار من التاجر
+  const tiktokOn = targets.includes('tiktok')
+  const selectedVideos = selected.filter(isVideo)
+  const tiktokMixed = tiktokOn && selectedVideos.length > 0 && selected.length > 1
+  const tiktokMaxDuration = tiktokOptions?.maxVideoDurationSeconds
+  const tiktokTooLong = tiktokOn && selectedVideos.length === 1 && tiktokMaxDuration > 0 && durations[selectedVideos[0]] > tiktokMaxDuration
   const errors = [
     // لا حساب جاهز أصلاً: "اختر حساباً" مضلل — نوجّه للربط
     targets.length === 0 && (readyKeys.length === 0
@@ -564,6 +693,11 @@ const VendorPublish = () => {
     caption.length > MAX_CAPTION && `النص أطول من ${MAX_CAPTION} حرف`,
     hashtags > MAX_HASHTAGS && `الوسوم أكثر من ${MAX_HASHTAGS}`,
     scheduleInvalid && 'اختر موعداً خلال 30 يوماً القادمة',
+    tiktokOn && mode === 'schedule' && 'تيك توك لا يدعم الجدولة — انشر الآن أو ألغِ تحديد تيك توك',
+    tiktokMixed && 'تيك توك يقبل فيديو واحداً أو صوراً فقط — لا خلط بينهما',
+    tiktokTooLong && `الفيديو أطول من حد حسابك في تيك توك (${tiktokMaxDuration} ثانية)`,
+    tiktokOn && !tt.privacy && 'اختر من يستطيع مشاهدة المنشور على تيك توك',
+    tiktokOn && !tt.consent && 'وافق على نشر المحتوى على حسابك في تيك توك',
   ].filter(Boolean)
   const chosen = targets.map(k => byKey[k])
   const publishLabel = mode === 'schedule'
@@ -684,6 +818,11 @@ const VendorPublish = () => {
             </div>
           </section>
 
+          {tiktokOn && (
+            <TikTokSettings options={tiktokOptions} settings={tt} onChange={patchTt}
+              isVideoPost={selectedVideos.length > 0} durationTooLong={tiktokTooLong} />
+          )}
+
           {/* الموعد */}
           <section className="bg-white rounded-2xl border border-gray-200 p-4">
             <h2 className="font-bold text-gray-900 mb-3">موعد النشر</h2>
@@ -742,13 +881,14 @@ const VendorPublish = () => {
           <div className="relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl p-6 animate-slide-up pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <h3 className="text-lg font-bold text-gray-900 text-center">{mode === 'now' ? 'نشر المنشور الآن؟' : 'جدولة المنشور؟'}</h3>
             <p className="text-sm text-gray-600 text-center mt-2">
-              {mode === 'now' ? 'سيُنشر علناً على:' : `سيُنشر علناً في ${formatDate(scheduleAt)} على:`}
+              {mode === 'now' ? 'سيُنشر على:' : `سيُنشر في ${formatDate(scheduleAt)} على:`}
             </p>
             <div className="mt-3 space-y-2">
               {chosen.map(p => (
                 <div key={p.key} className="flex items-center gap-2.5 bg-gray-50 rounded-xl p-2.5">
                   <Avatar src={p.account.avatarUrl} Logo={p.Logo} className="w-8 h-8" />
                   <span className="flex-1 text-sm font-bold text-gray-900 truncate" dir="ltr">@{p.account.username}</span>
+                  {p.key === 'tiktok' && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-700">{PRIVACY_LABELS[tt.privacy] || ''}</span>}
                   {p.account.avatarUrl && <p.Logo className="w-5 h-5" />}
                 </div>
               ))}

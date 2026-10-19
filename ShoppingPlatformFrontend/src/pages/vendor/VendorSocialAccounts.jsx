@@ -59,8 +59,9 @@ const PLATFORMS = {
       { icon: Users, text: 'قراءة اسم الحساب والصورة' },
       { icon: Video, text: 'عرض الفيديوهات المنشورة للعامة' },
       { icon: Eye, text: 'قراءة عدد المشاهدات والإعجابات' },
+      { icon: Send, text: 'نشر فيديوهات وصور منتجاتك على حسابك — فقط عندما تختارها وتضغط «نشر» بنفسك' },
     ],
-    promise: 'لن ننشر أي شيء على حسابك، ولن نطّلع على رسائلك أو كلمة المرور. يمكنك إلغاء الربط في أي وقت.',
+    promise: 'لا ننشر شيئاً تلقائياً أو دون موافقتك، ولن نطّلع على رسائلك أو كلمة المرور. يمكنك إلغاء الربط في أي وقت.',
     privacyUrl: 'https://www.tiktok.com/legal/page/global/privacy-policy/ar',
     profile: (status, items) => {
       const a = status?.account
@@ -185,6 +186,8 @@ const FacebookPagePicker = ({ selection, onClose, onConnected }) => {
           <div className="space-y-2">{[1, 2].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
         ) : isError ? (
           <p className="text-sm text-amber-800 bg-amber-50 rounded-xl p-3">انتهت مهلة الاختيار. اضغط «ربط» بجانب Facebook مرة أخرى.</p>
+        ) : pages.length === 0 ? (
+          <p className="text-sm text-gray-500 bg-gray-50 rounded-xl p-3 text-center">لا توجد صفحات متاحة للربط. تأكد أنك تدير صفحة فيسبوك ثم أعد المحاولة.</p>
         ) : (
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {pages.map(p => (
@@ -371,15 +374,15 @@ const ConnectModal = ({ cfg, onClose, onConfirm, connecting, wrongOrigin }) => (
 const LinkProductModal = ({ video, vendorId, onClose, onSave, saving }) => {
   const [query, setQuery] = useState('')
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['vendor-products', vendorId],
+    queryKey: ['vendor-products', vendorId, 'public'],
     queryFn: async () => {
       const data = unwrap(await apiGet(API_ENDPOINTS.PRODUCTS.BY_VENDOR(vendorId)))
       return Array.isArray(data) ? data : data?.items || []
     },
     enabled: !!vendorId,
   })
-  const q = query.trim()
-  const list = products.filter(p => p.isActive !== false && (!q || (p.nameAr || p.name || '').includes(q)))
+  const q = query.trim().toLowerCase()
+  const list = products.filter(p => p.isActive !== false && (!q || `${p.nameAr || ''} ${p.name || ''}`.toLowerCase().includes(q)))
   const current = video.product?.id
 
   return (
@@ -569,7 +572,7 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
             </div>
           )}
 
-          {cfg.key === 'instagram' && status.publishingEnabled && !status.needsReconnect && (
+          {(cfg.key === 'instagram' || cfg.key === 'tiktok') && status.publishingEnabled && !status.needsReconnect && (
             status.canPublish ? (
               <div className="flex items-center gap-2 text-sm text-green-800 bg-green-50 rounded-2xl p-3">
                 <Send size={16} className="flex-shrink-0" />
@@ -756,6 +759,86 @@ const InstagramPostsSection = () => {
 }
 
 // ===========================
+// سجل منشورات تيك توك من المنصة (جارٍ النشر / منشور / فشل)
+// ===========================
+const TIKTOK_PRIVACY = { PUBLIC_TO_EVERYONE: 'للجميع', MUTUAL_FOLLOW_FRIENDS: 'للأصدقاء', FOLLOWER_OF_CREATOR: 'للمتابعين', SELF_ONLY: 'لي وحدي' }
+
+const TikTokPostsSection = () => {
+  const { success, error: showError } = useToast()
+  const queryClient = useQueryClient()
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ['tiktok-posts'],
+    queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.TIKTOK.POSTS)) || [],
+    // تيك توك قد يعالج المنشور دقائق — نتابعه ما دام قيد النشر
+    refetchInterval: (q) => (q.state.data || []).some(p => p.status === 'PUBLISHING') ? 20000 : false,
+  })
+  const retry = useMutation({
+    mutationFn: async (post) => unwrap(await apiPost(API_ENDPOINTS.TIKTOK.POST_RETRY(post.id))),
+    onSuccess: (post) => {
+      queryClient.invalidateQueries({ queryKey: ['tiktok-posts'] })
+      queryClient.invalidateQueries({ queryKey: ['tiktok-items'] })
+      if (post.status === 'PUBLISHED') success('تم النشر على تيك توك 🎉')
+      else if (post.status === 'FAILED') showError(post.error || 'تعذّر النشر')
+    },
+    onError: (err) => showError(err.message || 'تعذّر تنفيذ العملية'),
+  })
+
+  return (
+    <section id="tiktok-posts" className="scroll-mt-20">
+      <div className="flex items-center gap-2 mb-3">
+        <TikTokLogo className="w-5 h-5" />
+        <h2 className="text-lg font-bold text-gray-900 flex-1">منشورات تيك توك من المنصة</h2>
+        <Link to="/vendor/products" className="text-sm font-bold text-gray-700 inline-flex items-center gap-1 hover:text-black">
+          <Send size={14} />نشر منتج
+        </Link>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-24 rounded-2xl" />
+      ) : posts.length === 0 ? (
+        <div className="text-center text-sm text-gray-500 bg-white rounded-2xl border border-dashed border-gray-300 py-8 px-4">
+          لم تنشر على تيك توك من المنصة بعد — من «منتجاتي» اختر منتجاً ثم «نشر»
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+          {posts.map(p => {
+            const st = POST_STATUS[p.status] || POST_STATUS.PUBLISHING
+            const busy = retry.isPending && retry.variables?.id === p.id
+            const first = p.media[0]
+            return (
+              <div key={p.id} className="flex items-start gap-3 p-3.5">
+                <span className="w-14 h-14 rounded-xl bg-white border border-gray-100 overflow-hidden flex-shrink-0 relative">
+                  {first && (p.isVideo
+                    ? <video src={getImageUrl(first)} muted playsInline preload="metadata" className="w-full h-full object-cover bg-black" />
+                    : <img src={getImageUrl(first)} alt="" className="w-full h-full object-contain" />)}
+                  {p.media.length > 1 && <span className="absolute bottom-0.5 left-0.5 text-[10px] font-bold bg-black/70 text-white px-1 rounded">{p.media.length}</span>}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-bold text-gray-900 truncate flex-1">{p.productName || 'منتج محذوف'}</p>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${toneClass[st.tone]}`}>{st.label}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{p.caption}</p>
+                  <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                    <Clock size={11} />{formatPostDate(p.publishedAt || p.createdAt)}
+                    <span className="mx-1">·</span>{TIKTOK_PRIVACY[p.privacyLevel] || p.privacyLevel}
+                  </p>
+                  {p.error && p.status === 'FAILED' && <p className="text-xs mt-1 text-red-600">{p.error}</p>}
+                  {p.status === 'FAILED' && (
+                    <button onClick={() => retry.mutate(p)} disabled={busy} className="mt-1.5 text-xs font-bold text-gray-700 inline-flex items-center gap-1 disabled:opacity-50">
+                      <RotateCcw size={12} className={busy ? 'animate-spin' : ''} />إعادة المحاولة
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ===========================
 // الصفحة
 // ===========================
 const VendorSocialAccounts = () => {
@@ -778,6 +861,20 @@ const VendorSocialAccounts = () => {
   const [filter, setFilter] = useState('all')
   const [platformFilter, setPlatformFilter] = useState('all')
   const [pageSelection, setPageSelection] = useState(null)  // اختيار صفحة فيسبوك بعد العودة
+
+  // فتح/إغلاق نافذة الربط يصفّر حالة الطلب السابق حتى لا تبقى النافذة عالقة على «جاري التحويل»
+  const openConnect = (key) => { byKey[key].connect.reset(); byKey[key].clearWrongOrigin(); setConnectKey(key) }
+  const closeConnect = () => {
+    if (connectKey) { byKey[connectKey].connect.reset(); byKey[connectKey].clearWrongOrigin() }
+    setConnectKey(null)
+  }
+  // الرجوع من صفحة المنصة بزر الرجوع (bfcache) يعيد الصفحة بحالتها المحفوظة
+  useEffect(() => {
+    const onShow = (e) => { if (e.persisted) { platforms.forEach(p => p.connect.reset()); setConnectKey(null) } }
+    window.addEventListener('pageshow', onShow)
+    return () => window.removeEventListener('pageshow', onShow)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // نتيجة العودة من المنصة (مرة واحدة — StrictMode يشغّل التأثير مرتين في التطوير)
   const handledResult = useRef(false)
@@ -813,7 +910,9 @@ const VendorSocialAccounts = () => {
   const statusLoading = platforms.some(p => p.statusLoading)
   const statusError = platforms.every(p => p.statusError)
 
-  const inPlatform = items.filter(v => platformFilter === 'all' || v.platform === platformFilter)
+  // فلتر منصة لم تعد مربوطة يعود إلى «الكل»
+  const activePlatformFilter = connectedPlatforms.some(p => p.cfg.key === platformFilter) ? platformFilter : 'all'
+  const inPlatform = items.filter(v => activePlatformFilter === 'all' || v.platform === activePlatformFilter)
   const hiddenCount = inPlatform.filter(v => v.isHidden).length
   const linkedCount = inPlatform.filter(v => v.product).length
   const filters = [
@@ -849,10 +948,18 @@ const VendorSocialAccounts = () => {
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-            {platforms.map(p => p.status && (
+            {platforms.map(p => p.status ? (
               <AccountRow key={p.cfg.key} platform={p}
-                onConnect={() => setConnectKey(p.cfg.key)}
+                onConnect={() => openConnect(p.cfg.key)}
                 onOpen={() => setAccountKey(p.cfg.key)} />
+            ) : p.statusError && (
+              <div key={p.cfg.key} className="flex items-center gap-3 p-4">
+                <span className="w-12 h-12 rounded-2xl bg-black flex items-center justify-center flex-shrink-0"><p.cfg.Logo className="w-7 h-7" /></span>
+                <p className="flex-1 min-w-0 text-sm text-red-700">تعذّر تحميل حالة {p.cfg.name}</p>
+                <button onClick={p.refresh} className="h-9 px-3.5 rounded-full border border-gray-200 text-sm font-medium inline-flex items-center gap-1.5">
+                  <RefreshCw size={14} />إعادة المحاولة
+                </button>
+              </div>
             ))}
             {UPCOMING.map(p => (
               <div key={p.name} className="flex items-center gap-3 px-4 py-3 opacity-70">
@@ -880,7 +987,7 @@ const VendorSocialAccounts = () => {
                 <>
                   {[{ key: 'all', name: 'الكل' }, ...connectedPlatforms.map(p => p.cfg)].map(p => (
                     <button key={p.key} onClick={() => setPlatformFilter(p.key)} aria-label={p.name}
-                      className={`h-9 px-3 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-1.5 border transition-colors ${platformFilter === p.key ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
+                      className={`h-9 px-3 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-1.5 border transition-colors ${activePlatformFilter === p.key ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
                       {p.Logo ? <p.Logo className="w-4 h-4" /> : p.name}
                     </button>
                   ))}
@@ -919,11 +1026,12 @@ const VendorSocialAccounts = () => {
       )}
 
       {instagram.connected && instagram.status?.publishingEnabled && <InstagramPostsSection />}
+      {tiktok.connected && tiktok.status?.publishingEnabled && <TikTokPostsSection />}
 
       {accountPlatform?.connected && (
         <AccountSheet platform={accountPlatform}
           onClose={() => setAccountKey(null)}
-          onReconnect={() => { setAccountKey(null); setConnectKey(accountPlatform.cfg.key) }} />
+          onReconnect={() => { setAccountKey(null); openConnect(accountPlatform.cfg.key) }} />
       )}
 
       {pageSelection && (
@@ -934,8 +1042,8 @@ const VendorSocialAccounts = () => {
 
       {connectPlatform && (
         <ConnectModal cfg={connectPlatform.cfg}
-          onClose={() => { connectPlatform.clearWrongOrigin(); setConnectKey(null) }}
-          onConfirm={() => connectPlatform.connect.mutate(undefined, { onError: () => setConnectKey(null) })}
+          onClose={closeConnect}
+          onConfirm={() => connectPlatform.connect.mutate(undefined, { onError: () => { connectPlatform.connect.reset(); setConnectKey(null) } })}
           wrongOrigin={connectPlatform.wrongOrigin}
           connecting={connectPlatform.connect.isPending || (connectPlatform.connect.isSuccess && !connectPlatform.wrongOrigin)} />
       )}

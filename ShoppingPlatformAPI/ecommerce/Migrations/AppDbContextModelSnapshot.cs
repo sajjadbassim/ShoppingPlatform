@@ -3792,6 +3792,114 @@ namespace ecommerce.Migrations
                     b.ToTable("tiktok_oauth_states", (string)null);
                 });
 
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowComment")
+                        .HasColumnType("bit")
+                        .HasColumnName("allow_comment");
+
+                    b.Property<bool>("AllowDuet")
+                        .HasColumnType("bit")
+                        .HasColumnName("allow_duet");
+
+                    b.Property<bool>("AllowStitch")
+                        .HasColumnType("bit")
+                        .HasColumnName("allow_stitch");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("Caption")
+                        .IsRequired()
+                        .HasMaxLength(2200)
+                        .HasColumnType("nvarchar(2200)")
+                        .HasColumnName("caption");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("error");
+
+                    b.Property<string>("ExternalVideoId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("external_video_id");
+
+                    b.Property<bool>("IsVideo")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_video");
+
+                    b.Property<string>("PreparedImagesJson")
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("prepared_images_json");
+
+                    b.Property<string>("PrivacyLevel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .HasColumnName("privacy_level");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("product_id");
+
+                    b.Property<bool>("PromotesOwnBusiness")
+                        .HasColumnType("bit")
+                        .HasColumnName("promotes_own_business");
+
+                    b.Property<string>("PublishId")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("publish_id");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("SourceMediaJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("source_media_json");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("vendor_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("Status", "UpdatedAt");
+
+                    b.HasIndex("VendorId", "CreatedAt");
+
+                    b.ToTable("tiktok_posts", (string)null);
+                });
+
             modelBuilder.Entity("ecommerce.Core.Models.TikTokVideo", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5109,6 +5217,24 @@ namespace ecommerce.Migrations
                         .HasForeignKey("VendorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Vendor");
+                });
+
+            modelBuilder.Entity("ecommerce.Core.Models.TikTokPost", b =>
+                {
+                    b.HasOne("ecommerce.Core.Models.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("ecommerce.Core.Models.Vendor", "Vendor")
+                        .WithMany()
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
 
                     b.Navigation("Vendor");
                 });

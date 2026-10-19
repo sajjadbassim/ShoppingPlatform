@@ -17,6 +17,9 @@ namespace ecommerce.Services.TikTokService
         public static TikTokConnectResult Fail(string reason) => new(false, reason);
     }
 
+    // جلسة النشر: توكن صالح (يُجدَّد عند الحاجة) وهل مُنحت صلاحية النشر
+    public record TikTokPublishSession(string AccessToken, string? Username, string? DisplayName, string? AvatarUrl, bool CanPublish);
+
     // بداية الربط: الرابط الذي يُفتح في المتصفح + قيمة الكوكي التي تُثبت أن العودة من نفس المتصفح
     public record TikTokConnectStart(string AuthorizeUrl, string Nonce);
 
@@ -43,11 +46,16 @@ namespace ecommerce.Services.TikTokService
 
         // للمزامنة الدورية في الخلفية — يعيد عدد الحسابات التي تمت مزامنتها
         Task<int> SyncDueConnectionsAsync(CancellationToken ct = default);
+
+        // النشر من المنصة (TikTokPublishService)
+        Task<TikTokPublishSession> GetPublishSessionAsync(Guid vendorId, CancellationToken ct = default);
+        Task LinkPublishedVideoAsync(Guid vendorId, string externalVideoId, Guid? productId, CancellationToken ct = default);
     }
 
     public class TikTokService : ITikTokService
     {
         public const string ScopeVideoList = "video.list";
+        public const string ScopePublish = "video.publish";
         public const string ScopeProfile = "user.info.profile";
         public const string ScopeStats = "user.info.stats";
 
@@ -290,6 +298,68 @@ namespace ecommerce.Services.TikTokService
                 await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
                 await _unitOfWork.SaveChangesAsync(ct);
                 return true;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        // ===================================
+        // النشر
+        // ===================================
+        public async Task<TikTokPublishSession> GetPublishSessionAsync(Guid vendorId, CancellationToken ct = default)
+        {
+            if (!_options.IsConfigured)
+                throw new BusinessRuleException("ربط تيك توك غير مفعّل على المنصة بعد");
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(RefreshWaitLimit, ct))
+                throw new BusinessRuleException("مزامنة جارية حالياً، حاول بعد لحظات");
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: false, ct)
+                    ?? throw new NotFoundException("لا يوجد حساب تيك توك مربوط بمتجرك");
+                if (connection.NeedsReconnect)
+                    throw new TikTokApiException("انتهت صلاحية الربط", "needs_reconnect", requiresReconnect: true);
+
+                try
+                {
+                    var token = await GetValidAccessTokenAsync(connection, ct);
+                    await _unitOfWork.SaveChangesAsync(ct);   // التوكن ربما جُدِّد
+                    return new TikTokPublishSession(token, connection.Username, connection.DisplayName, connection.AvatarUrl,
+                        connection.HasScope(ScopePublish));
+                }
+                catch (TikTokApiException ex) when (ex.RequiresReconnect)
+                {
+                    connection.NeedsReconnect = true;
+                    await _unitOfWork.SaveChangesAsync(ct);
+                    throw;
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        // بعد النشر: مزامنة سريعة ثم ربط الفيديو الجديد بالمنتج (إن ظهر في قائمة الحساب — المنشور الخاص لا يظهر)
+        public async Task LinkPublishedVideoAsync(Guid vendorId, string externalVideoId, Guid? productId, CancellationToken ct = default)
+        {
+            var gate = LockFor(vendorId);
+            if (!await gate.WaitAsync(RefreshWaitLimit, ct)) return;   // المزامنة الدورية ستجلبه
+            try
+            {
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct);
+                if (connection == null || connection.NeedsReconnect) return;
+
+                await SyncConnectionAsync(connection, showAllNewVideos: false, ct);
+                var video = connection.Videos.FirstOrDefault(v => v.ExternalId == externalVideoId);
+                if (video != null && productId.HasValue)
+                {
+                    video.ProductId = productId;
+                    video.IsHidden = false;
+                }
+                await _unitOfWork.SaveChangesAsync(ct);
             }
             finally
             {
@@ -682,6 +752,8 @@ namespace ecommerce.Services.TikTokService
         private TikTokStatusDto MapStatus(TikTokConnection? c) => new()
         {
             Configured = _options.IsConfigured,
+            PublishingEnabled = _options.IsConfigured && !string.IsNullOrWhiteSpace(_options.PublicBaseUrl),
+            CanPublish = c != null && !c.NeedsReconnect && c.HasScope(ScopePublish),
             Connected = c != null,
             NeedsReconnect = c?.NeedsReconnect ?? false,
             Account = c == null ? null : MapAccount(c),

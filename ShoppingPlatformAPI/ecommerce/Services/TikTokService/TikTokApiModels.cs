@@ -78,12 +78,61 @@ namespace ecommerce.Services.TikTokService
         [JsonPropertyName("like_count")] public long? LikeCount { get; set; }
     }
 
+    // Content Posting API: خيارات الحساب قبل النشر
+    public class TikTokCreatorInfoResponse
+    {
+        [JsonPropertyName("data")] public TikTokCreatorInfo? Data { get; set; }
+        [JsonPropertyName("error")] public TikTokApiError? Error { get; set; }
+    }
+
+    public class TikTokCreatorInfo
+    {
+        [JsonPropertyName("creator_nickname")] public string? Nickname { get; set; }
+        [JsonPropertyName("creator_username")] public string? Username { get; set; }
+        [JsonPropertyName("privacy_level_options")] public List<string>? PrivacyLevelOptions { get; set; }
+        [JsonPropertyName("comment_disabled")] public bool CommentDisabled { get; set; }
+        [JsonPropertyName("duet_disabled")] public bool DuetDisabled { get; set; }
+        [JsonPropertyName("stitch_disabled")] public bool StitchDisabled { get; set; }
+        [JsonPropertyName("max_video_post_duration_sec")] public int MaxVideoDurationSeconds { get; set; }
+    }
+
+    public class TikTokPublishInitResponse
+    {
+        [JsonPropertyName("data")] public TikTokPublishInitData? Data { get; set; }
+        [JsonPropertyName("error")] public TikTokApiError? Error { get; set; }
+    }
+
+    public class TikTokPublishInitData
+    {
+        [JsonPropertyName("publish_id")] public string? PublishId { get; set; }
+    }
+
+    public class TikTokPublishStatusResponse
+    {
+        [JsonPropertyName("data")] public TikTokPublishStatus? Data { get; set; }
+        [JsonPropertyName("error")] public TikTokApiError? Error { get; set; }
+    }
+
+    public class TikTokPublishStatus
+    {
+        // PROCESSING_DOWNLOAD | PROCESSING_UPLOAD | SEND_TO_USER_INBOX | PUBLISH_COMPLETE | FAILED
+        [JsonPropertyName("status")] public string? Status { get; set; }
+        [JsonPropertyName("fail_reason")] public string? FailReason { get; set; }
+        [JsonPropertyName("publicaly_available_post_id")] public List<long>? PostIds { get; set; }
+    }
+
+    // خيارات النشر التي اختارها التاجر
+    public record TikTokPostSettings(string PrivacyLevel, bool AllowComment, bool AllowDuet, bool AllowStitch, bool PromotesOwnBusiness);
+
     // ===================================
     // خطأ من تيك توك
     // ===================================
     public class TikTokApiException : Exception
     {
         public string? Code { get; }
+
+        // رسالة تيك توك الأصلية (للتسجيل ولعرض سبب رفض المنشور للتاجر)
+        public string? Detail { get; init; }
 
         // التوكن غير صالح أو أُلغي الإذن — لا فائدة من إعادة المحاولة، يلزم إعادة الربط
         public bool RequiresReconnect { get; }

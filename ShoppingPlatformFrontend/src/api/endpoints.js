@@ -93,6 +93,9 @@ export const API_ENDPOINTS = {
     STORE_FEED_REFRESH: (vendorId) => `/api/tiktok/stores/${vendorId}/videos/refresh`,
     REELS: '/api/tiktok/reels',
     REELS_REFRESH: '/api/tiktok/reels/refresh',
+    PUBLISH_OPTIONS: '/api/tiktok/publish/options',
+    POSTS: '/api/tiktok/posts',
+    POST_RETRY: (id) => `/api/tiktok/posts/${id}/retry`,
   },
 
   // ============ Instagram (المسار يطابق الروابط المسجّلة في تطبيق Meta) ============

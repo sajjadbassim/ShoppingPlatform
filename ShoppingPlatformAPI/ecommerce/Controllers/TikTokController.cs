@@ -23,15 +23,42 @@ namespace ecommerce.Controllers
         private const string CookiePath = "/api/tiktok";
 
         private readonly ITikTokService _tikTokService;
+        private readonly ITikTokPublishService _publishService;
         private readonly ICurrentUserService _currentUser;
         private readonly TikTokOptions _options;
 
-        public TikTokController(ITikTokService tikTokService, ICurrentUserService currentUser, IOptions<TikTokOptions> options)
+        public TikTokController(ITikTokService tikTokService, ITikTokPublishService publishService,
+            ICurrentUserService currentUser, IOptions<TikTokOptions> options)
         {
             _tikTokService = tikTokService;
+            _publishService = publishService;
             _currentUser = currentUser;
             _options = options.Value;
         }
+
+        // ===================================
+        // النشر من المنصة على حساب التاجر (Direct Post)
+        // ===================================
+
+        // GET: api/tiktok/publish/options?productId= — الحساب، صور المنتج، نص مقترح، خيارات الخصوصية من تيك توك
+        [HttpGet("publish/options")]
+        public async Task<ActionResult<ApiResponse<TikTokPublishOptionsDto>>> GetPublishOptions([FromQuery] Guid productId, CancellationToken ct)
+            => Ok(ApiResponse<TikTokPublishOptionsDto>.Ok(await _publishService.GetOptionsAsync(_currentUser.UserId, productId, ct)));
+
+        // GET: api/tiktok/posts — آخر 50 منشوراً من المنصة
+        [HttpGet("posts")]
+        public async Task<ActionResult<ApiResponse<List<TikTokPostDto>>>> GetPosts(CancellationToken ct)
+            => Ok(ApiResponse<List<TikTokPostDto>>.Ok(await _publishService.ListAsync(_currentUser.UserId, ct)));
+
+        // POST: api/tiktok/posts — { productId, media[], caption, privacyLevel, allowComment, allowDuet, allowStitch, promotesOwnBusiness, consent }
+        [HttpPost("posts")]
+        public async Task<ActionResult<ApiResponse<TikTokPostDto>>> CreatePost(CreateTikTokPostDto dto, CancellationToken ct)
+            => Ok(ApiResponse<TikTokPostDto>.Ok(await _publishService.CreateAsync(_currentUser.UserId, dto, ct)));
+
+        // POST: api/tiktok/posts/{id}/retry — للتي فشلت فقط
+        [HttpPost("posts/{id:guid}/retry")]
+        public async Task<ActionResult<ApiResponse<TikTokPostDto>>> RetryPost(Guid id, CancellationToken ct)
+            => Ok(ApiResponse<TikTokPostDto>.Ok(await _publishService.RetryAsync(_currentUser.UserId, id, ct)));
 
         // GET: api/tiktok/status
         [HttpGet("status")]
