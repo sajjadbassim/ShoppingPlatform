@@ -5,6 +5,7 @@ import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { useToast } from '../../components/common/Toast'
 import { authService } from '../../services/authService'
+import { DevCodeHint } from '../../components/auth/PhoneCodeForm'
 
 const PHONE_REGEX = /^(\+964|0)7[3-9]\d{8}$/
 
@@ -21,6 +22,7 @@ const ForgotPasswordPage = () => {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const [devCode, setDevCode] = useState('')
 
   const handleSendCode = async (e) => {
     e.preventDefault()
@@ -37,7 +39,8 @@ const ForgotPasswordPage = () => {
 
     setLoading(true)
     try {
-      await authService.forgotPassword(phone)
+      const res = await authService.forgotPassword(phone)
+      setDevCode(res?.data?.devCode || '')
       setStep(2)
     } catch (err) {
       showError(err.message || 'تعذّر إرسال رمز التحقق')
@@ -139,6 +142,7 @@ const ForgotPasswordPage = () => {
         {step === 2 && (
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <form onSubmit={handleVerifyCode} className="space-y-5">
+              <DevCodeHint code={devCode} onUse={(c) => { setCode(c); setFieldError('') }} />
               <Input
                 label="رمز التحقق"
                 name="code"

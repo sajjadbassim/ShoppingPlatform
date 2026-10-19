@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.Exceptions;
 using ecommerce.Core.Models;
 using ecommerce.Data;
@@ -53,7 +53,7 @@ namespace ecommerce.Tests.Services
             var avatars = new ecommerce.Services.AvatarService(_context, env.Object, _fetcher,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ecommerce.Services.AvatarService>.Instance);
             var auth = new AuthService(new UserRepository(_context), Options.Create(_jwt), new VendorRepository(_context),
-                Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<ISmsSender>(), Mock.Of<INotificationService>(),
+                Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<IOtpSender>(), Mock.Of<INotificationService>(),
                 new AuthThrottle(new MemoryCache(new MemoryCacheOptions())), new RefreshTokenRepository(_context));
             return new GoogleAuthService(_context, auth, new FakeValidator(),
                 Options.Create(new GoogleOptions { ClientId = "client" }), Options.Create(_jwt), avatars: avatars);

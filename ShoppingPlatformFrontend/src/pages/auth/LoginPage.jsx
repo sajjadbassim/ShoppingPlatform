@@ -10,7 +10,7 @@ import { GoogleSignInSection } from '../../components/auth/GoogleSignIn'
 const LoginPage = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { success, error } = useToast()
+  const { success } = useToast()
   
   // Zustand Store
   const { login, isLoading, error: authError, clearError } = useAuthStore()
@@ -90,8 +90,8 @@ const LoginPage = () => {
       const redirectPath = roleRedirects[result.user?.role] || '/'
       navigate(redirectPath, { replace: true })
       
-    } catch (err) {
-      error(err.message || 'فشل تسجيل الدخول')
+    } catch {
+      // الخطأ يظهر في المربع أعلى النموذج (authError من المتجر) — بلا إشعار مكرر
     }
   }
 
@@ -156,6 +156,7 @@ const LoginPage = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute left-3 top-9 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
+                  aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -196,7 +197,7 @@ const LoginPage = () => {
             {/* Register Link */}
             <p className="text-center mt-6 text-gray-600">
               ليس لديك حساب؟{' '}
-              <Link to="/register" className="text-primary font-semibold hover:underline">
+              <Link to="/register" state={{ from }} className="text-primary font-semibold hover:underline">
                 إنشاء حساب جديد
               </Link>
             </p>

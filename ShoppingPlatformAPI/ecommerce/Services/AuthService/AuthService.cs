@@ -1,4 +1,4 @@
-﻿using ecommerce.Services.LoyaltyService;
+using ecommerce.Services.LoyaltyService;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Auth;
 using ecommerce.Core.Models;
@@ -21,25 +21,28 @@ namespace ecommerce.Services.AuthService
         private readonly JwtSettings _jwtSettings;
         private readonly IVendorRepository _vendorRepository;
         private readonly IPasswordResetOtpRepository _passwordResetOtpRepository;
-        private readonly ISmsSender _smsSender;
+        private readonly IOtpSender _otpSender;
         private readonly INotificationService _notificationService;
         private readonly IAuthThrottle _throttle;
         private readonly ecommerce.Services.ActivityLogService.IActivityLogService? _activity;
         private readonly IRefreshTokenRepository _refreshTokens;
         private readonly ILoyaltyService? _loyalty;
+        private readonly IPhoneVerificationService? _phoneVerification;
 
         public AuthService(
             IUserRepository userRepository,
             IOptions<JwtSettings> jwtSettings,
             IVendorRepository vendorRepository,
             IPasswordResetOtpRepository passwordResetOtpRepository,
-            ISmsSender smsSender,
+            IOtpSender otpSender,
             INotificationService notificationService,
             IAuthThrottle throttle,
             IRefreshTokenRepository refreshTokens,
             ILoyaltyService? loyalty = null,
-            ecommerce.Services.ActivityLogService.IActivityLogService? activity = null)
+            ecommerce.Services.ActivityLogService.IActivityLogService? activity = null,
+            IPhoneVerificationService? phoneVerification = null)
         {
+            _phoneVerification = phoneVerification;
             _activity = activity;
             _loyalty = loyalty;
             _throttle = throttle;
@@ -48,12 +51,12 @@ namespace ecommerce.Services.AuthService
             _jwtSettings = jwtSettings.Value;
             _vendorRepository = vendorRepository;
             _passwordResetOtpRepository = passwordResetOtpRepository;
-            _smsSender = smsSender;
+            _otpSender = otpSender;
             _notificationService = notificationService;
         }
 
         public const string PhoneUnavailable =
-            "لا يمكن إكمال التسجيل بهذا الرقم — إذا كان لديك حساب به فادخل بكلمة المرور";
+            "لا يمكن إكمال التسجيل بهذا الرقم أو البريد — إذا كان لديك حساب بأحدهما فادخل بكلمة المرور";
 
         // الإيميل مستخدم لحساب آخر؟ (بلا فرق بين الأحرف الكبيرة والصغيرة)
         private async Task<bool> EmailTakenAsync(string email, Guid? exceptUserId = null) =>
@@ -63,13 +66,16 @@ namespace ecommerce.Services.AuthService
             email.Length == 0 ? null : await _userRepository.GetByEmailAsync(email);
 
         // إضافة رقم الهاتف لحساب بلا هاتف (شرط إتمام الطلب) — يُعيد جلسة جديدة فيها الرقم
-        public async Task<LoginResponseDto> AddPhoneAsync(Guid userId, string phone)
+        public async Task<LoginResponseDto> AddPhoneAsync(Guid userId, string phone, string? verificationToken = null)
         {
             var user = await _userRepository.GetByIdAsync(userId) ?? throw new NotFoundException("المستخدم غير موجود");
             var normalized = PhoneNumber.Require(phone);
             if (user.Phone == normalized) return await SignInAsync(user);
             if (!string.IsNullOrEmpty(user.Phone))
                 throw new BusinessRuleException("لحسابك رقم هاتف مسبقاً");
+
+            // إثبات ملكية الرقم قبل أي فحص آخر — حتى لا يُعرف هل الرقم مسجّل لغيره بلا رمز
+            var verification = _phoneVerification == null ? null : await _phoneVerification.RequireAsync(normalized, verificationToken);
 
             var owner = await _userRepository.GetByPhoneAsync(normalized);
             if (owner != null && owner.Id != userId)
@@ -81,6 +87,7 @@ namespace ecommerce.Services.AuthService
             {
                 throw new BusinessRuleException("لا يمكن استخدام هذا الرقم — إذا كان لديك حساب به فادخل إليه بكلمة المرور");
             }
+            if (verification != null) await _phoneVerification!.MarkUsedAsync(verification);
             return await SignInAsync(user);
         }
 
@@ -137,6 +144,10 @@ namespace ecommerce.Services.AuthService
         {
             // الرقم بصيغة واحدة 07XXXXXXXXX حتى لا يتكرر نفس الرقم بصيغتين
             var phone = PhoneNumber.Require(dto.Phone);
+
+            // إثبات ملكية الرقم أولاً — قبل فحص التكرار حتى لا يُعرف هل الرقم مسجّل بلا رمز يصل لصاحبه
+            var verification = _phoneVerification == null ? null : await _phoneVerification.RequireAsync(phone, dto.PhoneVerificationToken);
+
             var fullName = (dto.FullName ?? "").Trim();
             if (fullName.Length < 3)
                 throw new BusinessRuleException("الاسم يجب أن يكون 3 أحرف على الأقل");
@@ -168,9 +179,10 @@ namespace ecommerce.Services.AuthService
             }
             catch (Microsoft.EntityFrameworkCore.DbUpdateException)
             {
-                // تسجيلان بنفس الرقم في نفس اللحظة — يمنعهما الفهرس الفريد
+                // تسجيلان بنفس الرقم أو البريد في نفس اللحظة — يمنعهما الفهرس الفريد
                 throw new BusinessRuleException(PhoneUnavailable);
             }
+            if (verification != null) await _phoneVerification!.MarkUsedAsync(verification);
 
             try
             {
@@ -292,31 +304,34 @@ namespace ecommerce.Services.AuthService
         // ─────────────────────────────────────────────────────────────────────
         // FORGOT PASSWORD — إرسال رمز تحقق للهاتف
         // ─────────────────────────────────────────────────────────────────────
-        public async Task ForgotPasswordAsync(ForgotPasswordDto dto)
+        public async Task<string?> ForgotPasswordAsync(ForgotPasswordDto dto)
         {
             var phone = PhoneNumber.ForLookup(dto.Phone);
             _throttle.EnsureOtpRequestAllowed(phone);
 
+            // الرمز وتشفيره (أبطأ خطوة، ~0.4 ثانية) قبل البحث عن الرقم: زمن الرد واحد سواء كان الرقم مسجلاً أم لا
+            // مولّد تشفيري: Random.Shared قابل للتنبؤ (والحد الأعلى كان يُستثنى منه 999999)
+            var code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            var codeHash = BCrypt.Net.BCrypt.HashPassword(code);
+
             // نفس الرد سواء كان الرقم مسجلاً أم لا — حتى لا تُعرف الأرقام المسجلة
             var user = await _userRepository.GetByPhoneAsync(phone);
             if (user == null || !user.IsActive || string.IsNullOrEmpty(user.Phone))
-                return;
+                return null;
 
             // إبطال أي رموز سابقة لم تُستخدم بعد
             await _passwordResetOtpRepository.InvalidatePendingForUserAsync(user.Id);
 
-            // مولّد تشفيري: Random.Shared قابل للتنبؤ (والحد الأعلى كان يُستثنى منه 999999)
-            var code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-
             var otp = new PasswordResetOtp
             {
                 UserId = user.Id,
-                CodeHash = BCrypt.Net.BCrypt.HashPassword(code),
+                CodeHash = codeHash,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(10),
             };
 
             await _passwordResetOtpRepository.CreateAsync(otp);
-            await _smsSender.SendAsync(user.Phone, $"رمز إعادة تعيين كلمة المرور في واسط: {code} (صالح لمدة 10 دقائق)");
+            await _otpSender.SendCodeAsync(user.Phone, code);   // في الخلفية — لا ينتظر المزوّد
+            return code;
         }
 
         // ─────────────────────────────────────────────────────────────────────

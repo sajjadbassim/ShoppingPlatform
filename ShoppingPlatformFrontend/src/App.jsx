@@ -33,6 +33,7 @@ const OrderDetailsPage = lazy(() => import('./pages/customer/OrderDetailsPage'))
 const StoresPage = lazy(() => import('./pages/customer/StoresPage'))
 const StoreDetailsPage = lazy(() => import('./pages/customer/StoreDetailsPage'))
 const ProfilePage = lazy(() => import('./pages/customer/ProfilePage'))
+const OpenStorePage = lazy(() => import('./pages/customer/OpenStorePage'))
 const WishlistPage = lazy(() => import('./pages/customer/WishlistPage'))
 const SettingsPage = lazy(() => import('./pages/customer/SettingsPage'))
 const CategoriesPage = lazy(() => import('./pages/customer/CategoriesPage'))
@@ -127,6 +128,7 @@ const router = createBrowserRouter(createRoutesFromElements(
       <Route path="orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
       <Route path="orders/:id" element={<ProtectedRoute><OrderDetailsPage /></ProtectedRoute>} />
       <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+      <Route path="open-store" element={<ProtectedRoute><OpenStorePage /></ProtectedRoute>} />
       <Route path="wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
       <Route path="settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />

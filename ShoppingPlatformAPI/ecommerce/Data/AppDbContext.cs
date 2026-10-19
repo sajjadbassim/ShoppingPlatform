@@ -1,4 +1,4 @@
-﻿using ecommerce.Core.Constants;
+using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Net;
@@ -54,6 +54,7 @@ namespace ecommerce.Data
         public DbSet<ReturnTripItem> ReturnTripItems { get; set; }
 
         public DbSet<PasswordResetOtp> PasswordResetOtps { get; set; }
+        public DbSet<PhoneVerification> PhoneVerifications { get; set; }
 
         public DbSet<ProductAttribute> ProductAttributes { get; set; }
         public DbSet<ProductAttributeValue> ProductAttributeValues { get; set; }

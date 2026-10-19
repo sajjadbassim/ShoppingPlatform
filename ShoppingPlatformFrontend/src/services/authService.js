@@ -15,13 +15,8 @@ export const authService = {
 login: async (credentials) => {
   const response = await apiPost(API_ENDPOINTS.AUTH.LOGIN, credentials);
 
-  const data = response.data.data; // ✅ مثل باقي الخدمات
-
-  saveSession(data);
-
-  localStorage.setItem('user', JSON.stringify(data));
-
-  return data; // ✅ نرجع data فقط
+  // الجلسة وبيانات المستخدم يحفظها authStore (saveSession + persist بمفتاح user)
+  return response.data.data;
 },
 
 
@@ -36,13 +31,7 @@ login: async (credentials) => {
 register: async (userData) => {
   const response = await apiPost(API_ENDPOINTS.AUTH.REGISTER, userData);
 
-  const data = response.data.data;
-
-  saveSession(data);
-
-  localStorage.setItem('user', JSON.stringify(data));
-
-  return data;
+  return response.data.data;
 },
 
 
@@ -72,6 +61,27 @@ changePassword: async (passwords) => {
   forgotPassword: async (phone) => {
     const response = await apiPost(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { phone });
     return response.data;
+  },
+
+  /**
+   * رمز تأكيد رقم الهاتف (إنشاء حساب / إضافة رقم) — يعيد devCode في بيئة التطوير فقط
+   * @param {string} phone
+   * @returns {Promise<string>}
+   */
+  sendPhoneCode: async (phone) => {
+    const response = await apiPost(API_ENDPOINTS.AUTH.PHONE_SEND_CODE, { phone });
+    return response.data?.data?.devCode || '';
+  },
+
+  /**
+   * التحقق من رمز الهاتف ← verificationToken يُرسل مع التسجيل أو إضافة الرقم
+   * @param {string} phone
+   * @param {string} code
+   * @returns {Promise<string>}
+   */
+  verifyPhoneCode: async (phone, code) => {
+    const response = await apiPost(API_ENDPOINTS.AUTH.PHONE_VERIFY_CODE, { phone, code });
+    return response.data.data.verificationToken;
   },
 
   /**
@@ -125,14 +135,6 @@ getCurrentUser: async () => {
    */
   isAuthenticated: () => {
     return !!localStorage.getItem('accessToken');
-  },
-
-  /**
-   * الحصول على المستخدم من localStorage
-   */
-  getStoredUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
   },
 
   /**

@@ -43,7 +43,7 @@ namespace ecommerce.Services.VendorService.VendorService
                 throw new BusinessRuleException("اسم المتجر مطلوب");
 
             if (await _vendorRepository.NameTakenAsync(dto.Name, dto.NameAr))
-                throw new BusinessRuleException("اسم المتجر مستخدم لمتجر آخر");
+                throw new BusinessRuleException("اسم المتجر غير متاح، اختر اسماً آخر");
 
             if (byAdmin)
             {
@@ -347,6 +347,13 @@ namespace ecommerce.Services.VendorService.VendorService
             }
             catch { /* الإشعار لا يُفشل التفعيل */ }
             return true;
+        }
+
+        // طلب فتح المتجر الخاص بالمالك (مفعّل أو قيد المراجعة) — null إن لم يقدّم طلباً
+        public async Task<VendorResponseDto?> GetByOwnerAsync(Guid ownerId)
+        {
+            var vendor = await _vendorRepository.GetByOwnerIdAsync(ownerId);
+            return vendor == null ? null : await MapToDtoAsync(vendor);
         }
 
         private async Task<VendorResponseDto> MapToDtoAsync(Vendor vendor)

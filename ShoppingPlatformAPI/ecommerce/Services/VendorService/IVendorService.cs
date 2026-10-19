@@ -10,6 +10,7 @@ namespace ecommerce.Services.VendorService.VendorService
         Task<VendorResponseDto> GetByIdAsync(Guid id);
         Task<IEnumerable<VendorResponseDto>> GetAllAsync(bool onlyActive = true);
         Task<VendorResponseDto> GetByPhoneAsync(string phone);
+        Task<VendorResponseDto?> GetByOwnerAsync(Guid ownerId);
 
         Task<VendorResponseDto> UpdateAsync(Guid id, VendorUpdateDto dto);
         Task<bool> DeleteAsync(Guid id);

@@ -31,7 +31,7 @@ namespace ecommerce.Tests.Services
             Options.Create(new JwtSettings { Secret = new string('k', 64), Issuer = "i", Audience = "a", ExpirationInMinutes = 60 }),
             new VendorRepository(_context),
             Mock.Of<IPasswordResetOtpRepository>(),
-            Mock.Of<ISmsSender>(),
+            Mock.Of<IOtpSender>(),
             Mock.Of<INotificationService>(),
             _throttle,
             new RefreshTokenRepository(_context));

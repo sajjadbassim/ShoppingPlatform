@@ -48,7 +48,7 @@ namespace ecommerce.Tests.Services
             context ??= _context;
             return new AuthService(new UserRepository(context),
                 Options.Create(new JwtSettings { Secret = new string('k', 64), Issuer = "i", Audience = "a", ExpirationInMinutes = 60, RefreshTokenDays = 30 }),
-                new VendorRepository(context), Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<ISmsSender>(),
+                new VendorRepository(context), Mock.Of<IPasswordResetOtpRepository>(), Mock.Of<IOtpSender>(),
                 Mock.Of<INotificationService>(), new AuthThrottle(new MemoryCache(new MemoryCacheOptions())),
                 new RefreshTokenRepository(context));
         }

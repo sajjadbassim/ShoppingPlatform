@@ -15,11 +15,54 @@ namespace ecommerce.Controllers
     {
         private readonly IAuthService _authService;
         private readonly ecommerce.Services.AuthService.IAuthThrottle? _throttle;
+        private readonly IPhoneVerificationService? _phoneVerification;
+        private readonly IWebHostEnvironment? _env;
 
-        public AuthController(IAuthService authService, ecommerce.Services.AuthService.IAuthThrottle? throttle = null)
+        public AuthController(IAuthService authService, ecommerce.Services.AuthService.IAuthThrottle? throttle = null,
+            IPhoneVerificationService? phoneVerification = null, IWebHostEnvironment? env = null)
         {
             _authService = authService;
             _throttle = throttle;
+            _phoneVerification = phoneVerification;
+            _env = env;
+        }
+
+        // بيئة التطوير فقط: الرمز يُعاد في الرد ليُجرَّب دون رسالة حقيقية (مفتاح Wevlix التجريبي لا يرسل)
+        private object? DevCode(string? code) =>
+            code != null && _env?.IsDevelopment() == true ? new { devCode = code } : null;
+
+        // POST: api/auth/phone/send-code — رمز تحقق لرقم سيُربط بحساب (إنشاء حساب أو إضافة رقم)
+        [HttpPost("phone/send-code")]
+        [AllowAnonymous]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
+        public async Task<IActionResult> SendPhoneCode([FromBody] ForgotPasswordDto dto)
+        {
+            try
+            {
+                var code = await _phoneVerification!.SendCodeAsync(dto.Phone);
+                return Ok(new { success = true, data = DevCode(code), message = "أرسلنا رمز التحقق إلى واتساب على رقمك" });
+            }
+            catch (AppException ex)
+            {
+                return ApiErrors.From(ex);
+            }
+        }
+
+        // POST: api/auth/phone/verify-code — رمز صحيح ← verificationToken يُرسل مع التسجيل أو إضافة الرقم
+        [HttpPost("phone/verify-code")]
+        [AllowAnonymous]
+        [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth-ip")]
+        public async Task<IActionResult> VerifyPhoneCode([FromBody] VerifyResetOtpDto dto)
+        {
+            try
+            {
+                var token = await _phoneVerification!.VerifyCodeAsync(dto.Phone, dto.Code);
+                return Ok(new { success = true, data = new { verificationToken = token }, message = "تم تأكيد رقم الهاتف" });
+            }
+            catch (AppException ex)
+            {
+                return ApiErrors.From(ex);
+            }
         }
 
         // POST: api/auth/register
@@ -88,7 +131,7 @@ namespace ecommerce.Controllers
             {
                 var idClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
                 if (!Guid.TryParse(idClaim, out var userId)) return Unauthorized();
-                var result = await _authService.AddPhoneAsync(userId, dto.Phone);
+                var result = await _authService.AddPhoneAsync(userId, dto.Phone, dto.VerificationToken);
                 return Ok(new { success = true, data = result, message = "تم حفظ رقم الهاتف" });
             }
             catch (AppException ex)
@@ -129,8 +172,8 @@ namespace ecommerce.Controllers
         {
             try
             {
-                await _authService.ForgotPasswordAsync(dto);
-                return Ok(new { success = true, message = "إذا كان الرقم مسجلاً سيصلك رمز التحقق خلال لحظات" });
+                var code = await _authService.ForgotPasswordAsync(dto);
+                return Ok(new { success = true, data = DevCode(code), message = "إذا كان الرقم مسجلاً سيصلك رمز التحقق خلال لحظات" });
             }
             catch (AppException ex)
             {
@@ -247,5 +290,9 @@ namespace ecommerce.Controllers
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "رقم الهاتف مطلوب")]
         public string Phone { get; set; } = "";
+
+        // من POST api/auth/phone/verify-code
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? VerificationToken { get; set; }
     }
 }

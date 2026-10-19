@@ -299,6 +299,13 @@ const Header = () => {
                     <span>النقاط التشجيعية</span>
                   </Link>
 
+                  {user?.role === 'CUSTOMER' && (
+                    <Link to="/open-store" className="dropdown-item">
+                      <Store size={18} />
+                      <span>افتح متجرك</span>
+                    </Link>
+                  )}
+
                   <Link to="/settings" className="dropdown-item">
                     <Settings size={18} />
                     <span>الإعدادات</span>

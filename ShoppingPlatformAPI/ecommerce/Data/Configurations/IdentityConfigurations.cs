@@ -230,4 +230,28 @@ namespace ecommerce.Data.Configurations
                 .OnDelete(DeleteBehavior.Cascade);
         }
     }
+
+    // ===================================
+    // تكوين جدول PhoneVerification
+    // ===================================
+    public class PhoneVerificationConfiguration : IEntityTypeConfiguration<PhoneVerification>
+    {
+        public void Configure(EntityTypeBuilder<PhoneVerification> entity)
+        {
+            entity.ToTable("phone_verifications");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Phone).HasColumnName("phone").IsRequired().HasMaxLength(20);
+            entity.Property(e => e.CodeHash).HasColumnName("code_hash").IsRequired().HasMaxLength(255);
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.Attempts).HasColumnName("attempts").HasDefaultValue(0);
+            entity.Property(e => e.TokenHash).HasColumnName("token_hash").HasMaxLength(64);
+            entity.Property(e => e.TokenExpiresAt).HasColumnName("token_expires_at");
+            entity.Property(e => e.UsedAt).HasColumnName("used_at");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasIndex(e => e.Phone).HasDatabaseName("idx_phone_verifications_phone");
+            entity.HasIndex(e => e.TokenHash).HasDatabaseName("idx_phone_verifications_token_hash");
+        }
+    }
 }

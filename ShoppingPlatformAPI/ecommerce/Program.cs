@@ -1,4 +1,4 @@
-﻿using Serilog;
+using Serilog;
 using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.Models;
@@ -320,6 +320,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddAppPersistence(builder.Configuration);
 builder.Services.AddAppServices();
+builder.Services.AddOtpSender(builder.Configuration);
 builder.Services.AddAppDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddTikTokIntegration(builder.Configuration);
 builder.Services.AddInstagramIntegration(builder.Configuration);

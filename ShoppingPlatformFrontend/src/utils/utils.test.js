@@ -8,6 +8,7 @@ import {
 import { IMG_SIZE, getAllProductImages, getImageUrl, getPrimaryImage } from './imageHelper'
 import { getDashboardLink } from './dashboardLink'
 import { SCOPE, isGroceryCategory, searchLink } from './shopScope'
+import { normalizeIraqiPhone } from './phone'
 
 describe('orderStatusText', () => {
   it('ترجمة رموز الحالة داخل النص', () => {
@@ -93,5 +94,15 @@ describe('shopScope', () => {
     expect(isGroceryCategory({ section: 'grocery' })).toBe(true)
     expect(isGroceryCategory({ section: 'general' })).toBe(false)
     expect(isGroceryCategory(null)).toBe(false)
+  })
+})
+
+describe('phone', () => {
+  it('صيغ الرقم العراقي تتوحّد كما في الخادم', () => {
+    expect(normalizeIraqiPhone('+964 770 123-4567')).toBe('07701234567')
+    expect(normalizeIraqiPhone('009647701234567')).toBe('07701234567')
+    expect(normalizeIraqiPhone('7701234567')).toBe('07701234567')
+    expect(normalizeIraqiPhone('07012345678')).toBe(null)
+    expect(normalizeIraqiPhone('')).toBe(null)
   })
 })

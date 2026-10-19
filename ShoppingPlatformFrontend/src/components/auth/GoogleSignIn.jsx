@@ -7,7 +7,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import AccountExistsHint, { isAccountExistsMessage } from './AccountExistsHint'
-import { getReferral } from '../../utils/referral'
+import { clearReferral, getReferral } from '../../utils/referral'
 
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -126,6 +126,7 @@ export const GoogleSignInSection = ({ redirectTo = '/', text = 'continue_with' }
       // رمز دعوة صديق (إن فتح الزائر رابط دعوة) — يُطبَّق على الحساب الجديد فقط
       const res = await apiPost(API_ENDPOINTS.AUTH.GOOGLE, { credential, referralCode: getReferral() || undefined })
       const data = res.data?.data ?? res.data
+      clearReferral()   // استُعمل (أو لم يُطبَّق لحساب قديم) — لا يُرسل مع تسجيل لاحق على هذا الجهاز
       finish(data.login)
     } catch (err) {
       if (isAccountExistsMessage(err.message)) setExists({ message: err.message, email: emailOf(credential) })

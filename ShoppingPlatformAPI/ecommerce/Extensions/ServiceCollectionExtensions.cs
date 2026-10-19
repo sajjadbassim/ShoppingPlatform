@@ -1,4 +1,4 @@
-﻿using ecommerce.Services.DriverTrackingService;
+using ecommerce.Services.DriverTrackingService;
 using ecommerce.Services.OpsReportService;
 using ecommerce.Services.VendorAccessService;
 using ecommerce.Core.Interfaces;
@@ -118,8 +118,8 @@ namespace ecommerce.Extensions
             services.AddScoped<IOrderStatusLogRepository, OrderStatusLogRepository>();
 
             services.AddScoped<IAuthService, AuthService>();
+            services.AddScoped<IPhoneVerificationService, PhoneVerificationService>();
             services.AddScoped<IPasswordResetOtpRepository, PasswordResetOtpRepository>();
-            services.AddScoped<ISmsSender, ConsoleSmsSender>();
 
             services.AddScoped<INotificationRepository, NotificationRepository>();
             services.AddScoped<INotificationService, NotificationService>();
@@ -197,6 +197,20 @@ namespace ecommerce.Extensions
 
         // ربط متاجر التجار بتيك توك — المفاتيح من القسم "TikTok" (السر في user-secrets / متغيرات البيئة).
         // يُستدعى بعد AddAppDataProtection (تشفير التوكنات)
+        // رمز التحقق عبر واتساب (Wevlix) — بلا مفتاح يُطبع الرمز في السجل (التطوير)
+        public static IServiceCollection AddOtpSender(this IServiceCollection services, IConfiguration config)
+        {
+            var section = config.GetSection(WevlixOptions.SectionName);
+            services.Configure<WevlixOptions>(section);
+            if (section.Get<WevlixOptions>()?.Enabled == true)
+            {
+                services.AddHttpClient(WevlixOtpSender.HttpClientName, c => c.Timeout = TimeSpan.FromSeconds(10));
+                services.AddSingleton<IOtpSender, WevlixOtpSender>();   // بلا تبعيات scoped — يرسل في الخلفية
+            }
+            else services.AddScoped<IOtpSender, ConsoleOtpSender>();
+            return services;
+        }
+
         public static IServiceCollection AddTikTokIntegration(this IServiceCollection services, IConfiguration config)
         {
             services.Configure<TikTokOptions>(config.GetSection(TikTokOptions.SectionName));

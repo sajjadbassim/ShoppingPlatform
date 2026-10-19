@@ -29,6 +29,10 @@ namespace ecommerce.Core.DTO.Auth
         [MaxLength(16)]
         public string? ReferralCode { get; set; }
 
+        // من POST api/auth/phone/verify-code — يثبت أن صاحب الطلب يملك الرقم
+        [MaxLength(100)]
+        public string? PhoneVerificationToken { get; set; }
+
 
 
     }

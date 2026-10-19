@@ -63,6 +63,16 @@ namespace ecommerce.Controllers
             }
         }
         
+        // GET: api/vendors/my-request — متجر المستخدم الحالي أو طلبه قيد المراجعة (data = null إن لم يقدّم)
+        [HttpGet("my-request")]
+        [Authorize]
+        public async Task<IActionResult> GetMyRequest()
+        {
+            var ownerId = GetCurrentUserId();
+            if (ownerId == null) return Unauthorized();
+            return Ok(new { success = true, data = await _vendorService.GetByOwnerAsync(ownerId.Value) });
+        }
+
         // GET: api/vendors/{id}
         [HttpGet("{id}")]
         [AllowAnonymous]

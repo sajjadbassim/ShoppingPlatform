@@ -2,32 +2,45 @@ import { useState } from 'react'
 import { GoogleSignInSection } from '../../components/auth/GoogleSignIn'
 import { getReferral, clearReferral } from '../../utils/referral'
 import AccountExistsHint, { isAccountExistsMessage } from '../../components/auth/AccountExistsHint'
-import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Lock, User, Phone, Store, ChevronLeft, AlertCircle, CheckCircle } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff, User, Store, ChevronLeft, AlertCircle } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { useToast } from '../../components/common/Toast'
+import { ConfirmModal } from '../../components/common/Modal'
 import { useAuthStore } from '../../stores'
-import { apiPostForm } from '../../api/axios'
-import { API_ENDPOINTS } from '../../api/endpoints'
+import { normalizeIraqiPhone } from '../../utils/phone'
+import { authService } from '../../services/authService'
+import PhoneCodeForm from '../../components/auth/PhoneCodeForm'
+
+// البائع: يُنشأ حسابه كزبون ثم يُكمل بيانات متجره في /open-store
+const ROLE_HOME = { ADMIN: '/admin', OPS: '/operations', DRIVER: '/driver' }
 
 const RegisterPage = () => {
   const navigate = useNavigate()
-  const { success, error: showError } = useToast()
-  const { register, isLoading, error: authError, clearError } = useAuthStore()
+  const location = useLocation()
+  const { success } = useToast()
+  const { register, login, isLoading, error: authError, clearError } = useAuthStore()
 
   const [step, setStep] = useState(1)
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [askOpenStore, setAskOpenStore] = useState(false)   // زبون مسجّل اختار «بائع» وأدخل كلمة مروره الصحيحة
+  // الخطوات: 1 المعلومات ← 2 رمز واتساب لتأكيد الرقم ← 3 كلمة المرور
+  const [codeSent, setCodeSent] = useState(null)           // { phone, devCode }
+  const [verification, setVerification] = useState(null)   // { phone, token } — رمز إثبات ملكية الرقم
+  const [sendingCode, setSendingCode] = useState(false)
   const [formData, setFormData] = useState({
     accountType: 'customer',
     fullName: '', email: '', phone: '', password: '', confirmPassword: '',
-    storeName: '', storeNameAr: '', storeDesc: '', storePhone: '', storeAddress: '',
-    minOrder: '5000', prepTime: '30',
     agreeTerms: false,
     referralCode: getReferral(),   // من رابط دعوة صديق، ويمكن كتابته يدوياً
   })
   const [errors, setErrors] = useState({})
+
+  // الصفحة التي جاء منها الزائر (مثلاً صفحة منتج) — يعود إليها بعد إنشاء الحساب
+  const from = location.state?.from && !['/login', '/register'].includes(location.state.from) ? location.state.from : '/'
+  const phone = normalizeIraqiPhone(formData.phone) ?? formData.phone.replace(/\s/g, '')
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -42,22 +55,37 @@ const RegisterPage = () => {
       e.fullName = 'الاسم يجب أن يكون 3 أحرف على الأقل'
     if (!formData.phone)
       e.phone = 'رقم الهاتف مطلوب'
-    else if (!/^(07[3-9]\d{8})$/.test(formData.phone.replace(/\s/g, '')))
+    else if (!normalizeIraqiPhone(formData.phone))
       e.phone = 'رقم الهاتف غير صحيح (مثال: 07701234567)'
     if (!formData.email.trim())
       e.email = 'البريد الإلكتروني مطلوب'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()))
       e.email = 'البريد الإلكتروني غير صحيح'
-    if (formData.accountType === 'vendor') {
-      if (!formData.storeName.trim())    e.storeName    = 'اسم المتجر مطلوب'
-      if (!formData.storeNameAr.trim())  e.storeNameAr  = 'اسم المتجر بالعربي مطلوب'
-      if (!formData.storeAddress.trim()) e.storeAddress = 'العنوان مطلوب'
-      if (!formData.storeDesc.trim())    e.storeDesc    = 'وصف المتجر مطلوب'
-      if (!formData.minOrder)            e.minOrder     = 'الحد الأدنى للطلب مطلوب'
-      if (!formData.prepTime)            e.prepTime     = 'وقت التحضير مطلوب'
-    }
     setErrors(e)
     return Object.keys(e).length === 0
+  }
+
+  // التالي من الخطوة 1: رقم مؤكَّد مسبقاً (رجع ليعدّل اسمه) ← كلمة المرور مباشرة، وإلا نرسل الرمز
+  const goToVerify = async () => {
+    if (!validateStep1()) return
+    if (verification?.phone === phone) { setStep(3); return }
+    setSendingCode(true)
+    try {
+      setCodeSent({ phone, devCode: await authService.sendPhoneCode(phone) })
+      setStep(2)
+    } catch (err) {
+      setErrors({ phone: err.message || 'تعذّر إرسال رمز التحقق' })
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  // انتهت صلاحية رمز الإثبات (30 دقيقة) — نعيده لتأكيد الرقم من جديد
+  const handleNotVerified = (message) => {
+    if (!message?.includes('أكّد رقم هاتفك')) return false
+    setVerification(null)
+    setStep(1)
+    return true
   }
 
   const validateStep2 = () => {
@@ -71,66 +99,63 @@ const RegisterPage = () => {
     return Object.keys(e).length === 0
   }
 
+  const account = () => ({
+    phone,
+    password: formData.password,
+    fullName: formData.fullName.trim(),
+    email: formData.email.trim().toLowerCase(),
+    referralCode: formData.referralCode.trim() || undefined,
+    phoneVerificationToken: verification?.token,
+  })
+
   const handleCustomerSubmit = async (e) => {
     e.preventDefault()
     if (!validateStep2()) return
     try {
-      await register({
-        phone: formData.phone.replace(/\s/g, ''),
-        password: formData.password,
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim().toLowerCase(),
-        referralCode: formData.referralCode.trim() || undefined,
-      })
+      await register(account())
       clearReferral()
       success('تم إنشاء الحساب بنجاح! 🎉')
-      navigate('/', { replace: true })
+      navigate(from, { replace: true })
     } catch (err) {
-      if (!isAccountExistsMessage(err.message)) showError(err.message || 'فشل إنشاء الحساب')
+      // الخطأ يظهر في المربع أعلى النموذج (authError من المتجر) — بلا إشعار مكرر
+      handleNotVerified(err.message)
     }
   }
 
-  const handleVendorSubmit = async () => {
+  // الرقم أو البريد مسجّل: نجرّب الدخول بالرقم وكلمة المرور المدخلة. صاحب الحساب وحده يعرفها،
+  // فلا نكشف لغيره أن الرقم مسجّل — كلمة مرور خاطئة تُبقي الرسالة المحايدة كما هي
+  const continueExistingAccount = async (neutralMessage) => {
+    try {
+      const { user } = await login({ identifier: phone, password: formData.password })
+      if (user.role === 'CUSTOMER') setAskOpenStore(true)
+      else if (user.role === 'VENDOR') {
+        success('لديك متجر مسبقاً')
+        navigate('/vendor', { replace: true })
+      } else navigate(ROLE_HOME[user.role] || '/', { replace: true })
+    } catch {
+      useAuthStore.setState({ error: neutralMessage })
+    }
+  }
+
+  const handleVendorSubmit = async (e) => {
+    e.preventDefault()
     if (!validateStep2()) return
     setSubmitting(true)
     try {
-      // 1. تسجيل الحساب
-      await register({
-        phone: formData.phone.replace(/\s/g, ''),
-        password: formData.password,
-        fullName: formData.fullName.trim(),
-        email: formData.email.trim().toLowerCase(),
-      })
-
-      // 2. إنشاء المتجر في try/catch منفصل
-      try {
-        const fd = new FormData()
-        fd.append('Name',              formData.storeName.trim())
-        fd.append('NameAr',            formData.storeNameAr.trim())
-        fd.append('Phone',             formData.storePhone || formData.phone.replace(/\s/g, ''))
-        fd.append('IsActive',          'false')
-        fd.append('MinOrderAmount',    formData.minOrder          || '5000')
-        fd.append('EstimatedPrepTime', formData.prepTime          || '30')
-        fd.append('Address',           formData.storeAddress      || '-')
-        fd.append('Description',       formData.storeDesc         || '-')
-        // بلا شعار: يضيفه صاحب المتجر من إعدادات متجره بعد الموافقة (حتى ذلك يظهر رمز افتراضي)
-        await apiPostForm(API_ENDPOINTS.VENDORS.BASE, fd)
-        setStep(3)
-      } catch (vendorErr) {
-        console.error('Vendor creation error:', vendorErr)
-        showError('تم إنشاء حسابك ✅ لكن فشل إنشاء المتجر — يرجى التواصل مع الدعم')
-        setTimeout(() => navigate('/', { replace: true }), 3000)
-      }
-
+      await register(account())
+      clearReferral()
+      success('تم إنشاء حسابك — بقيت بيانات المتجر')
+      navigate('/open-store', { replace: true })
     } catch (err) {
-      if (!isAccountExistsMessage(err.message)) showError(err.message || 'فشل إنشاء الحساب')
+      if (isAccountExistsMessage(err.message)) await continueExistingAccount(err.message)
+      else handleNotVerified(err.message)
+      // غير ذلك: الخطأ يظهر في المربع أعلى النموذج
     } finally {
       setSubmitting(false)
     }
   }
 
-  const inputCls = "w-full h-11 px-4 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
-  const progressPct = step === 3 ? 100 : (step / 2) * 100
+  const progressPct = Math.round((step / 3) * 100)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-primary/10 flex overflow-x-clip">
@@ -167,22 +192,20 @@ const RegisterPage = () => {
             <h1 className="text-2xl font-bold text-gray-900">إنشاء حساب جديد</h1>
           </div>
 
-          {step < 3 && (
-            <div className="mb-5">
-              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                <span>الخطوة {step} من 2</span>
-                <span>{progressPct}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-200 rounded-full">
-                <div className="h-1.5 bg-primary rounded-full transition-all duration-300"
-                  style={{ width: `${progressPct}%` }} />
-              </div>
+          <div className="mb-5">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>الخطوة {step} من 3</span>
+              <span>{progressPct}%</span>
             </div>
-          )}
+            <div className="h-1.5 bg-gray-200 rounded-full">
+              <div className="h-1.5 bg-primary rounded-full transition-all duration-300"
+                style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
 
           <div className="bg-white rounded-2xl shadow-xl p-7">
             {isAccountExistsMessage(authError) ? (
-              <AccountExistsHint message={authError} identifier={formData.phone.replace(/\s/g, '')} className="mb-4" />
+              <AccountExistsHint message={authError} identifier={phone} className="mb-4" />
             ) : authError && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
@@ -195,7 +218,7 @@ const RegisterPage = () => {
               <div className="space-y-4">
                 {formData.accountType === 'customer' && (
                   <div className="space-y-3">
-                    <GoogleSignInSection text="signup_with" />
+                    <GoogleSignInSection text="signup_with" redirectTo={from} />
                     <div className="relative">
                       <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
                       <div className="relative flex justify-center text-xs"><span className="px-3 bg-white text-gray-400">أو أنشئ حساباً برقم هاتفك</span></div>
@@ -238,85 +261,38 @@ const RegisterPage = () => {
                   value={formData.email} onChange={handleChange} error={errors.email}
                   placeholder="example@email.com" dir="ltr" required />
 
-                {formData.accountType === 'customer' && (
-                  <Input label="رمز دعوة صديق (اختياري)" name="referralCode"
-                    value={formData.referralCode} onChange={handleChange}
-                    placeholder="ABC2345" dir="ltr" maxLength={16}
-                    hint="تحصل أنت وصديقك على نقاط عند تسليم أول طلب لك" />
-                )}
+                <Input label="رمز دعوة صديق (اختياري)" name="referralCode"
+                  value={formData.referralCode} onChange={handleChange}
+                  placeholder="ABC2345" dir="ltr" maxLength={16}
+                  hint="تحصل أنت وصديقك على نقاط عند تسليم أول طلب لك" />
 
-                {/* حقول المتجر — تظهر فقط للبائع */}
                 {formData.accountType === 'vendor' && (
-                  <div className="border border-primary/20 bg-primary/5 rounded-xl p-4 space-y-3">
-                    <p className="text-sm font-semibold text-primary flex items-center gap-2">
-                      <Store size={14} />بيانات المتجر
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 block mb-1">اسم المتجر (EN) *</label>
-                        <input name="storeName" value={formData.storeName} onChange={handleChange}
-                          placeholder="My Store" dir="ltr"
-                          className={`${inputCls} ${errors.storeName ? 'border-red-400' : ''}`} />
-                        {errors.storeName && <p className="text-xs text-red-500 mt-0.5">{errors.storeName}</p>}
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700 block mb-1">اسم المتجر (AR) *</label>
-                        <input name="storeNameAr" value={formData.storeNameAr} onChange={handleChange}
-                          placeholder="متجري"
-                          className={`${inputCls} ${errors.storeNameAr ? 'border-red-400' : ''}`} />
-                        {errors.storeNameAr && <p className="text-xs text-red-500 mt-0.5">{errors.storeNameAr}</p>}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 block mb-1">هاتف المتجر</label>
-                      <input name="storePhone" value={formData.storePhone} onChange={handleChange}
-                        placeholder={formData.phone || '07XX XXX XXXX'} dir="ltr" className={inputCls} />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 block mb-1">العنوان *</label>
-                      <input name="storeAddress" value={formData.storeAddress} onChange={handleChange}
-                        placeholder="المدينة، الحي"
-                        className={`${inputCls} ${errors.storeAddress ? 'border-red-400' : ''}`} />
-                      {errors.storeAddress && <p className="text-xs text-red-500 mt-0.5">{errors.storeAddress}</p>}
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-700 block mb-1">وصف المتجر *</label>
-                      <textarea name="storeDesc" value={formData.storeDesc} onChange={handleChange}
-                        placeholder="اكتب وصفاً مختصراً..." rows={2}
-                        className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-primary resize-none ${errors.storeDesc ? 'border-red-400' : 'border-gray-300'}`} />
-                      {errors.storeDesc && <p className="text-xs text-red-500 mt-0.5">{errors.storeDesc}</p>}
-                    </div>
-                    {/* أجرة التوصيل تحددها الإدارة عند الموافقة على المتجر */}
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { name: 'minOrder',    label: 'الحد الأدنى *',  placeholder: '5000' },
-                        { name: 'prepTime',    label: 'وقت التحضير *',  placeholder: '30'   },
-                      ].map(f => (
-                        <div key={f.name}>
-                          <label className="text-xs font-medium text-gray-700 block mb-1">{f.label}</label>
-                          <input type="number" name={f.name} value={formData[f.name]}
-                            onChange={handleChange} placeholder={f.placeholder}
-                            className={`${inputCls} ${errors[f.name] ? 'border-red-400' : ''}`} />
-                          {errors[f.name] && <p className="text-xs text-red-500 mt-0.5">{errors[f.name]}</p>}
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      ⚠️ المتجر سيبقى غير نشط حتى مراجعته من الإدارة
-                    </p>
-                  </div>
+                  <p className="text-xs text-primary bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <Store size={14} className="flex-shrink-0" />
+                    بعد إنشاء الحساب تنتقل مباشرة لإدخال بيانات متجرك
+                  </p>
                 )}
 
                 <Button type="button" variant="primary" size="lg" fullWidth
-                  onClick={() => { if (validateStep1()) setStep(2) }}>
+                  loading={sendingCode} disabled={sendingCode} onClick={goToVerify}>
                   التالي <ChevronLeft size={18} />
                 </Button>
               </div>
             )}
 
-            {/* ===== Step 2 ===== */}
-            {step === 2 && (
-              <form onSubmit={formData.accountType === 'customer' ? handleCustomerSubmit : e => { e.preventDefault(); handleVendorSubmit() }}>
+            {/* ===== Step 2: تأكيد الرقم برمز واتساب ===== */}
+            {step === 2 && codeSent && (
+              <div className="space-y-4">
+                <h2 className="font-bold text-gray-900">تأكيد رقم الهاتف</h2>
+                <PhoneCodeForm phone={codeSent.phone} initialDevCode={codeSent.devCode}
+                  onVerified={(token) => { setVerification({ phone: codeSent.phone, token }); setStep(3) }}
+                  onChangePhone={() => setStep(1)} />
+              </div>
+            )}
+
+            {/* ===== Step 3: كلمة المرور ===== */}
+            {step === 3 && (
+              <form onSubmit={formData.accountType === 'customer' ? handleCustomerSubmit : handleVendorSubmit}>
                 <div className="space-y-4">
                   <h2 className="font-bold text-gray-900">كلمة المرور</h2>
 
@@ -326,6 +302,7 @@ const RegisterPage = () => {
                       value={formData.password} onChange={handleChange}
                       error={errors.password} placeholder="••••••••" dir="ltr" required />
                     <button type="button" onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
                       className="absolute left-3 top-9 text-gray-400 hover:text-gray-600">
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -344,7 +321,7 @@ const RegisterPage = () => {
                     </div>
                   )}
 
-                  <Input label="تأكيد كلمة المرور" name="confirmPassword" type="password"
+                  <Input label="تأكيد كلمة المرور" name="confirmPassword" type={showPassword ? 'text' : 'password'}
                     value={formData.confirmPassword} onChange={handleChange}
                     error={errors.confirmPassword} placeholder="••••••••" dir="ltr" required />
 
@@ -368,50 +345,31 @@ const RegisterPage = () => {
                     </Button>
                     <Button type="submit" variant="primary" size="lg" fullWidth
                       loading={isLoading || submitting}>
-                      {formData.accountType === 'vendor' ? 'إرسال الطلب' : 'إنشاء الحساب'}
+                      {formData.accountType === 'vendor' ? 'التالي: بيانات المتجر' : 'إنشاء الحساب'}
                     </Button>
                   </div>
                 </div>
               </form>
             )}
 
-            {/* ===== Step 3: شاشة نجاح البائع ===== */}
-            {step === 3 && (
-              <div className="text-center py-4">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle size={40} className="text-green-500" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">تم إرسال طلبك بنجاح! 🎉</h2>
-                <p className="text-gray-600 mb-1">شكراً لانضمامك إلى منصة واسط</p>
-                <p className="text-sm text-primary font-medium mb-6">
-                  سنتواصل معك في أقرب وقت لتفعيل متجرك
-                </p>
-                <div className="bg-gray-50 rounded-xl p-4 mb-6 text-right space-y-2">
-                  <p className="text-sm text-gray-600 flex items-center gap-2">
-                    <span className="text-green-500">✓</span> تم إنشاء حسابك
-                  </p>
-                  <p className="text-sm text-gray-600 flex items-center gap-2">
-                    <span className="text-green-500">✓</span> تم استلام طلب المتجر
-                  </p>
-                  <p className="text-sm text-gray-600 flex items-center gap-2">
-                    <span className="text-amber-500">⏳</span> قيد المراجعة من الإدارة
-                  </p>
-                </div>
-                <Button variant="primary" fullWidth onClick={() => navigate('/', { replace: true })}>
-                  العودة للرئيسية
-                </Button>
-              </div>
-            )}
-
-            {step < 3 && (
-              <p className="text-center mt-5 text-gray-500 text-sm">
-                لديك حساب بالفعل؟{' '}
-                <Link to="/login" className="text-primary font-semibold hover:underline">تسجيل الدخول</Link>
-              </p>
-            )}
+            <p className="text-center mt-5 text-gray-500 text-sm">
+              لديك حساب بالفعل؟{' '}
+              <Link to="/login" state={{ from }} className="text-primary font-semibold hover:underline">تسجيل الدخول</Link>
+            </p>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={askOpenStore}
+        type="info"
+        title="حسابك مسجّل كعميل"
+        message="هل تريد إنشاء متجرك الآن؟"
+        confirmText="نعم"
+        cancelText="لا"
+        onConfirm={() => navigate('/open-store', { replace: true })}
+        onClose={() => navigate(from, { replace: true })}
+      />
     </div>
   )
 }
