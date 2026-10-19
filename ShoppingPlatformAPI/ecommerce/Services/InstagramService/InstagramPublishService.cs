@@ -446,7 +446,13 @@ namespace ecommerce.Services.InstagramService
                             p.Status == InstagramPost.StatusPublishing || p.Status == InstagramPost.StatusFailed)
                 .Select(p => p.SourceImagesJson)
                 .ToListAsync(ct);
-            var keep = inUse.SelectMany(ReadList).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // ملفات منشورات تيك توك (المجدولة خصوصاً) لا تُحذف أيضاً
+            var tikTokInUse = await _context.Set<TikTokPost>().AsNoTracking()
+                .Where(p => p.CreatedAt > recent || p.Status == TikTokPost.StatusScheduled ||
+                            p.Status == TikTokPost.StatusPublishing || p.Status == TikTokPost.StatusFailed)
+                .Select(p => p.SourceMediaJson)
+                .ToListAsync(ct);
+            var keep = inUse.Concat(tikTokInUse).SelectMany(ReadList).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var removed = _uploads.CleanupUnused(keep, now.AddDays(-1));
             if (removed > 0) _logger.LogInformation("Removed {Count} unused social upload(s)", removed);
         }

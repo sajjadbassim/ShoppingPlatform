@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace ecommerce.Services.TikTokService
 {
     // نشر منتجات التاجر على حساب تيك توك المربوط بمتجره (Content Posting API — Direct Post، صلاحية video.publish).
-    // التاجر يختار الوسائط والنص والخصوصية ويضغط «نشر» بنفسه — لا نشر تلقائي ولا جدولة.
+    // التاجر يختار الوسائط والنص والخصوصية ويضغط «نشر» بنفسه. تيك توك لا يوفر جدولة، فالمجدول تحفظه المنصة وتنشره خلفيتها عند موعده.
     // الخطوات: creator_info (خيارات الحساب) ← init (تيك توك يسحب الوسائط من رابطنا العام: PULL_FROM_URL) ← متابعة الحالة.
     // منشور فيديو (ملف واحد) أو منشور صور (حتى 35) — تيك توك لا يقبل الخلط بينهما
     public interface ITikTokPublishService
@@ -21,8 +21,10 @@ namespace ecommerce.Services.TikTokService
         Task<TikTokPostDto> CreateAsync(Guid userId, CreateTikTokPostDto dto, CancellationToken ct = default);
         Task<List<TikTokPostDto>> ListAsync(Guid userId, CancellationToken ct = default);
         Task<TikTokPostDto> RetryAsync(Guid userId, Guid postId, CancellationToken ct = default);
+        Task<TikTokPostDto> CancelAsync(Guid userId, Guid postId, CancellationToken ct = default);
+        Task<List<TikTokVideoDto>> ListUnlistedPublishedAsync(Guid userId, IReadOnlyCollection<DateTime?> listedPublishedAt, CancellationToken ct = default);
 
-        // الخلفية: متابعة المنشورات قيد المعالجة عند تيك توك
+        // الخلفية: نشر المجدول الذي حان موعده، ثم متابعة المنشورات قيد المعالجة عند تيك توك
         Task<int> ProcessPendingAsync(CancellationToken ct = default);
     }
 
@@ -32,6 +34,9 @@ namespace ecommerce.Services.TikTokService
         private static readonly string[] PrivacyLevels =
             { "PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY" };
 
+        private static readonly TimeSpan MaxScheduleAhead = TimeSpan.FromDays(30);
+        // بعد هذه المدة من الموعد لا ننشر المجدول (توقف الخادم طويلاً مثلاً) كي لا يظهر منشور قديم فجأة
+        private static readonly TimeSpan MaxScheduleLate = TimeSpan.FromHours(6);
         private static readonly TimeSpan PendingTimeout = TimeSpan.FromMinutes(30);
         private static readonly TimeSpan NoPublishIdTimeout = TimeSpan.FromMinutes(5);
         // نتابع الحالة داخل الطلب نفسه (حتى ~30 ثانية) ليرى التاجر النتيجة، وإلا تكمل الخلفية
@@ -154,6 +159,15 @@ namespace ecommerce.Services.TikTokService
             if (!PrivacyLevels.Contains(dto.PrivacyLevel))
                 throw new BusinessRuleException("اختر من يستطيع مشاهدة المنشور");
 
+            var scheduledAt = dto.ScheduledAt?.ToUniversalTime();
+            if (scheduledAt.HasValue)
+            {
+                if (scheduledAt.Value < Now.AddMinutes(-1))
+                    throw new BusinessRuleException("موعد النشر في الماضي");
+                if (scheduledAt.Value > Now + MaxScheduleAhead)
+                    throw new BusinessRuleException("يمكن جدولة النشر حتى 30 يوماً فقط");
+            }
+
             var session = await _tikTok.GetPublishSessionAsync(vendorId, ct);
             if (!session.CanPublish)
                 throw new BusinessRuleException("أعد ربط حساب تيك توك ووافق على صلاحية النشر");
@@ -176,12 +190,16 @@ namespace ecommerce.Services.TikTokService
                 AllowDuet = isVideo && dto.AllowDuet && !info.DuetDisabled,
                 AllowStitch = isVideo && dto.AllowStitch && !info.StitchDisabled,
                 PromotesOwnBusiness = dto.PromotesOwnBusiness,
-                Status = TikTokPost.StatusPublishing
+                Status = scheduledAt.HasValue ? TikTokPost.StatusScheduled : TikTokPost.StatusPublishing,
+                ScheduledAt = scheduledAt,
+                PublishStartedAt = scheduledAt.HasValue ? null : Now
             };
             _context.Add(post);
             await _context.SaveChangesAsync(ct);
 
-            await ProcessAsync(post.Id, ct);
+            // المجدول تنشره الخلفية عند موعده
+            if (!scheduledAt.HasValue)
+                await ProcessAsync(post.Id, ct);
             return await GetDtoAsync(post.Id, ct);
         }
 
@@ -206,6 +224,7 @@ namespace ecommerce.Services.TikTokService
                 throw new BusinessRuleException("يمكن إعادة المحاولة للمنشورات التي فشلت فقط");
 
             post.Status = TikTokPost.StatusPublishing;
+            post.PublishStartedAt = Now;
             post.PublishId = null;
             post.Attempts = 0;
             post.Error = null;
@@ -214,12 +233,66 @@ namespace ecommerce.Services.TikTokService
             return await GetDtoAsync(post.Id, ct);
         }
 
+        // تيك توك لا يعيد المنشورات الخاصة (أنا فقط) ولا معرّفها في قائمة الحساب، فلا تصل إليها المزامنة أبداً.
+        // نعرضها من سجل المنصة؛ ونستثني ما ظهر لاحقاً في القائمة (صار عاماً) بمطابقة وقت النشر
+        public async Task<List<TikTokVideoDto>> ListUnlistedPublishedAsync(Guid userId,
+            IReadOnlyCollection<DateTime?> listedPublishedAt, CancellationToken ct = default)
+        {
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            var posts = await _context.Set<TikTokPost>().AsNoTracking()
+                .Where(p => p.VendorId == vendorId && p.Status == TikTokPost.StatusPublished && p.ExternalVideoId == null)
+                .OrderByDescending(p => p.PublishedAt)
+                .Take(200)
+                .ToListAsync(ct);
+
+            var window = TimeSpan.FromMinutes(10);
+            return posts
+                .Where(p => !listedPublishedAt.Any(t => t.HasValue && p.PublishedAt.HasValue && (t.Value - p.PublishedAt.Value).Duration() < window))
+                .Select(p =>
+                {
+                    var media = ReadList(p.SourceMediaJson);
+                    return new TikTokVideoDto
+                    {
+                        Id = p.Id,
+                        ExternalId = "",
+                        Title = p.Caption,
+                        CoverImageUrl = !p.IsVideo && media.Count > 0 ? media[0] : null,
+                        PublishedAt = p.PublishedAt,
+                        IsHidden = true,
+                        PlatformOnly = true,
+                        PrivacyLevel = p.PrivacyLevel
+                    };
+                })
+                .ToList();
+        }
+
+        public async Task<TikTokPostDto> CancelAsync(Guid userId, Guid postId, CancellationToken ct = default)
+        {
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            if (!await _context.Set<TikTokPost>().AnyAsync(p => p.Id == postId && p.VendorId == vendorId, ct))
+                throw new NotFoundException("المنشور غير موجود");
+
+            // تحديث ذري: إن التقطته الخلفية للنشر في هذه اللحظة لا يُلغى
+            var now = Now;
+            var cancelled = await _context.Set<TikTokPost>()
+                .Where(p => p.Id == postId && p.VendorId == vendorId && p.Status == TikTokPost.StatusScheduled)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.Status, TikTokPost.StatusCancelled)
+                    .SetProperty(p => p.UpdatedAt, now), ct);
+            if (cancelled == 0)
+                throw new BusinessRuleException("يمكن إلغاء المنشورات المجدولة فقط (وقد يكون نشره بدأ الآن)");
+            _context.ChangeTracker.Clear();
+            return await GetDtoAsync(postId, ct);
+        }
+
         // ===================================
         // الخلفية
         // ===================================
         public async Task<int> ProcessPendingAsync(CancellationToken ct = default)
         {
             var now = Now;
+            var handled = await ProcessDueScheduledAsync(now, ct);
+
             var pending = await _context.Set<TikTokPost>().AsNoTracking()
                 .Where(p => p.Status == TikTokPost.StatusPublishing)
                 .OrderBy(p => p.CreatedAt)
@@ -227,7 +300,6 @@ namespace ecommerce.Services.TikTokService
                 .Take(20)
                 .ToListAsync(ct);
 
-            var handled = 0;
             foreach (var p in pending)
             {
                 // طلب التاجر ما زال يتابعه
@@ -243,6 +315,46 @@ namespace ecommerce.Services.TikTokService
                     await ProcessAsync(p.Id, ct);
                     handled++;
                 }
+            }
+            return handled;
+        }
+
+        // المجدولة التي حان موعدها: نلتقطها بتحديث ذري (SCHEDULED ← PUBLISHING) ثم تُنشر كأي منشور
+        private async Task<int> ProcessDueScheduledAsync(DateTime now, CancellationToken ct)
+        {
+            var due = await _context.Set<TikTokPost>().AsNoTracking()
+                .Where(p => p.Status == TikTokPost.StatusScheduled && p.ScheduledAt <= now)
+                .OrderBy(p => p.ScheduledAt)
+                .Select(p => new { p.Id, p.ScheduledAt })
+                .Take(10)
+                .ToListAsync(ct);
+
+            var handled = 0;
+            foreach (var p in due)
+            {
+                if (p.ScheduledAt < now - MaxScheduleLate)
+                {
+                    await _context.Set<TikTokPost>()
+                        .Where(x => x.Id == p.Id && x.Status == TikTokPost.StatusScheduled)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(x => x.Status, TikTokPost.StatusFailed)
+                            .SetProperty(x => x.Error, "فات موعد النشر المجدول بسبب توقف الخدمة — أعد المحاولة للنشر الآن")
+                            .SetProperty(x => x.UpdatedAt, now), ct);
+                    handled++;
+                    continue;
+                }
+
+                var claimed = await _context.Set<TikTokPost>()
+                    .Where(x => x.Id == p.Id && x.Status == TikTokPost.StatusScheduled)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(x => x.Status, TikTokPost.StatusPublishing)
+                        .SetProperty(x => x.PublishStartedAt, now)
+                        .SetProperty(x => x.UpdatedAt, now), ct);
+                if (claimed == 0) continue;   // أُلغي في هذه الأثناء
+
+                _context.ChangeTracker.Clear();
+                await ProcessAsync(p.Id, ct);
+                handled++;
             }
             return handled;
         }
@@ -303,7 +415,7 @@ namespace ecommerce.Services.TikTokService
                 {
                     var status = await _api.FetchPublishStatusAsync(session.AccessToken, post.PublishId!, ct);
                     if (ApplyStatus(post, status)) break;
-                    if (Now - post.CreatedAt > PendingTimeout)
+                    if (Now - (post.PublishStartedAt ?? post.CreatedAt) > PendingTimeout)
                     {
                         Fail(post, "استغرق تيك توك وقتاً طويلاً في معالجة المنشور — أعد المحاولة");
                         break;
@@ -490,6 +602,7 @@ namespace ecommerce.Services.TikTokService
             IsVideo = p.IsVideo,
             PrivacyLevel = p.PrivacyLevel,
             Status = p.Status,
+            ScheduledAt = p.ScheduledAt,
             PublishedAt = p.PublishedAt,
             Error = p.Error,
             CreatedAt = p.CreatedAt

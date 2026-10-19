@@ -60,6 +60,11 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<TikTokPostDto>>> RetryPost(Guid id, CancellationToken ct)
             => Ok(ApiResponse<TikTokPostDto>.Ok(await _publishService.RetryAsync(_currentUser.UserId, id, ct)));
 
+        // POST: api/tiktok/posts/{id}/cancel — للمجدولة فقط
+        [HttpPost("posts/{id:guid}/cancel")]
+        public async Task<ActionResult<ApiResponse<TikTokPostDto>>> CancelPost(Guid id, CancellationToken ct)
+            => Ok(ApiResponse<TikTokPostDto>.Ok(await _publishService.CancelAsync(_currentUser.UserId, id, ct)));
+
         // GET: api/tiktok/status
         [HttpGet("status")]
         public async Task<ActionResult<ApiResponse<TikTokStatusDto>>> GetStatus(CancellationToken ct)
@@ -123,7 +128,9 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<List<TikTokVideoDto>>>> GetVideos(CancellationToken ct)
         {
             var videos = await _tikTokService.GetVideosAsync(_currentUser.UserId, ct);
-            return Ok(ApiResponse<List<TikTokVideoDto>>.Ok(videos));
+            // المنشورات الخاصة المنشورة من المنصة لا تعيدها قائمة تيك توك
+            var unlisted = await _publishService.ListUnlistedPublishedAsync(_currentUser.UserId, videos.Select(v => v.PublishedAt).ToList(), ct);
+            return Ok(ApiResponse<List<TikTokVideoDto>>.Ok(videos.Concat(unlisted).ToList()));
         }
 
         // PATCH: api/tiktok/videos/{id} — إخفاء/إظهار أو ربط بمنتج

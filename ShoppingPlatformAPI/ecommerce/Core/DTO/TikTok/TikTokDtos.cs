@@ -62,6 +62,10 @@ namespace ecommerce.Core.DTO.TikTok
         public DateTime? PublishedAt { get; set; }
         public bool IsHidden { get; set; }
         public TikTokLinkedProductDto? Product { get; set; }
+
+        // منشور نُشر من المنصة بخصوصية خاصة: تيك توك لا يعيده في قائمة الحساب، فيُعرض من سجل المنصة (للقراءة فقط)
+        public bool PlatformOnly { get; set; }
+        public string? PrivacyLevel { get; set; }
     }
 
     public class TikTokLinkedProductDto

@@ -3866,9 +3866,17 @@ namespace ecommerce.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("publish_id");
 
+                    b.Property<DateTime?>("PublishStartedAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("publish_started_at");
+
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("published_at");
+
+                    b.Property<DateTime?>("ScheduledAt")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("scheduled_at");
 
                     b.Property<string>("SourceMediaJson")
                         .IsRequired()
@@ -3892,6 +3900,8 @@ namespace ecommerce.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("Status", "ScheduledAt");
 
                     b.HasIndex("Status", "UpdatedAt");
 

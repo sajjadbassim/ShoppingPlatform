@@ -137,6 +137,9 @@ namespace ecommerce.Data.Configurations
             builder.Property(p => p.PublishId).HasColumnName("publish_id").HasMaxLength(100);
             builder.Property(p => p.ExternalVideoId).HasColumnName("external_video_id").HasMaxLength(64);
             builder.Property(p => p.PublishedAt).HasColumnName("published_at").HasColumnType("datetime2");
+            builder.Property(p => p.ScheduledAt).HasColumnName("scheduled_at").HasColumnType("datetime2");
+            builder.Property(p => p.PublishStartedAt).HasColumnName("publish_started_at").HasColumnType("datetime2");
+            builder.HasIndex(p => new { p.Status, p.ScheduledAt });
 
             builder.Property(p => p.CreatedAt).HasColumnName("created_at").HasColumnType("datetime2");
             builder.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasColumnType("datetime2");

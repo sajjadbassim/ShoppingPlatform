@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace ecommerce.Services.TikTokService
 {
-    // يتابع منشورات تيك توك التي ما زالت قيد المعالجة عند تيك توك (النشر لا يكتمل دائماً خلال الطلب نفسه)
+    // ينشر منشورات تيك توك المجدولة عند موعدها (تيك توك نفسه لا يجدول)، ويتابع ما زال قيد المعالجة عند تيك توك
     public class TikTokPublishBackgroundService : BackgroundService
     {
         private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(30);

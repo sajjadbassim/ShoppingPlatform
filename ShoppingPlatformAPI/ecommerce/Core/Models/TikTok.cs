@@ -81,9 +81,11 @@ namespace ecommerce.Core.Models
     // لا جدولة: تيك توك لا يوفّرها عبر الـ API، والنشر فوري بضغطة التاجر نفسه
     public class TikTokPost : IAuditableEntity
     {
+        public const string StatusScheduled = "SCHEDULED";
         public const string StatusPublishing = "PUBLISHING";
         public const string StatusPublished = "PUBLISHED";
         public const string StatusFailed = "FAILED";
+        public const string StatusCancelled = "CANCELLED";
 
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid VendorId { get; set; }
@@ -112,6 +114,11 @@ namespace ecommerce.Core.Models
         public string? PublishId { get; set; }
         public string? ExternalVideoId { get; set; }
         public DateTime? PublishedAt { get; set; }
+
+        // تيك توك لا يدعم الجدولة: المنصة تحتفظ بالمنشور (SCHEDULED) وتنشره بنفسها عند هذا الموعد (UTC)
+        public DateTime? ScheduledAt { get; set; }
+        // بداية آخر محاولة نشر — منها تُحسب مهلة المعالجة (CreatedAt لا يصلح للمجدول ولا لإعادة المحاولة)
+        public DateTime? PublishStartedAt { get; set; }
 
         public DateTime CreatedAt { get; set; }
         public DateTime? UpdatedAt { get; set; }

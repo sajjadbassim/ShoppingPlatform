@@ -18,6 +18,7 @@ import { apiGet, apiPost } from '../../api/axios'
 import { useCategories } from '../../hooks/useCategories'
 import { BulkPriceModal, CsvImportModal, downloadProductsCsv } from '../../components/vendor/ProductBulkTools'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { PUBLISH_PLATFORMS, fetchPublishedMap } from '../../config/publishPlatforms'
 import productService from '../../services/productService'
 import { getImageUrl } from '../../utils/imageHelper'
 
@@ -45,6 +46,14 @@ const useProductSales = (vendorId) => useQuery({
   },
   enabled: !!vendorId,
   staleTime: 5 * 60 * 1000,
+})
+
+// المنتجات التي نُشرت فعلاً ← مفاتيح المنصات
+const usePublishedProducts = (vendorId) => useQuery({
+  queryKey: ['vendor-published-products', vendorId],
+  queryFn: fetchPublishedMap,
+  enabled: !!vendorId,
+  staleTime: 60 * 1000,
 })
 
 const productImage = (p) => {
@@ -119,7 +128,7 @@ const StockEditor = ({ product, onSave, saving }) => {
 // ===========================
 // صف منتج
 // ===========================
-const ProductRow = ({ product: p, sold, selected, selecting, onSelect, onToggleActive, onStock, busy, actions }) => {
+const ProductRow = ({ product: p, sold, publishedOn, selected, selecting, onSelect, onToggleActive, onStock, busy, actions }) => {
   const img = productImage(p)
   const hidden = !p.isActive
   const discount = p.originalPrice > p.price ? Math.round((1 - p.price / p.originalPrice) * 100) : 0
@@ -144,6 +153,17 @@ const ProductRow = ({ product: p, sold, selected, selecting, onSelect, onToggleA
             {p.categoryNameAr || p.categoryName || 'بدون فئة'}{p.sku && <span className="font-mono"> · {p.sku}</span>}
             {sold > 0 && <span className="text-green-700 font-medium"> · بيع {sold}</span>}
           </p>
+          {publishedOn?.length > 0 && (
+            <span className="inline-flex items-center gap-1.5 mt-1 text-[11px] text-gray-500">
+              منشور على
+              {publishedOn.filter(k => PUBLISH_PLATFORMS[k]).map(k => (
+                <span key={k} title={PUBLISH_PLATFORMS[k].label} aria-label={PUBLISH_PLATFORMS[k].label}
+                  className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
+                  {(Logo => <Logo className="w-3 h-3" />)(PUBLISH_PLATFORMS[k].Logo)}
+                </span>
+              ))}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 mt-1.5 sm:mt-0 sm:block">
           <p className="font-bold text-gray-900 text-sm">{(p.price || 0).toLocaleString('en-US')} <span className="text-xs font-normal text-gray-500">د.ع</span></p>
@@ -179,6 +199,7 @@ const VendorProducts = () => {
 
   const { data: products = [], isLoading, isError, error, refetch, isFetching } = useVendorProducts(vendorId)
   const { data: sales = {} } = useProductSales(vendorId)
+  const { data: published = {} } = usePublishedProducts(vendorId)
   const { data: categoriesData } = useCategories()
   const [priceModal, setPriceModal] = useState(false)
   const [importModal, setImportModal] = useState(false)
@@ -279,6 +300,8 @@ const VendorProducts = () => {
     const results = await Promise.allSettled(ids.map(id => productService.delete(id)))
     const done = ids.filter((_, i) => results[i].status === 'fulfilled')
     queryClient.setQueryData(['vendor-products', vendorId], (old = []) => old.filter(p => !done.includes(p.id)))
+    const staleKeys = ['vendor-published-products', 'instagram-posts', 'instagram-items', 'tiktok-posts', 'tiktok-items']
+    staleKeys.forEach(k => queryClient.invalidateQueries({ queryKey: [k] }))
     setDeleting(false)
     setToDelete(null)
     if (done.length < ids.length) showError(`تعذّر حذف ${ids.length - done.length} منتج`)
@@ -421,7 +444,7 @@ const VendorProducts = () => {
             </div>
             <div className="divide-y divide-gray-100">
               {shown.map(p => (
-                <ProductRow key={p.id} product={p} sold={soldOf(p)}
+                <ProductRow key={p.id} product={p} sold={soldOf(p)} publishedOn={published[p.id]}
                   selecting={selecting} selected={selected.includes(p.id)}
                   onSelect={() => setSelected(s => s.includes(p.id) ? s.filter(i => i !== p.id) : [...s, p.id])}
                   onToggleActive={() => toggleActive(p)}

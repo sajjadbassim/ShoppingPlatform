@@ -170,7 +170,7 @@ namespace ecommerce.Services.TikTokService
                     description,
                     privacy_level = s.PrivacyLevel,
                     disable_comment = !s.AllowComment,
-                    auto_add_music = true,
+                    auto_add_music = false,
                     brand_organic_toggle = s.PromotesOwnBusiness
                 },
                 source_info = new { source = "PULL_FROM_URL", photo_cover_index = 0, photo_images = imageUrls },

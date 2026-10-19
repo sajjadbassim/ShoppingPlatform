@@ -96,6 +96,7 @@ export const API_ENDPOINTS = {
     PUBLISH_OPTIONS: '/api/tiktok/publish/options',
     POSTS: '/api/tiktok/posts',
     POST_RETRY: (id) => `/api/tiktok/posts/${id}/retry`,
+    POST_CANCEL: (id) => `/api/tiktok/posts/${id}/cancel`,
   },
 
   // ============ Instagram (المسار يطابق الروابط المسجّلة في تطبيق Meta) ============

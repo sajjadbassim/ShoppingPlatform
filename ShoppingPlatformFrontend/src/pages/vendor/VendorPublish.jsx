@@ -15,6 +15,7 @@ import { useToast } from '../../components/common/Toast'
 import { Skeleton } from '../../components/common/Loading'
 import InstagramLogo from '../../components/social/InstagramLogo'
 import TikTokLogo from '../../components/tiktok/TikTokLogo'
+import { PUBLISH_PLATFORMS, fetchPublishedMap } from '../../config/publishPlatforms'
 import FacebookLogo from '../../components/social/FacebookLogo'
 
 const unwrap = (r) => r.data?.data ?? r.data
@@ -247,7 +248,7 @@ const buildPlatforms = (ig, tiktok, facebook, store) => {
       account: { username: tk?.username || tk?.displayName || 'your_account', name: tk?.displayName, avatarUrl: tk?.avatarUrl },
       connected: !!tiktok?.connected,
       hint: {
-        ready: 'فيديو واحد أو صور (حتى 35) — النشر الآن فقط',
+        ready: 'فيديو واحد أو صور (حتى 35)',
         soon: 'جارٍ التحميل…',
         disabled: 'النشر غير مفعّل على المنصة بعد',
         connect: 'غير مربوط',
@@ -327,6 +328,7 @@ const PUBLISHERS = {
       allowStitch: tt.stitch,
       promotesOwnBusiness: tt.promotes,
       consent: tt.consent,
+      scheduledAt: body.scheduledAt,
     }, { timeout: 120000 })),
     retry: async (postId) => unwrap(await api.post(API_ENDPOINTS.TIKTOK.POST_RETRY(postId), {}, { timeout: 120000 })),
     invalidate: [['tiktok-posts'], ['tiktok-videos'], ['tiktok-items'], ['tiktok-status']],
@@ -469,6 +471,13 @@ const VendorPublish = () => {
     queryKey: ['publish-options', id],
     queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.INSTAGRAM.PUBLISH_OPTIONS, { productId: id })),
   })
+  // المنصات التي نُشر عليها هذا المنتج سابقاً — للتنبيه قبل تكرار النشر
+  const { data: publishedMap } = useQuery({
+    queryKey: ['vendor-published-products', 'all'],
+    queryFn: fetchPublishedMap,
+    staleTime: 30 * 1000,
+  })
+  const publishedBefore = (publishedMap?.[id] || []).filter(k => PUBLISH_PLATFORMS[k])
   const { data: tiktok } = useQuery({
     queryKey: ['tiktok-status'],
     // يُعاد عند الفشل كبقية الطلبات: إعادة تشغيل الخادم لحظة فتح الصفحة كانت تُظهر الحساب كأنه غير مربوط
@@ -499,8 +508,16 @@ const VendorPublish = () => {
   const [uploading, setUploading] = useState([])   // [{ id, name, preview, video, progress }]
   const [durations, setDurations] = useState({})   // رابط الفيديو ← مدته بالثواني
   // إعدادات تيك توك — الخصوصية فارغة عمداً: يختارها التاجر بنفسه
-  const [tt, setTt] = useState({ privacy: '', comment: false, duet: false, stitch: false, promotes: true, consent: false })
+  const [tt, setTt] = useState({ privacy: '', comment: true, duet: true, stitch: true, promotes: true, consent: true })
   const patchTt = (patch) => setTt(s => ({ ...s, ...patch }))
+  // الخصوصية الافتراضية «الجميع»، وإن لم تُتح لحسابه فأول خيار متاح؛ يغيّرها التاجر إن أراد
+  useEffect(() => {
+    const opts = tiktokOptions?.privacyOptions
+    if (!opts?.length) return
+    setTt(s => (s.privacy && opts.includes(s.privacy))
+      ? s
+      : { ...s, privacy: opts.includes('PUBLIC_TO_EVERYONE') ? 'PUBLIC_TO_EVERYONE' : opts[0] })
+  }, [tiktokOptions])
   const fileInput = useRef(null)
 
   const platforms = ig ? buildPlatforms(ig, tiktok, facebook, { name: ig.storeName, logo: ig.storeLogoUrl }) : []
@@ -585,7 +602,10 @@ const VendorPublish = () => {
     scheduledAt: mode === 'schedule' ? new Date(scheduleAt).toISOString() : null,
   })
 
-  const invalidate = (keys) => keys.forEach(k => PUBLISHERS[k]?.invalidate.forEach(queryKey => queryClient.invalidateQueries({ queryKey })))
+  const invalidate = (keys) => {
+    keys.forEach(k => PUBLISHERS[k]?.invalidate.forEach(queryKey => queryClient.invalidateQueries({ queryKey })))
+    queryClient.invalidateQueries({ queryKey: ['vendor-published-products'] })
+  }
   // فشل الطلب نفسه (تحقق، شبكة) يُعرض كنتيجة فاشلة لتلك المنصة فقط
   const requestFailure = (err) => ({ status: 'FAILED', requestFailed: true, error: err?.message || 'تعذّر الإرسال' })
 
@@ -623,6 +643,18 @@ const VendorPublish = () => {
         <h1 className="text-xl font-bold text-gray-900">نشر المنتج</h1>
         {ig?.productName && <p className="text-xs text-gray-500 truncate">{ig.productName}</p>}
       </div>
+    </div>
+  )
+  const publishedNotice = !results && publishedBefore.length > 0 && (
+    <div className="mb-4 rounded-2xl bg-blue-50 text-blue-900 p-3 flex items-center gap-2.5 text-sm">
+      <Info size={18} className="flex-shrink-0" />
+      <span className="flex-1 font-medium">تم نشر هذا المنتج سابقاً على {publishedBefore.map(k => PUBLISH_PLATFORMS[k].label).join(' و')}</span>
+      <span className="flex gap-1.5 flex-shrink-0">
+        {publishedBefore.map(k => {
+          const { Logo, label } = PUBLISH_PLATFORMS[k]
+          return <span key={k} title={label} className="w-6 h-6 rounded-full bg-white flex items-center justify-center"><Logo className="w-3.5 h-3.5" /></span>
+        })}
+      </span>
     </div>
   )
 
@@ -693,7 +725,6 @@ const VendorPublish = () => {
     caption.length > MAX_CAPTION && `النص أطول من ${MAX_CAPTION} حرف`,
     hashtags > MAX_HASHTAGS && `الوسوم أكثر من ${MAX_HASHTAGS}`,
     scheduleInvalid && 'اختر موعداً خلال 30 يوماً القادمة',
-    tiktokOn && mode === 'schedule' && 'تيك توك لا يدعم الجدولة — انشر الآن أو ألغِ تحديد تيك توك',
     tiktokMixed && 'تيك توك يقبل فيديو واحداً أو صوراً فقط — لا خلط بينهما',
     tiktokTooLong && `الفيديو أطول من حد حسابك في تيك توك (${tiktokMaxDuration} ثانية)`,
     tiktokOn && !tt.privacy && 'اختر من يستطيع مشاهدة المنشور على تيك توك',
@@ -716,6 +747,7 @@ const VendorPublish = () => {
   return (
     <div className="max-w-5xl mx-auto pb-28 lg:pb-6">
       {header}
+      {publishedNotice}
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-5 items-start">
         <div className="space-y-5 min-w-0">

@@ -226,6 +226,9 @@ const usePlatform = (cfg) => {
     queryKey: itemsKey,
     queryFn: async () => (unwrap(await apiGet(cfg.api.items)) || []).map(cfg.normalizeItem),
     enabled: connected,
+    // ما نُشر من المنصة (أو أنهته الخلفية) يظهر عند فتح الصفحة دون ضغط «مزامنة»؛ والجلب من قاعدتنا لا من المنصات الخارجية
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const refresh = () => {
@@ -651,6 +654,16 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
 // ===========================
 // سجل منشورات إنستغرام من المنصة (منشور / مجدول / فشل)
 // ===========================
+const GRID_PAGE = 24   // منشورات الشبكة في كل دفعة
+const LOG_PAGE = 10    // صفوف سجل النشر في كل دفعة
+
+const LoadMore = ({ shown, total, onMore }) => shown < total && (
+  <button type="button" onClick={onMore}
+    className="mt-3 w-full h-11 rounded-full bg-white border border-gray-200 text-sm font-bold text-gray-700 hover:bg-gray-50">
+    عرض المزيد ({total - shown})
+  </button>
+)
+
 const POST_STATUS = {
   PUBLISHED: { label: 'منشور', tone: 'ok' },
   SCHEDULED: { label: 'مجدول', tone: 'info' },
@@ -670,6 +683,7 @@ const InstagramPostsSection = () => {
     // تحديث تلقائي ما دام هناك منشور مجدول أو قيد النشر
     refetchInterval: (q) => (q.state.data || []).some(p => p.status === 'SCHEDULED' || p.status === 'PUBLISHING') ? 30000 : false,
   })
+  const [limit, setLimit] = useState(LOG_PAGE)
   // القدوم من رابط «سجل المنشورات»
   useEffect(() => {
     if (!isLoading && window.location.hash === '#instagram-posts')
@@ -704,8 +718,9 @@ const InstagramPostsSection = () => {
           لم تنشر من المنصة بعد — من «منتجاتي» اختر منتجاً ثم «نشر»
         </div>
       ) : (
+        <>
         <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-          {posts.map(p => {
+          {posts.slice(0, limit).map(p => {
             const st = POST_STATUS[p.status] || POST_STATUS.SCHEDULED
             const busy = action.isPending && action.variables?.post.id === p.id
             return (
@@ -753,6 +768,8 @@ const InstagramPostsSection = () => {
             )
           })}
         </div>
+        <LoadMore shown={Math.min(limit, posts.length)} total={posts.length} onMore={() => setLimit(l => l + LOG_PAGE)} />
+        </>
       )}
     </section>
   )
@@ -770,14 +787,18 @@ const TikTokPostsSection = () => {
     queryKey: ['tiktok-posts'],
     queryFn: async () => unwrap(await apiGet(API_ENDPOINTS.TIKTOK.POSTS)) || [],
     // تيك توك قد يعالج المنشور دقائق — نتابعه ما دام قيد النشر
-    refetchInterval: (q) => (q.state.data || []).some(p => p.status === 'PUBLISHING') ? 20000 : false,
+    refetchInterval: (q) => (q.state.data || []).some(p => p.status === 'SCHEDULED' || p.status === 'PUBLISHING') ? 20000 : false,
   })
+  const [limit, setLimit] = useState(LOG_PAGE)
   const retry = useMutation({
-    mutationFn: async (post) => unwrap(await apiPost(API_ENDPOINTS.TIKTOK.POST_RETRY(post.id))),
-    onSuccess: (post) => {
+    mutationFn: async ({ post, kind }) => unwrap(await apiPost(
+      kind === 'cancel' ? API_ENDPOINTS.TIKTOK.POST_CANCEL(post.id) : API_ENDPOINTS.TIKTOK.POST_RETRY(post.id))),
+    onSuccess: (post, { kind }) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-posts'] })
       queryClient.invalidateQueries({ queryKey: ['tiktok-items'] })
-      if (post.status === 'PUBLISHED') success('تم النشر على تيك توك 🎉')
+      queryClient.invalidateQueries({ queryKey: ['vendor-published-products'] })
+      if (kind === 'cancel') success('تم إلغاء المنشور المجدول')
+      else if (post.status === 'PUBLISHED') success('تم النشر على تيك توك 🎉')
       else if (post.status === 'FAILED') showError(post.error || 'تعذّر النشر')
     },
     onError: (err) => showError(err.message || 'تعذّر تنفيذ العملية'),
@@ -799,10 +820,11 @@ const TikTokPostsSection = () => {
           لم تنشر على تيك توك من المنصة بعد — من «منتجاتي» اختر منتجاً ثم «نشر»
         </div>
       ) : (
+        <>
         <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-          {posts.map(p => {
+          {posts.slice(0, limit).map(p => {
             const st = POST_STATUS[p.status] || POST_STATUS.PUBLISHING
-            const busy = retry.isPending && retry.variables?.id === p.id
+            const busy = retry.isPending && retry.variables?.post.id === p.id
             const first = p.media[0]
             return (
               <div key={p.id} className="flex items-start gap-3 p-3.5">
@@ -819,13 +841,19 @@ const TikTokPostsSection = () => {
                   </div>
                   <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">{p.caption}</p>
                   <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <Clock size={11} />{formatPostDate(p.publishedAt || p.createdAt)}
+                    <Clock size={11} />{formatPostDate(p.status === 'SCHEDULED' ? p.scheduledAt : (p.publishedAt || p.createdAt))}
                     <span className="mx-1">·</span>{TIKTOK_PRIVACY[p.privacyLevel] || p.privacyLevel}
                   </p>
                   {p.error && p.status === 'FAILED' && <p className="text-xs mt-1 text-red-600">{p.error}</p>}
                   {p.status === 'FAILED' && (
-                    <button onClick={() => retry.mutate(p)} disabled={busy} className="mt-1.5 text-xs font-bold text-gray-700 inline-flex items-center gap-1 disabled:opacity-50">
+                    <button onClick={() => retry.mutate({ post: p, kind: 'retry' })} disabled={busy} className="mt-1.5 text-xs font-bold text-gray-700 inline-flex items-center gap-1 disabled:opacity-50">
                       <RotateCcw size={12} className={busy ? 'animate-spin' : ''} />إعادة المحاولة
+                    </button>
+                  )}
+                  {p.status === 'SCHEDULED' && (
+                    <button onClick={() => confirm('إلغاء هذا المنشور المجدول؟') && retry.mutate({ post: p, kind: 'cancel' })} disabled={busy}
+                      className="mt-1.5 text-xs font-bold text-red-600 inline-flex items-center gap-1 disabled:opacity-50">
+                      <Ban size={12} />إلغاء
                     </button>
                   )}
                 </div>
@@ -833,6 +861,8 @@ const TikTokPostsSection = () => {
             )
           })}
         </div>
+        <LoadMore shown={Math.min(limit, posts.length)} total={posts.length} onMore={() => setLimit(l => l + LOG_PAGE)} />
+        </>
       )}
     </section>
   )
@@ -921,8 +951,12 @@ const VendorSocialAccounts = () => {
     { key: 'hidden', label: 'مخفي', count: hiddenCount },
     { key: 'linked', label: 'مربوط بمنتج', count: linkedCount },
   ]
-  const shownVideos = inPlatform.filter(v =>
+  const filteredVideos = inPlatform.filter(v =>
     filter === 'visible' ? !v.isHidden : filter === 'hidden' ? v.isHidden : filter === 'linked' ? !!v.product : true)
+  // تقسيم لصفحات: يبدأ بدفعة ويزيد البائع عند الحاجة (إنستغرام قد يصل لمئات المنشورات)
+  const [gridLimit, setGridLimit] = useState(GRID_PAGE)
+  const shownVideos = filteredVideos.slice(0, gridLimit)
+  const viewable = items.filter(v => !v.platformOnly)
 
   const updateItem = (item, patch, options) => byKey[item.platform].updateItem.mutate({ id: item.id, patch }, options)
   const savingItem = platforms.some(p => p.updateItem.isPending)
@@ -986,7 +1020,7 @@ const VendorSocialAccounts = () => {
               {connectedPlatforms.length > 1 && (
                 <>
                   {[{ key: 'all', name: 'الكل' }, ...connectedPlatforms.map(p => p.cfg)].map(p => (
-                    <button key={p.key} onClick={() => setPlatformFilter(p.key)} aria-label={p.name}
+                    <button key={p.key} onClick={() => { setPlatformFilter(p.key); setGridLimit(GRID_PAGE) }} aria-label={p.name}
                       className={`h-9 px-3 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-1.5 border transition-colors ${activePlatformFilter === p.key ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
                       {p.Logo ? <p.Logo className="w-4 h-4" /> : p.name}
                     </button>
@@ -995,7 +1029,7 @@ const VendorSocialAccounts = () => {
                 </>
               )}
               {filters.map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)}
+                <button key={f.key} onClick={() => { setFilter(f.key); setGridLimit(GRID_PAGE) }}
                   className={`h-9 px-3.5 rounded-full text-sm font-medium whitespace-nowrap inline-flex items-center gap-1.5 border transition-colors ${filter === f.key ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
                   {f.label}
                   <span className={`text-[11px] px-1.5 rounded-full ${filter === f.key ? 'bg-white/20' : 'bg-gray-100 text-gray-500'}`}>{f.count}</span>
@@ -1022,6 +1056,7 @@ const VendorSocialAccounts = () => {
               ))}
             </ReelsGrid>
           )}
+          <LoadMore shown={shownVideos.length} total={filteredVideos.length} onMore={() => setGridLimit(l => l + GRID_PAGE)} />
         </section>
       )}
 
@@ -1061,8 +1096,13 @@ const VendorSocialAccounts = () => {
                 )}
               </div>
             </div>
-            {[
-              { icon: Play, label: actionVideo.mediaType === 'video' ? 'تشغيل الفيديو' : 'عرض المنشور', onClick: () => { setViewerIndex(items.findIndex(v => v.id === actionVideo.id)); setActionVideo(null) } },
+            {actionVideo.platformOnly && (
+              <p className="px-5 py-4 text-sm text-gray-600 leading-relaxed">
+                نُشر من المنصة بخصوصية «{TIKTOK_PRIVACY[actionVideo.privacyLevel] || 'خاصة'}». لا يعيد تيك توك المنشورات الخاصة، لذلك لا يمكن ربطه بمنتج أو عرضه في المتجر من هنا — اجعله عاماً من تطبيق تيك توك ليظهر ويُزامَن تلقائياً.
+              </p>
+            )}
+            {!actionVideo.platformOnly && [
+              { icon: Play, label: actionVideo.mediaType === 'video' ? 'تشغيل الفيديو' : 'عرض المنشور', onClick: () => { setViewerIndex(viewable.findIndex(v => v.id === actionVideo.id)); setActionVideo(null) } },
               { icon: Package, label: actionVideo.product ? 'تغيير المنتج المربوط' : 'ربط بمنتج', onClick: () => { setLinkingVideo(actionVideo); setActionVideo(null) } },
               {
                 icon: actionVideo.isHidden ? Eye : EyeOff,
@@ -1086,7 +1126,7 @@ const VendorSocialAccounts = () => {
         </div>
       )}
       {viewerIndex !== null && viewerIndex >= 0 && (
-        <TikTokFeedViewer videos={items} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
+        <TikTokFeedViewer videos={viewable} startIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       )}
       {linkingVideo && (
         <LinkProductModal video={linkingVideo} vendorId={vendorId} saving={savingItem}

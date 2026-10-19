@@ -52,6 +52,9 @@ namespace ecommerce.Core.DTO.TikTok
 
         // إقرار التاجر بموافقته على نشر المحتوى على حسابه (اشتراط تيك توك)
         public bool Consent { get; set; }
+
+        // يُنشر عند هذا الموعد (حتى 30 يوماً)؛ فارغ = النشر الآن
+        public DateTime? ScheduledAt { get; set; }
     }
 
     public class TikTokPostDto
@@ -64,6 +67,7 @@ namespace ecommerce.Core.DTO.TikTok
         public bool IsVideo { get; set; }
         public string PrivacyLevel { get; set; } = "";
         public string Status { get; set; } = "";
+        public DateTime? ScheduledAt { get; set; }
         public DateTime? PublishedAt { get; set; }
         public string? Error { get; set; }
         public DateTime CreatedAt { get; set; }

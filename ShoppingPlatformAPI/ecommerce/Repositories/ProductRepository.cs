@@ -567,6 +567,12 @@ namespace ecommerce.Repositories
             _context.CartItems.RemoveRange(await _context.CartItems.Where(c => c.ProductId == id).ToListAsync());
             _context.Wishlists.RemoveRange(await _context.Wishlists.Where(w => w.ProductId == id).ToListAsync());
 
+            // منشورات إنستغرام/تيك توك تبقى على الحساب (لا يمكن حذفها من المنصة) لكن لا تشير لمنتج محذوف
+            foreach (var media in await _context.Set<InstagramMedia>().Where(m => m.ProductId == id).ToListAsync())
+                media.ProductId = null;
+            foreach (var video in await _context.Set<TikTokVideo>().Where(v => v.ProductId == id).ToListAsync())
+                video.ProductId = null;
+
             await _context.SaveChangesAsync();
             return true;
         }
