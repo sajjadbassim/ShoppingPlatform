@@ -1,2 +1,5 @@
 # Security audit reports map live vulnerabilities — never commit them
 SECURITY-AUDIT-*.md
+
+# ملفات محلية فيها أسرار (مفاتيح Wevlix وغيرها)
+*.local.md
