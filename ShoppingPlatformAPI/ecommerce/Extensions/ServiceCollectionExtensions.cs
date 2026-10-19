@@ -127,6 +127,7 @@ namespace ecommerce.Extensions
             services.AddScoped<IAdminService, AdminService>();
 
             services.AddScoped<IFileService, FileService>();
+            services.AddSingleton<ImageVariants>();
             services.AddScoped<ecommerce.Services.IAvatarService, ecommerce.Services.AvatarService>();
             services.AddScoped<ecommerce.Services.IDeliveryZoneService, ecommerce.Services.DeliveryZoneService>();
             services.AddScoped<ecommerce.Services.IGooglePictureFetcher, ecommerce.Services.GooglePictureFetcher>();

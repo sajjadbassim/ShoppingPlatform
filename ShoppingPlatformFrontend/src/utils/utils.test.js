@@ -5,7 +5,7 @@ import {
   localizeStatusCodes,
   staffStatusMessage,
 } from './orderStatusText'
-import { getAllProductImages, getImageUrl, getPrimaryImage } from './imageHelper'
+import { IMG_SIZE, getAllProductImages, getImageUrl, getPrimaryImage } from './imageHelper'
 import { getDashboardLink } from './dashboardLink'
 import { SCOPE, isGroceryCategory, searchLink } from './shopScope'
 
@@ -41,6 +41,14 @@ describe('imageHelper', () => {
     vi.stubEnv('VITE_API_URL', 'http://api.test')
     expect(getImageUrl('/uploads/a.png')).toBe('http://api.test/uploads/a.png')
     expect(getImageUrl('uploads/a.png')).toBe('http://api.test/uploads/a.png')
+  })
+
+  it('العرض يطلب نسخة الخادم المصغّرة لصور /uploads فقط', () => {
+    vi.stubEnv('VITE_API_URL', 'http://api.test')
+    expect(getImageUrl('/uploads/a.png', IMG_SIZE.CARD)).toBe('http://api.test/uploads/a.png?w=600')
+    expect(getImageUrl('https://cdn.test/x.jpg', IMG_SIZE.CARD)).toBe('https://cdn.test/x.jpg')
+    expect(getImageUrl('/images/logo.png', IMG_SIZE.THUMB)).toBe('http://api.test/images/logo.png')
+    expect(getPrimaryImage({ primaryImageUrl: '/uploads/p.png' }, IMG_SIZE.THUMB)).toBe('http://api.test/uploads/p.png?w=200')
   })
 
   it('الرابط الكامل يبقى كما هو والفارغ يرجع null', () => {

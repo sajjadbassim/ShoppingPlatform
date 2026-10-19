@@ -13,7 +13,7 @@ import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useProduct, useProductsByCategory } from '../../hooks/useProducts'
 import { useProductVariants } from '../../hooks/useVariants'
-import { getAllProductImages, getImageUrl } from '../../utils/imageHelper'
+import { getAllProductImages, getImageUrl, IMG_SIZE } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -224,7 +224,7 @@ const MobileReviewCard = ({ review, currentUserId, onMarkHelpful, onReport }) =>
 
 const MobileRelatedCard = ({ p, isWishlisted, onToggleWishlist, onQuickAdd }) => {
   const img = p.images?.[0]?.url || p.images?.[0]?.imageUrl || p.primaryImageUrl
-  const src = img ? getImageUrl(img) : ''
+  const src = img ? getImageUrl(img, IMG_SIZE.CARD) : ''
   const inStock = p.isAvailable && p.stockQuantity > 0
   return (
     <Link to={`/products/${p.id}`} className="block w-[44%] min-w-[150px] sm:w-[200px] flex-shrink-0 snap-start text-gray-900">
@@ -854,7 +854,7 @@ const ProductDetailsContent = () => {
     )
   }
 
-  const images = getAllProductImages(product)
+  const images = getAllProductImages(product, IMG_SIZE.FULL)
   const isWishlisted = isInWishlist(product.id)
   const discount = product.originalPrice && product.originalPrice > product.price
     ? Math.round((1 - product.price / product.originalPrice) * 100)

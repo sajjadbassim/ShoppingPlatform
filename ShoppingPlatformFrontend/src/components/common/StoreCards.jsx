@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { MapPin, Package, Clock, Truck, ArrowLeft, Sparkles, Star } from 'lucide-react'
 import { Skeleton } from './Loading'
 import { useProductsByVendor } from '../../hooks/useProducts'
-import { getVendorLogo, getVendorCover, getPrimaryImage } from '../../utils/imageHelper'
+import { getVendorLogo, getVendorCover, getPrimaryImage, IMG_SIZE } from '../../utils/imageHelper'
 import { ClosedBadge } from '../vendor/StoreHoursEditor'
 import { usePublicZones, vendorUsesZones, deliveryFeeLabel } from '../../hooks/useDeliveryZones'
 
@@ -24,7 +24,7 @@ const COVER_GRADIENTS = [
 // أجزاء مشتركة
 // ===========================
 const StoreLogo = ({ store, index, className = 'w-14 h-14' }) => {
-  const logoUrl = getVendorLogo(store)
+  const logoUrl = getVendorLogo(store, IMG_SIZE.THUMB)
   return (
     <div className={`${className} flex-shrink-0 rounded-2xl bg-white ring-2 ring-white shadow-lg overflow-hidden flex items-center justify-center text-2xl`}>
       {logoUrl
@@ -35,7 +35,7 @@ const StoreLogo = ({ store, index, className = 'w-14 h-14' }) => {
 }
 
 const StoreCover = ({ store, index, className }) => {
-  const coverUrl = getVendorCover(store)
+  const coverUrl = getVendorCover(store, IMG_SIZE.CARD)
   return (
     <div className={`relative overflow-hidden bg-gradient-to-br ${COVER_GRADIENTS[index % COVER_GRADIENTS.length]} ${className}`}>
       {coverUrl && (
@@ -101,7 +101,7 @@ const ProductsPreview = ({ storeId, count = 4, size = 'h-16' }) => {
     <div className="grid grid-cols-4 gap-1.5">
       {shown.map((p, i) => (
         <div key={p.id} className={`relative ${size} rounded-xl overflow-hidden product-media`}>
-          <img src={getPrimaryImage(p)} alt="" loading="lazy" className="w-full h-full object-cover" />
+          <img src={getPrimaryImage(p, IMG_SIZE.THUMB)} alt="" loading="lazy" className="w-full h-full object-cover" />
           {i === shown.length - 1 && more > 0 && (
             <span className="absolute inset-0 bg-black/55 text-white text-sm font-bold flex items-center justify-center" dir="ltr">+{more}</span>
           )}

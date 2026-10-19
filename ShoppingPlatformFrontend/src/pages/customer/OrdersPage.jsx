@@ -12,7 +12,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
-import { getImageUrl } from '../../utils/imageHelper'
+import { getImageUrl, IMG_SIZE } from '../../utils/imageHelper'
 import { countPieces } from '../../utils/weight'
 
 const PAGE_SIZE = 10
@@ -124,7 +124,7 @@ const OrderCard = ({ order, onReorder, reordering }) => {
             {shown.map((item, i) => (
               <div key={item.id || i}
                 className="relative w-14 h-14 rounded-xl overflow-hidden product-media ring-2 ring-white">
-                {item.productImageUrl && <img src={getImageUrl(item.productImageUrl)} alt="" loading="lazy" className="w-full h-full object-cover" />}
+                {item.productImageUrl && <img src={getImageUrl(item.productImageUrl, IMG_SIZE.THUMB)} alt="" loading="lazy" className="w-full h-full object-cover" />}
                 {i === shown.length - 1 && more > 0 && (
                   <span className="absolute inset-0 bg-black/55 text-white text-xs font-bold flex items-center justify-center" dir="ltr">+{more}</span>
                 )}

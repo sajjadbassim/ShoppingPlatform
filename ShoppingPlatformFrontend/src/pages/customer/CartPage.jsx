@@ -8,7 +8,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useCouponStore } from '../../stores/couponStore'
-import { getImageUrl } from '../../utils/imageHelper'
+import { getImageUrl, IMG_SIZE } from '../../utils/imageHelper'
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPost } from '../../api/axios'
@@ -58,7 +58,7 @@ const SuggestedTile = ({ product: p }) => {
     <Link to={`/products/${p.id}`}
       className="group flex-shrink-0 w-[42%] min-w-[150px] sm:w-auto sm:min-w-0 snap-start bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
       <div className="relative aspect-square product-media">
-        {p.primaryImageUrl && <img src={getImageUrl(p.primaryImageUrl)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />}
+        {p.primaryImageUrl && <img src={getImageUrl(p.primaryImageUrl, IMG_SIZE.THUMB)} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />}
         {discount > 0 && <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-rose-500 text-white text-[11px] font-bold">-{discount}%</span>}
       </div>
       <div className="p-2.5">
@@ -390,7 +390,7 @@ const CartPage = () => {
                           <Link to={`/products/${item.productId}`}
                             className="w-20 h-20 lg:w-24 lg:h-24 product-media rounded-xl overflow-hidden flex-shrink-0">
                             <img
-                              src={getImageUrl(item.productImage) || '/placeholder-product.png'}
+                              src={getImageUrl(item.productImage, IMG_SIZE.THUMB) || '/placeholder-product.png'}
                               alt={item.productNameAr || item.productName}
                               className="w-full h-full object-cover"
                             />

@@ -10,7 +10,7 @@ import { useToast } from '../../components/common/Toast'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useCartStore } from '../../stores/cartStore'
 import { useAuthStore } from '../../stores/authStore'
-import { getPrimaryImage } from '../../utils/imageHelper'
+import { getPrimaryImage, IMG_SIZE } from '../../utils/imageHelper'
 import { variantsService } from '../../services/variantsService'
 
 const isInStock = (item) => item.product?.isAvailable && item.product?.stockQuantity > 0
@@ -22,7 +22,7 @@ const hasOptions = async (productId) =>
 // صف منتج مضغوط (الهاتف): كل التفاصيل ظاهرة دون تمرير
 const WishlistRow = ({ item, onAddToCart, onRemove }) => {
   const p = item.product || {}
-  const img = getPrimaryImage(p)
+  const img = getPrimaryImage(p, IMG_SIZE.THUMB)
   const inStock = p.isAvailable && p.stockQuantity > 0
   const hasDiscount = p.originalPrice && p.originalPrice > p.price
   return (

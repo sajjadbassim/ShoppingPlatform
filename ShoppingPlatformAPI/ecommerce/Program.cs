@@ -380,6 +380,7 @@ app.UseStatusCodePages(async ctx =>
         ApiResponse<object>.Fail(message, http.TraceIdentifier), StatusPageJson));
 });
 
+app.UseImageVariants();
 app.UseStaticFiles();
 
 if (app.Environment.IsDevelopment())

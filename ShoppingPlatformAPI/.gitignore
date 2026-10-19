@@ -32,3 +32,6 @@ ecommerce/wwwroot/uploads/social/
 ecommerce/wwwroot/uploads/avatars/
 ecommerce/wwwroot/uploads/returns/
 ecommerce/wwwroot/uploads/reviews/
+
+# نسخ الصور المصغّرة (ImageVariants) — تُولَّد عند الطلب من الأصل
+ecommerce/wwwroot/uploads/_w/

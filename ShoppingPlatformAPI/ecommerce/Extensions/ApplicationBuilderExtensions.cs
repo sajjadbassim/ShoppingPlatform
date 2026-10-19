@@ -7,5 +7,9 @@ namespace ecommerce.Extensions
         // يُستدعى أول شيء في الـ Pipeline حتى يلتقط استثناءات كل ما بعده
         public static IApplicationBuilder UseAppExceptionHandling(this IApplicationBuilder app) =>
             app.UseMiddleware<ExceptionHandlingMiddleware>();
+
+        // قبل UseStaticFiles مباشرة
+        public static IApplicationBuilder UseImageVariants(this IApplicationBuilder app) =>
+            app.UseMiddleware<ImageVariantMiddleware>();
     }
 }

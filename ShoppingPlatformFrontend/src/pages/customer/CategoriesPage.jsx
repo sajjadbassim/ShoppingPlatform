@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, AlertCircle, Grid, Star, ArrowLeft, ShoppingBasket } from 'lucide-react'
 import CategoryIcon from '../../components/common/CategoryIcon'
 import { useProductsByCategory } from '../../hooks/useProducts'
-import { getPrimaryImage } from '../../utils/imageHelper'
+import { getPrimaryImage, IMG_SIZE } from '../../utils/imageHelper'
 import Breadcrumb from '../../components/common/Breadcrumb'
 import { Skeleton } from '../../components/common/Loading'
 import { useCategories } from '../../hooks/useCategories'
@@ -30,7 +30,7 @@ const GRADIENTS = [
 // الهاتف: عمود الفئات + محتوى الفئة المختارة
 // ===========================
 const CategoryProductCard = ({ p }) => {
-  const img = getPrimaryImage(p)
+  const img = getPrimaryImage(p, IMG_SIZE.CARD)
   const hasDiscount = p.originalPrice && p.originalPrice > p.price
   const rating = p.averageRating || p.rating || 0
   return (

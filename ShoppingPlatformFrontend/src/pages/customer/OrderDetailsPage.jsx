@@ -10,7 +10,7 @@ import Button from '../../components/common/Button'
 import { Skeleton } from '../../components/common/Loading'
 import { useToast } from '../../components/common/Toast'
 import { useOrderByNumber, useCancelOrder, useOrderTracking, useOrderRatingStatus, useCreateOrderRating, useRateOrderStores } from '../../hooks/useOrders'
-import { getImageUrl } from '../../utils/imageHelper'
+import { getImageUrl, IMG_SIZE } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
 import { useState, useEffect } from 'react'
 import { orderService } from '../../services'
@@ -571,7 +571,7 @@ const OrderDetailsPage = () => {
                     <div key={item.id || index} className="flex gap-4 py-4 first:pt-0 last:pb-0">
                       <div className="w-20 h-20 product-media rounded-lg overflow-hidden">
                         <img
-                          src={getImageUrl(item.productImageUrl) || '/placeholder-product.png'}
+                          src={getImageUrl(item.productImageUrl, IMG_SIZE.THUMB) || '/placeholder-product.png'}
                           alt=""
                           className="w-full h-full object-cover"
                         />

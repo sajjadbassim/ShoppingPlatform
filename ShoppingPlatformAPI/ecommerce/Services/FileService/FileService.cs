@@ -7,9 +7,12 @@ namespace ecommerce.Services.FileService
         private readonly long _maxFileSize = 5 * 1024 * 1024; // 5MB
         private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
 
+        private readonly ImageVariants _variants;
+
         public FileService(IWebHostEnvironment environment)
         {
             _environment = environment;
+            _variants = new ImageVariants(environment);
         }
 
         public async Task<string> SaveImageAsync(IFormFile file, string folder = "products")
@@ -111,6 +114,8 @@ namespace ecommerce.Services.FileService
                 var uploadsRoot = Path.GetFullPath(Path.Combine(_environment.WebRootPath, "uploads")) + Path.DirectorySeparatorChar;
                 if (!filePath.StartsWith(uploadsRoot, StringComparison.OrdinalIgnoreCase))
                     return false;
+
+                _variants.Delete(imageUrl);
 
                 if (File.Exists(filePath))
                 {

@@ -23,7 +23,7 @@ import { orderService } from '../../services'
 import { apiPost, apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { getImageUrl } from '../../utils/imageHelper'
+import { getImageUrl, IMG_SIZE } from '../../utils/imageHelper'
 import { formatQuantity, countPieces } from '../../utils/weight'
 
 // تفضيل الاستبدال عند نفاد منتج سوبرماركت
@@ -735,7 +735,7 @@ const CheckoutPage = () => {
                 {displayItems.map(item => (
                   <div key={item.variantId || item.productId || item.id} className="flex gap-3">
                     <img
-                      src={getImageUrl(item.productImage || item.image) || '/placeholder-product.png'}
+                      src={getImageUrl(item.productImage || item.image, IMG_SIZE.THUMB) || '/placeholder-product.png'}
                       alt=""
                       className="w-14 h-14 object-cover rounded-xl flex-shrink-0"
                     />

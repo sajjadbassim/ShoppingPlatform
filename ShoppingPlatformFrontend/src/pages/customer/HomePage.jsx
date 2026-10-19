@@ -10,7 +10,7 @@ import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
 import { useToast } from '../../components/common/Toast'
-import { getImageUrl, getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
+import { getImageUrl, getPrimaryImage, getVendorLogo, IMG_SIZE } from '../../utils/imageHelper'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { useAdvancedFilter } from '../../hooks/useProducts'
@@ -253,7 +253,7 @@ const GroceryHero = () => (
 const RAIL_CARD_WIDTH = 'w-[38%] min-w-[140px] md:min-w-0 md:w-[calc((100%-48px)/4)] lg:w-[calc((100%-64px)/5)] xl:w-[calc((100%-80px)/6)]'
 
 const MobileProductCard = ({ product, onAddToCart, onToggleWishlist, boxed = false, className = RAIL_CARD_WIDTH }) => {
-  const img = getPrimaryImage(product)
+  const img = getPrimaryImage(product, IMG_SIZE.CARD)
   const hasDiscount = product.originalPrice && product.originalPrice > product.price
   const discount = hasDiscount ? Math.round((1 - product.price / product.originalPrice) * 100) : product.discountPercentage
   const stop = (fn) => (e) => { e.preventDefault(); e.stopPropagation(); fn?.() }
@@ -561,7 +561,7 @@ const ProductRail = ({ children, className = '' }) => {
 // المتاجر المميزة: بطاقات أفقية بغلاف المتجر وشعاره، التقييم، وقت التحضير ورسوم التوصيل
 const StoreCardMini = ({ vendor }) => {
   const { data: zonesCfg } = usePublicZones()
-  const logo = getVendorLogo(vendor)
+  const logo = getVendorLogo(vendor, IMG_SIZE.THUMB)
   const cover = vendor.coverImageUrl ? bannerSrc(vendor.coverImageUrl) : null
   const rating = vendor.rating ? Number(vendor.rating).toFixed(1) : null
 

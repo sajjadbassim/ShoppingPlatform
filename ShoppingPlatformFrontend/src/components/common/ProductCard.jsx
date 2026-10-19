@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Heart, Star, ShoppingCart, Plus, Store } from 'lucide-react'
-import { getPrimaryImage } from '../../utils/imageHelper'
+import { getPrimaryImage, IMG_SIZE } from '../../utils/imageHelper'
 import { useProductVariants, variantKeys } from '../../hooks/useVariants'
 import { variantsService } from '../../services/variantsService'
 import { formatPrice, pricePerKg } from '../../utils/weight'
@@ -104,7 +104,7 @@ const ProductCard = ({
   const [imageError, setImageError] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
-  const imageUrl = getPrimaryImage(product)
+  const imageUrl = getPrimaryImage(product, IMG_SIZE.CARD)
 
   const {
     id,

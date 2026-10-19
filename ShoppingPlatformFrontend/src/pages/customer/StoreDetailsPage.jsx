@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/commo
 import { useToast } from '../../components/common/Toast'
 import { useVendor } from '../../hooks/useVendors'
 import { useProductsByVendor } from '../../hooks/useProducts'
-import { getVendorLogo, getVendorCover, getPrimaryImage } from '../../utils/imageHelper'
+import { getVendorLogo, getVendorCover, getPrimaryImage, IMG_SIZE } from '../../utils/imageHelper'
 import { useCartStore } from '../../stores/cartStore'
 import { useWishlistStore } from '../../stores/wishlistStore'
 import { useAuthStore } from '../../stores/authStore'
@@ -124,8 +124,8 @@ const StoreDetailsPage = () => {
   )
 
   const breadcrumbItems = [{ label: 'المتاجر', path: '/stores' }, { label: store.nameAr || store.name }]
-  const logoUrl = getVendorLogo(store)
-  const coverUrl = getVendorCover(store)
+  const logoUrl = getVendorLogo(store, IMG_SIZE.THUMB)
+  const coverUrl = getVendorCover(store, IMG_SIZE.FULL)
 
   const formattedProducts = products.slice(0, 8).map(p => ({
     id: p.id, name: p.nameAr || p.name,

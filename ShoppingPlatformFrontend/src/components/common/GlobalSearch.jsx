@@ -4,7 +4,7 @@ import { Search, X, Package, Store, Tag, Clock, ArrowLeft } from 'lucide-react'
 import { useAdvancedFilter } from '../../hooks/useProducts'
 import { useVendorsPaged } from '../../hooks/useVendors'
 import { useCategories } from '../../hooks/useCategories'
-import { getPrimaryImage, getVendorLogo } from '../../utils/imageHelper'
+import { getPrimaryImage, getVendorLogo, IMG_SIZE } from '../../utils/imageHelper'
 import { SCOPE, isGroceryCategory, searchLink, useShopScope } from '../../utils/shopScope'
 import { formatPrice } from '../../utils/weight'
 import { useBackToClose } from '../../hooks/useBackToClose'
@@ -213,8 +213,8 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-right"
                         >
                           <div className="w-12 h-12 product-media rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-                            {getPrimaryImage(product) ? (
-                              <img src={getPrimaryImage(product)} alt="" className="w-full h-full object-cover" />
+                            {getPrimaryImage(product, IMG_SIZE.THUMB) ? (
+                              <img src={getPrimaryImage(product, IMG_SIZE.THUMB)} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <Package size={20} className="text-gray-400" />
                             )}
@@ -245,8 +245,8 @@ const GlobalSearch = ({ isOpen, onClose }) => {
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-right"
                         >
                           <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            {getVendorLogo(vendor) ? (
-                              <img src={getVendorLogo(vendor)} alt="" className="w-full h-full object-cover rounded-lg" />
+                            {getVendorLogo(vendor, IMG_SIZE.THUMB) ? (
+                              <img src={getVendorLogo(vendor, IMG_SIZE.THUMB)} alt="" className="w-full h-full object-cover rounded-lg" />
                             ) : (
                               <Store size={20} className="text-blue-500" />
                             )}
