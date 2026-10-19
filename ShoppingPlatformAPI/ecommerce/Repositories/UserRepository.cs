@@ -40,6 +40,9 @@ namespace ecommerce.Repositories
                 .ToListAsync();
         }
 
+        public async Task<IEnumerable<User>> GetAllByRoleAsync(string role) =>
+            await _context.Users.Where(u => u.Role == role).OrderByDescending(u => u.CreatedAt).ToListAsync();
+
         public async Task<IEnumerable<User>> GetByRoleAsync(string role)
         {
             return await _context.Users

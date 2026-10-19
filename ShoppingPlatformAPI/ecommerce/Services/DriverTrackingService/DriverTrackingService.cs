@@ -18,7 +18,8 @@ namespace ecommerce.Services.DriverTrackingService
         Task RevokeLinkAsync(Guid driverId, CancellationToken ct = default);
         Task<DriverTrackingInfoDto> GetByTokenAsync(string token, CancellationToken ct = default);
         Task UpdateLocationAsync(string token, DriverLocationUpdateDto dto, CancellationToken ct = default);
-        Task UpdateLocationForDriverAsync(Guid driverId, DriverLocationUpdateDto dto, CancellationToken ct = default);
+        // false = تُجوهل (أقل من MinUpdateInterval عن السابق)
+        Task<bool> UpdateLocationForDriverAsync(Guid driverId, DriverLocationUpdateDto dto, CancellationToken ct = default);
         Task<TrackingBoardDto> GetBoardAsync(CancellationToken ct = default);
     }
 
@@ -102,23 +103,23 @@ namespace ecommerce.Services.DriverTrackingService
             await ApplyLocationAsync(driver, dto, ct);
         }
 
-        public async Task UpdateLocationForDriverAsync(Guid driverId, DriverLocationUpdateDto dto, CancellationToken ct = default)
+        public async Task<bool> UpdateLocationForDriverAsync(Guid driverId, DriverLocationUpdateDto dto, CancellationToken ct = default)
         {
             if (dto.Latitude is < -90 or > 90 || dto.Longitude is < -180 or > 180 || (dto.Latitude == 0 && dto.Longitude == 0))
                 throw new BusinessRuleException("موقع غير صالح");
 
             var driver = await _context.Drivers.FirstOrDefaultAsync(d => d.Id == driverId, ct)
                 ?? throw new NotFoundException("السائق غير موجود");
-            await ApplyLocationAsync(driver, dto, ct);
+            return await ApplyLocationAsync(driver, dto, ct);
         }
 
-        private async Task ApplyLocationAsync(Core.Models.Driver driver, DriverLocationUpdateDto dto, CancellationToken ct)
+        private async Task<bool> ApplyLocationAsync(Core.Models.Driver driver, DriverLocationUpdateDto dto, CancellationToken ct)
         {
             if (driver.Status != DriverStatus.Active)
                 throw new ForbiddenException("حساب السائق موقوف");
 
             if (driver.LastLocationAt.HasValue && Now - driver.LastLocationAt.Value < MinUpdateInterval)
-                return;
+                return false;
 
             driver.LastLatitude = Math.Round(dto.Latitude, 6);
             driver.LastLongitude = Math.Round(dto.Longitude, 6);
@@ -134,6 +135,7 @@ namespace ecommerce.Services.DriverTrackingService
                 Accuracy = driver.LastLocationAccuracy,
                 At = driver.LastLocationAt.Value,
             }, ct);
+            return true;
         }
 
         private async Task<Core.Models.Driver> FindByTokenAsync(string token, CancellationToken ct)

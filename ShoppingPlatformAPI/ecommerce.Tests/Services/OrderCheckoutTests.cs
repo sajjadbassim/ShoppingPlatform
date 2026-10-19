@@ -42,7 +42,7 @@ namespace ecommerce.Tests.Services
                 .Options);
 
             _customer = new User { Phone = "07701234567", FullName = "زبون", Role = UserRoles.Customer, PasswordHash = "x", IsActive = true };
-            _address = new Address { UserId = _customer.Id, StreetAddress = "شارع 1", City = "بغداد", Phone = "07701234567" };
+            _address = new Address { UserId = _customer.Id, Latitude = 32.5051m, Longitude = 45.8243m, StreetAddress = "شارع 1", City = "بغداد", Phone = "07701234567" };
             _storeA = new Vendor { Name = "A", NameAr = "A", OwnerId = Guid.NewGuid(), IsActive = true, DeliveryFee = 3000 };
             _storeB = new Vendor { Name = "B", NameAr = "B", OwnerId = Guid.NewGuid(), IsActive = true, DeliveryFee = 2000 };
 
@@ -167,6 +167,18 @@ namespace ecommerce.Tests.Services
             Assert.Equal(5000, item.UnitPrice);
         }
 
+        // عنوان بلا دبوس كان يمر دون فحص واسط ودون موقع لملاحة السائق
+        [Fact]
+        public async Task Checkout_AddressWithoutPin_IsRejected()
+        {
+            _address.Latitude = null;
+            _address.Longitude = null;
+
+            var ex = await Assert.ThrowsAsync<BusinessRuleException>(() => Checkout());
+            Assert.Contains("الخريطة", ex.Message);
+            Assert.Empty(_context.Orders);
+        }
+
         [Fact]
         public async Task Checkout_SecondOrderSameDay_GetsNextNumber()
         {
@@ -271,7 +283,7 @@ namespace ecommerce.Tests.Services
         {
             _address.UserId = Guid.NewGuid();
 
-            await Assert.ThrowsAsync<BusinessRuleException>(() => Checkout());
+            await Assert.ThrowsAsync<NotFoundException>(() => Checkout());   // لا يكشف وجود عنوان زبون آخر
             _inventory.Verify(i => i.ReserveAsync(It.IsAny<IEnumerable<StockLine>>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 

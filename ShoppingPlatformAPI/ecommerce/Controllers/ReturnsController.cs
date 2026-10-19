@@ -1,3 +1,4 @@
+using ecommerce.Common;
 ﻿using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Return;
@@ -59,7 +60,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -97,6 +98,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                StatusFilter.Validate(status, typeof(ReturnStatus), ignoreCase: true);
                 var (returns, totalCount) = await _returnService.GetPagedAsync(
                     status, pageNumber, pageSize);
 
@@ -115,7 +117,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -142,11 +144,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = ex.Message
-                });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -233,7 +231,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

@@ -52,6 +52,18 @@ namespace ecommerce.Tests.Services
             Assert.Equal(0, result.FinalAmount);
         }
 
+        // 100% بلا سقف = البضاعة مجانية مهما كبرت السلة
+        [Theory]
+        [InlineData(null)]
+        [InlineData(0)]
+        public async Task Create_HundredPercentWithoutCap_IsRejected(int? cap)
+        {
+            var dto = new CreateCouponDto { Code = "FREE", DiscountType = DiscountType.PERCENTAGE, DiscountValue = 100, MaxDiscountAmount = cap, UserUsageLimit = 1 };
+            var ex = await Assert.ThrowsAsync<ecommerce.Core.Exceptions.BusinessRuleException>(() => new CouponService(_repository.Object).CreateAsync(dto));
+            Assert.Contains("سقف", ex.Message);
+            _repository.Verify(r => r.CreateAsync(It.IsAny<Coupon>()), Times.Never);
+        }
+
         [Fact]
         public async Task UnknownCode_IsInvalid() =>
             Assert.False((await new CouponService(_repository.Object)

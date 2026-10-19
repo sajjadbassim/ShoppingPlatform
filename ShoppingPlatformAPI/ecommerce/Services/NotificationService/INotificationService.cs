@@ -21,6 +21,8 @@ namespace ecommerce.Services.NotificationService
 
         // الزبون
         Task NotifyCustomerAsync(Guid customerId, string message, object? data = null);
+        // تغيّر في طلب الزبون لا يغيّر حالته الرئيسية (رفض متجر لجزء، قبول جزئي، تأكيد جزء) — نوعه order_status لا general
+        Task NotifyCustomerOrderNoticeAsync(Guid customerId, string message, object? data = null);
 
         // تذكيرات الزبون (توفر منتج، سلة متروكة، مكافأة دعوة) — يحترم مفتاح «التذكيرات» في الإعدادات.
         // data.link = الصفحة التي تُفتح عند الضغط (مسار داخلي مثل /cart)

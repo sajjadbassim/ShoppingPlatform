@@ -26,10 +26,12 @@ namespace ecommerce.Services
         {
             var (items, totalCount) = await _driverRepository.GetPagedAsync(
                 pageNumber, pageSize, status, workStatus);
+            var drivers = items.ToList();
+            var load = await _driverRepository.GetActiveOrderCountsAsync(drivers.Select(d => d.Id));
 
             return new DriversPagedResultDto
             {
-                Items = items.Select(MapToDto).ToList(),
+                Items = drivers.Select(d => { var dto = MapToDto(d); dto.ActiveOrders = load.GetValueOrDefault(d.Id); return dto; }).ToList(),
                 TotalCount = totalCount,
                 PageNumber = pageNumber,
                 PageSize = pageSize

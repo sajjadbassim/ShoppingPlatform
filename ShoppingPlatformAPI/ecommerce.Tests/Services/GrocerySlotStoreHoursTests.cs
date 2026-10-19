@@ -48,7 +48,7 @@ namespace ecommerce.Tests.Services
             _grocery = new Category { Name = "Grocery", NameAr = "سوبرماركت", IsGrocery = true };
             _electronics = new Category { Name = "Electronics", NameAr = "إلكترونيات" };
             _customer = new User { Phone = "07701234567", FullName = "زبون", Role = UserRoles.Customer, PasswordHash = "x", IsActive = true };
-            _address = new Address { UserId = _customer.Id, StreetAddress = "1", City = "الكوت", Phone = "0770" };
+            _address = new Address { UserId = _customer.Id, Latitude = 32.5051m, Longitude = 45.8243m, StreetAddress = "1", City = "الكوت", Phone = "0770" };
             _context.AddRange(_mart, _electronicsStore, _grocery, _electronics, _customer, _address);
             _context.SaveChanges();
         }

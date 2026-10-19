@@ -75,7 +75,8 @@ namespace ecommerce.Services
 
         public async Task<IEnumerable<UserResponseDto>> GetByRoleAsync(string role)
         {
-            var users = await _userRepository.GetByRoleAsync(role);
+            // مثل بقية شاشات الإدارة: غير الفعّالين يظهرون (IsActive في الرد)
+            var users = await _userRepository.GetAllByRoleAsync(role);
             return users.Select(MapToDto);
         }
 

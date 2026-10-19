@@ -1,3 +1,4 @@
+using ecommerce.Common;
 ﻿using ecommerce.Services;
 using ecommerce.Services.InvoiceService;
 using Microsoft.AspNetCore.Authorization;
@@ -53,7 +54,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -80,7 +81,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

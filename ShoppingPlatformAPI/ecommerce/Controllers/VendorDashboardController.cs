@@ -1,3 +1,5 @@
+using ecommerce.Core.Constants;
+using ecommerce.Common;
 ﻿using ecommerce.Core.Constants;
 using ecommerce.Filters;
 using ecommerce.Core.DTO.Vendor;
@@ -73,7 +75,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -99,7 +101,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -117,6 +119,7 @@ namespace ecommerce.Controllers
         {
             try
             {
+                StatusFilter.Validate(status, typeof(OrderStatus));
                 var result = await _dashboardService.GetOrdersAsync(vendorId, status, pageNumber, Math.Clamp(pageSize, 1, 100), search);
                 return Ok(new
                 {
@@ -127,7 +130,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -195,7 +198,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -210,7 +213,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -225,7 +228,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -250,7 +253,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -276,7 +279,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

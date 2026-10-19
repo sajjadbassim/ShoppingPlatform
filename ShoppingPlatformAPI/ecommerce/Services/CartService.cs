@@ -101,12 +101,12 @@ namespace ecommerce.Services
                     throw new BusinessRuleException("هذا المتغير غير متوفر حالياً");
 
                 if (variant.StockQuantity < dto.Quantity)
-                    throw new BusinessRuleException($"الكمية المتوفرة من هذا المتغير فقط {variant.StockQuantity}");
+                    throw new BusinessRuleException(StockText.Available(variant.StockQuantity, variant: true));
             }
             else
             {
                 if (product.StockQuantity < dto.Quantity)
-                    throw new BusinessRuleException($"الكمية المتوفرة فقط {product.StockQuantity}");
+                    throw new BusinessRuleException(StockText.Available(product.StockQuantity));
             }
 
             var cart = await GetOrCreateCartAsync(userId);
@@ -164,12 +164,12 @@ namespace ecommerce.Services
             if (dto.VariantId.HasValue && cartItem.Variant != null)
             {
                 if (dto.Quantity > cartItem.Variant.StockQuantity)
-                    throw new BusinessRuleException($"الكمية المتوفرة من هذا المتغير فقط {cartItem.Variant.StockQuantity}");
+                    throw new BusinessRuleException(StockText.Available(cartItem.Variant.StockQuantity, variant: true));
             }
             else
             {
                 if (dto.Quantity > product.StockQuantity)
-                    throw new BusinessRuleException($"الكمية المتوفرة فقط {product.StockQuantity}");
+                    throw new BusinessRuleException(StockText.Available(product.StockQuantity));
             }
 
             cartItem.Quantity = dto.Quantity;
@@ -294,7 +294,7 @@ namespace ecommerce.Services
                     warnings.Add($"المنتج '{item.Product.NameAr ?? item.Product.Name}' غير متوفر حالياً");
 
                 if (item.Quantity > stockQty)
-                    warnings.Add($"المنتج '{item.Product.NameAr ?? item.Product.Name}' الكمية المتوفرة فقط {stockQty}");
+                    warnings.Add($"المنتج '{item.Product.NameAr ?? item.Product.Name}' {StockText.Available(stockQty)}");
 
                 // ─── بناء الـ DTO ────────────────────────────────────────────
                 items.Add(new CartItemDto

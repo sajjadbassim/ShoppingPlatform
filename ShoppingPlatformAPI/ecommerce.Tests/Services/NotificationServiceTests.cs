@@ -4,6 +4,7 @@ using ecommerce.Hubs;
 using ecommerce.Repositories;
 using ecommerce.Services.NotificationService;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -86,6 +87,53 @@ namespace ecommerce.Tests.Services
             await _service.NotifyVendorAsync(vendorId, NotificationCategory.NewOrders, NotificationType.NEW_ORDER, "طلب جديد");
 
             _notificationRepository.Verify(r => r.CreateAsync(It.IsAny<Notification>()), Times.Never);
+        }
+
+        // متعدد المتاجر: متجر بدأ التحضير قبل تأكيد الآخر ← يقفز الطلب من «مؤكد جزئياً» إلى «قيد التحضير»
+        // دون «مؤكد» — كان الزبون لا يصله «تم تأكيد طلبك» أبداً
+        [Fact]
+        public async Task CustomerStatus_SkippedConfirmed_IsMergedIntoPreparingNotice()
+        {
+            using var context = new ecommerce.Data.AppDbContext(new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<ecommerce.Data.AppDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            var orderId = Guid.NewGuid();
+            context.OrderStatusLogs.AddRange(
+                new OrderStatusLog { OrderId = orderId, OldStatus = OrderStatus.PENDING_CONFIRMATION, NewStatus = OrderStatus.PARTIALLY_CONFIRMED },
+                new OrderStatusLog { OrderId = orderId, OldStatus = OrderStatus.PARTIALLY_CONFIRMED, NewStatus = OrderStatus.PREPARING });
+            context.SaveChanges();
+            var service = Service(context);
+
+            await service.NotifyCustomerOrderStatusAsync(Guid.NewGuid(), orderId, "ORD-1", OrderStatus.PREPARING);
+
+            _notificationRepository.Verify(r => r.CreateAsync(It.Is<Notification>(n =>
+                n.Message.Contains("تم تأكيد طلبك") && n.Message.Contains("قيد التحضير"))), Times.Once);
+        }
+
+        [Fact]
+        public async Task CustomerStatus_AfterConfirmed_PreparingNoticeIsPlain()
+        {
+            using var context = new ecommerce.Data.AppDbContext(new Microsoft.EntityFrameworkCore.DbContextOptionsBuilder<ecommerce.Data.AppDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            var orderId = Guid.NewGuid();
+            context.OrderStatusLogs.AddRange(
+                new OrderStatusLog { OrderId = orderId, OldStatus = OrderStatus.PENDING_CONFIRMATION, NewStatus = OrderStatus.CONFIRMED },
+                new OrderStatusLog { OrderId = orderId, OldStatus = OrderStatus.CONFIRMED, NewStatus = OrderStatus.PREPARING });
+            context.SaveChanges();
+
+            await Service(context).NotifyCustomerOrderStatusAsync(Guid.NewGuid(), orderId, "ORD-1", OrderStatus.PREPARING);
+
+            _notificationRepository.Verify(r => r.CreateAsync(It.Is<Notification>(n => !n.Message.Contains("تم تأكيد"))), Times.Once);
+        }
+
+        private NotificationService Service(ecommerce.Data.AppDbContext context)
+        {
+            var hubClients = new Mock<IHubClients>();
+            hubClients.Setup(c => c.User(It.IsAny<string>())).Returns(new Mock<IClientProxy>().Object);
+            var notificationHub = new Mock<IHubContext<NotificationHub>>();
+            notificationHub.Setup(h => h.Clients).Returns(hubClients.Object);
+            return new NotificationService(notificationHub.Object, new Mock<IHubContext<OpsHub>>().Object,
+                _notificationRepository.Object, _userRepository.Object, _vendorRepository.Object,
+                _productRepository.Object, _preferencesRepository.Object, NullLogger<NotificationService>.Instance, context: context);
         }
 
         [Fact]

@@ -474,7 +474,9 @@ const DriverDashboard = () => {
         <section className="bg-white rounded-2xl border border-gray-200 p-3">
           {delivering_ ? (
             <p className="text-sm font-bold text-blue-700 flex items-center justify-center gap-2 py-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" /> قيد التوصيل — سلّم طلباتك لتغيير حالتك
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+              {/* طلب معيَّن لم يُستلم من المتجر: «سلّم» مضللة */}
+              {active.every(o => o.allPickedUp) ? 'قيد التوصيل — سلّم طلباتك لتغيير حالتك' : 'لديك طلب معيَّن — استلمه من المتجر أو اطلب من العمليات إعادة تعيينه'}
             </p>
           ) : (
             <div className="grid grid-cols-3 gap-1.5 bg-gray-100 rounded-xl p-1">

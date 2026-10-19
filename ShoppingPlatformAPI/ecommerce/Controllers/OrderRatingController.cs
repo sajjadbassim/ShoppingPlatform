@@ -1,3 +1,4 @@
+using ecommerce.Common;
 using ecommerce.Core.DTO.OrderRating;
 using ecommerce.Services;
 using ecommerce.Services.OrderRatingService;
@@ -41,7 +42,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -67,7 +68,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -90,7 +91,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -108,7 +109,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }
@@ -142,7 +143,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -162,7 +163,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -180,7 +181,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -198,7 +199,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

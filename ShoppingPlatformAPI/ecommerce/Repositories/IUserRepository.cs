@@ -11,6 +11,8 @@ namespace ecommerce.Repositories
         Task<User?> GetByEmailAsync(string email);
         Task<IEnumerable<User>> GetAllAsync();
         Task<IEnumerable<User>> GetByRoleAsync(string role);
+        // مع غير الفعّالين — لشاشة الإدارة (GetByRoleAsync للإشعارات: الفعّالون فقط)
+        Task<IEnumerable<User>> GetAllByRoleAsync(string role);
         Task<User> CreateAsync(User user);
         Task<User> UpdateAsync(User user);
         Task<bool> DeleteAsync(Guid id);

@@ -659,6 +659,10 @@ namespace ecommerce.Services.LoyaltyService
         // ===================================
         public async Task<LoyaltySettingsDto> UpdateSettingsAsync(UpdateLoyaltySettingsDto dto)
         {
+            // جسم فارغ {} كان يُقبل بـ200 ويحدّث updated_at دون تغيير شيء
+            if (dto.GetType().GetProperties().All(p => p.GetValue(dto) == null))
+                throw new BusinessRuleException("لم يُرسل أي إعداد للحفظ");
+
             var settings = await GetSettingsEntityAsync();
 
             if (dto.PointsPerCurrencyUnit != null) settings.PointsPerCurrencyUnit = dto.PointsPerCurrencyUnit.Value;

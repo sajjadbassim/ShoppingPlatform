@@ -1,3 +1,4 @@
+using ecommerce.Common;
 ﻿using ecommerce.Core.DTO.CouponDto;
 using ecommerce.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -51,7 +52,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -69,7 +70,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -103,7 +104,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -140,7 +141,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -158,7 +159,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -179,7 +180,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

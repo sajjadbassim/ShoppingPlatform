@@ -3938,7 +3938,9 @@ namespace ecommerce.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .HasDatabaseName("idx_users_email");
+                        .IsUnique()
+                        .HasDatabaseName("idx_users_email")
+                        .HasFilter("[email] IS NOT NULL AND [email] <> ''");
 
                     b.HasIndex("GoogleId")
                         .IsUnique()

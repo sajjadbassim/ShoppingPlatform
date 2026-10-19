@@ -65,7 +65,7 @@ namespace ecommerce.Tests.Services
             Assert.Equal(33000, order.TotalAmount);
             _inventory.Verify(i => i.RestockAsync(It.Is<IEnumerable<StockLineQuantity>>(l =>
                 l.Single().ProductId == _shirt.ProductId && l.Single().Quantity == 1), It.IsAny<CancellationToken>()), Times.Once);
-            _notify.Verify(n => n.NotifyCustomerAsync(_order.CustomerId, It.Is<string>(m => m.Contains("غير متوفرة") && m.Contains("33,000")), It.IsAny<object?>()), Times.Once);
+            _notify.Verify(n => n.NotifyCustomerOrderNoticeAsync(_order.CustomerId, It.Is<string>(m => m.Contains("غير متوفرة") && m.Contains("33,000")), It.IsAny<object?>()), Times.Once);
         }
 
         [Fact]
@@ -82,6 +82,43 @@ namespace ecommerce.Tests.Services
         public async Task PartialAccept_MoreThanOrdered_IsRejected() =>
             await Assert.ThrowsAsync<BusinessRuleException>(() => Service().ConfirmOrderAsync(_store.Id, _sub.Id, Guid.NewGuid(),
                 new[] { new UnavailableItemDto { ItemId = _shirt.Id, Quantity = 3 } }));
+
+        // كان سطر بكمية 0 يُسقط بصمت فيصير القبول الجزئي قبولاً كاملاً
+        [Fact]
+        public async Task PartialAccept_ZeroQuantity_IsRejected_AndOrderStaysPending()
+        {
+            await Assert.ThrowsAsync<BusinessRuleException>(() => Service().ConfirmOrderAsync(_store.Id, _sub.Id, Guid.NewGuid(),
+                new[] { new UnavailableItemDto { ItemId = _shirt.Id, Quantity = 0 } }));
+            Assert.Equal(SubOrderStatus.PendingConfirmation, (await _context.SubOrders.AsNoTracking().SingleAsync()).Status);
+        }
+
+        // المتجر يرى نصيبه من الخصم وما يدفعه الزبون — لا الإجمالي قبل الخصم فقط
+        [Fact]
+        public async Task VendorOrder_ShowsDiscountSharesAndWhatCustomerPays()
+        {
+            _order.CouponVendorId = _store.Id;
+            _sub.CouponShare = 5000;
+            _sub.PointsShare = 2000;
+            _context.SaveChanges();
+
+            var result = await Service().GetOrderByIdAsync(_store.Id, _sub.Id);
+
+            Assert.Equal(5000, result.VendorDiscount);
+            Assert.Equal(2000, result.PlatformDiscount);
+            Assert.Equal(36000, result.CustomerPays);
+        }
+
+        [Fact]
+        public async Task VendorOrder_PlatformCoupon_IsNotChargedToVendor()
+        {
+            _sub.CouponShare = 5000;
+            _context.SaveChanges();
+
+            var result = await Service().GetOrderByIdAsync(_store.Id, _sub.Id);
+
+            Assert.Equal(0, result.VendorDiscount);
+            Assert.Equal(5000, result.PlatformDiscount);
+        }
 
         [Fact]
         public async Task FullAccept_ChangesNothingInTotals()

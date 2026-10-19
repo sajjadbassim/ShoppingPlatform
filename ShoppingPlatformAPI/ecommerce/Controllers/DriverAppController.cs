@@ -58,14 +58,20 @@ namespace ecommerce.Controllers
             return Ok(ApiResponse<object>.Ok(null!, "أُبلغت العمليات"));
         }
 
-        public record ReturnPickupFailedDto([property: System.ComponentModel.DataAnnotations.MaxLength(300)] string? Note);
+        // صنف عادي لا record: MVC يرفض سمات التحقق بـ[property:] على معاملات السجل (كان يعيد 500)
+        public class ReturnPickupFailedDto
+        {
+            [System.ComponentModel.DataAnnotations.MaxLength(300)]
+            public string? Note { get; set; }
+        }
 
         // POST: api/driver/me/location
         [HttpPost("me/location")]
         public async Task<ActionResult<ApiResponse<object>>> Location([FromBody] DriverLocationUpdateDto dto, CancellationToken ct)
         {
-            await _app.UpdateLocationAsync(UserId, dto, ct);
-            return Ok(ApiResponse<object>.Ok(null!));
+            // التحديث الأسرع من 3 ثوانٍ يُتجاهل — الرد يقول ذلك بدل 200 صامت
+            var accepted = await _app.UpdateLocationAsync(UserId, dto, ct);
+            return Ok(ApiResponse<object>.Ok(new { accepted }, accepted ? null : "تُجوهل التحديث: أقل من 3 ثوانٍ عن السابق"));
         }
 
         // GET: api/driver/orders?history=false

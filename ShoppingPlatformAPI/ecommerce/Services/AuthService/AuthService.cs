@@ -305,7 +305,8 @@ namespace ecommerce.Services.AuthService
             // إبطال أي رموز سابقة لم تُستخدم بعد
             await _passwordResetOtpRepository.InvalidatePendingForUserAsync(user.Id);
 
-            var code = Random.Shared.Next(100000, 999999).ToString();
+            // مولّد تشفيري: Random.Shared قابل للتنبؤ (والحد الأعلى كان يُستثنى منه 999999)
+            var code = System.Security.Cryptography.RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
             var otp = new PasswordResetOtp
             {

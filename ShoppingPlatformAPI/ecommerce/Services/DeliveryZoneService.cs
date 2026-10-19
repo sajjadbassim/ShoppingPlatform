@@ -60,7 +60,8 @@ namespace ecommerce.Services
 
     public class SetZonesModeDto
     {
-        [Required] public string Mode { get; set; } = ZonesMode.Off;
+        // بلا قيمة افتراضية: جسم فارغ {} كان يأخذ Off فيُطفئ المناطق بصمت ويرجع 200
+        [Required(ErrorMessage = "اختر وضع المناطق")] public string? Mode { get; set; }
         public List<Guid>? VendorIds { get; set; }
     }
 
@@ -246,7 +247,8 @@ namespace ecommerce.Services
             {
                 var address = await _context.Addresses.AsNoTracking().FirstOrDefaultAsync(a => a.Id == addressId, ct)
                     ?? throw new NotFoundException("العنوان غير موجود");
-                if (address.UserId != userId) throw new ForbiddenException("هذا العنوان غير مسجل باسمك");
+                // عنوان زبون آخر = «غير موجود» مثل الطلب — 403 كان يكشف أن العنوان موجود
+                if (address.UserId != userId) throw new NotFoundException("العنوان غير موجود");
                 zoneId = address.ZoneId;
             }
 

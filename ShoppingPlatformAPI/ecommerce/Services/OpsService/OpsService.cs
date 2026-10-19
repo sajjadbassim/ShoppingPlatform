@@ -162,7 +162,7 @@ namespace ecommerce.Services
             await SaveOpsNotificationAsync(dto.OpsUserId, NotificationType.SUB_ORDER, $"تم تأكيد الطلب الفرعي: {subOrder.SubOrderNumber}", new { subOrderId = subOrder.Id, subOrderNumber = subOrder.SubOrderNumber });
             // طلب من متجر واحد: يصل الزبون إشعار «تم تأكيد طلبك» من تحديث حالة الطلب أدناه — «جزء» فقط لمتعدد المتاجر
             if ((await _subOrderRepository.GetByOrderIdAsync(subOrder.OrderId)).Count(s => s.Status != OrderStatus.CANCELLED) > 1)
-                await _notificationService.NotifyCustomerAsync(subOrder.Order.CustomerId, $"تم تأكيد جزء من طلبك ({subOrder.Vendor.DisplayName})", new { subOrderId = subOrder.Id });
+                await _notificationService.NotifyCustomerOrderNoticeAsync(subOrder.Order.CustomerId, $"تم تأكيد جزء من طلبك {subOrder.Order.OrderNumber} ({subOrder.Vendor.DisplayName})", new { orderId = subOrder.OrderId, subOrderId = subOrder.Id });
             await UpdateMainOrderStatusAsync(subOrder.OrderId, dto.OpsUserId);
 
             return await MapToDtoAsync(subOrder);
@@ -220,7 +220,7 @@ namespace ecommerce.Services
 
             // إلغاء جزئي: الزبون يعرف ما أُلغي والمبلغ الجديد. الإلغاء الكامل يصله من تحديث حالة الطلب أدناه
             if (!wholeOrderCancelled)
-                await _notificationService.NotifyCustomerAsync(order.CustomerId,
+                await _notificationService.NotifyCustomerOrderNoticeAsync(order.CustomerId,
                     $"تم إلغاء جزء من طلبك {order.OrderNumber} ({subOrder.Vendor.DisplayName}): {dto.CancellationReason} — المبلغ الجديد {order.TotalAmount:N0} د.ع"
                     + OrderTotals.PointsReturnedNote(OrderTotals.UnusedPoints(order)),
                     new { orderId = order.Id, subOrderId = subOrder.Id });

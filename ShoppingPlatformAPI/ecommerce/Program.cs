@@ -71,11 +71,18 @@ builder.Services.AddControllers(options =>
     // سجل النشاط لكل الأدوار عدا الزبون
     options.Filters.Add<ecommerce.Filters.ActivityLogFilter>();
 })
-.AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new ecommerce.Common.UtcDateTimeConverter()));
+.AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.Converters.Add(new ecommerce.Common.UtcDateTimeConverter());
+    // العربية في الردود كما هي بدل \uXXXX (ردود JSON لا تُضمَّن في HTML)
+    o.JsonSerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
+});
 
 // أخطاء التحقق من المدخلات بنفس شكل ApiResponse بدل ValidationProblemDetails
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
+    // NotFound()/Forbid() بلا نص و415 عند جسم فارغ كانت تخرج ProblemDetails — تتولاها UseStatusCodePages بشكل ApiResponse
+    options.SuppressMapClientErrors = true;
     options.InvalidModelStateResponseFactory = context =>
     {
         // رسائل الإطار الافتراضية بالإنجليزية ← عربية مفهومة تسمّي الحقل (رسائلنا العربية تبقى كما هي)
@@ -350,6 +357,10 @@ app.UseForwardedHeaders();
 app.UseAppExceptionHandling();
 
 // ردود بلا نص (رفض الصلاحية 403، عدم تسجيل الدخول 401، مسار غير موجود): رسالة عربية بنفس شكل باقي الردود
+var StatusPageJson = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)
+{
+    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+};
 app.UseStatusCodePages(async ctx =>
 {
     var http = ctx.HttpContext;
@@ -360,10 +371,13 @@ app.UseStatusCodePages(async ctx =>
         StatusCodes.Status403Forbidden => "ليس لديك صلاحية لهذا الإجراء",
         StatusCodes.Status404NotFound => "غير موجود",
         StatusCodes.Status405MethodNotAllowed => "طريقة الطلب غير مدعومة",
+        StatusCodes.Status415UnsupportedMediaType => "أرسل البيانات بصيغة JSON",
         _ => "تعذّر تنفيذ الطلب",
     };
+    // نفس شكل ApiResponse.Fail (مع traceId)، والعربية كما هي لا \uXXXX
     http.Response.ContentType = "application/json; charset=utf-8";
-    await http.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(new { success = false, message }));
+    await http.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(
+        ApiResponse<object>.Fail(message, http.TraceIdentifier), StatusPageJson));
 });
 
 app.UseStaticFiles();

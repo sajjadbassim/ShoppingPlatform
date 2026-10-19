@@ -1,3 +1,5 @@
+using ecommerce.Core.Constants;
+using ecommerce.Common;
 // Controllers/DriversController.cs
 using ecommerce.Core.DTO.Drivers;
 using ecommerce.Core.DTO.Ops;
@@ -32,13 +34,15 @@ namespace ecommerce.Controllers
         {
             try
             {
+                StatusFilter.Validate(status, typeof(DriverStatus));
+                StatusFilter.Validate(workStatus, typeof(DriverWorkStatus));
                 var result = await _driverService.GetDriversPagedAsync(
                     pageNumber, pageSize, status, workStatus);
                 return Ok(new { success = true, data = result });
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -53,7 +57,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -85,7 +89,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -100,7 +104,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -115,7 +119,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -130,7 +134,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -149,7 +153,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -164,7 +168,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 

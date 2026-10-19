@@ -219,6 +219,9 @@ namespace ecommerce.Services
                 throw new BusinessRuleException("قيمة الخصم يجب أن تكون أكبر من صفر");
             if (type == DiscountType.PERCENTAGE && value > 100)
                 throw new BusinessRuleException("نسبة الخصم لا يمكن أن تتجاوز 100%");
+            // 100% بلا سقف = البضاعة مجانية لأي سلة مهما كبرت
+            if (type == DiscountType.PERCENTAGE && value >= 100 && maxDiscount is not > 0)
+                throw new BusinessRuleException("خصم 100% يحتاج سقفاً للخصم — حدّد أقصى مبلغ يُخصم");
             if (minOrder < 0)
                 throw new BusinessRuleException("الحد الأدنى للطلب لا يكون سالباً");
             if (maxDiscount is < 0)

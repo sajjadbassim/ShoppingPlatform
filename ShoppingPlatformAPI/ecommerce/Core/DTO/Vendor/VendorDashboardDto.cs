@@ -118,6 +118,10 @@
         public string DeliveryAddress { get; set; }
         public decimal Subtotal { get; set; }
         public decimal DeliveryFee { get; set; }
+        // نصيب هذا الجزء من الخصم: كوبون المتجر يُخصم من مستحقه، والنقاط والكوبون العام على المنصة
+        public decimal VendorDiscount { get; set; }
+        public decimal PlatformDiscount { get; set; }
+        public decimal CustomerPays { get; set; }      // ما يدفعه الزبون عن هذا الجزء (ويحصّله السائق)
         public string Status { get; set; }
         public string? CancellationReason { get; set; }
         public DateTime? ConfirmationDeadline { get; set; }
@@ -227,6 +231,8 @@
     public class RejectSubOrderDto
     {
         public Guid OpsUserId { get; set; }
+        // نفس رسالة الـcontroller للسبب الفارغ (كانت «الحقل «السبب» مطلوب» حين يغيب الحقل)
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "سبب الرفض مطلوب")]
         public string Reason { get; set; }
     }
 

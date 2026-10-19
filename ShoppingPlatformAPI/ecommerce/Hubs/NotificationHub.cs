@@ -4,6 +4,8 @@ using System.Text.RegularExpressions;
 
 namespace ecommerce.Hubs
 {
+    // مسجّلو الدخول فقط — بلا هذا يتصل أي أحد (الإشعارات تُرسل بـ Clients.User فلا يصله شيء، لكنه اتصال مفتوح بلا هوية)
+    [Authorize]
     public class NotificationHub : Hub
     {
         // عند اتصال المستخدم

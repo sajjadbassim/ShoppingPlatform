@@ -393,8 +393,12 @@ namespace ecommerce.Services
             if (subOrder == null)
                 throw new NotFoundException("الطلب غير موجود");
 
+            // سطر بكمية 0 أو أقل كان يُسقط بصمت فيصير القبول الجزئي قبولاً كاملاً
+            if (unavailable?.Any(l => l.Quantity <= 0) == true)
+                throw new BusinessRuleException("كمية القطعة غير المتوفرة يجب أن تكون 1 على الأقل");
+
             // ضغطة مكررة على «قبول» (الأولى نُفّذت قبلها) — لا سجل ولا إشعار ثانٍ
-            if (subOrder.Status == SubOrderStatus.Confirmed && !(unavailable?.Any(l => l.Quantity > 0) ?? false))
+            if (subOrder.Status == SubOrderStatus.Confirmed && !(unavailable?.Any() ?? false))
                 return await GetOrderByIdAsync(vendorId, subOrderId);
             if (subOrder.Status != SubOrderStatus.PendingConfirmation)
                 throw new BusinessRuleException($"لا يمكن تأكيد الطلب وهو «{OrderStatusText.Ar(subOrder.Status)}»");
@@ -569,7 +573,7 @@ namespace ecommerce.Services
                       (removedOnly.Count > 0 ? $"، وأُزيل ({DescribeRemoved(removedOnly)})" : "") +
                       $" — أصبح المبلغ {order.TotalAmount:N0} د.ع";
                 message += OrderTotals.PointsReturnedNote(pointsReturned);
-                await _notifications.NotifyCustomerAsync(order.CustomerId, message,
+                await _notifications.NotifyCustomerOrderNoticeAsync(order.CustomerId, message,
                     new { orderId = order.Id, orderNumber = order.OrderNumber });
             }
             catch { /* الإشعار لا يُفشل القبول */ }
@@ -705,7 +709,7 @@ namespace ecommerce.Services
                 try
                 {
                     var vendorName = await _context.Vendors.Where(v => v.Id == vendorId).Select(v => v.NameAr ?? v.Name).FirstOrDefaultAsync();
-                    await _notifications.NotifyCustomerAsync(subOrder.Order.CustomerId,
+                    await _notifications.NotifyCustomerOrderNoticeAsync(subOrder.Order.CustomerId,
                         $"اعتذر المتجر «{vendorName}» عن جزء من طلبك {subOrder.Order.OrderNumber}: {reason} — المبلغ الجديد {subOrder.Order.TotalAmount:N0} د.ع"
                         + OrderTotals.PointsReturnedNote(pointsReturned),
                         new { orderId = subOrder.OrderId, subOrderId = subOrder.Id });
@@ -953,6 +957,9 @@ namespace ecommerce.Services
                 DeliveryAddress = deliveryAddress,
                 Subtotal = so.Subtotal,
                 DeliveryFee = so.DeliveryFee,
+                VendorDiscount = so.Order?.CouponVendorId == so.VendorId ? so.CouponShare : 0,
+                PlatformDiscount = so.PointsShare + (so.Order?.CouponVendorId == so.VendorId ? 0 : so.CouponShare),
+                CustomerPays = OrderTotals.DueFor(so),
                 Status = so.Status,
                 CancellationReason = so.CancellationReason,
                 ConfirmationDeadline = so.ConfirmationDeadline,

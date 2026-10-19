@@ -317,7 +317,7 @@ const AdminOrderDetails = () => {
                 {tracking.estimatedDelivery && (
                   <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 text-sm text-gray-600">
                     <Clock size={14} className="text-primary" />
-                    <span>التسليم المتوقع: {new Date(tracking.estimatedDelivery).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
+                    <span>التسليم المتوقع: {new Date(tracking.estimatedDelivery).toLocaleString('ar-IQ-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Baghdad' })}</span>
                   </div>
                 )}
               </div>

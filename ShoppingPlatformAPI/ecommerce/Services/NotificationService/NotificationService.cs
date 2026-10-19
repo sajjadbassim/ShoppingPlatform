@@ -164,6 +164,12 @@ namespace ecommerce.Services.NotificationService
                 customerId, NotificationCategory.OrderUpdates, NotificationType.GENERAL, message, data);
         }
 
+        public async Task NotifyCustomerOrderNoticeAsync(Guid customerId, string message, object? data = null)
+        {
+            await SendToUserAsync(
+                customerId, NotificationCategory.OrderUpdates, NotificationType.ORDER_STATUS, message, data);
+        }
+
         public async Task NotifyCustomerReminderAsync(Guid customerId, string message, object? data = null)
         {
             await SendToUserAsync(
@@ -224,7 +230,21 @@ namespace ecommerce.Services.NotificationService
         // الإلغاء: السبب، وأن النقاط المستخدمة رجعت للرصيد
         private async Task<string> CustomerStatusMessageAsync(Guid orderId, string orderNumber, string status)
         {
-            if (status != OrderStatus.CANCELLED || _context == null) return OrderStatusText.CustomerMessage(status, orderNumber);
+            if (_context == null) return OrderStatusText.CustomerMessage(status, orderNumber);
+            if (status is OrderStatus.PREPARING or OrderStatus.READY)
+            {
+                // متعدد المتاجر: متجر بدأ التحضير قبل أن يؤكد الآخر ← يقفز الطلب من «مؤكد جزئياً» إلى «قيد التحضير»
+                // دون المرور بـ«مؤكد»، فلا يصل الزبون «تم تأكيد طلبك» أبداً — يُدمج التأكيد في هذا الإشعار
+                var confirmedBefore = await _context.OrderStatusLogs.AsNoTracking()
+                    .AnyAsync(l => l.OrderId == orderId && l.NewStatus == OrderStatus.CONFIRMED);
+                var stores = await _context.SubOrders.AsNoTracking()
+                    .CountAsync(s => s.OrderId == orderId && s.Status != OrderStatus.CANCELLED);
+                var text = status == OrderStatus.READY && stores > 1
+                    ? $"جهّزت كل المتاجر ({stores}) طلبك {orderNumber} وهو بانتظار السائق 📦"
+                    : OrderStatusText.CustomerMessage(status, orderNumber);
+                return confirmedBefore ? text : $"تم تأكيد طلبك {orderNumber} ✅ — {text}";
+            }
+            if (status != OrderStatus.CANCELLED) return OrderStatusText.CustomerMessage(status, orderNumber);
             var order = await _context.Orders.AsNoTracking().Where(o => o.Id == orderId)
                 .Select(o => new { o.CancellationReason, o.PointsRedeemedAmount }).FirstOrDefaultAsync();
             return OrderStatusText.CustomerMessage(status, orderNumber)

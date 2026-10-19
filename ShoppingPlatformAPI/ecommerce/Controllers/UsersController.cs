@@ -1,3 +1,4 @@
+using ecommerce.Common;
 ﻿using ecommerce.Core.DTO.Users;
 using ecommerce.Core.Models;
 using ecommerce.Services;
@@ -69,7 +70,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -85,7 +86,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -105,7 +106,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -125,7 +126,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 

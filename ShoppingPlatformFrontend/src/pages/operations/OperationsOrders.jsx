@@ -184,9 +184,11 @@ const SubOrderBlock = ({ sub, onConfirm, onCancel, onStatus, onUnassign, busy })
                 <span className="block text-[11px] text-gray-500 truncate">{it.variantAttributes.map(a => `${a.attributeNameAr}: ${a.valueAr}`).join(' · ')}</span>
               )}
             </span>
-            <span className="text-xs text-gray-600 flex-shrink-0">{money(it.subtotal)}</span>
+            {/* الجزء الملغى: مبلغه للسجل فقط — مشطوب كي لا يُقرأ كأنه مستحق */}
+            <span className={`text-xs flex-shrink-0 ${sub.status === 'CANCELLED' ? 'text-gray-400 line-through' : 'text-gray-600'}`}>{money(it.subtotal)}</span>
           </div>
         ))}
+        {sub.status === 'CANCELLED' && <p className="text-[11px] text-gray-500">أُلغي هذا الجزء — لا يُحسب في المطلوب من الزبون</p>}
       </div>
 
       {sub.driverName && (

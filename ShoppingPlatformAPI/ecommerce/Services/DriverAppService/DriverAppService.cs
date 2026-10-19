@@ -22,7 +22,7 @@ namespace ecommerce.Services.DriverAppService
         Task<string> GetRefusalFeePayerAsync(CancellationToken ct = default);
         Task<DeliverySettingsDto> GetSettingsAsync(CancellationToken ct = default);
         Task<DeliverySettingsDto> UpdateSettingsAsync(DeliverySettingsDto dto, Guid userId, CancellationToken ct = default);
-        Task UpdateLocationAsync(Guid userId, DriverLocationUpdateDto dto, CancellationToken ct = default);
+        Task<bool> UpdateLocationAsync(Guid userId, DriverLocationUpdateDto dto, CancellationToken ct = default);
 
         // للعمليات
         Task<DriverDto> SetAccountAsync(Guid driverId, string password, CancellationToken ct = default);
@@ -117,10 +117,14 @@ namespace ecommerce.Services.DriverAppService
                 throw new BusinessRuleException("حالة غير صالحة");
 
             var driver = await GetDriverAsync(userId, ct);
-            var hasActive = await _context.SubOrders
-                .AnyAsync(so => so.DriverId == driver.Id && DriverTrip.Statuses.Contains(so.Status), ct);
-            if (hasActive)
+            var active = await _context.SubOrders
+                .Where(so => so.DriverId == driver.Id && DriverTrip.Statuses.Contains(so.Status))
+                .Select(so => so.PickedUpAt).ToListAsync(ct);
+            // طلب معيَّن لم يُستلم بعد: «سلّمها» مضللة — يستلمه أو تعيده العمليات لغيره
+            if (active.Any(p => p != null))
                 throw new BusinessRuleException("لديك طلبات قيد التوصيل — سلّمها أولاً");
+            if (active.Count > 0)
+                throw new BusinessRuleException("لديك طلبات معيَّنة لك لم تستلمها بعد — استلمها، أو اطلب من العمليات إعادة تعيينها قبل تغيير حالتك");
             if (workStatus == DriverWorkStatus.Offline && _returnTrips != null && await _returnTrips.CountOpenForDriverAsync(driver.Id, ct) > 0)
                 throw new BusinessRuleException("معك بضاعة مرتجعة لم تُسلَّم لمتاجرها — أرجعها قبل إنهاء العمل");
 
@@ -544,10 +548,10 @@ namespace ecommerce.Services.DriverAppService
             return await GetSettingsAsync(ct);
         }
 
-        public async Task UpdateLocationAsync(Guid userId, DriverLocationUpdateDto dto, CancellationToken ct = default)
+        public async Task<bool> UpdateLocationAsync(Guid userId, DriverLocationUpdateDto dto, CancellationToken ct = default)
         {
             var driver = await GetDriverAsync(userId, ct);
-            await _tracking.UpdateLocationForDriverAsync(driver.Id, dto, ct);
+            return await _tracking.UpdateLocationForDriverAsync(driver.Id, dto, ct);
         }
 
         // ===================================
@@ -846,6 +850,7 @@ namespace ecommerce.Services.DriverAppService
                 Status = pending.Count > 0 ? OrderStatus.OUT_FOR_DELIVERY
                     : subs.All(s => s.Status == OrderStatus.DELIVERY_FAILED || s.FailedAt != null && s.Status == OrderStatus.CANCELLED)
                         ? OrderStatus.DELIVERY_FAILED : OrderStatus.DELIVERED,
+                AllPickedUp = pending.All(s => s.PickedUpAt != null),
                 CustomerName = order.Customer?.FullName ?? "—",
                 CustomerPhone = string.IsNullOrWhiteSpace(a?.Phone) ? order.Customer?.Phone : a!.Phone,
                 Address = a == null ? "—" : string.Join("، ", new[] { a.StreetAddress, a.Area, a.City }.Where(x => !string.IsNullOrWhiteSpace(x))),

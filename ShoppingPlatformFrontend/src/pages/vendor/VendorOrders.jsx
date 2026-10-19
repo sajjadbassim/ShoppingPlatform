@@ -404,6 +404,18 @@ const OrderSheet = ({ order, vendorId, storeName, onClose, onAccept, onReject, o
               <div className="flex justify-between text-gray-600"><span>المجموع الفرعي</span><span>{money(partial ? newSubtotal : order.subtotal)}</span></div>
               <div className="flex justify-between text-gray-600"><span>التوصيل</span><span>{money(order.deliveryFee)}</span></div>
               <div className="flex justify-between font-bold text-gray-900 pt-1.5 border-t border-gray-100"><span>الإجمالي</span><span className="text-primary">{money((partial ? newSubtotal : order.subtotal ?? 0) + (order.deliveryFee ?? 0))}</span></div>
+              {/* نصيب هذا الطلب من الخصم — كان المتجر يرى الإجمالي قبل الخصم والسائق يحصّل أقل منه */}
+              {!partial && (order.vendorDiscount > 0 || order.platformDiscount > 0) && (
+                <>
+                  {order.vendorDiscount > 0 && (
+                    <div className="flex justify-between text-red-600"><span>كوبون متجرك (يُخصم من مستحقك)</span><span>−{money(order.vendorDiscount)}</span></div>
+                  )}
+                  {order.platformDiscount > 0 && (
+                    <div className="flex justify-between text-gray-600"><span>خصم المنصة (نقاط/كوبون عام — لا يُخصم منك)</span><span>−{money(order.platformDiscount)}</span></div>
+                  )}
+                  <div className="flex justify-between font-bold text-gray-900"><span>يدفعه الزبون</span><span>{money(order.customerPays)}</span></div>
+                </>
+              )}
             </div>
           </div>
 

@@ -105,7 +105,7 @@ namespace ecommerce.Tests.Services
         {
             var other = new Address { UserId = Guid.NewGuid(), Label = "x", StreetAddress = "1", Area = "x", City = "x", Phone = "x" };
             _context.Addresses.Add(other); _context.SaveChanges();
-            await Assert.ThrowsAsync<ForbiddenException>(() => Service().QuoteAsync(_customer.Id, other.Id, null));
+            await Assert.ThrowsAsync<NotFoundException>(() => Service().QuoteAsync(_customer.Id, other.Id, null));
         }
 
         [Fact]

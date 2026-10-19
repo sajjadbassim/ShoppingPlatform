@@ -1,3 +1,4 @@
+using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Common;
 using ecommerce.Core.DTO.Order;
@@ -69,8 +70,7 @@ namespace ecommerce.Controllers
             }
             catch (AppException ex)
             {
-                var innerMessage = ex.Message;
-                return BadRequest(new { success = false, message = innerMessage });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -127,7 +127,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -159,7 +159,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -197,7 +197,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
 
@@ -223,7 +223,7 @@ namespace ecommerce.Controllers
             }
             catch (BusinessRuleException ex)
             {
-                return BadRequest(new { success = false, message = ex.Message });
+                return ApiErrors.From(ex);
             }
         }
     }

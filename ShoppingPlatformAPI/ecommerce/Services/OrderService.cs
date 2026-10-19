@@ -84,7 +84,10 @@ namespace ecommerce.Services
 
             var address = await _addressRepository.GetByIdAsync(dto.AddressId);
             if (address == null) throw new NotFoundException("العنوان غير موجود");
-            if (address.UserId != userId) throw new BusinessRuleException("هذا العنوان غير مسجل باسمك");
+            if (address.UserId != userId) throw new NotFoundException("العنوان غير موجود");   // لا نكشف وجود عنوان زبون آخر
+            // بلا دبوس لا فحص لواسط ولا موقع لملاحة السائق — يُحفظ العنوان هكذا لكن لا يُطلب عليه
+            if (address.Latitude == null || address.Longitude == null)
+                throw new BusinessRuleException("حدّد موقع العنوان على الخريطة لإكمال الطلب — عدّل العنوان وضع الدبوس على باب البيت");
             if (!ServiceArea.Covers(address.Latitude, address.Longitude))
                 throw new BusinessRuleException("عنوان التوصيل خارج منطقة التوصيل (محافظة واسط فقط) — اختر عنواناً آخر أو عدّل موقعه على الخريطة");
 
@@ -123,12 +126,12 @@ namespace ecommerce.Services
                     if (!item.Variant.IsAvailable)
                         errors.Add($"الخيار المختار من «{item.Product.NameAr ?? item.Product.Name}» غير متوفر حالياً");
                     if (item.Quantity > item.Variant.StockQuantity)
-                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» الكمية المتوفرة من هذا المتغير فقط {item.Variant.StockQuantity}");
+                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» {StockText.Available(item.Variant.StockQuantity, variant: true)}");
                 }
                 else
                 {
                     if (item.Quantity > item.Product.StockQuantity)
-                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» الكمية المتوفرة فقط {item.Product.StockQuantity}");
+                        errors.Add($"المنتج «{item.Product.NameAr ?? item.Product.Name}» {StockText.Available(item.Product.StockQuantity)}");
                 }
             }
 
@@ -486,7 +489,9 @@ namespace ecommerce.Services
                 return new SubOrderTrackingDto { SubOrderId = so.Id, SubOrderNumber = so.SubOrderNumber, VendorName = so.Vendor?.Name ?? "", Status = so.Status, Driver = driverDto, Timeline = subTimeline };
             }).ToList();
 
-            return new OrderTrackingDto { OrderId = order.Id, OrderNumber = order.OrderNumber, CurrentStatus = order.Status, EstimatedDelivery = null, Timeline = timeline, SubOrders = subOrdersTracking };
+            return new OrderTrackingDto { OrderId = order.Id, OrderNumber = order.OrderNumber, CurrentStatus = order.Status,
+                // الموعد الوحيد الذي نعرفه فعلاً: نهاية فترة توصيل السوبرماركت المختارة (الطلب الفوري بلا تقدير)
+                EstimatedDelivery = order.Status is OrderStatus.DELIVERED or OrderStatus.CANCELLED ? null : order.DeliverySlotEnd, Timeline = timeline, SubOrders = subOrdersTracking };
         }
 
         public async Task<OrderResponseDto> CancelOrderAsync(Guid orderId, Guid customerId, CancelOrderDto dto)

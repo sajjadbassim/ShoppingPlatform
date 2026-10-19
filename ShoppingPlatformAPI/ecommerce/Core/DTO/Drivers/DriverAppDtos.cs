@@ -26,6 +26,8 @@ namespace ecommerce.Core.DTO.Drivers
         public Guid OrderId { get; set; }
         public string OrderNumber { get; set; }
         public string Status { get; set; }           // حالة جزء السائق: OUT_FOR_DELIVERY أو DELIVERED
+        // OUT_FOR_DELIVERY هنا = «في رحلته» ولو لم يستلم من المتجر بعد — هذا يقول هل استلم كل الأجزاء فعلاً
+        public bool AllPickedUp { get; set; }
         public string CustomerName { get; set; }
         public string? CustomerPhone { get; set; }
         public string Address { get; set; }

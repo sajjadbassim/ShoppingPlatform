@@ -124,7 +124,7 @@ namespace ecommerce.Tests.Services
         public async Task Checkout_WithGroceryItems_RequiresSlot_AndStoresPreferenceAndWeight()
         {
             var tomatoes = AddProduct("طماطم", _grocery, price: 750, weightStep: 0.5m);
-            var address = new Address { UserId = _customer.Id, StreetAddress = "1", City = "الكوت", Phone = "0770" };
+            var address = new Address { UserId = _customer.Id, Latitude = 32.5051m, Longitude = 45.8243m, StreetAddress = "1", City = "الكوت", Phone = "0770" };
             _context.Add(address);
             _context.SaveChanges();
             var cart = new Cart { UserId = _customer.Id, Items = new List<CartItem> { new() { ProductId = tomatoes.Id, Product = tomatoes, Quantity = 3 } } };
@@ -152,7 +152,7 @@ namespace ecommerce.Tests.Services
         public async Task Checkout_WithoutGroceryItems_NeedsNoSlot()
         {
             var phone = AddProduct("هاتف", _electronics, price: 100000);
-            var address = new Address { UserId = _customer.Id, StreetAddress = "1", City = "الكوت", Phone = "0770" };
+            var address = new Address { UserId = _customer.Id, Latitude = 32.5051m, Longitude = 45.8243m, StreetAddress = "1", City = "الكوت", Phone = "0770" };
             _context.Add(address);
             _context.SaveChanges();
             var cart = new Cart { UserId = _customer.Id, Items = new List<CartItem> { new() { ProductId = phone.Id, Product = phone, Quantity = 1 } } };
@@ -169,7 +169,7 @@ namespace ecommerce.Tests.Services
         private (SubOrder Sub, SubOrderItem Milk) SeedPendingOrder(string preference)
         {
             var milkProduct = AddProduct("حليب كامل", _grocery, price: 5000);
-            var address = new Address { UserId = _customer.Id, StreetAddress = "1", City = "الكوت", Phone = "0770" };
+            var address = new Address { UserId = _customer.Id, Latitude = 32.5051m, Longitude = 45.8243m, StreetAddress = "1", City = "الكوت", Phone = "0770" };
             _context.Add(address);
             var order = new Order
             {
@@ -212,7 +212,7 @@ namespace ecommerce.Tests.Services
             Assert.Equal(10000, result.Subtotal);             // 5000 المتبقي + 5000 البديل
             inventory.Verify(i => i.ReserveAsync(It.Is<IEnumerable<StockLine>>(l => l.Single().ProductId == pricier.Id && l.Single().Quantity == 1),
                 It.IsAny<CancellationToken>()), Times.Once);
-            _notify.Verify(n => n.NotifyCustomerAsync(_customer.Id, It.Is<string>(m => m.Contains("استُبدل")), It.IsAny<object?>()), Times.Once);
+            _notify.Verify(n => n.NotifyCustomerOrderNoticeAsync(_customer.Id, It.Is<string>(m => m.Contains("استُبدل")), It.IsAny<object?>()), Times.Once);
         }
 
         [Fact]

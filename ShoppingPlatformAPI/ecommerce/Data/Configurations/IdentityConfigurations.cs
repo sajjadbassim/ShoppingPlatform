@@ -35,7 +35,11 @@ namespace ecommerce.Data.Configurations
             entity.Property(e => e.GooglePictureUrl).HasColumnName("google_picture_url");
             entity.Property(e => e.HasPassword).HasColumnName("has_password").HasDefaultValue(true);
 
+            // البريد فريد على مستوى القاعدة (كان الفحص في الكود فقط — طلبان متزامنان يمرّان معاً).
+            // الحسابات بلا بريد تحفظ "" فتُستثنى
             entity.HasIndex(e => e.Email)
+                .IsUnique()
+                .HasFilter("[email] IS NOT NULL AND [email] <> ''")
                 .HasDatabaseName("idx_users_email");
 
             // رمز الدعوة فريد (للحسابات التي أُنشئ لها رمز فقط)
