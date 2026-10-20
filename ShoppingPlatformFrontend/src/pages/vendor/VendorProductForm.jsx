@@ -356,7 +356,7 @@ const VendorProductForm = () => {
               <div className="inline-flex items-center rounded-xl border border-gray-200 overflow-hidden">
                 <button type="button" onClick={() => set({ StockQuantity: String(Math.max(0, (Number(form.StockQuantity) || 0) - 1)) })} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50" aria-label="إنقاص"><Minus size={16} /></button>
                 <input type="number" inputMode="numeric" min="0" value={form.StockQuantity} onChange={e => set({ StockQuantity: e.target.value })}
-                  className="w-20 h-11 text-center font-bold border-x border-gray-200 focus:outline-none" aria-label="الكمية" />
+                  className="no-spin w-20 h-11 text-center font-bold bg-white text-gray-900 border-x border-gray-200 focus:outline-none" aria-label="الكمية" />
                 <button type="button" onClick={() => set({ StockQuantity: String((Number(form.StockQuantity) || 0) + 1) })} className="w-11 h-11 flex items-center justify-center hover:bg-gray-50" aria-label="زيادة"><Plus size={16} /></button>
               </div>
             </div>

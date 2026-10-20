@@ -196,7 +196,7 @@ const ActivityLogView = ({ role, compact = false }) => {
             <div className="relative flex-1">
               <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث: رقم طلب، اسم منتج، اسم موظف..."
-                className="w-full h-10 pr-9 pl-3 border border-gray-300 rounded-lg text-sm" />
+                className="w-full h-10 pr-9 pl-3 bg-white text-gray-900 placeholder-gray-400 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary" />
             </div>
             <button type="button" onClick={() => refetch()} aria-label="تحديث" className="w-10 h-10 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500">
               <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />

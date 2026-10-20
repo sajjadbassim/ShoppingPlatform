@@ -23,7 +23,7 @@ import UserAvatar from './UserAvatar'
 import { useBackToClose } from '../../hooks/useBackToClose'
 
 // المسارات التي تُعتبر ضمن تبويب "حسابي"
-const ACCOUNT_PATHS = ['/profile', '/open-store', '/orders', '/wishlist', '/settings', '/loyalty', '/returns', '/notifications']
+const ACCOUNT_PATHS = ['/profile', '/orders', '/wishlist', '/settings', '/loyalty', '/returns', '/notifications']
 
 
 /**
@@ -129,7 +129,6 @@ const BottomNav = () => {
     { to: '/orders', icon: Package, label: 'طلباتي' },
     { to: '/wishlist', icon: Heart, label: 'المفضلة', count: wishlistCount },
     { to: '/profile', icon: User, label: 'الملف الشخصي' },
-    ...(user?.role === 'CUSTOMER' ? [{ to: '/open-store', icon: Store, label: 'افتح متجرك' }] : []),
     { to: '/settings', icon: Settings, label: 'الإعدادات' },
   ]
 

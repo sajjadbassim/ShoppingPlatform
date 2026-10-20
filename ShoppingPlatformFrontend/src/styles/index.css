@@ -413,6 +413,10 @@ html.has-bottom-nav {
 :where(.dark) .bg-white\/90:not(:where(.theme-static, .theme-static *)) { background-color: rgb(var(--c-surface) / 0.9); }
 :where(.dark) .bg-white\/95:not(:where(.theme-static, .theme-static *)) { background-color: rgb(var(--c-surface) / 0.95); }
 
+/* إخفاء أسهم الحقل الرقمي (حيث لدينا أزرار + و −) */
+.no-spin { -moz-appearance: textfield; appearance: textfield; }
+.no-spin::-webkit-outer-spin-button, .no-spin::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 /* عناصر يجب أن تبقى بيضاء (مثل مقبض مفتاح التشغيل) */
 :where(.dark) .keep-white { background-color: #fff; }
 

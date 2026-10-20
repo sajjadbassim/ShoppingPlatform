@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { lazy as lazyLoad, Suspense } from 'react'
 const LocationPicker = lazyLoad(() => import('../../components/common/LocationPicker'))
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
-import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft, Bell, Store } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Camera, Edit, Shield, Package, Heart, LogOut, Plus, RotateCcw, Star, Clock, Check, X, Trash2, ChevronLeft, Bell } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Input from '../../components/common/Input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/common/Tabs'
@@ -284,11 +284,6 @@ const stats = {
                     <span className="mr-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{pendingReturnsCount}</span>
                   )}
                 </Link>
-                {user?.role === 'CUSTOMER' && (
-                  <Link to="/open-store" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
-                    <Store size={20} /><span>افتح متجرك</span>
-                  </Link>
-                )}
                 <Link to="/settings" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg">
                   <Shield size={20} /><span>الإعدادات</span>
                 </Link>
