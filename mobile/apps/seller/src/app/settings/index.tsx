@@ -12,7 +12,13 @@ import { toast } from '../../lib/toast';
 import { useVendorId } from '../../lib/vendor';
 
 const pick = async (aspect: [number, number]): Promise<PickedImage | null> => {
-  const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
+  let res: ImagePicker.ImagePickerResult;
+  try {
+    res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
+  } catch {
+    toast.error('تعذّر فتح معرض الصور');
+    return null;
+  }
   if (res.canceled) return null;
   const a = res.assets[0];
   return { uri: a.uri, name: a.fileName ?? `store-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' };

@@ -75,7 +75,12 @@ export default function ProductFormScreen() {
   const pickImages = async () => {
     const room = MAX_PRODUCT_IMAGES - imageCount;
     if (room <= 0) return toast.error(`الحد الأقصى ${MAX_PRODUCT_IMAGES} صور للمنتج`);
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.7 });
+    let res: ImagePicker.ImagePickerResult;
+    try {
+      res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.7 });
+    } catch {
+      return toast.error('تعذّر فتح معرض الصور');
+    }
     if (res.canceled) return;
     setNewImages((prev) => [
       ...prev,

@@ -8,6 +8,8 @@ import { API_URL } from './config';
 
 const ACCESS_KEY = 'accessToken';
 const REFRESH_KEY = 'refreshToken';
+// بيانات المستخدم بلا رموز (الدور ومعرّف المتجر والصلاحيات): /auth/me لا يعيدها، فتُحفظ لتبقى بعد إعادة الفتح
+const PROFILE_KEY = 'sessionProfile';
 
 export interface SessionStorageAdapter {
   getItem(key: string): Promise<string | null>;
@@ -60,7 +62,14 @@ export const loadSession = async () => {
     accessToken = null;
     refreshToken = null;
   }
-  useSessionStore.setState({ ready: true, signedIn: !!accessToken });
+  let profile: SessionData | null = null;
+  try {
+    const raw = accessToken ? await storage.getItem(PROFILE_KEY) : null;
+    profile = raw ? (JSON.parse(raw) as SessionData) : null;
+  } catch {
+    profile = null;
+  }
+  useSessionStore.setState({ ready: true, signedIn: !!accessToken, session: profile });
 };
 
 export const getAccessToken = () => accessToken;
@@ -82,7 +91,11 @@ export const saveSession = (data?: SessionData | null) => {
     refreshToken = data.refreshToken;
     persist(REFRESH_KEY, data.refreshToken);
   }
-  if (data?.token) useSessionStore.setState({ session: data, signedIn: true });
+  if (data?.token) {
+    useSessionStore.setState({ session: data, signedIn: true });
+    const { token: _t, refreshToken: _r, ...profile } = data;
+    persist(PROFILE_KEY, JSON.stringify(profile));
+  }
 };
 
 // دمج حقول في الجلسة المعروضة (الاسم والبريد...) دون المساس بالرموز
@@ -94,6 +107,7 @@ export const clearSession = () => {
   refreshToken = null;
   persist(ACCESS_KEY, null);
   persist(REFRESH_KEY, null);
+  persist(PROFILE_KEY, null);
   useSessionStore.setState({ session: null, signedIn: false });
 };
 
