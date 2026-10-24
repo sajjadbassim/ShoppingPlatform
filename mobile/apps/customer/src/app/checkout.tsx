@@ -27,7 +27,7 @@ import {
   type SubstitutionPreference,
 } from '@wasit/shared';
 import { AppText, Button, brand, colors, fonts, spacing, createStyles, tc, useTheme } from '@wasit/ui';
-import { useCart } from '../api/useCart';
+import { emptyCartInMemory, useCart } from '../api/useCart';
 import { useAddresses, useDeliveryQuote, useDeliverySlots, useLoyaltyEstimate, useUpdateAddress, useZonesConfig } from '../api/useCheckout';
 import { useCoupon } from '../api/useCoupon';
 import { AddPhoneModal } from '../components/AddPhoneModal';
@@ -152,7 +152,7 @@ export default function CheckoutScreen() {
         }
       }
 
-      queryClient.removeQueries({ queryKey: ['cart'] });
+      emptyCartInMemory(queryClient);
       queryClient.removeQueries({ queryKey: ['delivery-slots'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       useCouponStore.getState().clear();

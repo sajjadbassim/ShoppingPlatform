@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   addToCart,
   clearCart,
@@ -11,6 +11,25 @@ import {
 } from '@wasit/shared';
 
 const CART_KEY = ['cart'] as const;
+
+// تفريغ السلة في الذاكرة فوراً (بعد إتمام الطلب أو إفراغها). invalidate/remove وحدهما لا يكفيان:
+// شاشة السلة تبقى مفتوحة تحت الشاشات الأخرى ولا تعيد الجلب عند الرجوع إليها فتعرض القطع القديمة
+export const emptyCartInMemory = (queryClient: QueryClient) => {
+  queryClient.setQueryData<Cart>(CART_KEY, (old) =>
+    old && {
+      ...old,
+      items: [],
+      totalItems: 0,
+      subtotal: 0,
+      totalDeliveryFees: 0,
+      totalAmount: 0,
+      vendorsSummary: [],
+      warnings: [],
+      hasGroceryItems: false,
+    },
+  );
+  queryClient.invalidateQueries({ queryKey: CART_KEY });
+};
 
 // السلة للزبون المسجّل فقط (الخادم يرفض غيره)
 export const useCart = () => {
@@ -33,6 +52,6 @@ export const useCartActions = () => {
     add: useMutation({ mutationFn: addToCart, onSuccess: setCart }),
     update: useMutation({ mutationFn: updateCartItem, onSuccess: setCart }),
     remove: useMutation({ mutationFn: removeCartItem, onSuccess: setCart }),
-    clear: useMutation({ mutationFn: clearCart, onSuccess: () => queryClient.removeQueries({ queryKey: CART_KEY }) }),
+    clear: useMutation({ mutationFn: clearCart, onSuccess: () => emptyCartInMemory(queryClient) }),
   };
 };

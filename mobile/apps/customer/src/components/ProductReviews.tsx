@@ -19,7 +19,7 @@ import { useOrders } from '../api/useOrders';
 import { toast } from '../lib/toast';
 
 const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('ar-IQ', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', year: 'numeric' });
+  new Date(iso).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', year: 'numeric' });
 
 const SORTS = [
   { key: 'newest', label: 'الأحدث' },

@@ -28,7 +28,7 @@ import { toast, toastReorderResult } from '../../lib/toast';
 
 const formatDateTime = (iso?: string | null) =>
   iso
-    ? new Date(iso).toLocaleString('ar-IQ', {
+    ? new Date(iso).toLocaleString('ar-IQ-u-nu-latn', {
         timeZone: 'Asia/Baghdad',
         day: 'numeric',
         month: 'short',
@@ -149,7 +149,7 @@ export default function OrderScreen() {
 
   const items = order.subOrders.flatMap((sub) => sub.items.map((item) => ({ item, delivered: sub.status === 'DELIVERED' })));
   const hideTracking = order.status === 'CANCELLED' || order.status === 'DELIVERY_FAILED';
-  const dateText = new Date(order.createdAt).toLocaleString('ar-IQ', {
+  const dateText = new Date(order.createdAt).toLocaleString('ar-IQ-u-nu-latn', {
     timeZone: 'Asia/Baghdad',
     year: 'numeric',
     month: 'long',
@@ -269,7 +269,7 @@ export default function OrderScreen() {
                   <AppText weight="medium" style={{ color: tc('#1E3A8A') }}>
                     {s.driver!.driverName}
                   </AppText>
-                  <AppText style={styles.driverPhone}>{s.driver!.driverPhone}</AppText>
+                  <AppText style={styles.driverPhone}>{`‎${s.driver!.driverPhone}`}</AppText>
                 </View>
               </Pressable>
             ))}
@@ -285,7 +285,7 @@ export default function OrderScreen() {
                   </AppText>
                   {step.isCompleted && !!step.occurredAt && (
                     <AppText muted style={styles.small}>
-                      {new Date(step.occurredAt).toLocaleDateString('ar-IQ', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      {new Date(step.occurredAt).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' })}
                     </AppText>
                   )}
                 </View>

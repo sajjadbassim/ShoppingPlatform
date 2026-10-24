@@ -16,7 +16,7 @@ import { useLoyaltyAccount, useLoyaltySettings, useLoyaltyTransactions, useRefer
 import { AppHeader } from '../components/AppHeader';
 
 const num = (n: number) => Math.round(n).toLocaleString('en-US');
-const date = (iso: string) => new Date(iso).toLocaleDateString('ar-IQ', { timeZone: 'Asia/Baghdad' });
+const date = (iso: string) => new Date(iso).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad' });
 
 const TIERS = createThemed<Record<string, { label: string; icon: string; bg: string; fg: string }>>(() => ({
   bronze: { label: 'برونزي', icon: '🥉', bg: tc('#FEF3C7'), fg: tc('#B45309') },

@@ -6,7 +6,7 @@ import { AppText, Button, colors, radius, spacing, createStyles, useTheme } from
 import { useNotificationActions, useNotifications } from '../api/useNotifications';
 
 const formatTime = (iso: string) =>
-  new Date(iso).toLocaleString('ar-IQ', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  new Date(iso).toLocaleString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 export default function NotificationsScreen() {
   useTheme();

@@ -172,7 +172,7 @@ function AboutTab({ vendor }: { vendor: VendorDetails }) {
             <InfoTile
               icon="calendar-outline"
               label="انضم للمنصة"
-              value={new Date(vendor.createdAt).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long' })}
+              value={new Date(vendor.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long' })}
             />
           )}
         </View>

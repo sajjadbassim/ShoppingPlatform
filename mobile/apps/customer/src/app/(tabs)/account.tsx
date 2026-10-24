@@ -472,7 +472,7 @@ function ReturnsTab({ records, loading }: { records: ReturnRecord[]; loading: bo
                   <AppText weight="medium" style={{ fontSize: 15 }}>
                     #{r.returnNumber || r.id.slice(0, 8)}
                   </AppText>
-                  <AppText style={styles.returnDate}>{new Date(r.createdAt).toLocaleDateString('ar-IQ', { timeZone: 'Asia/Baghdad' })}</AppText>
+                  <AppText style={styles.returnDate}>{new Date(r.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad' })}</AppText>
                   <AppText muted style={{ fontSize: 14, marginTop: 2 }}>
                     {r.reasonAr}
                   </AppText>

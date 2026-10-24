@@ -64,9 +64,9 @@ const STATUS_STYLE = createThemed<Record<string, { bg: string; fg: string; icon:
 const formatDate = (iso: string) => {
   const d = new Date(iso);
   const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days < 1) return `اليوم، ${d.toLocaleTimeString('ar-IQ', { timeZone: 'Asia/Baghdad', hour: 'numeric', minute: '2-digit' })}`;
+  if (days < 1) return `اليوم، ${d.toLocaleTimeString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', hour: 'numeric', minute: '2-digit' })}`;
   if (days < 2) return 'أمس';
-  return d.toLocaleDateString('ar-IQ', { timeZone: 'Asia/Baghdad', year: 'numeric', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', year: 'numeric', month: 'short', day: 'numeric' });
 };
 
 function Progress({ status }: { status: string }) {
