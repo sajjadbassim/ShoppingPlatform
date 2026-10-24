@@ -221,6 +221,11 @@ export const API_ENDPOINTS = {
     AVATAR: '/api/profile/avatar',
   },
 
+  // حذف الزبون لحسابه بنفسه
+  ACCOUNT: {
+    DELETE: '/api/account',
+  },
+
   ADDRESSES: {
     BASE: '/api/Addresses',
     BY_ID: (id) => `/api/Addresses/${id}`,

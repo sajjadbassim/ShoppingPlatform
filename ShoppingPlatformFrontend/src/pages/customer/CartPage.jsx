@@ -37,6 +37,9 @@ const VariantBadges = ({ variantAttributes, variantSku }) => {
 // ===========================
 // السلة الفارغة: رسالة واضحة + طرق للبدء + اقتراحات منتجات
 // ===========================
+// أقسام الرئيسية التي data فيها منتجات فعلاً (البانرات والفئات والمتاجر ليست منتجات)
+const PRODUCT_SECTION_TYPES = ['featured_products', 'custom_products', 'flash_deals']
+
 const useSuggestedProducts = () => {
   // نفس بيانات الصفحة الرئيسية (مخزّنة غالباً) — منتجات مميزة بلا تكرار
   const { data } = useQuery({
@@ -46,9 +49,9 @@ const useSuggestedProducts = () => {
   })
   const seen = new Set()
   return (data?.sections || [])
-    .filter(sec => sec.isActive && sec.type !== 'top_vendors')
+    .filter(sec => sec.isActive && PRODUCT_SECTION_TYPES.includes(sec.type))
     .flatMap(sec => sec.data || [])
-    .filter(p => p?.id && !seen.has(p.id) && seen.add(p.id))
+    .filter(p => p?.id && p.price != null && !seen.has(p.id) && seen.add(p.id))
     .slice(0, 10)
 }
 

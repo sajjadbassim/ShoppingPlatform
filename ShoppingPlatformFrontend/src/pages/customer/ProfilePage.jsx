@@ -182,6 +182,21 @@ useEffect(() => {
 
   const handleLogout = () => { logout(); success('تم تسجيل الخروج بنجاح'); navigate('/') }
 
+  // حذف الحساب بنفسه: يُخفي هوية الحساب ويعطّله ويُبقي الطلبات للسجلات (الخادم يرفض إن كانت هناك طلبات جارية)
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deletePassword, setDeletePassword] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true)
+    try {
+      await apiDelete(API_ENDPOINTS.ACCOUNT.DELETE, { data: { password: deletePassword } })
+      logout()
+      success('تم حذف حسابك')
+      navigate('/')
+    } catch (err) { error(err.message || 'تعذّر حذف الحساب') }
+    finally { setDeletingAccount(false) }
+  }
+
   const returnStatusMap = {
     PENDING:   { label: 'قيد المراجعة', color: 'bg-yellow-100 text-yellow-700', icon: Clock  },
     APPROVED:  { label: 'مقبول',        color: 'bg-green-100 text-green-700',   icon: Check  },
@@ -464,6 +479,27 @@ const stats = {
                         <Button variant="primary" onClick={handleChangePassword} loading={passwordLoading} disabled={!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}>تحديث كلمة المرور</Button>
                       </div>
                     </div>
+
+                    {user?.role === 'CUSTOMER' && (
+                      <div className="p-4 border border-red-200 bg-red-50/50 rounded-lg">
+                        <h4 className="font-medium text-red-700 mb-1">حذف الحساب</h4>
+                        <p className="text-sm text-gray-600 mb-4">
+                          يُحذف اسمك ورقمك وبريدك وعناوينك ومفضلتك ولا يمكن التراجع. تبقى سجلات طلباتك السابقة دون بيانات شخصية.
+                        </p>
+                        {!showDeleteAccount ? (
+                          <Button variant="danger" onClick={() => setShowDeleteAccount(true)}>حذف حسابي</Button>
+                        ) : (
+                          <div className="space-y-4">
+                            <Input label="كلمة المرور للتأكيد" type="password" placeholder="••••••••" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+                            <p className="text-xs text-gray-500">إن كان حسابك مسجّلاً بـ Google بلا كلمة مرور فاتركه فارغاً.</p>
+                            <div className="flex gap-3">
+                              <Button variant="danger" onClick={handleDeleteAccount} loading={deletingAccount}>تأكيد الحذف النهائي</Button>
+                              <Button variant="outline" onClick={() => { setShowDeleteAccount(false); setDeletePassword('') }}>إلغاء</Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
