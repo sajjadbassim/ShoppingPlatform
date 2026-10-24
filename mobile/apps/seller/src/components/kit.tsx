@@ -106,7 +106,7 @@ export function Chip({ label, tone = 'primary' }: { label: string; tone?: Tone }
   const [bg, fg] = toneColors(tone);
   return (
     <View style={[styles.chip, { backgroundColor: bg }]}>
-      <AppText weight="bold" style={{ fontSize: 12, color: fg }}>{label}</AppText>
+      <AppText weight="bold" numberOfLines={1} style={{ fontSize: 12, color: fg }}>{label}</AppText>
     </View>
   );
 }
@@ -183,7 +183,7 @@ export function FilterPills<T extends string>({ value, onChange, options }: { va
         const on = o.key === value;
         return (
           <Pressable key={o.key} onPress={() => onChange(o.key)} style={[styles.pill, on && { backgroundColor: colors.text, borderColor: colors.text }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-            <AppText weight="bold" style={{ fontSize: 13, lineHeight: 22, color: on ? '#FFFFFF' : colors.text }}>{o.label}</AppText>
+            <AppText weight="bold" numberOfLines={1} style={{ fontSize: 13, lineHeight: 22, color: on ? '#FFFFFF' : colors.text }}>{o.label}</AppText>
             {o.count != null && (
               <View style={[styles.pillCount, on ? { backgroundColor: 'rgba(255,255,255,0.22)' } : o.alert ? { backgroundColor: palette.warnSoft } : { backgroundColor: brand.surfaceMuted }]}>
                 <AppText weight="bold" style={{ fontSize: 11, color: on ? '#FFFFFF' : o.alert ? palette.warnText : colors.textMuted }}>{o.count}</AppText>

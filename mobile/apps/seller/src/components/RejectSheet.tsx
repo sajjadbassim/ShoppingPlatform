@@ -36,7 +36,7 @@ export function RejectSheet({ order, busy, onClose, onSubmit }: { order: Pick<Ve
         return (
           <Pressable key={r} onPress={() => setReason(r)} style={[styles.option, on && styles.optionOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}>
             <View style={[styles.radio, on && { borderColor: colors.primary }]}>{on && <View style={styles.dot} />}</View>
-            <AppText weight={on ? 'bold' : 'regular'} style={{ fontSize: 15 }}>{r === 'other' ? 'سبب آخر' : r}</AppText>
+            <AppText weight={on ? 'bold' : 'regular'} style={{ flex: 1, fontSize: 15 }}>{r === 'other' ? 'سبب آخر' : r}</AppText>
           </Pressable>
         );
       })}

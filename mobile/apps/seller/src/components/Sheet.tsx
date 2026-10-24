@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { ToastHost } from './ToastHost';
 
 // نافذة من الأسفل (رفض طلب، نموذج كوبون، فلاتر...). تُغلق بالضغط على الخلفية ما لم تكن مشغولة
 export function Sheet({ visible, onClose, title, subtitle, children, footer, busy }: { visible: boolean; onClose: () => void; title: string; subtitle?: string; children: ReactNode; footer?: ReactNode; busy?: boolean }) {
@@ -9,7 +10,8 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer, bus
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={() => { if (!busy) onClose(); }} statusBarTranslucent>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <Pressable style={styles.backdrop} onPress={() => !busy && onClose()}>
           <Pressable style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) + 4 }]} onPress={() => {}}>
             <View style={styles.grab} />
@@ -22,6 +24,9 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer, bus
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
+      {/* الإشعارات تُرسم تحت النوافذ المنبثقة في أندرويد، فنكرّر المضيف داخلها */}
+      <ToastHost />
+      </View>
     </Modal>
   );
 }

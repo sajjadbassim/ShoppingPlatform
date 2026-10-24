@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,6 +24,12 @@ export default function OrdersScreen() {
   const [term, setTerm] = useState('');
   const [rejecting, setRejecting] = useState<VendorOrder | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // بحث مباشر بعد توقف الكتابة (دون انتظار زر البحث)
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const counts = useOrderCounts();
   const list = useOrders(status, term);
