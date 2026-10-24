@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { fetchOwnVendorId, logout, patchSession } from '@wasit/shared';
 import { brand, colors, fonts, useTheme } from '@wasit/ui';
 import { useDashboard } from '../../api/useVendor';
 import { useVendorSession } from '../../lib/vendor';
@@ -17,7 +19,15 @@ const icon = (name: IconName, active: IconName) =>
 export default function TabsLayout() {
   useTheme();
   const insets = useSafeAreaInsets();
-  const { can } = useVendorSession();
+  const { can, vendorId } = useVendorSession();
+
+  // جلسة محفوظة قبل حفظ بيانات المستخدم لا تحمل معرّف المتجر: نستعيده، وإن تعذّر (موظف) نطلب دخولاً جديداً
+  useEffect(() => {
+    if (vendorId) return;
+    fetchOwnVendorId()
+      .then((id) => (id ? patchSession({ vendorId: id }) : logout()))
+      .catch(() => {});
+  }, [vendorId]);
   const { data: dash } = useDashboard();
   return (
     <Tabs

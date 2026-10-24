@@ -7,6 +7,12 @@ import type { WorkingDay } from './storeHours';
 // لوحة البائع (VendorDashboardController وVendorMarketingController وما حولهما). الأشكال مطابقة لـ DTOs الخادم
 
 const V = API_ENDPOINTS.VENDOR_DASHBOARD;
+
+// متجر صاحب الحساب الحالي: يستعيد معرّف المتجر لجلسة قديمة بلا vendorId (الموظف لا متجر مسجّلاً باسمه فيعيد null)
+export const fetchOwnVendorId = async (): Promise<string | null> => {
+  const res = await api.get(API_ENDPOINTS.VENDORS.MY_REQUEST);
+  return res.data?.data?.id ?? null;
+};
 const M = API_ENDPOINTS.VENDOR_MARKETING;
 const unwrap = <T>(res: { data?: { data?: T } | T }): T => ((res.data as { data?: T })?.data ?? res.data) as T;
 const MULTIPART = { headers: { 'Content-Type': 'multipart/form-data' } };
