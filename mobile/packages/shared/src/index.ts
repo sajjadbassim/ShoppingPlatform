@@ -34,3 +34,5 @@ export * from './searchSuggestions';
 export * from './typography';
 export * from './darkTheme';
 export * from './dates';
+export * from './driver';
+export * from './vendor';

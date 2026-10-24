@@ -63,6 +63,15 @@ const applyPalette = (mode: ThemeMode) => {
 let mode: ThemeMode = 'light';
 const listeners = new Set<() => void>();
 
+// تطبيق له هوية لونية مختلفة (البائع): يستبدل قيم الوضع الفاتح قبل رسم أي شاشة.
+// الجدول الداكن مبني على لوحة الويب، فالتطبيق الذي يغيّر لوحته يبقى فاتحاً فقط
+export function configurePalette(next: { colors?: Partial<Palette>; brand?: Partial<Brand> }) {
+  Object.assign(lightColors, next.colors);
+  Object.assign(lightBrand, next.brand);
+  applyPalette(mode);
+  listeners.forEach((l) => l());
+}
+
 export const getThemeMode = (): ThemeMode => mode;
 export const isDarkTheme = () => mode === 'dark';
 
