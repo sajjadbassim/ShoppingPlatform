@@ -47,6 +47,7 @@ namespace ecommerce.Services.ProductService.ProductService
         // ===================================
         Task<PagedResponse<ProductDto>> GetAdvancedFilteredAsync(ProductFilterDto filter);
         Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null);
+        Task<List<SearchSuggestionDto>> SuggestAsync(string term, int limit = 8, string? scope = null);
         Task<List<ProductDto>> GetBuyAgainAsync(Guid userId, string? scope = null, int max = 20);
     }
 }

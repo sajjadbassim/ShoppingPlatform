@@ -521,6 +521,76 @@ namespace ecommerce.Repositories
         }
 
         // ===================================
+        // SuggestAsync: اقتراحات نصية أثناء الكتابة
+        // ===================================
+        public async Task<List<SearchSuggestionDto>> SuggestAsync(string term, int limit = 8, string? scope = null)
+        {
+            var text = (term ?? string.Empty).Trim().ToLower();
+            if (text.Length == 0) return new List<SearchSuggestionDto>();
+            limit = Math.Clamp(limit, 1, 20);
+
+            var shopScope = ShopScope.Parse(scope);
+            var groceryIds = shopScope == null ? new HashSet<Guid>() : await CategoryVisibility.GetGroceryCategoryIdsAsync(_context);
+
+            // فئات ومتاجر قليلة (حتى 2 لكل نوع) والباقي للمنتجات — نفس قواعد الظهور في البحث الموحد
+            var hiddenCategoryIds = (await CategoryVisibility.GetHiddenCategoryIdsAsync(_context)).ToList();
+            var groceryList = groceryIds.ToList();
+            var categories = await _context.Categories
+                .Where(c =>
+                    !hiddenCategoryIds.Contains(c.Id) &&
+                    (shopScope == null || groceryList.Contains(c.Id) == (shopScope == ShopScope.Grocery)) &&
+                    ((c.Name != null && c.Name.ToLower().Contains(text)) ||
+                     (c.NameAr != null && c.NameAr.Contains(text))))
+                .OrderBy(c => c.NameAr ?? c.Name)
+                .Take(Math.Min(2, limit))
+                .Select(c => new SearchSuggestionDto { Type = SearchSuggestionTypes.Category, Id = c.Id, Text = c.NameAr ?? c.Name })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var stores = await _context.Vendors
+                .Where(v =>
+                    v.IsActive &&
+                    ((v.Name != null && v.Name.ToLower().Contains(text)) ||
+                     (v.NameAr != null && v.NameAr.Contains(text))))
+                .OrderBy(v => v.NameAr ?? v.Name)
+                .Take(Math.Min(2, limit))
+                .Select(v => new SearchSuggestionDto { Type = SearchSuggestionTypes.Store, Id = v.Id, Text = v.NameAr ?? v.Name })
+                .AsNoTracking()
+                .ToListAsync();
+
+            var productSlots = limit - categories.Count - stores.Count;
+            var products = new List<SearchSuggestionDto>();
+            if (productSlots > 0)
+            {
+                var visible = CategoryVisibility.ApplyScope(
+                    await ApplyVisibilityAsync(_context.Products, isActive: null), shopScope, groceryIds);
+                var matches = await visible
+                    .Where(p =>
+                        p.IsAvailable &&
+                        ((p.Name != null && p.Name.ToLower().Contains(text)) ||
+                         (p.NameAr != null && p.NameAr.Contains(text))))
+                    // ما يبدأ بالكلمة أولاً ثم الأكثر مبيعاً
+                    .OrderByDescending(p => (p.NameAr != null && p.NameAr.StartsWith(text)) || (p.Name != null && p.Name.ToLower().StartsWith(text)))
+                    .ThenByDescending(p => p.SubOrderItems.Sum(i => (int?)i.Quantity) ?? 0)
+                    .Take(productSlots * 3)
+                    .Select(p => new SearchSuggestionDto
+                    {
+                        Type = SearchSuggestionTypes.Product,
+                        Id = p.Id,
+                        Text = p.NameAr ?? p.Name,
+                        Subtitle = p.Vendor.NameAr ?? p.Vendor.Name
+                    })
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // اسم المنتج نفسه عند عدة متاجر يظهر مرة واحدة
+                products = matches.DistinctBy(m => m.Text).Take(productSlots).ToList();
+            }
+
+            return products.Concat(stores).Concat(categories).ToList();
+        }
+
+        // ===================================
         // CreateAsync
         // ===================================
         public async Task<Product> CreateAsync(Product product)

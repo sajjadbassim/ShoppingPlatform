@@ -45,25 +45,28 @@ namespace ecommerce.Services.PushService
         private readonly PushQueue _queue;
         private readonly IServiceScopeFactory _scopes;
         private readonly PushOptions _options;
+        private readonly IFcmSender _fcm;
         private readonly ILogger<PushSenderService> _logger;
         private readonly WebPushClient _client = new();
 
-        public PushSenderService(PushQueue queue, IServiceScopeFactory scopes, Microsoft.Extensions.Options.IOptions<PushOptions> options, ILogger<PushSenderService> logger)
+        public PushSenderService(PushQueue queue, IServiceScopeFactory scopes, Microsoft.Extensions.Options.IOptions<PushOptions> options, IFcmSender fcm, ILogger<PushSenderService> logger)
         {
             _queue = queue;
             _scopes = scopes;
             _options = options.Value;
+            _fcm = fcm;
             _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             if (!_options.IsConfigured)
-            {
                 _logger.LogWarning("Web Push غير مفعّل: مفاتيح Push:PublicKey / Push:PrivateKey غير موجودة");
-                return;
-            }
-            var vapid = new VapidDetails(_options.Subject, _options.PublicKey, _options.PrivateKey);
+            if (!_fcm.IsConfigured)
+                _logger.LogWarning("إشعارات الموبايل (FCM) غير مفعّلة: Firebase:CredentialsPath غير مضبوط أو الملف غير موجود");
+            if (!_options.IsConfigured && !_fcm.IsConfigured) return;
+
+            var vapid = _options.IsConfigured ? new VapidDetails(_options.Subject, _options.PublicKey, _options.PrivateKey) : null;
 
             await foreach (var message in _queue.Reader.ReadAllAsync(stoppingToken))
             {
@@ -75,7 +78,7 @@ namespace ecommerce.Services.PushService
             }
         }
 
-        private async Task SendAsync(PushMessage message, VapidDetails vapid, CancellationToken ct)
+        private async Task SendAsync(PushMessage message, VapidDetails? vapid, CancellationToken ct)
         {
             using var scope = _scopes.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -86,8 +89,11 @@ namespace ecommerce.Services.PushService
             if (recipients.Count == 0) return;
 
             var ids = recipients.Select(r => r.Id).ToList();
-            var subscriptions = await db.PushSubscriptions.Where(s => ids.Contains(s.UserId)).ToListAsync(ct);
-            if (subscriptions.Count == 0) return;
+            var subscriptions = vapid == null ? new List<Core.Models.PushSubscription>()
+                : await db.PushSubscriptions.Where(s => ids.Contains(s.UserId)).ToListAsync(ct);
+            var devices = !_fcm.IsConfigured ? new List<Core.Models.DeviceToken>()
+                : await db.DeviceTokens.Where(d => ids.Contains(d.UserId)).ToListAsync(ct);
+            if (subscriptions.Count == 0 && devices.Count == 0) return;
 
             var links = scope.ServiceProvider.GetRequiredService<INotificationLinkService>();
             var gone = new List<Core.Models.PushSubscription>();
@@ -107,11 +113,28 @@ namespace ecommerce.Services.PushService
                     tag = message.Tag,
                 });
 
+                // أجهزة الموبايل (FCM): الإشعار المعروض + بيانات لفتح الشاشة المناسبة عند الضغط
+                var myDevices = devices.Where(d => d.UserId == r.Id).ToList();
+                if (myDevices.Count > 0)
+                {
+                    var data = new Dictionary<string, string> { ["url"] = url ?? "/notifications" };
+                    if (message.Tag != null) data["tag"] = message.Tag;
+                    if (message.NotificationId.HasValue) data["notificationId"] = message.NotificationId.Value.ToString();
+
+                    var dead = await _fcm.SendAsync(myDevices.Select(d => d.Token).ToList(), new FcmMessage(Title, message.Body, data), ct);
+                    var now = DateTime.UtcNow;
+                    foreach (var d in myDevices)
+                    {
+                        if (dead.Contains(d.Token)) db.DeviceTokens.Remove(d);   // التطبيق حُذف من الجهاز أو انتهى الرمز
+                        else d.LastUsedAt = now;
+                    }
+                }
+
                 foreach (var sub in subscriptions.Where(s => s.UserId == r.Id))
                 {
                     try
                     {
-                        await _client.SendNotificationAsync(new WebPush.PushSubscription(sub.Endpoint, sub.P256dh, sub.Auth), payload, vapid, ct);
+                        await _client.SendNotificationAsync(new WebPush.PushSubscription(sub.Endpoint, sub.P256dh, sub.Auth), payload, vapid!, ct);
                         sub.LastUsedAt = DateTime.UtcNow;
                     }
                     catch (WebPushException ex) when (ex.StatusCode is HttpStatusCode.Gone or HttpStatusCode.NotFound or HttpStatusCode.Forbidden)

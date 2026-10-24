@@ -129,10 +129,8 @@ namespace ecommerce.Services
                 if (!withinWindow)
                     throw new BusinessRuleException("انتهت مدة الإرجاع المسموح بها (14 يوماً من تاريخ التسليم)");
 
-                // 4️⃣ التحقق من عدم وجود طلب إرجاع نشط مسبقاً
-                var hasActiveReturn = await _returnRepository.HasActiveReturnForOrderAsync(dto.OrderId);
-                if (hasActiveReturn)
-                    throw new BusinessRuleException("يوجد طلب إرجاع نشط لهذا الطلب مسبقاً");
+                // 4️⃣ يُسمح بأكثر من طلب إرجاع للطلب نفسه (لمنتجات مختلفة) حتى لو كان أحدها قيد المعالجة:
+                //    منع إرجاع القطعة مرتين يتم أدناه بخصم ما أُرجع سابقاً (غير المرفوض) من الكمية المستلمة
 
                 // 5️⃣ التحقق أن المنتجات وصلت الزبون فعلاً: من طلب متجر مُسلَّم (لا ما رفضه المتجر أو أزاله لعدم توفره)
                 var orderItems = order.SubOrders

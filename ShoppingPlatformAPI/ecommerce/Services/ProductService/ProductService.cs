@@ -271,6 +271,17 @@ namespace ecommerce.Services.ProductService.ProductService
         }
 
         // ===================================
+        // SuggestAsync: اقتراحات أثناء الكتابة (حرفان فأكثر، بلا تسعير ولا صور)
+        // ===================================
+        public async Task<List<SearchSuggestionDto>> SuggestAsync(string term, int limit = 8, string? scope = null)
+        {
+            var text = (term ?? string.Empty).Trim();
+            if (text.Length < 2) return new List<SearchSuggestionDto>();
+            if (text.Length > 50) text = text[..50];
+            return await _productRepository.SuggestAsync(text, Math.Clamp(limit, 1, 20), scope);
+        }
+
+        // ===================================
         // ✅ جديد: UnifiedSearchAsync
         // ===================================
         public async Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null)

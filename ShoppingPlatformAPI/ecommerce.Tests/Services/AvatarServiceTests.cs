@@ -100,6 +100,20 @@ namespace ecommerce.Tests.Services
         }
 
         [Fact]
+        public async Task GooglePicture_IsRefetched_WhenTheLocalFileWentMissing()
+        {
+            var u = AddUser();
+            _fetcher.Pictures["https://lh3.googleusercontent.com/a/p1=s256-c"] = Png;
+            await Service().SyncGoogleAsync(u, "https://lh3.googleusercontent.com/a/p1=s96-c");
+            System.IO.File.Delete(Disk(u.AvatarUrl!));
+
+            await Service().SyncGoogleAsync(u, "https://lh3.googleusercontent.com/a/p1=s96-c");
+
+            Assert.Equal(2, _fetcher.Calls);
+            Assert.True(System.IO.File.Exists(Disk(u.AvatarUrl!)));
+        }
+
+        [Fact]
         public async Task GooglePicture_IsCopied_UpdatedWhenChanged_ButNeverOverridesAnUpload()
         {
             var u = AddUser();

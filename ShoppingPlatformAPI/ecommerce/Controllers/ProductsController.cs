@@ -224,6 +224,28 @@ namespace ecommerce.Controllers
         }
 
         // ===================================
+        // GET: api/products/suggestions?term=حل&limit=8&scope=general|grocery
+        // اقتراحات نصية خفيفة أثناء الكتابة: منتجات ومتاجر وفئات (يعيد قائمة فارغة لأقل من حرفين)
+        // ===================================
+        [HttpGet("suggestions")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Suggestions(
+            [FromQuery] string? term,
+            [FromQuery] int limit = 8,
+            [FromQuery] string? scope = null)
+        {
+            try
+            {
+                var items = await _productService.SuggestAsync(term ?? string.Empty, limit, scope);
+                return Ok(new { success = true, data = items });
+            }
+            catch (AppException ex)
+            {
+                return ApiErrors.From(ex);
+            }
+        }
+
+        // ===================================
         // POST: api/products/filter
         // ===================================
         [HttpPost("filter")]

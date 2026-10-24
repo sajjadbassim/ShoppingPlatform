@@ -83,6 +83,9 @@ namespace ecommerce.Repositories
         // ===================================
         Task<UnifiedSearchResult> UnifiedSearchAsync(string searchTerm, int maxResults = 5, string? scope = null);
 
+        // اقتراحات نصية خفيفة أثناء الكتابة (منتجات + متاجر + فئات) في استعلام واحد
+        Task<List<SearchSuggestionDto>> SuggestAsync(string term, int limit = 8, string? scope = null);
+
         // للفلترة/الترتيب بالسعر بعد العروض (يُحسب في الذاكرة)
         Task<List<ProductPriceInfo>> GetAdvancedFilterCandidatesAsync(
             Guid? vendorId, Guid? categoryId, string? searchTerm, bool? isAvailable, bool? isActive,

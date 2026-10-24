@@ -65,11 +65,52 @@ namespace ecommerce.Controllers
             return Ok(new { success = true });
         }
 
+        // POST: api/push/device — يربط جهاز موبايل (رمز FCM) بالحساب الحالي، وينقله إن كان مربوطاً بحساب آخر
+        [HttpPost("device")]
+        public async Task<IActionResult> RegisterDevice([FromBody] DeviceTokenDto dto)
+        {
+            var platform = dto.Platform?.ToLowerInvariant();
+            var app = dto.App?.ToLowerInvariant();
+            if (platform is not ("android" or "ios") || app is not ("customer" or "driver"))
+                return BadRequest(new { success = false, message = "بيانات الجهاز غير صالحة" });
+
+            var existing = await _context.DeviceTokens.FirstOrDefaultAsync(d => d.Token == dto.Token);
+            if (existing == null)
+                _context.DeviceTokens.Add(new Core.Models.DeviceToken { UserId = UserId, Token = dto.Token, Platform = platform, App = app });
+            else
+            {
+                existing.UserId = UserId;
+                existing.Platform = platform;
+                existing.App = app;
+            }
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateException) when (existing == null)
+            {
+                // تسجيلان متزامنان لنفس الرمز: الآخر سبقنا، فنحدّث سجله بدل الفشل
+                _context.ChangeTracker.Clear();
+                await _context.DeviceTokens.Where(d => d.Token == dto.Token)
+                    .ExecuteUpdateAsync(s => s.SetProperty(d => d.UserId, UserId)
+                        .SetProperty(d => d.Platform, platform).SetProperty(d => d.App, app));
+            }
+            return Ok(new { success = true });
+        }
+
+        // POST: api/push/device/remove — عند تسجيل الخروج من التطبيق أو إيقاف الإشعارات
+        [HttpPost("device/remove")]
+        public async Task<IActionResult> RemoveDevice([FromBody] DeviceTokenRemoveDto dto)
+        {
+            await _context.DeviceTokens
+                .Where(d => d.Token == dto.Token && d.UserId == UserId)
+                .ExecuteDeleteAsync();
+            return Ok(new { success = true });
+        }
+
         // POST: api/push/test — إشعار تجريبي لأجهزة المستخدم الحالي
         [HttpPost("test")]
         public async Task<IActionResult> Test()
         {
-            var devices = await _context.PushSubscriptions.CountAsync(s => s.UserId == UserId);
+            var devices = await _context.PushSubscriptions.CountAsync(s => s.UserId == UserId)
+                + await _context.DeviceTokens.CountAsync(d => d.UserId == UserId);
             if (devices == 0)
                 return BadRequest(new { success = false, message = "لم تُفعَّل الإشعارات على أي جهاز بعد" });
             _push.Enqueue(new PushMessage("إشعار تجريبي — الإشعارات تعمل على هذا الجهاز ✓", UserId: UserId, Url: "/settings", Tag: "push-test"));
@@ -92,6 +133,18 @@ namespace ecommerce.Controllers
         [Required, MaxLength(700)] public string Endpoint { get; set; }
         [Required, MaxLength(200)] public string P256dh { get; set; }
         [Required, MaxLength(100)] public string Auth { get; set; }
+    }
+
+    public class DeviceTokenDto
+    {
+        [Required, MaxLength(400)] public string Token { get; set; }
+        [Required, MaxLength(10)] public string Platform { get; set; }
+        [Required, MaxLength(20)] public string App { get; set; }
+    }
+
+    public class DeviceTokenRemoveDto
+    {
+        [Required, MaxLength(400)] public string Token { get; set; }
     }
 
     public class PushUnsubscribeDto

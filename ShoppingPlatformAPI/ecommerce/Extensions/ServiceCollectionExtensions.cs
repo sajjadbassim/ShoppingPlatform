@@ -84,6 +84,10 @@ namespace ecommerce.Extensions
             services.AddOptions<ecommerce.Services.PushService.PushOptions>().BindConfiguration(ecommerce.Services.PushService.PushOptions.Section);
             services.AddSingleton<ecommerce.Services.PushService.PushQueue>();
             services.AddSingleton<ecommerce.Services.PushService.IPushQueue>(sp => sp.GetRequiredService<ecommerce.Services.PushService.PushQueue>());
+            services.AddOptions<ecommerce.Services.PushService.FirebaseOptions>().BindConfiguration(ecommerce.Services.PushService.FirebaseOptions.Section);
+            services.AddHttpClient("fcm", c => c.Timeout = TimeSpan.FromSeconds(15));
+            services.AddSingleton<ecommerce.Services.PushService.IFcmAuth, ecommerce.Services.PushService.GoogleFcmAuth>();
+            services.AddSingleton<ecommerce.Services.PushService.IFcmSender, ecommerce.Services.PushService.FcmSender>();
             services.AddHostedService<ecommerce.Services.PushService.PushSenderService>();
             services.AddScoped<ecommerce.Services.DriverAppService.IDriverAppService, ecommerce.Services.DriverAppService.DriverAppService>();
             services.AddScoped<INotificationLinkService, NotificationLinkService>();
@@ -129,6 +133,7 @@ namespace ecommerce.Extensions
             services.AddScoped<IFileService, FileService>();
             services.AddSingleton<ImageVariants>();
             services.AddScoped<ecommerce.Services.IAvatarService, ecommerce.Services.AvatarService>();
+            services.AddScoped<ecommerce.Services.IAccountDeletionService, ecommerce.Services.AccountDeletionService>();
             services.AddScoped<ecommerce.Services.IDeliveryZoneService, ecommerce.Services.DeliveryZoneService>();
             services.AddScoped<ecommerce.Services.IGooglePictureFetcher, ecommerce.Services.GooglePictureFetcher>();
             services.AddHttpClient("google-avatar", c => c.Timeout = TimeSpan.FromSeconds(5));

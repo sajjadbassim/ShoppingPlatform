@@ -112,13 +112,18 @@ namespace ecommerce.Services
             if (string.IsNullOrWhiteSpace(pictureUrl)) return;
             // صورة رفعها المستخدم أو حذفها بنفسه لا تُستبدل
             if (user.AvatarSource is AvatarSources.Upload or AvatarSources.None) return;
-            if (user.GooglePictureUrl == pictureUrl && user.AvatarUrl != null) return;
+            // الملف قد يضيع من القرص (نقل الخادم أو حذف يدوي) فتُعاد النسخة بدل الاكتفاء بالسجل
+            if (user.GooglePictureUrl == pictureUrl && user.AvatarUrl != null && LocalFileExists(user.AvatarUrl)) return;
 
             try
             {
                 var bytes = await _fetcher.FetchAsync(Larger(pictureUrl));
                 var url = bytes == null ? null : await SaveAsync(bytes);
-                if (url == null) return;
+                if (url == null)
+                {
+                    _logger.LogWarning("تعذّر جلب صورة Google للمستخدم {UserId}", user.Id);
+                    return;
+                }
 
                 var old = user.AvatarUrl;
                 user.AvatarUrl = url;
@@ -160,6 +165,10 @@ namespace ecommerce.Services
             await File.WriteAllBytesAsync(Path.Combine(dir, name), bytes);
             return $"/uploads/{Folder}/{name}";
         }
+
+        private bool LocalFileExists(string url) =>
+            url.StartsWith($"/uploads/{Folder}/")
+            && File.Exists(Path.Combine(_env.WebRootPath, "uploads", Folder, Path.GetFileName(url)));
 
         private void DeleteLocal(string? url)
         {

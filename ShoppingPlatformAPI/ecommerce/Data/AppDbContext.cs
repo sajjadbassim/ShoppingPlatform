@@ -44,6 +44,7 @@ namespace ecommerce.Data
 
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<PushSubscription> PushSubscriptions { get; set; }
+        public DbSet<DeviceToken> DeviceTokens { get; set; }
         public DbSet<DeliverySettings> DeliverySettings { get; set; }
         public DbSet<DeliveryZone> DeliveryZones { get; set; }
         public DbSet<OrderDriverRating> OrderDriverRatings { get; set; }
