@@ -17,13 +17,19 @@ type Tab = 'orders' | 'returns';
 
 export default function OrdersScreen() {
   useTheme();
-  const params = useLocalSearchParams<{ tab?: string; status?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; status?: string; t?: string }>();
   const [tab, setTab] = useState<Tab>(params.tab === 'returns' ? 'returns' : 'orders');
   const [status, setStatus] = useState<string>(params.status ?? 'PENDING_CONFIRMATION');
   const [search, setSearch] = useState('');
   const [term, setTerm] = useState('');
   const [rejecting, setRejecting] = useState<VendorOrder | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // التبويب يبقى مُحمَّلاً فالرابط (المرتجعات، حالة معيّنة) يُطبَّق عند كل وصول جديد وليس عند أول فتح فقط
+  useEffect(() => {
+    if (params.tab) setTab(params.tab === 'returns' ? 'returns' : 'orders');
+    if (params.status) setStatus(params.status);
+  }, [params.tab, params.status, params.t]);
 
   // بحث مباشر بعد توقف الكتابة (دون انتظار زر البحث)
   useEffect(() => {

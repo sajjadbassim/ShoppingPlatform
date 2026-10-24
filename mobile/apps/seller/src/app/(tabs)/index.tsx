@@ -10,6 +10,7 @@ import { useDashboard, useProfile, useReturnTrips } from '../../api/useVendor';
 import { Card, Chip, IconTile, ListRow, money, Screen, SectionTitle } from '../../components/kit';
 import { toast } from '../../lib/toast';
 import { palette } from '../../lib/palette';
+import { goOrders } from '../../lib/nav';
 import { useVendorSession } from '../../lib/vendor';
 
 // الرئيسية: ما يحتاج قرارك الآن أولاً، ثم أرقام المتجر وآخر الطلبات
@@ -77,7 +78,7 @@ export default function HomeScreen() {
 
       <SectionTitle>تحتاج قرارك الآن</SectionTitle>
       {can('orders') && (
-        <Card tone={pending > 0 ? 'warn' : undefined} onPress={() => router.push('/orders')}>
+        <Card tone={pending > 0 ? 'warn' : undefined} onPress={() => goOrders('orders', 'PENDING_CONFIRMATION')}>
           <View style={styles.rowC}>
             <IconTile icon="time-outline" tone={pending > 0 ? 'warn' : 'muted'} />
             <View style={{ flex: 1 }}>
@@ -89,7 +90,7 @@ export default function HomeScreen() {
         </Card>
       )}
       {can('orders') && returnsIncoming > 0 && (
-        <Card onPress={() => router.push('/orders?tab=returns')}>
+        <Card onPress={() => goOrders('returns')}>
           <View style={styles.rowC}>
             <IconTile icon="return-down-back-outline" tone="primary" />
             <View style={{ flex: 1 }}>
@@ -120,7 +121,7 @@ export default function HomeScreen() {
 
       {showNumbers && (d?.recentOrders?.length ?? 0) > 0 && can('orders') && (
         <>
-          <SectionTitle action={{ label: 'كل الطلبات', onPress: () => router.push('/orders') }}>آخر الطلبات</SectionTitle>
+          <SectionTitle action={{ label: 'كل الطلبات', onPress: () => goOrders('orders', 'all') }}>آخر الطلبات</SectionTitle>
           <Card pad={4}>
             {d!.recentOrders.map((o, i) => (
               <Pressable key={o.subOrderId} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.subOrderId } })} style={[styles.recent, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>

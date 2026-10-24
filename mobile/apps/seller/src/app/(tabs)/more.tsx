@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 import { router } from 'expo-router';
+import { goOrders } from '../../lib/nav';
 import { getImageUrl, logout } from '@wasit/shared';
 import { AppText, createStyles, useTheme } from '@wasit/ui';
 import { useDashboard, useProfile, useReturnTrips } from '../../api/useVendor';
@@ -59,7 +60,7 @@ export default function MoreScreen() {
       {ops.length > 0 && (
         <>
           <SectionTitle>العمليات</SectionTitle>
-          <Card pad={4}>{ops.map((m, i) => <ListRow key={m.to} icon={m.icon} tone={m.tone} title={m.title} subtitle={m.subtitle} badge={m.badge} onPress={() => router.push(m.to)} last={i === ops.length - 1} />)}</Card>
+          <Card pad={4}>{ops.map((m, i) => <ListRow key={m.to} icon={m.icon} tone={m.tone} title={m.title} subtitle={m.subtitle} badge={m.badge} onPress={() => (m.to.startsWith('/orders') ? goOrders('returns') : router.push(m.to))} last={i === ops.length - 1} />)}</Card>
         </>
       )}
       <SectionTitle>المتجر والفريق</SectionTitle>
