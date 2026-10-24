@@ -74,13 +74,13 @@ export default function StoreSettingsScreen() {
       <Card pad={0}>
         <Pressable onPress={async () => setCover((await pick([16, 9])) ?? cover)} style={styles.cover} accessibilityLabel="تغيير صورة الغلاف">
           {coverUri ? <Image source={{ uri: coverUri }} style={{ flex: 1 }} contentFit="cover" /> : <AppText muted style={{ textAlign: 'center', marginTop: 34 }}>لا توجد صورة غلاف</AppText>}
-          <View style={styles.coverBtn}><Ionicons name="camera-outline" size={14} color="#FFFFFF" /><AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 12 }}>تغيير الغلاف</AppText></View>
+          <View style={styles.coverBtn}><Ionicons name="camera-outline" size={14} color="#FFFFFF" /><AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 12, lineHeight: 20 }}>تغيير الغلاف</AppText></View>
         </Pressable>
         <View style={styles.logoRow}>
           <Pressable onPress={async () => setLogo((await pick([1, 1])) ?? logo)} style={styles.logo} accessibilityLabel="تغيير الشعار">
             {logoUri ? <Image source={{ uri: logoUri }} style={{ flex: 1 }} contentFit="cover" /> : <Ionicons name="storefront-outline" size={28} color={colors.primary} style={{ margin: 'auto' }} />}
           </Pressable>
-          <AppText weight="bold" style={{ color: colors.primaryHover }} onPress={async () => setLogo((await pick([1, 1])) ?? logo)}>تغيير الشعار</AppText>
+          <AppText weight="bold" style={{ color: colors.primaryHover, lineHeight: 24, flex: 1 }} onPress={async () => setLogo((await pick([1, 1])) ?? logo)}>تغيير الشعار</AppText>
         </View>
       </Card>
 

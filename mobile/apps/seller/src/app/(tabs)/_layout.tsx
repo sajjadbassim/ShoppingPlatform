@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { brand, colors, fonts, useTheme } from '@wasit/ui';
 import { useDashboard } from '../../api/useVendor';
@@ -15,6 +16,7 @@ const icon = (name: IconName, active: IconName) =>
 // خمسة تبويبات ثابتة. الموظف لا يرى تبويباً لا يملك صلاحيته (الخادم يفرضها أيضاً)
 export default function TabsLayout() {
   useTheme();
+  const insets = useSafeAreaInsets();
   const { can } = useVendorSession();
   const { data: dash } = useDashboard();
   return (
@@ -24,7 +26,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.primaryHover,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11.5 },
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, height: 66, paddingTop: 6 },
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, height: 62 + insets.bottom, paddingTop: 6, paddingBottom: insets.bottom + 4 },
         tabBarActiveBackgroundColor: 'transparent',
         tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#FFFFFF', fontFamily: fonts.bold },
       }}
