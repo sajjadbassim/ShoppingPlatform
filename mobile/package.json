@@ -1,0 +1,17 @@
+{
+  "name": "wasit-mobile",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "customer": "npm run start --workspace @wasit/customer",
+    "driver": "npm run start --workspace @wasit/driver",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "overrides": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

@@ -1,0 +1,20 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.env
+.env.local
+.env.*.local
+google-services.json
+GoogleService-Info.plist
+
+# مجلدات أصلية تولّدها expo prebuild/run:android — تُعاد توليدها ولا تُحفظ
+/apps/*/android/
+/apps/*/ios/
+/shots/
