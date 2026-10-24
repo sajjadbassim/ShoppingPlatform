@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { getImageUrl, type SalesPeriod } from '@wasit/shared';
@@ -32,6 +32,7 @@ export default function ReportsScreen() {
   const [range, setRange] = useState({ from: isoDay(new Date(Date.now() - 29 * 86400000)), to: isoDay(new Date()) });
   const sales = useSales(period, range);
   const dash = useDashboard();
+  const chartRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const s = sales.data;
   const d = dash.data;
 
@@ -68,7 +69,7 @@ export default function ReportsScreen() {
             {days.length === 0 || s.totalRevenue === 0 ? (
               <Empty icon="bar-chart-outline" text="لا توجد مبيعات في هذه الفترة" />
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chart}>
+              <ScrollView ref={chartRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chart} onContentSizeChange={() => chartRef.current?.scrollToEnd({ animated: false })}>
                 {days.map((x) => (
                   <View key={x.date} style={styles.barCol}>
                     <AppText muted style={{ fontSize: 9.5 }}>{x.revenue >= 1000 ? `${Math.round(x.revenue / 1000)}k` : x.revenue}</AppText>

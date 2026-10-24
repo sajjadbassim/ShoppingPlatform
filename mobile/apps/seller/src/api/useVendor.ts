@@ -114,7 +114,7 @@ export const useSales = (period: SalesPeriod, range?: { from: string; to: string
   });
 };
 
-export const useEarnings = () => useQuery({ queryKey: ['v-earnings'], queryFn: fetchMyEarnings });
+export const useEarnings = () => useQuery({ queryKey: ['v-earnings'], queryFn: fetchMyEarnings, refetchInterval: POLL_MS, refetchOnMount: 'always' });
 
 export const useReviewSummary = () => {
   const vendorId = useVendorId();

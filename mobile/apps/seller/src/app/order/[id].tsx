@@ -231,6 +231,14 @@ export default function OrderScreen() {
         </Card>
       )}
 
+      {!!(o.failureReasonAr || o.failureNote) && (
+        <Card tone="bad">
+          <AppText weight="extraBold" style={{ fontSize: 13, color: colors.errorDark }}>سبب تعذّر التسليم</AppText>
+          {!!o.failureReasonAr && <AppText>{o.failureReasonAr}</AppText>}
+          {!!o.failureNote && <AppText muted style={{ fontSize: 13 }}>{o.failureNote}</AppText>}
+        </Card>
+      )}
+
       {pending && !partial && o.items.length > 0 && (
         <Pressable onPress={() => setPartial(true)} style={{ alignItems: 'center', padding: 8 }}>
           <AppText weight="medium" style={{ color: colors.primaryHover, textDecorationLine: 'underline' }}>بعض القطع غير متوفرة؟ اقبل المتوفر فقط</AppText>

@@ -192,6 +192,8 @@ export interface VendorOrder {
   customerPays: number;
   status: SubOrderStatus;
   cancellationReason?: string | null;
+  failureReasonAr?: string | null;
+  failureNote?: string | null;
   confirmationDeadline?: string | null;
   minutesRemaining?: number | null;
   customerNotes?: string | null;
