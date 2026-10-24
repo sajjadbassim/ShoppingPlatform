@@ -3,3 +3,6 @@ SECURITY-AUDIT-*.md
 
 # ملفات محلية فيها أسرار (مفاتيح Wevlix وغيرها)
 *.local.md
+
+# Google OAuth client secrets (never commit)
+client_secret_*.json
