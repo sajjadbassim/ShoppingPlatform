@@ -179,7 +179,7 @@ namespace ecommerce.Services.StaffService
             return new User
             {
                 Phone = phone,
-                Email = email.Length > 0 ? email : null,
+                Email = email,   // الفارغ يُحفظ نصاً فارغاً: العمود لا يقبل null وفهرس البريد الفريد يتجاهل الفارغ
                 FullName = dto.FullName.Trim(),
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = role,

@@ -84,6 +84,16 @@ namespace ecommerce.Tests.Services
         }
 
         // ===== موظفو المتجر =====
+        // عمود البريد لا يقبل null: الموظف بلا بريد يُحفظ ببريد فارغ، وتكرار الفارغ بين موظفين مسموح
+        [Fact]
+        public async Task StaffWithoutEmail_IsStoredWithEmptyEmail_NotNull()
+        {
+            var first = await Service().CreateVendorStaffAsync(_owner.Id, NewStaff("07700000030", "orders"));
+            var second = await Service().CreateVendorStaffAsync(_owner.Id, NewStaff("07700000031", "orders"));
+            Assert.Equal(string.Empty, (await _context.Users.FindAsync(first.Id))!.Email);
+            Assert.Equal(string.Empty, (await _context.Users.FindAsync(second.Id))!.Email);
+        }
+
         [Fact]
         public async Task Owner_ManagesStaff_StaffResolvesStore_RemovedStaffLosesIt()
         {

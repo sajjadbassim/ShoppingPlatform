@@ -343,7 +343,7 @@ namespace ecommerce.Services.ProductService.ProductService
                     Description = dto.Description,
                     Price = dto.Price,
                     OriginalPrice = dto.OriginalPrice,
-                    Sku = dto.Sku,
+                    Sku = dto.Sku?.Trim() ?? string.Empty,   // العمود لا يقبل null
                     StockQuantity = dto.StockQuantity,
                     IsAvailable = dto.IsAvailable,
                     IsActive = dto.IsActive,
@@ -639,6 +639,8 @@ namespace ecommerce.Services.ProductService.ProductService
                 Description = source.Description,
                 Price = source.Price,
                 OriginalPrice = source.OriginalPrice,
+                // الرمز غير فريد في القاعدة؛ لاحقة قصيرة تميّز النسخة (والفارغ يبقى فارغاً)
+                Sku = string.IsNullOrWhiteSpace(source.Sku) ? string.Empty : $"{source.Sku}-C{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}",
                 StockQuantity = 0,
                 IsAvailable = source.IsAvailable,
                 IsActive = false,
