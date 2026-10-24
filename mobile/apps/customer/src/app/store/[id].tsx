@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { API_ENDPOINTS, API_URL, fetchStoreFeed, getImageUrl, IMG_SIZE, refreshStoreFeed, type ProductSummary, type VendorDetails } from '@wasit/shared';
+import { API_ENDPOINTS, API_URL, fetchStoreFeed, getImageUrl, IMG_SIZE, refreshStoreFeed, type ProductSummary, type VendorDetails, formatMonthYear } from '@wasit/shared';
 import { AppText, Button, colors, spacing, createStyles, tc, useTheme } from '@wasit/ui';
 import { useProducts, useVendor } from '../../api/useCatalog';
 import { AppHeader } from '../../components/AppHeader';
@@ -172,7 +172,7 @@ function AboutTab({ vendor }: { vendor: VendorDetails }) {
             <InfoTile
               icon="calendar-outline"
               label="انضم للمنصة"
-              value={new Date(vendor.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long' })}
+              value={formatMonthYear(vendor.createdAt)}
             />
           )}
         </View>

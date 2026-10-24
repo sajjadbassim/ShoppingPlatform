@@ -22,6 +22,7 @@ export interface Review {
   vendorReply?: string | null;
   createdAt: string;
   pointsEarned?: number;
+  images?: { id?: string; imageUrl: string }[];
 }
 
 // تصويت «مراجعة مفيدة»: POST للتصويت وDELETE لإلغائه (كالويب)

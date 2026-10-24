@@ -1,7 +1,7 @@
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { returnTone, useSessionStore, formatPrice, type ReturnRecord } from '@wasit/shared';
+import { returnTone, useSessionStore, formatPrice, type ReturnRecord, formatDate } from '@wasit/shared';
 import { AppText, Button, colors, createStyles, createThemed, radius, spacing, tc, useTheme } from '@wasit/ui';
 import { useMyReturns } from '../api/useFeedback';
 import { AppHeader } from '../components/AppHeader';
@@ -13,8 +13,6 @@ const TONES = createThemed(() => ({
   error: { bg: colors.errorLight, fg: colors.errorDark },
 }));
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('/');
 
 const goNew = () => router.push('/return-new');
 

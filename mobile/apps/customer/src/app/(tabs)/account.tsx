@@ -3,25 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { router, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  changePassword,
-  removeAvatar,
-  uploadAvatar,
-  formatAddress,
-  getImageUrl,
-  IMG_SIZE,
-  returnTone,
-  updateProfile,
-  useSessionStore,
-  validateChangePassword,
-  validateProfile,
-  type Address,
-  type ApiError,
-  type AuthUser,
-  type ChangePasswordErrors,
-  type ProfileErrors,
-  type ReturnRecord,
-} from '@wasit/shared';
+import { changePassword, removeAvatar, uploadAvatar, formatAddress, getImageUrl, IMG_SIZE, returnTone, updateProfile, useSessionStore, validateChangePassword, validateProfile, type Address, type ApiError, type AuthUser, type ChangePasswordErrors, type ProfileErrors, type ReturnRecord, formatDate, loyaltyTierName } from '@wasit/shared';
 import { AppText, Button, ErrorBanner, Input, brand, colors, createStyles, createThemed, spacing, tc, useTheme } from '@wasit/ui';
 import { useAddresses, useDeleteAddress, useZonesConfig } from '../../api/useCheckout';
 import { useLoyaltyAccount, useWishlist } from '../../api/useEngagement';
@@ -166,7 +148,7 @@ export default function AccountScreen() {
               </AppText>
               <AppText numberOfLines={1} style={styles.loyaltyText}>
                 رصيدك <AppText weight="bold" style={styles.loyaltyText}>{(loyalty.data?.balance ?? 0).toLocaleString('en-US')}</AppText> نقطة
-                {loyalty.data?.tierAr ? ` • المستوى ${loyalty.data.tierAr}` : ''}
+                {loyalty.data?.tier ? ` • المستوى ${loyaltyTierName(loyalty.data.tier)}` : ''}
               </AppText>
             </View>
             <Ionicons name="chevron-back" size={18} color={tc("#D97706")} />
@@ -472,7 +454,7 @@ function ReturnsTab({ records, loading }: { records: ReturnRecord[]; loading: bo
                   <AppText weight="medium" style={{ fontSize: 15 }}>
                     #{r.returnNumber || r.id.slice(0, 8)}
                   </AppText>
-                  <AppText style={styles.returnDate}>{new Date(r.createdAt).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad' })}</AppText>
+                  <AppText style={styles.returnDate}>{formatDate(r.createdAt)}</AppText>
                   <AppText muted style={{ fontSize: 14, marginTop: 2 }}>
                     {r.reasonAr}
                   </AppText>

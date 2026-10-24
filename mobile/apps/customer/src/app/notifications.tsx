@@ -1,12 +1,10 @@
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { notificationTarget, useSessionStore, type AppNotification } from '@wasit/shared';
+import { notificationTarget, useSessionStore, type AppNotification, formatDateTime } from '@wasit/shared';
 import { AppText, Button, colors, radius, spacing, createStyles, useTheme } from '@wasit/ui';
 import { useNotificationActions, useNotifications } from '../api/useNotifications';
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 export default function NotificationsScreen() {
   useTheme();
@@ -95,7 +93,7 @@ export default function NotificationsScreen() {
                   {item.message}
                 </AppText>
                 <AppText muted style={styles.small}>
-                  {formatTime(item.createdAt)}
+                  {formatDateTime(item.createdAt)}
                 </AppText>
               </View>
             </Pressable>

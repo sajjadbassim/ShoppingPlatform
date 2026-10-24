@@ -1,7 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CONTACT, infoDocuments, type DocBlock, type InfoDocKey } from '@wasit/shared';
+import { CONTACT, infoDocuments, type DocBlock, type InfoDocKey, formatDate } from '@wasit/shared';
 import { AppText, Button, colors, spacing, createStyles, tc, useTheme } from '@wasit/ui';
 import { AppHeader } from '../../components/AppHeader';
 
@@ -16,9 +16,6 @@ const TABS: { key: InfoDocKey; icon: keyof typeof Ionicons.glyphMap; label: stri
   { key: 'returnPolicy', icon: 'refresh-circle-outline', label: 'سياسة الإرجاع' },
   { key: 'payment', icon: 'card-outline', label: 'طرق الدفع' },
 ];
-
-const formatDate = (date: string) =>
-  new Date(date).toLocaleDateString('ar-IQ-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
 
 function Block({ block }: { block: DocBlock }) {
   useTheme();

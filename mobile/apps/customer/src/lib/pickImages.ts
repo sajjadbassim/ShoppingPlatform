@@ -13,12 +13,19 @@ export async function pickImages(limit: number): Promise<PickedImage[]> {
     return [];
   }
 
-  const result = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: ['images'],
-    allowsMultipleSelection: limit > 1,
-    selectionLimit: limit,
-    quality: 0.7,
-  });
+  let result: ImagePicker.ImagePickerResult;
+  try {
+    result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: limit > 1,
+      selectionLimit: limit,
+      quality: 0.7,
+    });
+  } catch {
+    // أجهزة/محاكيات بلا تطبيق معرض صور يستجيب لطلب الاختيار
+    toast.warning('لا يوجد تطبيق معرض صور على هذا الجهاز', { title: 'تعذّر فتح المعرض' });
+    return [];
+  }
   if (result.canceled) return [];
 
   const picked: PickedImage[] = [];

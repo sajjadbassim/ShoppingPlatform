@@ -4,25 +4,18 @@ import { ActivityIndicator, Pressable, ScrollView, Share, StyleSheet, View } fro
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-  referralShareText,
-  tierProgressPct,
-  useSessionStore,
-  type LoyaltyAccount,
-  type LoyaltyTransaction,
-} from '@wasit/shared';
+import { referralShareText, tierProgressPct, useSessionStore, type LoyaltyAccount, type LoyaltyTransaction, formatDate, loyaltyTierName } from '@wasit/shared';
 import { AppText, Button, colors, createStyles, createThemed, spacing, tc, useTheme } from '@wasit/ui';
 import { useLoyaltyAccount, useLoyaltySettings, useLoyaltyTransactions, useReferral } from '../api/useEngagement';
 import { AppHeader } from '../components/AppHeader';
 
 const num = (n: number) => Math.round(n).toLocaleString('en-US');
-const date = (iso: string) => new Date(iso).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad' });
 
 const TIERS = createThemed<Record<string, { label: string; icon: string; bg: string; fg: string }>>(() => ({
-  bronze: { label: 'برونزي', icon: '🥉', bg: tc('#FEF3C7'), fg: tc('#B45309') },
-  silver: { label: 'فضي', icon: '🥈', bg: tc('#F3F4F6'), fg: tc('#374151') },
-  gold: { label: 'ذهبي', icon: '🥇', bg: tc('#FEF9C3'), fg: tc('#A16207') },
-  platinum: { label: 'بلاتيني', icon: '💎', bg: tc('#F3E8FF'), fg: tc('#7E22CE') },
+  bronze: { label: 'بذرة', icon: '🌱', bg: tc('#FEF3C7'), fg: tc('#B45309') },
+  silver: { label: 'برعم', icon: '🌿', bg: tc('#F3F4F6'), fg: tc('#374151') },
+  gold: { label: 'زهرة', icon: '🌸', bg: tc('#FEF9C3'), fg: tc('#A16207') },
+  platinum: { label: 'ثمرة', icon: '🍊', bg: tc('#F3E8FF'), fg: tc('#7E22CE') },
 }));
 
 function BalanceCard({ account, progress }: { account: LoyaltyAccount; progress: number }) {
@@ -45,19 +38,15 @@ function BalanceCard({ account, progress }: { account: LoyaltyAccount; progress:
               {tier.icon} {tier.label}
             </AppText>
           </View>
-          <View style={styles.tierSmall}>
-            <Ionicons name="ribbon-outline" size={14} color={colors.white} />
-            <AppText style={{ color: colors.white, fontSize: 12 }}>{account.tierAr}</AppText>
-          </View>
         </View>
       </View>
 
       {!!account.nextTier && (
         <View style={{ marginTop: 24 }}>
           <View style={styles.progressLabels}>
-            <AppText style={styles.progressText}>المستوى الحالي: {account.tier}</AppText>
+            <AppText style={styles.progressText}>المستوى الحالي: {tier.label}</AppText>
             <AppText style={styles.progressText}>
-              التالي: {account.nextTier} ({num(account.nextTierPoints)} نقطة)
+              التالي: {loyaltyTierName(account.nextTier)} ({num(account.nextTierPoints)} نقطة)
             </AppText>
           </View>
           <View style={styles.track}>
@@ -148,8 +137,8 @@ function TransactionRow({ tx, last }: { tx: LoyaltyTransaction; last: boolean })
           {tx.descriptionAr || tx.description || tx.typeAr || tx.type}
         </AppText>
         {!!tx.orderNumber && <AppText style={styles.txOrder}>طلب #{tx.orderNumber}</AppText>}
-        <AppText style={styles.txDate}>{date(tx.createdAt)}</AppText>
-        {!!tx.expiresAt && <AppText style={styles.txExpire}>تنتهي: {date(tx.expiresAt)}</AppText>}
+        <AppText style={styles.txDate}>{formatDate(tx.createdAt)}</AppText>
+        {!!tx.expiresAt && <AppText style={styles.txExpire}>تنتهي: {formatDate(tx.expiresAt)}</AppText>}
       </View>
       <AppText weight="bold" style={[styles.txPoints, { color: earn ? tc('#16A34A') : colors.error }]}>
         {earn ? '+' : '-'}
@@ -238,7 +227,7 @@ export default function LoyaltyScreen() {
               <AppText weight="medium" style={{ color: tc('#C2410C'), fontSize: 14 }}>
                 {num(a.expiringPoints ?? 0)} نقطة ستنتهي قريباً
               </AppText>
-              <AppText style={{ color: tc('#EA580C'), fontSize: 12 }}>تاريخ الانتهاء: {date(a.expiringDate)}</AppText>
+              <AppText style={{ color: tc('#EA580C'), fontSize: 12 }}>تاريخ الانتهاء: {formatDate(a.expiringDate)}</AppText>
             </View>
           </View>
         )}
@@ -324,7 +313,6 @@ const styles = createStyles(() => ({
   onMuted: { color: 'rgba(255,255,255,0.75)', fontSize: 14 },
   balance: { color: colors.white, fontSize: 48, lineHeight: 62 },
   tierPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 2 },
-  tierSmall: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   progressLabels: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
   progressText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, flexShrink: 1 },
   track: { height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' },

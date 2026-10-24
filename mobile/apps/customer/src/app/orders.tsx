@@ -4,17 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  countPieces,
-  getImageUrl,
-  IMG_SIZE,
-  isActiveOrder,
-  OrderStatus,
-  orderStatusAr,
-  reorderLines,
-  useSessionStore,
-  type OrderDetails,
-} from '@wasit/shared';
+import { countPieces, getImageUrl, IMG_SIZE, isActiveOrder, OrderStatus, orderStatusAr, reorderLines, useSessionStore, type OrderDetails, formatDate, formatClock } from '@wasit/shared';
 import { AppText, Button, brand, colors, createStyles, createThemed, spacing, tc, useTheme } from '@wasit/ui';
 import { useOrders } from '../api/useOrders';
 import { AppHeader } from '../components/AppHeader';
@@ -61,12 +51,12 @@ const STATUS_STYLE = createThemed<Record<string, { bg: string; fg: string; icon:
   DELIVERY_FAILED: { bg: tc('#FFEDD5'), fg: tc('#9A3412'), icon: 'close' },
 }));
 
-const formatDate = (iso: string) => {
+const formatOrderDate = (iso: string) => {
   const d = new Date(iso);
   const days = Math.floor((Date.now() - d.getTime()) / 86400000);
-  if (days < 1) return `اليوم، ${d.toLocaleTimeString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', hour: 'numeric', minute: '2-digit' })}`;
+  if (days < 1) return `اليوم، ${formatClock(iso)}`;
   if (days < 2) return 'أمس';
-  return d.toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', year: 'numeric', month: 'short', day: 'numeric' });
+  return formatDate(iso);
 };
 
 function Progress({ status }: { status: string }) {
@@ -115,7 +105,7 @@ function OrderCard({ order, reordering, onReorder }: { order: OrderDetails; reor
               {orderStatusAr(status)}
             </AppText>
           </View>
-          <AppText style={styles.date}>{formatDate(order.createdAt)}</AppText>
+          <AppText style={styles.date}>{formatOrderDate(order.createdAt)}</AppText>
         </View>
 
         <View style={styles.itemsRow}>

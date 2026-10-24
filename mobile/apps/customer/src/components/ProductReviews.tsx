@@ -1,25 +1,15 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  distributionShare,
-  reviewableOrders,
-  timeAgoAr,
-  useSessionStore,
-  validateReview,
-  type ApiError,
-  type AuthUser,
-  type Review,
-  type ReviewErrors,
-} from '@wasit/shared';
+import { distributionShare, reviewableOrders, timeAgoAr, useSessionStore, validateReview, getImageUrl, IMG_SIZE, type ApiError, type PickedImage, type AuthUser, type Review, type ReviewErrors, formatDate } from '@wasit/shared';
 import { AppText, Button, Input, StarRating, brand, colors, radius, spacing, createStyles, tc, useTheme } from '@wasit/ui';
 import { useCreateReview, useMarkHelpful, useReviews, useReviewSummary } from '../api/useFeedback';
 import { useOrders } from '../api/useOrders';
+import { ImagePickerRow } from './ImagePickerRow';
 import { toast } from '../lib/toast';
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'short', year: 'numeric' });
 
 const SORTS = [
   { key: 'newest', label: 'الأحدث' },
@@ -184,6 +174,7 @@ function ReviewForm({ productId, onDone, onAlreadyReviewed }: { productId: strin
   const [orderId, setOrderId] = useState<string | undefined>();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [images, setImages] = useState<PickedImage[]>([]);
   const [errors, setErrors] = useState<ReviewErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -199,7 +190,7 @@ function ReviewForm({ productId, onDone, onAlreadyReviewed }: { productId: strin
     setServerError(null);
     if (Object.keys(found).length > 0 || !chosen) return;
     try {
-      const review = await create.mutateAsync({ productId, orderId: chosen, rating, title, body });
+      const review = await create.mutateAsync({ productId, orderId: chosen, rating, title, body, images });
       const points = review.pointsEarned ? ` وكسبت ${review.pointsEarned} نقطة ولاء` : '';
       toast.success(`تم نشر تقييمك${points}`, { title: 'شكراً لتقييمك' });
       onDone();
@@ -263,6 +254,7 @@ function ReviewForm({ productId, onDone, onAlreadyReviewed }: { productId: strin
         maxLength={2000}
         style={{ minHeight: 90, textAlignVertical: 'top' }}
       />
+      <ImagePickerRow label="صور المنتج (اختياري)" images={images} onChange={setImages} />
 
       <View style={styles.formButtons}>
         <Button title="نشر التقييم" loading={create.isPending} disabled={eligible.length === 0} onPress={submit} style={{ flex: 1 }} />
@@ -309,6 +301,13 @@ function ReviewRow({ review, productId }: { review: Review; productId: string })
           </AppText>
         )}
         {(!!review.body || !review.title) && <AppText style={styles.body}>{review.body || '—'}</AppText>}
+        {!!review.images?.length && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.xs, marginTop: spacing.xs }}>
+            {review.images.map((img, i) => (
+              <Image key={img.id ?? i} source={{ uri: getImageUrl(img.imageUrl, IMG_SIZE.THUMB)! }} style={styles.reviewImage} contentFit="cover" />
+            ))}
+          </ScrollView>
+        )}
       </View>
       {!!review.vendorReply && (
         <View style={styles.reply}>
@@ -360,6 +359,7 @@ const styles = createStyles(() => ({
   helpful: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, paddingHorizontal: 12, borderRadius: radius.full, borderWidth: 1, borderColor: colors.border },
   viewAll: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, borderRadius: radius.full, borderWidth: 1.5, borderColor: '#C7D2FE' },
   body: { fontSize: 14, lineHeight: 22 },
+  reviewImage: { width: 64, height: 64, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   small: { fontSize: 12 },
   reply: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.sm, gap: 2, marginTop: 4 },
 }));

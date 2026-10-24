@@ -4,18 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import {
-  canCancelOrder,
-  fetchOrderTiming,
-  fmtMinutes,
-  reorderLines,
-  formatPrice,
-  formatQuantity,
-  getImageUrl,
-  IMG_SIZE,
-  type ApiError,
-  type OrderItem,
-} from '@wasit/shared';
+import { canCancelOrder, fetchOrderTiming, fmtMinutes, reorderLines, formatPrice, formatQuantity, getImageUrl, IMG_SIZE, type ApiError, type OrderItem, formatDateTime } from '@wasit/shared';
 import { AppText, Button, brand, colors, createStyles, createThemed, fonts, radius, spacing, tc, useTheme } from '@wasit/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCancelOrder, useOrder, useOrderTracking } from '../../api/useOrders';
@@ -26,16 +15,6 @@ import { SoftPing } from '../../components/Motion';
 import { StatusBadge } from '../../components/StatusBadge';
 import { toast, toastReorderResult } from '../../lib/toast';
 
-const formatDateTime = (iso?: string | null) =>
-  iso
-    ? new Date(iso).toLocaleString('ar-IQ-u-nu-latn', {
-        timeZone: 'Asia/Baghdad',
-        day: 'numeric',
-        month: 'short',
-        hour: 'numeric',
-        minute: '2-digit',
-      })
-    : '';
 
 const call = (phone: string) => Linking.openURL(`tel:${phone}`).catch(() => toast.error('تعذّر فتح الاتصال'));
 
@@ -149,14 +128,7 @@ export default function OrderScreen() {
 
   const items = order.subOrders.flatMap((sub) => sub.items.map((item) => ({ item, delivered: sub.status === 'DELIVERED' })));
   const hideTracking = order.status === 'CANCELLED' || order.status === 'DELIVERY_FAILED';
-  const dateText = new Date(order.createdAt).toLocaleString('ar-IQ-u-nu-latn', {
-    timeZone: 'Asia/Baghdad',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const dateText = formatDateTime(order.createdAt);
   const refusalOnly = order.discountAmount > 0 && !(order.couponDiscountAmount > 0 || order.pointsDiscountAmount > 0);
 
   return (
@@ -285,7 +257,7 @@ export default function OrderScreen() {
                   </AppText>
                   {step.isCompleted && !!step.occurredAt && (
                     <AppText muted style={styles.small}>
-                      {new Date(step.occurredAt).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      {formatDateTime(step.occurredAt)}
                     </AppText>
                   )}
                 </View>

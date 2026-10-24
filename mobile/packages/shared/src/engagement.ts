@@ -158,3 +158,13 @@ export const tierProgressPct = (
   const nextThreshold = account.totalEarned + account.nextTierPoints;
   return nextThreshold > tierStart ? Math.min(100, Math.max(0, ((account.totalEarned - tierStart) / (nextThreshold - tierStart)) * 100)) : 0;
 };
+
+// أسماء مستويات الولاء في التطبيق: رحلة نموّ لطيفة (بذرة ← برعم ← زهرة ← ثمرة) بدل المعادن المطروقة
+export const LOYALTY_TIER_NAMES: Record<string, { name: string; icon: string }> = {
+  bronze: { name: 'بذرة', icon: '🌱' },
+  silver: { name: 'برعم', icon: '🌿' },
+  gold: { name: 'زهرة', icon: '🌸' },
+  platinum: { name: 'ثمرة', icon: '🍊' },
+};
+
+export const loyaltyTierName = (tier?: string | null): string => LOYALTY_TIER_NAMES[tier?.toLowerCase() ?? '']?.name ?? LOYALTY_TIER_NAMES.bronze.name;
