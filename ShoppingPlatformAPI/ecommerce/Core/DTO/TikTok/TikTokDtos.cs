@@ -48,6 +48,13 @@ namespace ecommerce.Core.DTO.TikTok
         public string AuthorizeUrl { get; set; } = "";
     }
 
+    // إكمال الربط من التطبيق: القيمتان اللتان أعادهما المتصفح إلى رابط التطبيق
+    public class TikTokCompleteConnectDto
+    {
+        public string? Code { get; set; }
+        public string? State { get; set; }
+    }
+
     public class TikTokVideoDto
     {
         public Guid Id { get; set; }

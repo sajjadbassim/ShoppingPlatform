@@ -832,10 +832,11 @@ export const updateVendorPrefs = async (patch: VendorNotifyPrefs): Promise<Vendo
 // ===== ربط حسابات التواصل (الحالة والربط والمزامنة والفصل؛ النشر من الويب حالياً) =====
 export type SocialPlatform = 'instagram' | 'facebook' | 'tiktok';
 
-const SOCIAL_ENDPOINTS: Record<SocialPlatform, { status: string; connectUrl: string; sync?: string; connection: string }> = {
+// appConnect: المنصة تدعم الربط من التطبيق بلا صفحة ويب (connect-url?client=app ثم إكماله بـ JWT عند عودة المتصفح)
+const SOCIAL_ENDPOINTS: Record<SocialPlatform, { status: string; connectUrl: string; sync?: string; connection: string; completeUrl?: string }> = {
   instagram: { status: API_ENDPOINTS.INSTAGRAM.STATUS, connectUrl: API_ENDPOINTS.INSTAGRAM.CONNECT_URL, sync: API_ENDPOINTS.INSTAGRAM.SYNC, connection: API_ENDPOINTS.INSTAGRAM.CONNECTION },
   facebook: { status: API_ENDPOINTS.FACEBOOK.STATUS, connectUrl: API_ENDPOINTS.FACEBOOK.CONNECT_URL, sync: API_ENDPOINTS.FACEBOOK.SYNC, connection: API_ENDPOINTS.FACEBOOK.CONNECTION },
-  tiktok: { status: API_ENDPOINTS.TIKTOK.STATUS, connectUrl: API_ENDPOINTS.TIKTOK.CONNECT_URL, sync: API_ENDPOINTS.TIKTOK.SYNC, connection: API_ENDPOINTS.TIKTOK.CONNECTION },
+  tiktok: { status: API_ENDPOINTS.TIKTOK.STATUS, connectUrl: API_ENDPOINTS.TIKTOK.CONNECT_URL, sync: API_ENDPOINTS.TIKTOK.SYNC, connection: API_ENDPOINTS.TIKTOK.CONNECTION, completeUrl: API_ENDPOINTS.TIKTOK.CONNECT_COMPLETE },
 };
 
 export const SOCIAL_PLATFORMS: { key: SocialPlatform; label: string }[] = [
@@ -853,8 +854,15 @@ export interface SocialStatus {
 
 export const fetchSocialStatus = async (p: SocialPlatform): Promise<SocialStatus> => unwrap(await api.get(SOCIAL_ENDPOINTS[p].status));
 export const fetchSocialConnectUrl = async (p: SocialPlatform): Promise<string> => {
-  const data = unwrap<string | { url?: string }>(await api.get(SOCIAL_ENDPOINTS[p].connectUrl));
-  return typeof data === 'string' ? data : data?.url ?? '';
+  const params = SOCIAL_ENDPOINTS[p].completeUrl ? { client: 'app' } : undefined;
+  const data = unwrap<string | { authorizeUrl?: string; url?: string }>(await api.get(SOCIAL_ENDPOINTS[p].connectUrl, { params }));
+  return typeof data === 'string' ? data : data?.authorizeUrl ?? data?.url ?? '';
+};
+// يكمل الربط بعد أن يعيد المتصفح code و state إلى رابط التطبيق: الـ JWT هو الذي يثبت أن الطلب من صاحب المتجر نفسه
+export const completeSocialConnect = async (p: SocialPlatform, code: string, state: string): Promise<SocialStatus> => {
+  const url = SOCIAL_ENDPOINTS[p].completeUrl;
+  if (!url) throw new Error('الربط من التطبيق غير متاح لهذه المنصة بعد');
+  return unwrap(await api.post(url, { code, state }));
 };
 export const syncSocial = async (p: SocialPlatform): Promise<void> => {
   const url = SOCIAL_ENDPOINTS[p].sync;

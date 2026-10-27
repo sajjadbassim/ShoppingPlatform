@@ -86,6 +86,7 @@ export const API_ENDPOINTS = {
   TIKTOK: {
     STATUS: '/api/tiktok/status',
     CONNECT_URL: '/api/tiktok/connect-url',
+    CONNECT_COMPLETE: '/api/tiktok/connect/complete',
     SYNC: '/api/tiktok/sync',
     VIDEOS: '/api/tiktok/videos',
     VIDEO: (id: Id) => `/api/tiktok/videos/${id}`,

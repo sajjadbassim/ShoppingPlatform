@@ -16,6 +16,9 @@ namespace ecommerce.Core.Models
         // الصفحة التي يعود إليها التاجر بعد الربط (يُضاف لها ?tiktok=connected|error)
         public string AfterConnectUrl { get; set; } = "/vendor/social";
 
+        // رابط التطبيق الذي يعود إليه المتصفح بعد تيك توك عند الربط من تطبيق الموبايل (يُضاف له code و state)
+        public string AppReturnUrl { get; set; } = "wasit-seller://social";
+
         // الصلاحيات المطلوبة — يجب أن تكون مفعّلة للتطبيق في بوابة المطوّرين.
         // أضف user.info.profile,user.info.stats لعرض اسم المستخدم وعدد المتابعين
         public string Scopes { get; set; } = "user.info.basic,video.list,video.publish";

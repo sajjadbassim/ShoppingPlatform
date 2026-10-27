@@ -208,6 +208,120 @@ namespace ecommerce.Tests.Services
         }
 
         // ===================================
+        // الربط من التطبيق (JWT بدل كوكي المتصفح)
+        // ===================================
+        private TikTokOAuthState AppPendingState(Guid? vendorId = null, DateTime? expiresAt = null) => new()
+        {
+            State = TikTokService.AppStatePrefix + "state-2",
+            VendorId = vendorId ?? _vendorId,
+            NonceHash = Hash("unused"),
+            ExpiresAt = expiresAt ?? Now.AddMinutes(5)
+        };
+
+        [Fact]
+        public async Task StartConnect_ForApp_StatePrefixed_SoItCannotCompleteInTheBrowser()
+        {
+            TikTokOAuthState? saved = null;
+            _repository.Setup(r => r.AddStateAsync(It.IsAny<TikTokOAuthState>(), It.IsAny<CancellationToken>()))
+                .Callback<TikTokOAuthState, CancellationToken>((s, _) => saved = s);
+
+            var start = await CreateService().StartConnectAsync(_userId, forApp: true);
+
+            Assert.NotNull(saved);
+            Assert.StartsWith(TikTokService.AppStatePrefix, saved!.State);
+            Assert.Equal(_vendorId, saved.VendorId);
+            Assert.EndsWith(saved.State, start.AuthorizeUrl);
+        }
+
+        [Fact]
+        public async Task CompleteConnect_AppState_ThroughBrowserFlow_IsRejected()
+        {
+            var pending = AppPendingState();
+            _repository.Setup(r => r.GetStateAsync(pending.State, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+
+            var result = await CreateService().CompleteConnectAsync("code", pending.State, "unused", null);
+
+            Assert.Equal("invalid_state", result.Reason);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_StateOfAnotherVendor_IsRejected_AndStateConsumed()
+        {
+            var pending = AppPendingState(vendorId: Guid.NewGuid());
+            _repository.Setup(r => r.GetStateAsync(pending.State, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.Equal("invalid_state", result.Reason);
+            _repository.Verify(r => r.RemoveState(pending), Times.Once);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_BrowserState_IsRejected()
+        {
+            var pending = PendingState("n");
+            _repository.Setup(r => r.GetStateAsync("state-1", It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", "state-1");
+
+            Assert.Equal("invalid_state", result.Reason);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_ExpiredState_IsRejected()
+        {
+            var pending = AppPendingState(expiresAt: Now.AddMinutes(-1));
+            _repository.Setup(r => r.GetStateAsync(pending.State, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.Equal("expired", result.Reason);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_UnknownState_IsRejected()
+        {
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", "app_missing");
+
+            Assert.Equal("invalid_state", result.Reason);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_UserWithoutStore_IsForbidden()
+        {
+            _repository.Setup(r => r.GetVendorIdByOwnerAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync((Guid?)null);
+            await Assert.ThrowsAsync<ForbiddenException>(() => CreateService().CompleteAppConnectAsync(_userId, "code", "app_x"));
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_Success_StoresTokens_WithoutNonce()
+        {
+            var pending = AppPendingState();
+            _repository.Setup(r => r.GetStateAsync(pending.State, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+            _repository.Setup(r => r.GetConnectionAsync(_vendorId, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((TikTokConnection?)null);
+            TikTokConnection? added = null;
+            _repository.Setup(r => r.AddConnectionAsync(It.IsAny<TikTokConnection>(), It.IsAny<CancellationToken>()))
+                .Callback<TikTokConnection, CancellationToken>((c, _) => added = c);
+            _api.Setup(a => a.ExchangeCodeAsync("code", It.IsAny<CancellationToken>())).ReturnsAsync(new TikTokTokenResponse
+            {
+                AccessToken = "access", RefreshToken = "refresh", OpenId = "open-1",
+                ExpiresIn = 86400, RefreshExpiresIn = 31536000, Scope = "user.info.basic,video.list"
+            });
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.True(result.Success);
+            Assert.NotNull(added);
+            Assert.Equal(_vendorId, added!.VendorId);
+            Assert.Equal("p:access", added.AccessTokenProtected);
+            _repository.Verify(r => r.RemoveState(pending), Times.Once);
+        }
+
+        // ===================================
         // المزامنة والتوكنات
         // ===================================
         [Fact]

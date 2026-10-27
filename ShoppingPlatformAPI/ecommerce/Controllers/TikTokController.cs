@@ -1,6 +1,7 @@
 using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.TikTok;
+using ecommerce.Core.Exceptions;
 using ecommerce.Core.Interfaces;
 using ecommerce.Core.Models;
 using ecommerce.Services.TikTokService;
@@ -74,23 +75,49 @@ namespace ecommerce.Controllers
         }
 
         // GET: api/tiktok/connect-url — الخطوة 1
+        // ?client=app: الربط من تطبيق الموبايل — لا كوكي، ويُكمَل بـ POST connect/complete بعد عودة المتصفح إلى رابط التطبيق
         [HttpGet("connect-url")]
-        public async Task<ActionResult<ApiResponse<TikTokConnectUrlDto>>> GetConnectUrl(CancellationToken ct)
+        public async Task<ActionResult<ApiResponse<TikTokConnectUrlDto>>> GetConnectUrl([FromQuery] string? client, CancellationToken ct)
         {
-            var start = await _tikTokService.StartConnectAsync(_currentUser.UserId, ct);
+            var forApp = string.Equals(client, "app", StringComparison.OrdinalIgnoreCase);
+            var start = await _tikTokService.StartConnectAsync(_currentUser.UserId, forApp, ct);
 
-            Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+            if (!forApp)
             {
-                HttpOnly = true,
-                Secure = Request.IsHttps,
-                SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من tiktok.com
-                Path = CookiePath,
-                MaxAge = TimeSpan.FromMinutes(10),
-                IsEssential = true
-            });
+                Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من tiktok.com
+                    Path = CookiePath,
+                    MaxAge = TimeSpan.FromMinutes(10),
+                    IsEssential = true
+                });
+            }
 
             return Ok(ApiResponse<TikTokConnectUrlDto>.Ok(new TikTokConnectUrlDto { AuthorizeUrl = start.AuthorizeUrl }));
         }
+
+        // POST: api/tiktok/connect/complete — { code, state } من رابط التطبيق العميق (الخطوة 3 للتطبيق)
+        [HttpPost("connect/complete")]
+        public async Task<ActionResult<ApiResponse<TikTokStatusDto>>> CompleteConnect(TikTokCompleteConnectDto dto, CancellationToken ct)
+        {
+            var result = await _tikTokService.CompleteAppConnectAsync(_currentUser.UserId, dto.Code, dto.State, ct);
+            if (!result.Success)
+                throw new BusinessRuleException(ConnectFailureMessage(result.Reason));
+
+            var status = await _tikTokService.GetStatusAsync(_currentUser.UserId, ct);
+            return Ok(ApiResponse<TikTokStatusDto>.Ok(status, "تم ربط حساب تيك توك"));
+        }
+
+        private static string ConnectFailureMessage(string? reason) => reason switch
+        {
+            "denied" => "لم تمنح تيك توك الإذن للربط",
+            "expired" => "انتهت مهلة طلب الربط، حاول مرة أخرى",
+            "token" => "تعذّر إكمال الربط مع تيك توك، حاول مرة أخرى",
+            "busy" => "عملية أخرى جارية على حسابك، حاول بعد لحظات",
+            _ => "تعذّر التحقق من طلب الربط، حاول مرة أخرى"
+        };
 
         // GET: api/tiktok/callback?code=...&state=... — الخطوة 2 (تيك توك يعيد المتصفح إلى هنا)
         // AllowAnonymous: التوجيه لا يحمل JWT؛ المتجر يُعرف من state المحفوظ في الخادم + كوكي المتصفح
@@ -102,6 +129,10 @@ namespace ecommerce.Controllers
             [FromQuery] string? error,
             CancellationToken ct)
         {
+            // الربط من التطبيق: لا يُكمَل هنا (لا كوكي ولا JWT) — يُعاد المتصفح إلى التطبيق ليكمله بـ JWT
+            if (TikTokService.IsAppState(state))
+                return Redirect(BuildAppReturnUrl(code, state, error));
+
             var nonce = Request.Cookies[NonceCookieName];
             Response.Cookies.Delete(NonceCookieName, new CookieOptions { Path = CookiePath });
 
@@ -113,6 +144,16 @@ namespace ecommerce.Controllers
                 url += "&reason=" + Uri.EscapeDataString(result.Reason);
 
             return Redirect(url);
+        }
+
+        private string BuildAppReturnUrl(string? code, string? state, string? error)
+        {
+            var separator = _options.AppReturnUrl.Contains('?') ? "&" : "?";
+            var url = _options.AppReturnUrl + separator + "platform=tiktok";
+            if (!string.IsNullOrEmpty(code)) url += "&code=" + Uri.EscapeDataString(code);
+            if (!string.IsNullOrEmpty(state)) url += "&state=" + Uri.EscapeDataString(state);
+            if (!string.IsNullOrEmpty(error)) url += "&error=" + Uri.EscapeDataString(error);
+            return url;
         }
 
         // POST: api/tiktok/sync

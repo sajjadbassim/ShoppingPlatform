@@ -26,8 +26,10 @@ namespace ecommerce.Services.TikTokService
     public interface ITikTokService
     {
         Task<TikTokStatusDto> GetStatusAsync(Guid userId, CancellationToken ct = default);
-        Task<TikTokConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default);
+        // forApp: الربط من تطبيق الموبايل — يُثبَت بـ JWT عند الإكمال بدل كوكي المتصفح
+        Task<TikTokConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default);
         Task<TikTokConnectResult> CompleteConnectAsync(string? code, string? state, string? nonce, string? error, CancellationToken ct = default);
+        Task<TikTokConnectResult> CompleteAppConnectAsync(Guid userId, string? code, string? state, CancellationToken ct = default);
         Task<TikTokStatusDto> SyncAsync(Guid userId, CancellationToken ct = default);
         Task<List<TikTokVideoDto>> GetVideosAsync(Guid userId, CancellationToken ct = default);
         Task<TikTokVideoDto> UpdateVideoAsync(Guid userId, Guid videoId, TikTokVideoUpdateDto dto, CancellationToken ct = default);
@@ -58,6 +60,9 @@ namespace ecommerce.Services.TikTokService
         public const string ScopePublish = "video.publish";
         public const string ScopeProfile = "user.info.profile";
         public const string ScopeStats = "user.info.stats";
+
+        // بادئة state الربط من التطبيق: تفصل مساره (يُكمَل بـ JWT) عن مسار المتصفح (يُكمَل بالكوكي)
+        public const string AppStatePrefix = "app_";
 
         private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(5);
@@ -116,12 +121,12 @@ namespace ecommerce.Services.TikTokService
         // ===================================
         // الخطوة 1: إنشاء رابط التفويض
         // ===================================
-        public async Task<TikTokConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default)
+        public async Task<TikTokConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default)
         {
             EnsureConfigured();
             var vendorId = await GetVendorIdAsync(userId, ct);
 
-            var state = GenerateToken();
+            var state = (forApp ? AppStatePrefix : "") + GenerateToken();
             var nonce = GenerateToken();
 
             await _repository.AddStateAsync(new TikTokOAuthState
@@ -165,6 +170,13 @@ namespace ecommerce.Services.TikTokService
             if (pending.ExpiresAt < Now)
                 return TikTokConnectResult.Fail("expired");
 
+            // حالة الربط من التطبيق لا تُكمَل بالكوكي: تُكمَل فقط بـ JWT في CompleteAppConnectAsync
+            if (IsAppState(pending.State))
+            {
+                _logger.LogWarning("TikTok callback rejected: app state completed through the browser flow for vendor {VendorId}", pending.VendorId);
+                return TikTokConnectResult.Fail("invalid_state");
+            }
+
             if (string.IsNullOrEmpty(nonce) ||
                 !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(Hash(nonce)), Encoding.UTF8.GetBytes(pending.NonceHash)))
             {
@@ -172,6 +184,48 @@ namespace ecommerce.Services.TikTokService
                 return TikTokConnectResult.Fail("invalid_state");
             }
 
+            return await FinishConnectAsync(pending.VendorId, code, ct);
+        }
+
+        // ===================================
+        // الخطوة 2 (التطبيق): التطبيق يستلم code و state من رابطه العميق ويرسلهما مع JWT.
+        // الـ JWT يحل محل كوكي المتصفح: المتجر صاحب الجلسة يجب أن يطابق المتجر الذي بدأ الربط،
+        // فلا يستطيع أحد ربط حسابه بمتجر غيره عبر رابط يرسله للضحية
+        // ===================================
+        public async Task<TikTokConnectResult> CompleteAppConnectAsync(
+            Guid userId, string? code, string? state, CancellationToken ct = default)
+        {
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            var pending = string.IsNullOrEmpty(state) ? null : await _repository.GetStateAsync(state, ct);
+
+            // state صالح لمرة واحدة: يُحذف فوراً مهما كانت النتيجة
+            if (pending != null)
+            {
+                _repository.RemoveState(pending);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+
+            if (string.IsNullOrEmpty(code) || pending == null || !IsAppState(pending.State))
+                return TikTokConnectResult.Fail("invalid_state");
+
+            if (pending.ExpiresAt < Now)
+                return TikTokConnectResult.Fail("expired");
+
+            if (pending.VendorId != vendorId)
+            {
+                _logger.LogWarning("TikTok app connect rejected: state belongs to vendor {StateVendorId}, session vendor is {VendorId}", pending.VendorId, vendorId);
+                return TikTokConnectResult.Fail("invalid_state");
+            }
+
+            return await FinishConnectAsync(vendorId, code, ct);
+        }
+
+        public static bool IsAppState(string? state) =>
+            state != null && state.StartsWith(AppStatePrefix, StringComparison.Ordinal);
+
+        // تبديل الرمز بتوكن وحفظ الربط ومزامنة الحساب — مشترك بين الكوكي والتطبيق بعد التحقق من الطلب
+        private async Task<TikTokConnectResult> FinishConnectAsync(Guid vendorId, string code, CancellationToken ct)
+        {
             TikTokTokenResponse token;
             try
             {
@@ -185,15 +239,15 @@ namespace ecommerce.Services.TikTokService
             if (string.IsNullOrEmpty(token.OpenId) || string.IsNullOrEmpty(token.RefreshToken))
                 return TikTokConnectResult.Fail("token");
 
-            var gate = LockFor(pending.VendorId);
+            var gate = LockFor(vendorId);
             if (!await gate.WaitAsync(RefreshWaitLimit, ct))
                 return TikTokConnectResult.Fail("busy");
             try
             {
-                var connection = await _repository.GetConnectionAsync(pending.VendorId, includeVideos: true, ct);
+                var connection = await _repository.GetConnectionAsync(vendorId, includeVideos: true, ct);
                 if (connection == null)
                 {
-                    connection = new TikTokConnection { VendorId = pending.VendorId };
+                    connection = new TikTokConnection { VendorId = vendorId };
                     await _repository.AddConnectionAsync(connection, ct);
                 }
                 else if (connection.OpenId != token.OpenId)
@@ -212,7 +266,7 @@ namespace ecommerce.Services.TikTokService
                 connection.LastSyncError = null;
                 await _unitOfWork.SaveChangesAsync(ct);
 
-                _logger.LogInformation("Vendor {VendorId} connected TikTok account {OpenId}", pending.VendorId, token.OpenId);
+                _logger.LogInformation("Vendor {VendorId} connected TikTok account {OpenId}", vendorId, token.OpenId);
 
                 // جلب الحساب والفيديوهات فوراً — فشلها لا يُلغي الربط، وستُعاد بالمزامنة الدورية
                 await SyncConnectionAsync(connection, showAllNewVideos: isNewAccount, ct);

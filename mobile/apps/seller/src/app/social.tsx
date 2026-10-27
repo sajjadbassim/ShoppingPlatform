@@ -1,15 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { disconnectSocial, fetchSocialConnectUrl, fetchSocialStatus, formatDateTime, SOCIAL_PLATFORMS, socialAccountName, syncSocial, type SocialPlatform } from '@wasit/shared';
+import { completeSocialConnect, disconnectSocial, fetchSocialConnectUrl, fetchSocialStatus, formatDateTime, SOCIAL_PLATFORMS, socialAccountName, syncSocial, type SocialPlatform } from '@wasit/shared';
 import { AppText, useTheme } from '@wasit/ui';
 import { ActionButton, Card, Chip, IconTile, Screen } from '../components/kit';
 import { confirmDialog } from '../lib/dialog';
 import { toast } from '../lib/toast';
 
-// ربط حسابات التواصل: الربط يتم في المتصفح (صلاحية المنصة)، ثم تعود وتحدّث. النشر على الحسابات من لوحة الويب حالياً
+// ربط حسابات التواصل: موافقة المنصة تتم في المتصفح، ثم تعيد المنصة المتصفح إلى رابط التطبيق (wasit-seller://social?platform&code&state)
+// فيكمل التطبيق الربط بنفسه بـ JWT، بلا مرور على صفحة الويب. النشر على الحسابات من لوحة الويب حالياً
 export default function SocialScreen() {
   useTheme();
+  const queryClient = useQueryClient();
+  const params = useLocalSearchParams<{ platform?: string; code?: string; state?: string; error?: string }>();
+  const handled = useRef<string | null>(null);
+
+  useEffect(() => {
+    const { platform, code, state, error } = params;
+    const key = `${platform ?? ''}|${state ?? ''}|${error ?? ''}`;
+    if (!platform || (!state && !error) || handled.current === key) return;
+    handled.current = key;
+    const p = SOCIAL_PLATFORMS.find((x) => x.key === platform);
+    const clear = () => router.setParams({ platform: undefined, code: undefined, state: undefined, error: undefined });
+    if (!p) { clear(); return; }
+    if (error || !code || !state) {
+      toast.error(error === 'access_denied' ? 'لم تمنح المنصة الإذن للربط' : 'تعذّر إكمال الربط، حاول مرة أخرى');
+      clear();
+      return;
+    }
+    completeSocialConnect(p.key, code, state)
+      .then(() => { toast.success(`تم ربط ${p.label}`); queryClient.invalidateQueries({ queryKey: ['v-social', p.key] }); })
+      .catch((e) => toast.error((e as { message?: string }).message || 'تعذّر إكمال الربط'))
+      .finally(clear);
+  }, [params, queryClient]);
+
   return (
     <Screen title="ربط الحسابات" subtitle="اربط حساباتك لتظهر منشوراتك في متجرك وفي ريلز" back>
       {SOCIAL_PLATFORMS.map((p) => <PlatformCard key={p.key} platform={p.key} label={p.label} />)}
