@@ -17,6 +17,9 @@ namespace ecommerce.Core.Models
         // الصفحة التي يعود إليها التاجر بعد الربط (يُضاف لها ?instagram=connected|error)
         public string AfterConnectUrl { get; set; } = "/vendor/social";
 
+        // رابط التطبيق العميق الذي يعود إليه المتصفح بعد موافقة إنستغرام عند الربط من تطبيق الموبايل
+        public string AppReturnUrl { get; set; } = "wasit-seller://social";
+
         // instagram_business_content_publish: نشر منتجات التاجر من المنصة على حسابه (يحتاج موافقة Meta)
         public string Scopes { get; set; } = "instagram_business_basic,instagram_business_content_publish";
 

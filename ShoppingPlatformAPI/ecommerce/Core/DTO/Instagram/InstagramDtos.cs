@@ -48,4 +48,11 @@ namespace ecommerce.Core.DTO.Instagram
     {
         public string AuthorizeUrl { get; set; } = "";
     }
+
+    // إكمال الربط من التطبيق: القيمتان اللتان أعادهما المتصفح إلى رابط التطبيق
+    public class InstagramCompleteConnectDto
+    {
+        public string? Code { get; set; }
+        public string? State { get; set; }
+    }
 }

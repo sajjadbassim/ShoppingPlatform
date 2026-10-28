@@ -106,6 +106,7 @@ export const API_ENDPOINTS = {
   INSTAGRAM: {
     STATUS: '/api/integrations/instagram/status',
     CONNECT_URL: '/api/integrations/instagram/connect-url',
+    CONNECT_COMPLETE: '/api/integrations/instagram/connect/complete',
     SYNC: '/api/integrations/instagram/sync',
     MEDIA: '/api/integrations/instagram/media',
     MEDIA_ITEM: (id: Id) => `/api/integrations/instagram/media/${id}`,
@@ -121,6 +122,7 @@ export const API_ENDPOINTS = {
   FACEBOOK: {
     STATUS: '/api/integrations/facebook/status',
     CONNECT_URL: '/api/integrations/facebook/connect-url',
+    CONNECT_COMPLETE: '/api/integrations/facebook/connect/complete',
     PAGES: '/api/integrations/facebook/pages',
     SELECT_PAGE: '/api/integrations/facebook/pages/select',
     SYNC: '/api/integrations/facebook/sync',

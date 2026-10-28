@@ -20,6 +20,9 @@ namespace ecommerce.Core.Models
         // الصفحة التي يعود إليها التاجر بعد الربط (يُضاف لها ?facebook=connected|choose|error)
         public string AfterConnectUrl { get; set; } = "/vendor/social";
 
+        // رابط التطبيق العميق الذي يعود إليه المتصفح بعد موافقة فيسبوك عند الربط من تطبيق الموبايل
+        public string AppReturnUrl { get; set; } = "wasit-seller://social";
+
         // فارغ = بدون رقم إصدار (إصدار التطبيق الافتراضي). مثال: v23.0
         public string ApiVersion { get; set; } = "";
 

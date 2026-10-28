@@ -44,6 +44,20 @@ namespace ecommerce.Core.DTO.Facebook
         public string AuthorizeUrl { get; set; } = "";
     }
 
+    // إكمال الربط من التطبيق: القيمتان اللتان أعادهما المتصفح إلى رابط التطبيق
+    public class FacebookCompleteConnectDto
+    {
+        public string? Code { get; set; }
+        public string? State { get; set; }
+    }
+
+    // SelectionId غير فارغ: للتاجر أكثر من صفحة ويجب أن يختار واحدة (GET pages ثم POST pages/select)؛ وإلا فالحالة هي الصفحة المربوطة
+    public class FacebookCompleteConnectResultDto
+    {
+        public string? SelectionId { get; set; }
+        public FacebookStatusDto? Status { get; set; }
+    }
+
     // التاجر يدير أكثر من صفحة: يختار واحدة بعد العودة من فيسبوك
     public class FacebookPageOptionDto
     {

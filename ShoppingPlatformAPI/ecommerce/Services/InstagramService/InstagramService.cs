@@ -35,8 +35,10 @@ namespace ecommerce.Services.InstagramService
     public interface IInstagramService
     {
         Task<InstagramStatusDto> GetStatusAsync(Guid userId, CancellationToken ct = default);
-        Task<InstagramConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default);
+        // forApp: الربط من تطبيق الموبايل — يُثبَت بـ JWT عند الإكمال بدل كوكي المتصفح
+        Task<InstagramConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default);
         Task<InstagramConnectResult> CompleteConnectAsync(string? code, string? state, string? nonce, string? error, CancellationToken ct = default);
+        Task<InstagramConnectResult> CompleteAppConnectAsync(Guid userId, string? code, string? state, CancellationToken ct = default);
         Task<InstagramStatusDto> SyncAsync(Guid userId, CancellationToken ct = default);
         Task<List<SocialFeedItemDto>> GetMediaAsync(Guid userId, CancellationToken ct = default);
         Task<SocialFeedItemDto> UpdateMediaAsync(Guid userId, Guid mediaId, SocialMediaUpdateDto dto, CancellationToken ct = default);
@@ -62,6 +64,9 @@ namespace ecommerce.Services.InstagramService
 
     public class InstagramService : IInstagramService
     {
+        // بادئة state الربط من التطبيق: تفصل مساره (يُكمَل بـ JWT) عن مسار المتصفح (يُكمَل بالكوكي)
+        public const string AppStatePrefix = "app_";
+
         private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(10);
 
         // التوكن طويل الأمد صالح 60 يوماً، ويقبل التجديد بعد 24 ساعة من إصداره.
@@ -122,12 +127,12 @@ namespace ecommerce.Services.InstagramService
         // ===================================
         // الخطوة 1: إنشاء رابط التفويض
         // ===================================
-        public async Task<InstagramConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default)
+        public async Task<InstagramConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default)
         {
             EnsureConfigured();
             var vendorId = await GetVendorIdAsync(userId, ct);
 
-            var state = GenerateToken();
+            var state = (forApp ? AppStatePrefix : "") + GenerateToken();
             var nonce = GenerateToken();
 
             await _repository.AddStateAsync(new InstagramOAuthState
@@ -171,6 +176,13 @@ namespace ecommerce.Services.InstagramService
             if (pending.ExpiresAt < Now)
                 return InstagramConnectResult.Fail("expired");
 
+            // حالة الربط من التطبيق لا تُكمَل بالكوكي: تُكمَل فقط بـ JWT في CompleteAppConnectAsync
+            if (IsAppState(pending.State))
+            {
+                _logger.LogWarning("Instagram callback rejected: app state completed through the browser flow for vendor {VendorId}", pending.VendorId);
+                return InstagramConnectResult.Fail("invalid_state");
+            }
+
             if (string.IsNullOrEmpty(nonce) ||
                 !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(Hash(nonce)), Encoding.UTF8.GetBytes(pending.NonceHash)))
             {
@@ -178,6 +190,47 @@ namespace ecommerce.Services.InstagramService
                 return InstagramConnectResult.Fail("invalid_state");
             }
 
+            return await FinishConnectAsync(pending.VendorId, code, ct);
+        }
+
+        // ===================================
+        // الخطوة 2 (التطبيق): التطبيق يستلم code و state من رابطه العميق ويرسلهما مع JWT.
+        // المتجر صاحب الجلسة يجب أن يطابق المتجر الذي بدأ الربط، فلا يربط أحد حسابه بمتجر غيره
+        // ===================================
+        public async Task<InstagramConnectResult> CompleteAppConnectAsync(
+            Guid userId, string? code, string? state, CancellationToken ct = default)
+        {
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            var pending = string.IsNullOrEmpty(state) ? null : await _repository.GetStateAsync(state, ct);
+
+            // state صالح لمرة واحدة: يُحذف فوراً مهما كانت النتيجة
+            if (pending != null)
+            {
+                _repository.RemoveState(pending);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+
+            if (string.IsNullOrEmpty(code) || pending == null || !IsAppState(pending.State))
+                return InstagramConnectResult.Fail("invalid_state");
+
+            if (pending.ExpiresAt < Now)
+                return InstagramConnectResult.Fail("expired");
+
+            if (pending.VendorId != vendorId)
+            {
+                _logger.LogWarning("Instagram app connect rejected: state belongs to vendor {StateVendorId}, session vendor is {VendorId}", pending.VendorId, vendorId);
+                return InstagramConnectResult.Fail("invalid_state");
+            }
+
+            return await FinishConnectAsync(vendorId, code, ct);
+        }
+
+        public static bool IsAppState(string? state) =>
+            state != null && state.StartsWith(AppStatePrefix, StringComparison.Ordinal);
+
+        // تبديل الرمز بتوكن وحفظ الربط ومزامنة الحساب — مشترك بين الكوكي والتطبيق بعد التحقق من الطلب
+        private async Task<InstagramConnectResult> FinishConnectAsync(Guid vendorId, string code, CancellationToken ct)
+        {
             // إنستغرام يضيف "#_" لنهاية الكود في التوجيه — المتصفح يحذفه عادةً، احتياطاً
             if (code.EndsWith("#_")) code = code[..^2];
 
@@ -190,19 +243,19 @@ namespace ecommerce.Services.InstagramService
             }
             catch (Exception ex) when (ex is InstagramApiException or HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
             {
-                _logger.LogWarning(ex, "Instagram token exchange failed for vendor {VendorId}", pending.VendorId);
+                _logger.LogWarning(ex, "Instagram token exchange failed for vendor {VendorId}", vendorId);
                 return InstagramConnectResult.Fail("token");
             }
 
-            var gate = LockFor(pending.VendorId);
+            var gate = LockFor(vendorId);
             if (!await gate.WaitAsync(LockWaitLimit, ct))
                 return InstagramConnectResult.Fail("busy");
             try
             {
-                var connection = await _repository.GetConnectionAsync(pending.VendorId, includeMedia: true, ct);
+                var connection = await _repository.GetConnectionAsync(vendorId, includeMedia: true, ct);
                 if (connection == null)
                 {
-                    connection = new InstagramConnection { VendorId = pending.VendorId };
+                    connection = new InstagramConnection { VendorId = vendorId };
                     await _repository.AddConnectionAsync(connection, ct);
                 }
                 else if (connection.InstagramUserId != shortToken.UserId)
@@ -222,7 +275,7 @@ namespace ecommerce.Services.InstagramService
                 connection.LastSyncError = null;
                 await _unitOfWork.SaveChangesAsync(ct);
 
-                _logger.LogInformation("Vendor {VendorId} connected Instagram account {UserId}", pending.VendorId, shortToken.UserId);
+                _logger.LogInformation("Vendor {VendorId} connected Instagram account {UserId}", vendorId, shortToken.UserId);
 
                 // جلب الحساب والمنشورات فوراً — فشلها لا يُلغي الربط، وستُعاد بالمزامنة الدورية
                 await SyncConnectionAsync(connection, showAllNewMedia: isNewAccount, ct);

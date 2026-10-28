@@ -834,8 +834,8 @@ export type SocialPlatform = 'instagram' | 'facebook' | 'tiktok';
 
 // appConnect: المنصة تدعم الربط من التطبيق بلا صفحة ويب (connect-url?client=app ثم إكماله بـ JWT عند عودة المتصفح)
 const SOCIAL_ENDPOINTS: Record<SocialPlatform, { status: string; connectUrl: string; sync?: string; connection: string; completeUrl?: string }> = {
-  instagram: { status: API_ENDPOINTS.INSTAGRAM.STATUS, connectUrl: API_ENDPOINTS.INSTAGRAM.CONNECT_URL, sync: API_ENDPOINTS.INSTAGRAM.SYNC, connection: API_ENDPOINTS.INSTAGRAM.CONNECTION },
-  facebook: { status: API_ENDPOINTS.FACEBOOK.STATUS, connectUrl: API_ENDPOINTS.FACEBOOK.CONNECT_URL, sync: API_ENDPOINTS.FACEBOOK.SYNC, connection: API_ENDPOINTS.FACEBOOK.CONNECTION },
+  instagram: { status: API_ENDPOINTS.INSTAGRAM.STATUS, connectUrl: API_ENDPOINTS.INSTAGRAM.CONNECT_URL, sync: API_ENDPOINTS.INSTAGRAM.SYNC, connection: API_ENDPOINTS.INSTAGRAM.CONNECTION, completeUrl: API_ENDPOINTS.INSTAGRAM.CONNECT_COMPLETE },
+  facebook: { status: API_ENDPOINTS.FACEBOOK.STATUS, connectUrl: API_ENDPOINTS.FACEBOOK.CONNECT_URL, sync: API_ENDPOINTS.FACEBOOK.SYNC, connection: API_ENDPOINTS.FACEBOOK.CONNECTION, completeUrl: API_ENDPOINTS.FACEBOOK.CONNECT_COMPLETE },
   tiktok: { status: API_ENDPOINTS.TIKTOK.STATUS, connectUrl: API_ENDPOINTS.TIKTOK.CONNECT_URL, sync: API_ENDPOINTS.TIKTOK.SYNC, connection: API_ENDPOINTS.TIKTOK.CONNECTION, completeUrl: API_ENDPOINTS.TIKTOK.CONNECT_COMPLETE },
 };
 
@@ -859,10 +859,18 @@ export const fetchSocialConnectUrl = async (p: SocialPlatform): Promise<string> 
   return typeof data === 'string' ? data : data?.authorizeUrl ?? data?.url ?? '';
 };
 // يكمل الربط بعد أن يعيد المتصفح code و state إلى رابط التطبيق: الـ JWT هو الذي يثبت أن الطلب من صاحب المتجر نفسه
-export const completeSocialConnect = async (p: SocialPlatform, code: string, state: string): Promise<SocialStatus> => {
+// فيسبوك: إن كان للتاجر أكثر من صفحة يعيد selectionId ليختار منها (fetchFacebookPages ثم selectFacebookPage)، وغير ذلك null
+export const completeSocialConnect = async (p: SocialPlatform, code: string, state: string): Promise<{ selectionId: string | null }> => {
   const url = SOCIAL_ENDPOINTS[p].completeUrl;
   if (!url) throw new Error('الربط من التطبيق غير متاح لهذه المنصة بعد');
-  return unwrap(await api.post(url, { code, state }));
+  const data = unwrap<{ selectionId?: string | null } | null>(await api.post(url, { code, state }));
+  return { selectionId: p === 'facebook' ? data?.selectionId ?? null : null };
+};
+export interface FacebookPageOption { id: string; name?: string | null; pictureUrl?: string | null }
+export const fetchFacebookPages = async (selectionId: string): Promise<FacebookPageOption[]> =>
+  unwrap(await api.get(API_ENDPOINTS.FACEBOOK.PAGES, { params: { selection: selectionId } })) ?? [];
+export const selectFacebookPage = async (selectionId: string, pageId: string): Promise<void> => {
+  await api.post(API_ENDPOINTS.FACEBOOK.SELECT_PAGE, { selectionId, pageId });
 };
 export const syncSocial = async (p: SocialPlatform): Promise<void> => {
   const url = SOCIAL_ENDPOINTS[p].sync;

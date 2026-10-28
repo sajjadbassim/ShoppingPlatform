@@ -2,6 +2,7 @@ using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Facebook;
 using ecommerce.Core.DTO.Social;
+using ecommerce.Core.Exceptions;
 using ecommerce.Core.Interfaces;
 using ecommerce.Core.Models;
 using ecommerce.Services.FacebookService;
@@ -42,23 +43,54 @@ namespace ecommerce.Controllers
         }
 
         // GET: api/integrations/facebook/connect-url — الخطوة 1
+        // ?client=app: الربط من تطبيق الموبايل — لا كوكي، ويُكمَل بـ POST connect/complete بعد عودة المتصفح إلى رابط التطبيق
         [HttpGet("connect-url")]
-        public async Task<ActionResult<ApiResponse<FacebookConnectUrlDto>>> GetConnectUrl(CancellationToken ct)
+        public async Task<ActionResult<ApiResponse<FacebookConnectUrlDto>>> GetConnectUrl([FromQuery] string? client, CancellationToken ct)
         {
-            var start = await _facebookService.StartConnectAsync(_currentUser.UserId, ct);
+            var forApp = string.Equals(client, "app", StringComparison.OrdinalIgnoreCase);
+            var start = await _facebookService.StartConnectAsync(_currentUser.UserId, forApp, ct);
 
-            Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+            if (!forApp)
             {
-                HttpOnly = true,
-                Secure = Request.IsHttps,
-                SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من facebook.com
-                Path = CookiePath,
-                MaxAge = TimeSpan.FromMinutes(10),
-                IsEssential = true
-            });
+                Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من facebook.com
+                    Path = CookiePath,
+                    MaxAge = TimeSpan.FromMinutes(10),
+                    IsEssential = true
+                });
+            }
 
             return Ok(ApiResponse<FacebookConnectUrlDto>.Ok(new FacebookConnectUrlDto { AuthorizeUrl = start.AuthorizeUrl }));
         }
+
+        // POST: api/integrations/facebook/connect/complete — { code, state } من رابط التطبيق العميق (الخطوة 3 للتطبيق)
+        // أكثر من صفحة: يعيد selectionId ويكمل التطبيق بـ GET pages ثم POST pages/select
+        [HttpPost("connect/complete")]
+        public async Task<ActionResult<ApiResponse<FacebookCompleteConnectResultDto>>> CompleteConnect(FacebookCompleteConnectDto dto, CancellationToken ct)
+        {
+            var result = await _facebookService.CompleteAppConnectAsync(_currentUser.UserId, dto.Code, dto.State, ct);
+            if (!result.Success)
+                throw new BusinessRuleException(ConnectFailureMessage(result.Reason));
+
+            if (result.SelectionId != null)
+                return Ok(ApiResponse<FacebookCompleteConnectResultDto>.Ok(new FacebookCompleteConnectResultDto { SelectionId = result.SelectionId }));
+
+            var status = await _facebookService.GetStatusAsync(_currentUser.UserId, ct);
+            return Ok(ApiResponse<FacebookCompleteConnectResultDto>.Ok(new FacebookCompleteConnectResultDto { Status = status }, "تم ربط صفحة فيسبوك"));
+        }
+
+        private static string ConnectFailureMessage(string? reason) => reason switch
+        {
+            "denied" => "لم تمنح فيسبوك الإذن للربط",
+            "expired" => "انتهت مهلة طلب الربط، حاول مرة أخرى",
+            "token" => "تعذّر إكمال الربط مع فيسبوك، حاول مرة أخرى",
+            "no_pages" => "لم تُمنح أي صفحة فيسبوك. اختر صفحة تديرها عند الربط",
+            "busy" => "عملية أخرى جارية على حسابك، حاول بعد لحظات",
+            _ => "تعذّر التحقق من طلب الربط، حاول مرة أخرى"
+        };
 
         // GET: api/integrations/facebook/callback — الخطوة 2 (فيسبوك يعيد المتصفح إلى هنا)
         // AllowAnonymous: التوجيه لا يحمل JWT؛ المتجر يُعرف من state المحفوظ في الخادم + كوكي المتصفح
@@ -70,6 +102,10 @@ namespace ecommerce.Controllers
             [FromQuery] string? error,
             CancellationToken ct)
         {
+            // الربط من التطبيق: لا يُكمَل هنا (لا كوكي ولا JWT) — يُعاد المتصفح إلى التطبيق ليكمله بـ JWT
+            if (FacebookService.IsAppState(state))
+                return Redirect(BuildAppReturnUrl(code, state, error));
+
             var nonce = Request.Cookies[NonceCookieName];
             Response.Cookies.Delete(NonceCookieName, new CookieOptions { Path = CookiePath });
 
@@ -84,6 +120,16 @@ namespace ecommerce.Controllers
                 url += "&reason=" + Uri.EscapeDataString(result.Reason);
 
             return Redirect(url);
+        }
+
+        private string BuildAppReturnUrl(string? code, string? state, string? error)
+        {
+            var separator = _options.AppReturnUrl.Contains('?') ? "&" : "?";
+            var url = _options.AppReturnUrl + separator + "platform=facebook";
+            if (!string.IsNullOrEmpty(code)) url += "&code=" + Uri.EscapeDataString(code);
+            if (!string.IsNullOrEmpty(state)) url += "&state=" + Uri.EscapeDataString(state);
+            if (!string.IsNullOrEmpty(error)) url += "&error=" + Uri.EscapeDataString(error);
+            return url;
         }
 
         // GET: api/integrations/facebook/pages?selection=... — الصفحات المنتظرة للاختيار

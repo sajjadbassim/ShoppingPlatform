@@ -209,3 +209,16 @@
 **نطاق التنفيذ:** تيك توك فقط. إنستغرام وفيسبوك ما زالا على مسار الكوكي (الخطوة التالية بالتصميم نفسه). في التطبيق يمرّ `client=app` لمنصة لها `completeUrl` فقط، فلا يتأثر الباقي.
 
 **للنشر:** لا إعداد جديد إلزامي (القيمة الافتراضية `AppReturnUrl` تطابق مخطط التطبيق). عنوان الرجوع المسجّل لدى تيك توك (`TikTok__RedirectUri`) لا يتغير.
+
+## نقل إنستغرام وفيسبوك إلى تدفق التطبيق بلا صفحة ويب (2026-10-28، نُفِّذ بإذن المستخدم)
+**القرار:** التدفق نفسه الذي نُفِّذ لتيك توك (انظر القسم السابق)، فالمنصات الثلاث صارت تُربط من تطبيق البائع بلا كوكي ولا صفحة ويب. مسار المتصفح بالكوكي في الويب لم يتغير.
+
+**التدفق:** `GET connect-url?client=app` يولّد `state` يبدأ بـ`app_` بلا كوكي ← `callback` يحوّل المتصفح إلى `wasit-seller://social?platform=instagram|facebook&code&state` دون استهلاك الـstate ← التطبيق يستدعي `POST connect/complete` بـJWT، والباك يطابق متجر الجلسة مع متجر الـstate ثم يكمل (تبديل الرمز، الحفظ، المزامنة). حالة `app_` لا تُقبل في مسار الكوكي، وحالة المتصفح لا تُقبل في مسار التطبيق.
+
+**إنستغرام:** `Core/Models/InstagramOptions.cs` (`AppReturnUrl`)، `Core/DTO/Instagram/InstagramDtos.cs` (`InstagramCompleteConnectDto`)، `InstagramService` (`StartConnectAsync(userId, forApp)`، `CompleteAppConnectAsync`، `IsAppState`، `FinishConnectAsync` المشترك)، `InstagramController` (`?client=app`، فرع `app_` في `callback`، `POST api/integrations/instagram/connect/complete`).
+
+**فيسبوك:** الملفات نفسها بأسمائها (`FacebookOptions`, `FacebookDtos`, `FacebookService`, `FacebookController`)، مع فرق واحد: قد يملك التاجر أكثر من صفحة. فـ`POST api/integrations/facebook/connect/complete` يعيد `{ selectionId, status }`: إن كان `selectionId` غير فارغ يختار التطبيق صفحة عبر `GET pages?selection=` ثم `POST pages/select` (نقطتان موجودتان وبـJWT)، وإلا فالصفحة رُبطت مباشرة. صار للتطبيق رسالة خاصة للحالة `no_pages`.
+
+**اختبارات:** 8 جديدة لإنستغرام و9 لفيسبوك بالنمط نفسه (بادئة الحالة، رفضها في مسار المتصفح، متجر آخر مع استهلاك الـstate، حالة المتصفح في مسار التطبيق، انتهاء المهلة، state مجهول، مستخدم بلا متجر، النجاح بلا nonce، وصفحة واحدة أو عدة صفحات لفيسبوك). الحزمة كاملة 593 ناجحاً.
+
+**للنشر:** لا إعداد إلزامي جديد (`AppReturnUrl` الافتراضي يطابق مخطط التطبيق). يجب أن يكون رابط إعادة التوجيه الخاص بكل منصة مسجلاً في لوحة المطورين كما هو. لا مهاجرة لقاعدة البيانات.

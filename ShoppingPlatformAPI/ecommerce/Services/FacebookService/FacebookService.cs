@@ -26,8 +26,10 @@ namespace ecommerce.Services.FacebookService
     public interface IFacebookService
     {
         Task<FacebookStatusDto> GetStatusAsync(Guid userId, CancellationToken ct = default);
-        Task<FacebookConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default);
+        // forApp: الربط من تطبيق الموبايل — يُثبَت بـ JWT عند الإكمال بدل كوكي المتصفح
+        Task<FacebookConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default);
         Task<FacebookConnectResult> CompleteConnectAsync(string? code, string? state, string? nonce, string? error, CancellationToken ct = default);
+        Task<FacebookConnectResult> CompleteAppConnectAsync(Guid userId, string? code, string? state, CancellationToken ct = default);
         Task<List<FacebookPageOptionDto>> GetPendingPagesAsync(Guid userId, string selectionId, CancellationToken ct = default);
         Task<FacebookStatusDto> SelectPageAsync(Guid userId, FacebookSelectPageDto dto, CancellationToken ct = default);
         Task<FacebookStatusDto> SyncAsync(Guid userId, CancellationToken ct = default);
@@ -48,6 +50,9 @@ namespace ecommerce.Services.FacebookService
 
     public class FacebookService : IFacebookService
     {
+        // بادئة state الربط من التطبيق: تفصل مساره (يُكمَل بـ JWT) عن مسار المتصفح (يُكمَل بالكوكي)
+        public const string AppStatePrefix = "app_";
+
         private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan SelectionLifetime = TimeSpan.FromMinutes(10);
         private const string SelectionCachePrefix = "facebook-page-selection:";
@@ -109,12 +114,12 @@ namespace ecommerce.Services.FacebookService
         // ===================================
         // الخطوة 1: إنشاء رابط التفويض
         // ===================================
-        public async Task<FacebookConnectStart> StartConnectAsync(Guid userId, CancellationToken ct = default)
+        public async Task<FacebookConnectStart> StartConnectAsync(Guid userId, bool forApp = false, CancellationToken ct = default)
         {
             EnsureConfigured();
             var vendorId = await GetVendorIdAsync(userId, ct);
 
-            var state = GenerateToken();
+            var state = (forApp ? AppStatePrefix : "") + GenerateToken();
             var nonce = GenerateToken();
 
             await _repository.AddStateAsync(new FacebookOAuthState
@@ -157,6 +162,13 @@ namespace ecommerce.Services.FacebookService
             if (pending.ExpiresAt < Now)
                 return FacebookConnectResult.Fail("expired");
 
+            // حالة الربط من التطبيق لا تُكمَل بالكوكي: تُكمَل فقط بـ JWT في CompleteAppConnectAsync
+            if (IsAppState(pending.State))
+            {
+                _logger.LogWarning("Facebook callback rejected: app state completed through the browser flow for vendor {VendorId}", pending.VendorId);
+                return FacebookConnectResult.Fail("invalid_state");
+            }
+
             if (string.IsNullOrEmpty(nonce) ||
                 !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(Hash(nonce)), Encoding.UTF8.GetBytes(pending.NonceHash)))
             {
@@ -164,6 +176,47 @@ namespace ecommerce.Services.FacebookService
                 return FacebookConnectResult.Fail("invalid_state");
             }
 
+            return await FinishConnectAsync(pending.VendorId, code, ct);
+        }
+
+        // ===================================
+        // الخطوة 2 (التطبيق): التطبيق يستلم code و state من رابطه العميق ويرسلهما مع JWT.
+        // المتجر صاحب الجلسة يجب أن يطابق المتجر الذي بدأ الربط، فلا يربط أحد صفحته بمتجر غيره
+        // ===================================
+        public async Task<FacebookConnectResult> CompleteAppConnectAsync(
+            Guid userId, string? code, string? state, CancellationToken ct = default)
+        {
+            var vendorId = await GetVendorIdAsync(userId, ct);
+            var pending = string.IsNullOrEmpty(state) ? null : await _repository.GetStateAsync(state, ct);
+
+            // state صالح لمرة واحدة: يُحذف فوراً مهما كانت النتيجة
+            if (pending != null)
+            {
+                _repository.RemoveState(pending);
+                await _unitOfWork.SaveChangesAsync(ct);
+            }
+
+            if (string.IsNullOrEmpty(code) || pending == null || !IsAppState(pending.State))
+                return FacebookConnectResult.Fail("invalid_state");
+
+            if (pending.ExpiresAt < Now)
+                return FacebookConnectResult.Fail("expired");
+
+            if (pending.VendorId != vendorId)
+            {
+                _logger.LogWarning("Facebook app connect rejected: state belongs to vendor {StateVendorId}, session vendor is {VendorId}", pending.VendorId, vendorId);
+                return FacebookConnectResult.Fail("invalid_state");
+            }
+
+            return await FinishConnectAsync(vendorId, code, ct);
+        }
+
+        public static bool IsAppState(string? state) =>
+            state != null && state.StartsWith(AppStatePrefix, StringComparison.Ordinal);
+
+        // تبديل الرمز بتوكن وجلب الصفحات وربطها أو طلب الاختيار — مشترك بين الكوكي والتطبيق بعد التحقق من الطلب
+        private async Task<FacebookConnectResult> FinishConnectAsync(Guid vendorId, string code, CancellationToken ct)
+        {
             string userId, scopes;
             List<FacebookPageAccount> pages;
             try
@@ -197,12 +250,12 @@ namespace ecommerce.Services.FacebookService
                         }
                     }
                     _logger.LogWarning("Facebook /me/accounts returned no pages for vendor {VendorId}; granted scopes [{Scopes}], granted page ids [{Ids}], usable {Count}",
-                        pending.VendorId, scopes, string.Join(',', grantedIds), pages.Count);
+                        vendorId, scopes, string.Join(',', grantedIds), pages.Count);
                 }
             }
             catch (Exception ex) when (ex is FacebookApiException or HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
             {
-                _logger.LogWarning(ex, "Facebook token exchange failed for vendor {VendorId}", pending.VendorId);
+                _logger.LogWarning(ex, "Facebook token exchange failed for vendor {VendorId}", vendorId);
                 return FacebookConnectResult.Fail("token");
             }
 
@@ -212,7 +265,7 @@ namespace ecommerce.Services.FacebookService
             if (pages.Count == 1)
             {
                 var page = pages[0];
-                return await ConnectPageAsync(pending.VendorId, userId, scopes, page.Id!, page.Name, page.Picture?.Data?.Url, page.AccessToken!, ct)
+                return await ConnectPageAsync(vendorId, userId, scopes, page.Id!, page.Name, page.Picture?.Data?.Url, page.AccessToken!, ct)
                     ? FacebookConnectResult.Ok()
                     : FacebookConnectResult.Fail("busy");
             }
@@ -220,7 +273,7 @@ namespace ecommerce.Services.FacebookService
             // أكثر من صفحة: يختار التاجر في المنصة
             var selectionId = GenerateToken();
             _cache.Set(SelectionCachePrefix + selectionId,
-                new PendingSelection(pending.VendorId, userId, scopes,
+                new PendingSelection(vendorId, userId, scopes,
                     pages.Select(p => new PendingPage(p.Id!, p.Name, p.Picture?.Data?.Url, _protector.Protect(p.AccessToken!))).ToList()),
                 SelectionLifetime);
             return FacebookConnectResult.Choose(selectionId);

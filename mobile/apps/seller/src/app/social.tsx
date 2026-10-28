@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Linking, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { completeSocialConnect, disconnectSocial, fetchSocialConnectUrl, fetchSocialStatus, formatDateTime, SOCIAL_PLATFORMS, socialAccountName, syncSocial, type SocialPlatform } from '@wasit/shared';
+import { completeSocialConnect, disconnectSocial, fetchFacebookPages, fetchSocialConnectUrl, fetchSocialStatus, formatDateTime, selectFacebookPage, SOCIAL_PLATFORMS, socialAccountName, syncSocial, type FacebookPageOption, type SocialPlatform } from '@wasit/shared';
 import { AppText, useTheme } from '@wasit/ui';
 import { ActionButton, Card, Chip, IconTile, Screen } from '../components/kit';
 import { confirmDialog } from '../lib/dialog';
@@ -15,6 +15,24 @@ export default function SocialScreen() {
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ platform?: string; code?: string; state?: string; error?: string }>();
   const handled = useRef<string | null>(null);
+  // فيسبوك: للتاجر أكثر من صفحة فيختار واحدة بعد عودته من المتصفح
+  const [pick, setPick] = useState<{ selectionId: string; pages: FacebookPageOption[] } | null>(null);
+  const [picking, setPicking] = useState(false);
+
+  const choosePage = async (pageId: string) => {
+    if (!pick) return;
+    setPicking(true);
+    try {
+      await selectFacebookPage(pick.selectionId, pageId);
+      toast.success('تم ربط فيسبوك');
+      setPick(null);
+      queryClient.invalidateQueries({ queryKey: ['v-social', 'facebook'] });
+    } catch (e) {
+      toast.error((e as { message?: string }).message || 'تعذّر ربط الصفحة');
+    } finally {
+      setPicking(false);
+    }
+  };
 
   useEffect(() => {
     const { platform, code, state, error } = params;
@@ -30,13 +48,30 @@ export default function SocialScreen() {
       return;
     }
     completeSocialConnect(p.key, code, state)
-      .then(() => { toast.success(`تم ربط ${p.label}`); queryClient.invalidateQueries({ queryKey: ['v-social', p.key] }); })
+      .then(async ({ selectionId }) => {
+        if (selectionId) {
+          const pages = await fetchFacebookPages(selectionId);
+          setPick({ selectionId, pages });
+          toast.info('اختر الصفحة التي تريد ربطها');
+          return;
+        }
+        toast.success(`تم ربط ${p.label}`);
+        queryClient.invalidateQueries({ queryKey: ['v-social', p.key] });
+      })
       .catch((e) => toast.error((e as { message?: string }).message || 'تعذّر إكمال الربط'))
       .finally(clear);
   }, [params, queryClient]);
 
   return (
     <Screen title="ربط الحسابات" subtitle="اربط حساباتك لتظهر منشوراتك في متجرك وفي ريلز" back>
+      {pick && (
+        <Card tone="warn">
+          <AppText weight="extraBold" style={{ fontSize: 16 }}>اختر صفحة فيسبوك</AppText>
+          <AppText muted style={{ fontSize: 12.5 }}>لديك أكثر من صفحة، اختر التي تريد ربطها بمتجرك.</AppText>
+          {pick.pages.map((pg) => <ActionButton key={pg.id} title={pg.name || pg.id} icon="logo-facebook" tone="soft" onPress={() => choosePage(pg.id)} loading={picking} compact />)}
+          <ActionButton title="إلغاء" tone="ghost" onPress={() => setPick(null)} compact />
+        </Card>
+      )}
       {SOCIAL_PLATFORMS.map((p) => <PlatformCard key={p.key} platform={p.key} label={p.label} />)}
       <Card>
         <AppText muted style={{ fontSize: 13, lineHeight: 22 }}>نشر المنتجات على هذه الحسابات وجدولتها غير متاح في التطبيق بعد، ويتم من لوحة التاجر على الويب.</AppText>
@@ -60,7 +95,7 @@ function PlatformCard({ platform, label }: { platform: SocialPlatform; label: st
       const url = await fetchSocialConnectUrl(platform);
       if (!url) throw new Error('تعذّر الحصول على رابط الربط');
       await Linking.openURL(url);
-      toast.info('أكمل الربط في المتصفح ثم عد وحدّث الصفحة');
+      toast.info('أكمل الربط في المتصفح وسيعيدك إلى التطبيق تلقائياً');
     } catch (e) {
       toast.error((e as { message?: string }).message || 'تعذّر بدء الربط');
     } finally {

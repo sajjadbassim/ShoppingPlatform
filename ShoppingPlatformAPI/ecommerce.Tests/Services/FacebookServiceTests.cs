@@ -232,6 +232,128 @@ namespace ecommerce.Tests.Services
             Assert.All(c.Media, m => Assert.False(m.IsHidden));
         }
 
+        // ===================================
+        // الربط من التطبيق (JWT بدل كوكي المتصفح)
+        // ===================================
+        private FacebookOAuthState AppPendingState(Guid? vendorId = null, DateTime? expiresAt = null) => new()
+        {
+            State = FacebookService.AppStatePrefix + "state-2",
+            VendorId = vendorId ?? _vendorId,
+            NonceHash = Hash("unused"),
+            ExpiresAt = expiresAt ?? Now.AddMinutes(5)
+        };
+
+        private FacebookOAuthState SetupAppState(Guid? vendorId = null, DateTime? expiresAt = null)
+        {
+            var pending = AppPendingState(vendorId, expiresAt);
+            _repository.Setup(r => r.GetStateAsync(pending.State, It.IsAny<CancellationToken>())).ReturnsAsync(pending);
+            return pending;
+        }
+
+        [Fact]
+        public async Task StartConnect_ForApp_StatePrefixed_SoItCannotCompleteInTheBrowser()
+        {
+            FacebookOAuthState? saved = null;
+            _repository.Setup(r => r.AddStateAsync(It.IsAny<FacebookOAuthState>(), It.IsAny<CancellationToken>()))
+                .Callback<FacebookOAuthState, CancellationToken>((s, _) => saved = s);
+
+            var start = await CreateService().StartConnectAsync(_userId, forApp: true);
+
+            Assert.NotNull(saved);
+            Assert.StartsWith(FacebookService.AppStatePrefix, saved!.State);
+            Assert.Equal(_vendorId, saved.VendorId);
+            Assert.EndsWith(saved.State, start.AuthorizeUrl);
+        }
+
+        [Fact]
+        public async Task CompleteConnect_AppState_ThroughBrowserFlow_IsRejected()
+        {
+            var pending = SetupAppState();
+
+            var result = await CreateService().CompleteConnectAsync("code", pending.State, "unused", null);
+
+            Assert.Equal("invalid_state", result.Reason);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_StateOfAnotherVendor_IsRejected_AndStateConsumed()
+        {
+            var pending = SetupAppState(vendorId: Guid.NewGuid());
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.Equal("invalid_state", result.Reason);
+            _repository.Verify(r => r.RemoveState(pending), Times.Once);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_BrowserState_IsRejected()
+        {
+            SetupState();
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", "state-1");
+
+            Assert.Equal("invalid_state", result.Reason);
+            _api.Verify(a => a.ExchangeCodeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_ExpiredState_IsRejected()
+        {
+            var pending = SetupAppState(expiresAt: Now.AddMinutes(-1));
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.Equal("expired", result.Reason);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_UnknownState_IsRejected()
+        {
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", "app_missing");
+
+            Assert.Equal("invalid_state", result.Reason);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_UserWithoutStore_IsForbidden()
+        {
+            _repository.Setup(r => r.GetVendorIdByOwnerAsync(_userId, It.IsAny<CancellationToken>())).ReturnsAsync((Guid?)null);
+            await Assert.ThrowsAsync<ForbiddenException>(() => CreateService().CompleteAppConnectAsync(_userId, "code", "app_x"));
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_SinglePage_Connects_WithoutNonce()
+        {
+            var pending = SetupAppState();
+            SetupPages("page-1");
+            CaptureAdded();
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.True(result.Success);
+            Assert.Null(result.SelectionId);
+            var c = await _repository.Object.GetConnectionAsync(_vendorId, false);
+            Assert.Equal("page-1", c!.PageId);
+            _repository.Verify(r => r.RemoveState(pending), Times.Once);
+        }
+
+        [Fact]
+        public async Task CompleteAppConnect_SeveralPages_AsksToChoose()
+        {
+            var pending = SetupAppState();
+            SetupPages("page-1", "page-2");
+            CaptureAdded();
+
+            var result = await CreateService().CompleteAppConnectAsync(_userId, "code", pending.State);
+
+            Assert.True(result.Success);
+            Assert.NotNull(result.SelectionId);
+            _repository.Verify(r => r.AddConnectionAsync(It.IsAny<FacebookConnection>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+
         [Fact]
         public async Task CompleteConnect_SeveralPages_AsksToChoose_ThenSelectionConnects()
         {

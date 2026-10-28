@@ -2,6 +2,7 @@ using ecommerce.Common;
 using ecommerce.Core.Constants;
 using ecommerce.Core.DTO.Instagram;
 using ecommerce.Core.DTO.Social;
+using ecommerce.Core.Exceptions;
 using ecommerce.Core.Interfaces;
 using ecommerce.Core.Models;
 using ecommerce.Services.InstagramService;
@@ -75,23 +76,49 @@ namespace ecommerce.Controllers
         }
 
         // GET: api/integrations/instagram/connect-url — الخطوة 1
+        // ?client=app: الربط من تطبيق الموبايل — لا كوكي، ويُكمَل بـ POST connect/complete بعد عودة المتصفح إلى رابط التطبيق
         [HttpGet("connect-url")]
-        public async Task<ActionResult<ApiResponse<InstagramConnectUrlDto>>> GetConnectUrl(CancellationToken ct)
+        public async Task<ActionResult<ApiResponse<InstagramConnectUrlDto>>> GetConnectUrl([FromQuery] string? client, CancellationToken ct)
         {
-            var start = await _instagramService.StartConnectAsync(_currentUser.UserId, ct);
+            var forApp = string.Equals(client, "app", StringComparison.OrdinalIgnoreCase);
+            var start = await _instagramService.StartConnectAsync(_currentUser.UserId, forApp, ct);
 
-            Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+            if (!forApp)
             {
-                HttpOnly = true,
-                Secure = Request.IsHttps,
-                SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من instagram.com
-                Path = CookiePath,
-                MaxAge = TimeSpan.FromMinutes(10),
-                IsEssential = true
-            });
+                Response.Cookies.Append(NonceCookieName, start.Nonce, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,   // يُرسَل مع التوجيه العائد من instagram.com
+                    Path = CookiePath,
+                    MaxAge = TimeSpan.FromMinutes(10),
+                    IsEssential = true
+                });
+            }
 
             return Ok(ApiResponse<InstagramConnectUrlDto>.Ok(new InstagramConnectUrlDto { AuthorizeUrl = start.AuthorizeUrl }));
         }
+
+        // POST: api/integrations/instagram/connect/complete — { code, state } من رابط التطبيق العميق (الخطوة 3 للتطبيق)
+        [HttpPost("connect/complete")]
+        public async Task<ActionResult<ApiResponse<InstagramStatusDto>>> CompleteConnect(InstagramCompleteConnectDto dto, CancellationToken ct)
+        {
+            var result = await _instagramService.CompleteAppConnectAsync(_currentUser.UserId, dto.Code, dto.State, ct);
+            if (!result.Success)
+                throw new BusinessRuleException(ConnectFailureMessage(result.Reason));
+
+            var status = await _instagramService.GetStatusAsync(_currentUser.UserId, ct);
+            return Ok(ApiResponse<InstagramStatusDto>.Ok(status, "تم ربط حساب إنستغرام"));
+        }
+
+        private static string ConnectFailureMessage(string? reason) => reason switch
+        {
+            "denied" => "لم تمنح إنستغرام الإذن للربط",
+            "expired" => "انتهت مهلة طلب الربط، حاول مرة أخرى",
+            "token" => "تعذّر إكمال الربط مع إنستغرام، حاول مرة أخرى",
+            "busy" => "عملية أخرى جارية على حسابك، حاول بعد لحظات",
+            _ => "تعذّر التحقق من طلب الربط، حاول مرة أخرى"
+        };
 
         // GET: api/integrations/instagram/callback?code=...&state=... — الخطوة 2 (إنستغرام يعيد المتصفح إلى هنا)
         // AllowAnonymous: التوجيه لا يحمل JWT؛ المتجر يُعرف من state المحفوظ في الخادم + كوكي المتصفح
@@ -103,6 +130,10 @@ namespace ecommerce.Controllers
             [FromQuery] string? error,
             CancellationToken ct)
         {
+            // الربط من التطبيق: لا يُكمَل هنا (لا كوكي ولا JWT) — يُعاد المتصفح إلى التطبيق ليكمله بـ JWT
+            if (InstagramService.IsAppState(state))
+                return Redirect(BuildAppReturnUrl(code, state, error));
+
             var nonce = Request.Cookies[NonceCookieName];
             Response.Cookies.Delete(NonceCookieName, new CookieOptions { Path = CookiePath });
 
@@ -114,6 +145,16 @@ namespace ecommerce.Controllers
                 url += "&reason=" + Uri.EscapeDataString(result.Reason);
 
             return Redirect(url);
+        }
+
+        private string BuildAppReturnUrl(string? code, string? state, string? error)
+        {
+            var separator = _options.AppReturnUrl.Contains('?') ? "&" : "?";
+            var url = _options.AppReturnUrl + separator + "platform=instagram";
+            if (!string.IsNullOrEmpty(code)) url += "&code=" + Uri.EscapeDataString(code);
+            if (!string.IsNullOrEmpty(state)) url += "&state=" + Uri.EscapeDataString(state);
+            if (!string.IsNullOrEmpty(error)) url += "&error=" + Uri.EscapeDataString(error);
+            return url;
         }
 
         // POST: api/integrations/instagram/sync
