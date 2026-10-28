@@ -28,7 +28,7 @@ namespace ecommerce.Core.Models
         [Column("platform")]
         public string Platform { get; set; }
 
-        // customer | driver — أي تطبيق سجّل هذا الجهاز
+        // customer | driver | seller — أي تطبيق سجّل هذا الجهاز
         [Required]
         [MaxLength(20)]
         [Column("app")]

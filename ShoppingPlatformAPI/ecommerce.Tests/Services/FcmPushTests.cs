@@ -128,6 +128,18 @@ namespace ecommerce.Tests.Services
             Assert.Equal("android", saved.Platform);
         }
 
+        [Fact]
+        public async Task RegisterDevice_AcceptsSellerApp()
+        {
+            var user = Guid.NewGuid();
+
+            Assert.IsType<OkObjectResult>(await Controller(user).RegisterDevice(new DeviceTokenDto { Token = "seller-t", Platform = "android", App = "seller" }));
+
+            var saved = Assert.Single(_context.DeviceTokens);
+            Assert.Equal(user, saved.UserId);
+            Assert.Equal("seller", saved.App);
+        }
+
         [Theory]
         [InlineData("windows", "customer")]
         [InlineData("android", "admin")]

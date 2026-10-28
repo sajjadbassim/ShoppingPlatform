@@ -71,7 +71,7 @@ namespace ecommerce.Controllers
         {
             var platform = dto.Platform?.ToLowerInvariant();
             var app = dto.App?.ToLowerInvariant();
-            if (platform is not ("android" or "ios") || app is not ("customer" or "driver"))
+            if (platform is not ("android" or "ios") || app is not ("customer" or "driver" or "seller"))
                 return BadRequest(new { success = false, message = "بيانات الجهاز غير صالحة" });
 
             var existing = await _context.DeviceTokens.FirstOrDefaultAsync(d => d.Token == dto.Token);
