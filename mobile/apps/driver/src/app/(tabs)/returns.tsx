@@ -1,8 +1,8 @@
-import { Linking, RefreshControl, View } from 'react-native';
-import { mapsUrl, newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
+import { RefreshControl, View } from 'react-native';
+import { newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
 import { AppText, brand, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDriverActions, useDriverReturns, useRefreshDriver } from '../../api/useDriver';
-import { ActionButton, Card, Chip, Empty, PhoneRow, Screen } from '../../components/kit';
+import { ActionButton, Card, Chip, Empty, openNavigation, PhoneRow, Screen } from '../../components/kit';
 import { confirmDialog } from '../../lib/dialog';
 import { toast } from '../../lib/toast';
 
@@ -33,7 +33,7 @@ function CustomerPickup({ trips }: { trips: ReturnTrip[] }) {
       <AppText weight="medium">{first.customerName}</AppText>
       <PhoneRow phone={first.customerPhone} />
       {!!first.customerAddress && (
-        <AppText style={{ fontSize: 13 }} onPress={() => Linking.openURL(mapsUrl({ latitude: first.latitude, longitude: first.longitude, address: first.customerAddress }))}>
+        <AppText style={{ fontSize: 13 }} onPress={() => openNavigation({ latitude: first.latitude, longitude: first.longitude, address: first.customerAddress })}>
           📍 {first.customerAddress}
         </AppText>
       )}

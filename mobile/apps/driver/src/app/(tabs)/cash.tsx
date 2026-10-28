@@ -18,13 +18,19 @@ const dayLabel = (iso: string) => {
   return formatDate(iso);
 };
 
-const num = (n: number) => Math.round(n).toLocaleString('en-US');
-
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ icon, label, value, unit }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; unit?: string }) {
   return (
     <View style={styles.stat}>
-      <AppText weight="extraBold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 14, color: colors.white, alignSelf: 'stretch', textAlign: 'center' }}>{value}</AppText>
-      <AppText style={styles.heroMuted}>{label}</AppText>
+      <View style={styles.statIcon}>
+        <Ionicons name={icon} size={16} color={colors.white} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <AppText style={styles.heroMuted}>{label}</AppText>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+          <AppText weight="extraBold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 16, color: colors.white, flexShrink: 1 }}>{value}</AppText>
+          {!!unit && <AppText style={styles.heroMuted}>{unit}</AppText>}
+        </View>
+      </View>
     </View>
   );
 }
@@ -41,7 +47,6 @@ export default function CashScreen() {
   const allItems: Entry[] = newestFirst(cash.data?.items ?? [], (i) => i.collectedAt);
   const items = allItems.filter((i) => inPeriod(i.collectedAt, period));
   const total = items.reduce((s, i) => s + i.amount, 0);
-  const biggest = items.reduce((m, i) => Math.max(m, i.amount), 0);
 
   const groups: { key: string; label: string; entries: Entry[] }[] = [];
   for (const i of items) {
@@ -56,16 +61,11 @@ export default function CashScreen() {
       <View style={styles.hero}>
         <AppText style={styles.heroMuted}>المستحق عليك للعمليات</AppText>
         <AppText weight="extraBold" style={{ color: colors.white, fontSize: 30 }}>{money(cash.data?.total)}</AppText>
-        <AppText style={styles.heroMuted}>من {allItems.length} طلب نقدي</AppText>
         {allItems.length > 0 && (
           <View style={styles.stats}>
-            <Stat label={period === 'all' ? 'المجموع' : PERIODS.find((p) => p.value === period)!.label} value={num(total)} />
+            <Stat icon="cash-outline" label={period === 'all' ? 'كل الفترات' : `مجموع ${PERIODS.find((p) => p.value === period)!.label}`} value={Math.round(total).toLocaleString('en-US')} unit="د.ع" />
             <View style={styles.sep} />
-            <Stat label="عدد الطلبات" value={String(items.length)} />
-            <View style={styles.sep} />
-            <Stat label="متوسط الطلب" value={num(items.length ? total / items.length : 0)} />
-            <View style={styles.sep} />
-            <Stat label="الأكبر" value={num(biggest)} />
+            <Stat icon="receipt-outline" label="عدد الطلبات" value={String(items.length)} unit="طلب" />
           </View>
         )}
       </View>
@@ -117,9 +117,10 @@ export default function CashScreen() {
 const styles = createStyles(() => ({
   hero: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: 16, gap: 4, alignItems: 'center' },
   heroMuted: { color: 'rgba(255,255,255,0.88)', fontSize: 12 },
-  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: radius.lg, paddingVertical: 8, paddingHorizontal: 6, marginTop: 8, alignSelf: 'stretch' },
-  stat: { flex: 1, alignItems: 'center', gap: 1 },
-  sep: { width: 1, height: 26, backgroundColor: 'rgba(255,255,255,0.25)' },
+  stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: radius.lg, paddingVertical: 10, paddingHorizontal: 6, marginTop: 8, alignSelf: 'stretch' },
+  stat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
+  statIcon: { width: 30, height: 30, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' },
+  sep: { width: 1, height: 30, backgroundColor: 'rgba(255,255,255,0.25)' },
   dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
 }));

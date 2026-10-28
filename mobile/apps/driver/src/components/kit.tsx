@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { Linking, Pressable, ScrollView, View, type RefreshControlProps } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, View, type RefreshControlProps } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { mapsUrl } from '@wasit/shared';
 import { AppText, brand, colors, createStyles, radius, useTheme } from '@wasit/ui';
 import { useUnreadCount } from '../api/useNotifications';
 
@@ -81,6 +82,18 @@ export function ActionButton({ title, icon, onPress, tone = 'primary', disabled,
     </Pressable>
   );
 }
+
+// رابط geo: يجعل أندرويد يعرض كل تطبيقات الخرائط المثبّتة (Waze وغيره) بدل الذهاب مباشرة إلى خرائط Google
+// كما يفعل رابط https. وإن لم يوجد تطبيق يعالجه نعود لرابط الويب
+export const openNavigation = (o: { latitude?: number | null; longitude?: number | null; address?: string | null }) => {
+  const hasPoint = !!o.latitude && !!o.longitude;
+  const query = encodeURIComponent(o.address ?? '');
+  const url =
+    Platform.OS === 'ios'
+      ? hasPoint ? `http://maps.apple.com/?daddr=${o.latitude},${o.longitude}` : `http://maps.apple.com/?q=${query}`
+      : hasPoint ? `geo:${o.latitude},${o.longitude}?q=${o.latitude},${o.longitude}` : `geo:0,0?q=${query}`;
+  Linking.openURL(url).catch(() => Linking.openURL(mapsUrl(o)));
+};
 
 export const callPhone = (phone?: string | null) => phone && Linking.openURL(`tel:${phone}`);
 
