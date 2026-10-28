@@ -85,22 +85,21 @@ namespace ecommerce.Tests.Services
         }
 
         [Fact]
-        public async Task DriverHistory_ListsReceivedTripsWithinWindowOnly_AndOpenListExcludesThem()
+        public async Task DriverHistory_ListsAllReceivedTrips_AndOpenListExcludesThem()
         {
             var (order, _, failed) = TwoStoreOrder();
             await Service().CreateForFailureAsync(order.Id, _driver.Id, new[] { failed.Id }, DeliveryFailureReason.NoAnswer);
             var trip = await _context.ReturnTrips.SingleAsync();
-            var since = DateTime.UtcNow.AddDays(-7);
 
-            Assert.Empty(await Service().GetClosedForDriverAsync(_driver.Id, since));   // ما زالت مفتوحة
+            Assert.Empty(await Service().GetClosedForDriverAsync(_driver.Id));   // ما زالت مفتوحة
             Assert.Single(await Service().GetOpenForDriverAsync(_driver.Id));
 
             await Service().ConfirmReceivedAsync(trip.Id, Guid.NewGuid(), _v2.Id);
 
             Assert.Empty(await Service().GetOpenForDriverAsync(_driver.Id));
-            Assert.Equal(trip.Id, (await Service().GetClosedForDriverAsync(_driver.Id, since)).Single().Id);
-            Assert.Empty(await Service().GetClosedForDriverAsync(Guid.NewGuid(), since));   // سجل سائق آخر
-            Assert.Empty(await Service().GetClosedForDriverAsync(_driver.Id, DateTime.UtcNow.AddMinutes(1)));   // خارج النافذة
+            Assert.Equal(trip.Id, (await Service().GetClosedForDriverAsync(_driver.Id)).Single().Id);
+            Assert.Empty(await Service().GetClosedForDriverAsync(Guid.NewGuid()));   // سجل سائق آخر
+            Assert.Empty(await Service().GetClosedForDriverAsync(_driver.Id, 0));   // السقف
         }
 
         [Fact]

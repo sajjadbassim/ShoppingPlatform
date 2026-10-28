@@ -253,12 +253,12 @@
 
 **التعديل (باك فقط، متوافق مع القديم):** معامل اختياري `history` (افتراضي `false` فيبقى السلوك كما هو).
 - `history=false`: المفتوح كما كان.
-- `history=true`: رحلات هذا المندوب بحالة `RECEIVED` و`ReceivedAt` خلال آخر 7 أيام (`HistoryDays` نفسه المستعمل للطلبات)، الأحدث إنشاءً أولاً. الشكل `ReturnTripDto` نفسه، وفيه `Status = RECEIVED` و`ReceivedAt` و`PickedUpAt`.
+- `history=true`: **كل** رحلات هذا المندوب بحالة `RECEIVED` (بلا حد زمني)، الأحدث استلاماً أولاً، بسقف أمان 200 رحلة (`GetClosedForDriverAsync(driverId, limit = 200)`). عُدِّل في 2026-10-29 بطلب المستخدم بعد أن كان 7 أيام. الشكل `ReturnTripDto` نفسه، وفيه `Status = RECEIVED` و`ReceivedAt` و`PickedUpAt`.
 
 **الملفات:** `Controllers/DriverAppController.cs` (`MyReturns([FromQuery] bool history)`)، `Services/DriverAppService/DriverAppService.cs` (`GetMyReturnTripsAsync(userId, history, ct)`)، `Services/ReturnTripService/ReturnTripService.cs` (`GetClosedForDriverAsync(driverId, since, ct)` في الواجهة والتنفيذ). لا مهاجرة لقاعدة البيانات.
 
-**اختبار:** `DriverHistory_ListsReceivedTripsWithinWindowOnly_AndOpenListExcludesThem` (المفتوح لا يظهر في السجل، المنتهي يظهر فيه ويغيب من المفتوح، سجل سائق آخر فارغ، خارج النافذة فارغ). اختبارات المرتجعات والمندوب 44 ناجحاً.
+**اختبار:** `DriverHistory_ListsReceivedTripsWithinWindowOnly_AndOpenListExcludesThem` (المنتهي يظهر في السجل ويغيب من المفتوح، سجل سائق آخر فارغ، والسقف يُحترم). اختبارات المرتجعات والمندوب 44 ناجحاً.
 
-**للنشر:** يحتاج نشر الباك على الخادم. قبل النشر يتجاهل الخادم `history` ويعيد المفتوح، لذا يرشّح التطبيق السجل بحالة `RECEIVED` فقط فلا يعرض خطأً.
+**للنشر:** نُشر على الخادم التجريبي بـ`wasit-deploy` (الكوميت `02acb44`) وجُرّب من تطبيق المندوب. قبل النشر (للخوادم الأخرى) يتجاهل الخادم `history` ويعيد المفتوح، لذا يرشّح التطبيق السجل بحالة `RECEIVED` فقط فلا يعرض خطأً.
 
 **للويب لاحقاً:** لا يلزم الويب تغيير. إن أردت سجلاً في واجهة مشابهة، استدعِ النقطة نفسها بالمعامل. مرتجعات المتجر لها نقطتها (`GetForVendorAsync(vendorId, openOnly)`) ولم تتغير.

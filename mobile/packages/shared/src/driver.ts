@@ -91,6 +91,7 @@ export interface ReturnTrip {
   status: string; // AT_CUSTOMER = لم يأخذ القطع من الزبون بعد
   createdAt: string;
   receivedAt?: string | null; // وقت تأكيد المتجر (في السجل فقط)
+  pickedUpAt?: string | null; // وقت أخذ القطع من الزبون أو من السائق
   returnId?: string | null;
   returnNumber?: string | null;
   customerName?: string | null;

@@ -656,7 +656,7 @@ namespace ecommerce.Services.DriverAppService
             var driver = await GetDriverAsync(userId, ct);
             if (_returnTrips == null) return new();
             return history
-                ? await _returnTrips.GetClosedForDriverAsync(driver.Id, DateTime.UtcNow.AddDays(-HistoryDays), ct)
+                ? await _returnTrips.GetClosedForDriverAsync(driver.Id, 200, ct)
                 : await _returnTrips.GetOpenForDriverAsync(driver.Id, ct);
         }
 

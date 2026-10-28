@@ -1,12 +1,19 @@
 import { useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
+import { router } from 'expo-router';
 import { formatDateTime, newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
 import { AppText, brand, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDriverActions, useDriverReturns, useRefreshDriver } from '../../api/useDriver';
 import { ActionButton, Card, Chip, ChipFilter, Empty, openNavigation, PhoneRow, Screen } from '../../components/kit';
-import { inPeriod, PERIODS, type Period } from '../../lib/period';
 import { confirmDialog } from '../../lib/dialog';
 import { toast } from '../../lib/toast';
+
+// النقر على بطاقة المرتجع يفتح تفاصيله (المعرّف: رقم المرتجع، أو رقم الرحلة لرفض الباب وتعذّر التسليم)
+const OpenReturn = ({ trip, children }: { trip: ReturnTrip; children: React.ReactNode }) => (
+  <Pressable onPress={() => router.push({ pathname: '/return/[id]', params: { id: trip.returnId ?? trip.id } })} style={({ pressed }) => pressed && { opacity: 0.85 }}>
+    {children}
+  </Pressable>
+);
 
 const Items = ({ trips }: { trips: ReturnTrip[] }) => (
   <View style={styles.items}>
@@ -27,6 +34,7 @@ function CustomerPickup({ trips }: { trips: ReturnTrip[] }) {
   const vendors = [...new Set(trips.map((t) => t.vendorName))].join('، ');
 
   return (
+    <OpenReturn trip={first}>
     <Card tone="warn" accent={colors.warning}>
       <View style={styles.row}>
         <AppText weight="bold">خذ القطع من الزبون</AppText>
@@ -81,12 +89,14 @@ function CustomerPickup({ trips }: { trips: ReturnTrip[] }) {
         </View>
       </View>
     </Card>
+    </OpenReturn>
   );
 }
 
 // قطع معه: يسلّمها للمتجر والمتجر يؤكد الاستلام
 function VendorDelivery({ trip }: { trip: ReturnTrip }) {
   return (
+    <OpenReturn trip={trip}>
     <Card accent={colors.primary}>
       <AppText weight="bold">{trip.vendorName}</AppText>
       <PhoneRow phone={trip.vendorPhone} />
@@ -95,12 +105,14 @@ function VendorDelivery({ trip }: { trip: ReturnTrip }) {
       <Items trips={[trip]} />
       <Chip label="بانتظار تأكيد المتجر" tone="muted" />
     </Card>
+    </OpenReturn>
   );
 }
 
 // مرتجع أنهاه المتجر: يبقى في السجل 7 أيام
 function ClosedTrip({ trip }: { trip: ReturnTrip }) {
   return (
+    <OpenReturn trip={trip}>
     <Card accent={colors.success}>
       <View style={styles.row}>
         <AppText weight="bold">{trip.vendorName}</AppText>
@@ -110,6 +122,7 @@ function ClosedTrip({ trip }: { trip: ReturnTrip }) {
       <Items trips={[trip]} />
       {!!trip.receivedAt && <AppText muted style={{ fontSize: 12 }}>{formatDateTime(trip.receivedAt)}</AppText>}
     </Card>
+    </OpenReturn>
   );
 }
 
@@ -118,35 +131,21 @@ export default function ReturnsScreen() {
   const returns = useDriverReturns();
   const closed = useDriverReturns(true);
   const refreshAll = useRefreshDriver();
-  const [kind, setKind] = useState<'pickup' | 'vendor' | 'history' | 'all'>('all');
-  const [period, setPeriod] = useState<Period>('all');
+  const [tab, setTab] = useState<'open' | 'history'>('open');
   const split = splitReturnTrips(newestFirst(returns.data ?? [], (t) => t.createdAt));
-  const history = newestFirst(closed.data ?? [], (t) => t.receivedAt ?? t.createdAt).filter((t) => inPeriod(t.receivedAt ?? t.createdAt, period));
-  const total = split.pickups.length + split.deliveries.length;
-  const showHistory = kind === 'history';
-  const pickups = kind === 'vendor' || showHistory ? [] : split.pickups.filter((g) => inPeriod(g[0].createdAt, period));
-  const deliveries = kind === 'pickup' || showHistory ? [] : split.deliveries.filter((t) => inPeriod(t.createdAt, period));
-  const shown = pickups.length + deliveries.length + (showHistory ? history.length : 0);
+  const history = newestFirst(closed.data ?? [], (t) => t.receivedAt ?? t.createdAt);
+  const openCount = split.pickups.length + split.deliveries.length;
+  const showHistory = tab === 'history';
+  const shown = showHistory ? history.length : openCount;
 
   return (
     <Screen title="المرتجعات" refreshControl={<RefreshControl refreshing={returns.isRefetching} onRefresh={refreshAll} />}>
-      <AppText muted style={{ fontSize: 13, lineHeight: 22 }}>
-        خذ القطع من الزبون ثم أرجعها لمتاجرها حين تتفرغ. المتجر يؤكد الاستلام.
-      </AppText>
-      <ChipFilter options={PERIODS} value={period} onChange={setPeriod} />
-      <ChipFilter
-        options={[{ value: 'pickup', label: `من الزبون · ${split.pickups.length}` }, { value: 'vendor', label: `للمتاجر · ${split.deliveries.length}` }, { value: 'history', label: 'السجل' }, { value: 'all', label: 'الكل' }] as const}
-        value={kind}
-        onChange={setKind}
-      />
+      <ChipFilter options={[{ value: 'open', label: `الحالية · ${openCount}` }, { value: 'history', label: 'السجل' }] as const} value={tab} onChange={setTab} />
       {shown === 0 && !returns.isLoading && (
-        <Empty
-          icon={showHistory || total > 0 ? 'funnel-outline' : 'return-down-back-outline'}
-          text={showHistory ? 'لا مرتجعات منتهية في هذه الفترة' : total === 0 ? 'لا توجد مرتجعات بعهدتك' : 'لا مرتجعات تطابق هذا الفلتر'}
-        />
+        <Empty icon="return-down-back-outline" text={showHistory ? 'لا توجد مرتجعات منتهية' : 'لا توجد مرتجعات بعهدتك'} />
       )}
-      {pickups.map((group) => <CustomerPickup key={group[0].returnId ?? group[0].id} trips={group} />)}
-      {deliveries.map((t) => <VendorDelivery key={t.id} trip={t} />)}
+      {!showHistory && split.pickups.map((group) => <CustomerPickup key={group[0].returnId ?? group[0].id} trips={group} />)}
+      {!showHistory && split.deliveries.map((t) => <VendorDelivery key={t.id} trip={t} />)}
       {showHistory && history.map((t) => <ClosedTrip key={t.id} trip={t} />)}
     </Screen>
   );

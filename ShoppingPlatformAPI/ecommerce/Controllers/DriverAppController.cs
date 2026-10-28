@@ -37,7 +37,7 @@ namespace ecommerce.Controllers
         public async Task<ActionResult<ApiResponse<DriverCashDto>>> MyCash(CancellationToken ct)
             => Ok(ApiResponse<DriverCashDto>.Ok(await _app.GetMyCashAsync(UserId, ct)));
 
-        // GET: api/driver/returns?history=false — بضاعة مرتجعة معه لم تُسلَّم لمتاجرها، أو (history=true) ما استلمه المتجر خلال 7 أيام
+        // GET: api/driver/returns?history=false — بضاعة مرتجعة معه لم تُسلَّم لمتاجرها، أو (history=true) كل ما استلمه المتجر (الأحدث أولاً، حتى 200)
         [HttpGet("returns")]
         public async Task<ActionResult<ApiResponse<List<ReturnTripDto>>>> MyReturns([FromQuery] bool history, CancellationToken ct)
             => Ok(ApiResponse<List<ReturnTripDto>>.Ok(await _app.GetMyReturnTripsAsync(UserId, history, ct)));

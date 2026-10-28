@@ -17,8 +17,8 @@ namespace ecommerce.Services.ReturnTripService
         // رفض عند الباب: مهمة إرجاع للقطع المرفوضة فقط
         Task CreateForRefusalAsync(Guid orderId, Guid driverId, Guid returnId, IReadOnlyCollection<(SubOrderItem Item, int Quantity)> refused, CancellationToken ct = default);
         Task<List<ReturnTripDto>> GetOpenForDriverAsync(Guid driverId, CancellationToken ct = default);
-        // سجل السائق: ما استلمه المتجر منذ التاريخ المعطى (الأحدث أولاً)
-        Task<List<ReturnTripDto>> GetClosedForDriverAsync(Guid driverId, DateTime since, CancellationToken ct = default);
+        // سجل السائق: كل ما استلمه المتجر، الأحدث استلاماً أولاً، حتى سقف `limit`
+        Task<List<ReturnTripDto>> GetClosedForDriverAsync(Guid driverId, int limit = 200, CancellationToken ct = default);
         Task<int> CountOpenForDriverAsync(Guid driverId, CancellationToken ct = default);
         Task<List<ReturnTripDto>> GetForVendorAsync(Guid vendorId, bool openOnly, CancellationToken ct = default);
         Task<ReturnTripReportDto> GetReportAsync(DateOnly? from, DateOnly? to, CancellationToken ct = default);
@@ -101,8 +101,9 @@ namespace ecommerce.Services.ReturnTripService
         public Task<List<ReturnTripDto>> GetOpenForDriverAsync(Guid driverId, CancellationToken ct = default) =>
             QueryAsync(Query().Where(t => t.DriverId == driverId && ReturnTripStatus.Open.Contains(t.Status)), ct);
 
-        public Task<List<ReturnTripDto>> GetClosedForDriverAsync(Guid driverId, DateTime since, CancellationToken ct = default) =>
-            QueryAsync(Query().Where(t => t.DriverId == driverId && t.Status == ReturnTripStatus.Received && t.ReceivedAt >= since), ct);
+        public Task<List<ReturnTripDto>> GetClosedForDriverAsync(Guid driverId, int limit = 200, CancellationToken ct = default) =>
+            QueryAsync(Query().Where(t => t.DriverId == driverId && t.Status == ReturnTripStatus.Received)
+                .OrderByDescending(t => t.ReceivedAt ?? t.CreatedAt).Take(limit), ct);
 
         public Task<int> CountOpenForDriverAsync(Guid driverId, CancellationToken ct = default) =>
             _context.ReturnTrips.CountAsync(t => t.DriverId == driverId && ReturnTripStatus.Open.Contains(t.Status), ct);
