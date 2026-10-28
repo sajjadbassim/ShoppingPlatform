@@ -1,9 +1,11 @@
 // src/hooks/useNotificationsRealtime.js
 import { useEffect, useRef } from 'react'
 import * as signalR from '@microsoft/signalr'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { getFreshAccessToken } from '../api/session'
 import { useNotificationsStore, formatNotification } from '../stores/notificationsStore'
+import { orderKeys } from './useOrders'
 
 const HUB_URL = `${import.meta.env.VITE_API_URL ?? 'http://localhost:5010'}/hubs/notifications`
 
@@ -16,6 +18,7 @@ export const useNotificationsRealtime = () => {
   // الاتصال يتبع حالة الدخول لا قيمة التوكن: التجديد كل ساعة لا يعيد الاتصال (accessTokenFactory يجلب الحالي)
   const signedIn = useAuthStore((s) => !!s.token)
   const addNotification = useNotificationsStore((s) => s.addNotification)
+  const queryClient = useQueryClient()
   const connectionRef = useRef(null)
   const isMounted = useRef(false)
 
@@ -48,9 +51,16 @@ export const useNotificationsRealtime = () => {
     }
 
     connection.on('Notification', handleIncoming)
-    connection.on('OrderStatusChanged', (payload) =>
+    // تغيّر حالة الطلب (تأكيد المتجر، التحضير، التوصيل…): نحدّث صفحة التفاصيل والتتبع والقوائم فوراً
+    // بدل انتظار دورة الدقيقتين، ولا يكتفي الجرس بعرض الإشعار
+    const refreshOrders = () => queryClient.invalidateQueries({ queryKey: orderKeys.all })
+    connection.on('OrderStatusChanged', (payload) => {
       handleIncoming({ ...payload, type: 'order_status' })
-    )
+      refreshOrders()
+    })
+
+    // بعد انقطاع الاتصال قد تكون فاتتنا أحداث
+    connection.onreconnected(refreshOrders)
 
     connection.onclose(() => {
       isMounted.current = false
@@ -68,7 +78,7 @@ export const useNotificationsRealtime = () => {
       isMounted.current = false
       connectionRef.current = null
     }
-  }, [signedIn])
+  }, [signedIn, queryClient])
 }
 
 export default useNotificationsRealtime
