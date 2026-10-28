@@ -21,6 +21,8 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 import AddPhoneModal from '../../components/auth/AddPhoneModal'
 import { useBackToClose } from '../../hooks/useBackToClose'
 import { usePublicZones } from '../../hooks/useDeliveryZones'
+import { tierLabel } from '../../utils/loyaltyTier'
+import { formatDate } from '../../utils/dates'
 
 const ProfilePage = () => {
   const navigate = useNavigate()
@@ -271,7 +273,7 @@ const stats = {
                   <span className="block text-sm font-bold text-gray-900">النقاط التشجيعية</span>
                   <span className="block text-xs text-amber-700 truncate">
                     رصيدك <span className="font-bold">{(loyaltyAccount?.balance ?? 0).toLocaleString('en-US')}</span> نقطة
-                    {loyaltyAccount?.tierAr && <> • المستوى {loyaltyAccount.tierAr}</>}
+                    {loyaltyAccount?.tier && <> • المستوى {tierLabel(loyaltyAccount.tier)}</>}
                   </span>
                 </span>
                 <ChevronLeft size={18} className="text-amber-600 flex-shrink-0" />
@@ -448,7 +450,7 @@ const stats = {
                           <div key={ret.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                             <div>
                               <p className="font-medium text-gray-900">#{ret.returnNumber || ret.id?.slice(0,8)}</p>
-                              <p className="text-xs text-gray-400">{new Date(ret.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+                              <p className="text-xs text-gray-400">{formatDate(ret.createdAt)}</p>
                               <p className="text-sm text-gray-500 mt-0.5">{ret.reasonAr || ret.reason}</p>
                             </div>
                             <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium ${s.color}`}>

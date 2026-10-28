@@ -11,6 +11,8 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import ReferralCard from '../../components/common/ReferralCard'
+import { getTier, tierLabel } from '../../utils/loyaltyTier'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Hooks
@@ -41,10 +43,10 @@ const useLoyaltyTransactions = (params = {}) => useQuery({
 
 const TierBadge = ({ tier }) => {
   const config = {
-    bronze:   { label: 'برونزي',  bg: 'bg-amber-100',   text: 'text-amber-700',  icon: '🥉' },
-    silver:   { label: 'فضي',     bg: 'bg-gray-100',    text: 'text-gray-700',   icon: '🥈' },
-    gold:     { label: 'ذهبي',    bg: 'bg-yellow-100',  text: 'text-yellow-700', icon: '🥇' },
-    platinum: { label: 'بلاتيني', bg: 'bg-purple-100',  text: 'text-purple-700', icon: '💎' },
+    bronze:   { label: tierLabel('bronze'),  bg: 'bg-amber-100',   text: 'text-amber-700',  icon: getTier('bronze').icon },
+    silver:   { label: tierLabel('silver'),   bg: 'bg-gray-100',    text: 'text-gray-700',   icon: getTier('silver').icon },
+    gold:     { label: tierLabel('gold'),     bg: 'bg-yellow-100',  text: 'text-yellow-700', icon: getTier('gold').icon },
+    platinum: { label: tierLabel('platinum'), bg: 'bg-purple-100',  text: 'text-purple-700', icon: getTier('platinum').icon },
   }
   const c = config[tier?.toLowerCase()] || config.bronze
   return (
@@ -77,11 +79,11 @@ const TransactionItem = ({ tx }) => {
             <p className="text-xs text-primary">طلب #{tx.orderNumber}</p>
           )}
           <p className="text-xs text-gray-400">
-            {new Date(tx.createdAt || tx.date).toLocaleDateString('ar-IQ-u-nu-latn')}
+            {formatDate(tx.createdAt || tx.date)}
           </p>
           {tx.expiresAt && (
             <p className="text-xs text-orange-500">
-              تنتهي: {new Date(tx.expiresAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+              تنتهي: {formatDate(tx.expiresAt)}
             </p>
           )}
         </div>
@@ -117,7 +119,7 @@ const LoyaltyPage = () => {
   const totalEarned   = account?.totalEarned     ?? 0
   const totalRedeemed = account?.totalRedeemed   ?? 0
   const tier          = account?.tier            ?? 'Bronze'
-  const tierAr        = account?.tierAr          ?? tier
+  const tierAr        = tierLabel(tier)
   const nextTier      = account?.nextTier        ?? null
   const pointsToNext  = account?.nextTierPoints  ?? 0
   const pointValue    = account?.balanceValue > 0 && account?.balance > 0
@@ -244,7 +246,7 @@ const LoyaltyPage = () => {
                     {expiringPoints.toLocaleString('en-US')} نقطة ستنتهي قريباً
                   </p>
                   <p className="text-xs text-orange-600">
-                    تاريخ الانتهاء: {new Date(expiringDate).toLocaleDateString('ar-IQ-u-nu-latn')}
+                    تاريخ الانتهاء: {formatDate(expiringDate)}
                   </p>
                 </div>
               </div>

@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   Star, Heart, Share2, Truck, Shield, RotateCcw,
   Minus, Plus, ShoppingCart, Store, AlertCircle, Check,
-  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent, ChevronDown, ChevronLeft, ChevronRight
+  ThumbsUp, Flag, Trash2, MessageSquare, Send, Gift, Percent, ChevronDown, ChevronLeft, ChevronRight, ImagePlus, X
 } from 'lucide-react'
 import Button from '../../components/common/Button'
 import Breadcrumb from '../../components/common/Breadcrumb'
@@ -25,9 +25,11 @@ import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { reviewsService } from '../../services/reviewsService'
+import { compressImage } from '../../utils/compressImage'
 import StockAlertButton from '../../components/common/StockAlertButton'
 import { formatQuantity, formatPrice, isByWeight, pricePerKg, stepLabel } from '../../utils/weight'
 import { StoreClosedBadge, isStoreClosed } from '../../components/common/StoreClosedBadge'
+import { formatDate } from '../../utils/dates'
 
 
 // ===========================
@@ -108,7 +110,7 @@ const ReviewCard = ({ review, currentUserId, onDelete, onMarkHelpful, onReport }
           </div>
           <div>
             <p className="font-medium text-gray-900 text-sm">{review.userName || review.userFullName || 'مستخدم'}</p>
-            <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+            <p className="text-xs text-gray-400">{formatDate(review.createdAt)}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -312,6 +314,23 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
   const [body, setBody] = useState('')
   const [orderId, setOrderId] = useState('')
   const [showForm, setShowForm] = useState(false)
+  // صور التقييم: حتى 5 صور، 3MB للصورة، JPEG/PNG/WebP (كتطبيق الهاتف)
+  const [images, setImages] = useState([])
+  const previews = useMemo(() => images.map(f => URL.createObjectURL(f)), [images])
+  useEffect(() => () => previews.forEach(u => URL.revokeObjectURL(u)), [previews])
+
+  const handleImages = async (e) => {
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    const ok = []
+    for (const f of picked) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) { showError('الصور المسموحة: JPEG أو PNG أو WebP'); continue }
+      const ready = await compressImage(f)
+      if (ready.size > 3 * 1024 * 1024) { showError('حجم الصورة يجب ألا يتجاوز 3MB'); continue }
+      ok.push(ready)
+    }
+    setImages(prev => [...prev, ...ok].slice(0, 5))
+  }
 
   // جلب طلبات العميل لاختيار الطلب المرتبط — المُسلَّمة التي تحتوي هذا المنتج فقط
   // (الخادم يرفض تقييماً مرتبطاً بطلب لا يحتويه)
@@ -334,12 +353,12 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
     if (!orderId) { showError('يرجى اختيار الطلب'); return }
 
     try {
-      const fd = reviewsService.buildFormData({ productId, orderId, rating, title, body })
+      const fd = reviewsService.buildFormData({ productId, orderId, rating, title, body, images })
       const created = await createReview(fd)
       showSuccess(created?.pointsEarned > 0
         ? `تم إضافة تقييمك وحصلت على ${created.pointsEarned} نقطة 🎉`
         : 'تم إضافة تقييمك بنجاح')
-      setRating(0); setTitle(''); setBody(''); setOrderId('')
+      setRating(0); setTitle(''); setBody(''); setOrderId(''); setImages([])
       setShowForm(false)
       onSuccess?.()
     } catch (err) {
@@ -381,7 +400,7 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
             <option value="">اختر الطلب...</option>
             {customerOrders.map(o => (
               <option key={o.id} value={o.id}>
-                {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                {o.orderNumber} — {formatDate(o.createdAt)}
               </option>
             ))}
           </select>
@@ -407,6 +426,27 @@ const WriteReviewForm = ({ productId, onSuccess }) => {
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary resize-none"
         />
+      </div>
+
+      <div>
+        <label className="text-sm text-gray-600 block mb-1">صور المنتج (اختياري — حتى 5 صور)</label>
+        <div className="flex gap-2 flex-wrap">
+          {images.map((img, i) => (
+            <div key={i} className="relative">
+              <img src={previews[i]} alt="" className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+              <button type="button" onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center">
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+          {images.length < 5 && (
+            <label className="w-16 h-16 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary text-gray-400 hover:text-primary">
+              <ImagePlus size={20} />
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp" onChange={handleImages} className="hidden" />
+            </label>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -443,7 +483,7 @@ const PromotionBadge = ({ promotions }) => {
                 ? `${promo.discountValue}%`
                 : `${Number(promo.discountValue).toLocaleString('en-US')} د.ع`
               }
-              {promo.expiresAt && ` • ينتهي ${new Date(promo.expiresAt).toLocaleDateString('ar-IQ-u-nu-latn')}`}
+              {promo.expiresAt && ` • ينتهي ${formatDate(promo.expiresAt)}`}
             </p>
           </div>
           <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full flex items-center gap-0.5">

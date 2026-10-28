@@ -10,13 +10,14 @@ import { useToast } from '../../components/common/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
 // ===========================
 
 const fmt = {
-  date: (d) => d ? new Date(d).toLocaleDateString('ar-IQ-u-nu-latn') : '—',
+  date: (d) => d ? formatDate(d) : '—',
   price: (n) => n != null ? `${Number(n).toLocaleString('en-US')} د.ع` : '—',
 }
 

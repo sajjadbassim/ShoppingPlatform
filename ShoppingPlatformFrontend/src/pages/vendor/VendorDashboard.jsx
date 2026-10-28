@@ -15,6 +15,7 @@ import { can } from '../../utils/permissions'
 import { apiGet, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getImageUrl } from '../../utils/imageHelper'
+import { formatDate } from '../../utils/dates'
 
 const VendorDashboard = () => {
   const [dateRange, setDateRange] = useState('month')
@@ -281,7 +282,7 @@ const VendorDashboard = () => {
                     <td className="px-4 py-3 font-medium text-primary text-xs">#{order.subOrderNumber}</td>
                     <td className="px-4 py-3 text-gray-700">{order.customerName || '—'}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                      {formatDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3 font-medium">{(order.subtotal||0).toLocaleString('en-US')} د.ع</td>
                     <td className="px-4 py-3"><StatusBadge status={order.status} /></td>

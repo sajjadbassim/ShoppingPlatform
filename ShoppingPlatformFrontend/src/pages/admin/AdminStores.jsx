@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPutForm } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo } from '../../utils/imageHelper'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
@@ -147,7 +148,7 @@ const StoreDetailModal = ({ store, onClose, onToggle, toggling }) => {
               <div className="mt-1 flex items-center gap-2">
                 <StatusBadge active={store.isActive} />
                 <span className="text-xs text-gray-400">
-                  {new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                  {formatDate(store.createdAt)}
                 </span>
               </div>
             </div>
@@ -238,7 +239,7 @@ const StoreRow = ({ store, onView, onToggle, toggling }) => (
       {store.deliveryFee ? `${store.deliveryFee.toLocaleString('en-US')} د.ع` : '—'}
     </td>
     <td className="px-4 py-3 text-xs text-gray-400">
-      {new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+      {formatDate(store.createdAt)}
     </td>
     <td className="px-4 py-3"><StatusBadge active={store.isActive} /></td>
     <td className="px-4 py-3">

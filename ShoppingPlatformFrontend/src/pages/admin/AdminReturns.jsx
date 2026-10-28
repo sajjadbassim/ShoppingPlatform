@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { ReturnPickupFeeChip } from '../../components/common/FeePayerException'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
@@ -411,7 +412,7 @@ const ReturnRow = ({ ret, onReview, onRestock, onAssign, onSaved }) => (
       </div>
     </td>
     <td className="px-4 py-3 text-xs text-gray-400">
-      {new Date(ret.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+      {formatDate(ret.createdAt)}
     </td>
     <td className="px-4 py-3"><StatusBadge status={ret.status} /></td>
     <td className="px-4 py-3">
@@ -444,7 +445,7 @@ const ReturnRow = ({ ret, onReview, onRestock, onAssign, onSaved }) => (
       )}
       {ret.isRestocked && (
         <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-1 rounded-full whitespace-nowrap"
-          title={ret.restockedAt ? `بتاريخ ${new Date(ret.restockedAt).toLocaleDateString('ar-IQ-u-nu-latn')}` : undefined}>
+          title={ret.restockedAt ? `بتاريخ ${formatDate(ret.restockedAt)}` : undefined}>
           <PackageCheck size={12} />أُعيد للمخزون
         </span>
       )}

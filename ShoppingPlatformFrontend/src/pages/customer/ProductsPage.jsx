@@ -465,7 +465,7 @@ const ProductsPage = () => {
                   </select>}
 
                   {/* View mode */}
-                  <div className="hidden sm:flex border border-gray-300 rounded-lg overflow-hidden">
+                  <div className="flex border border-gray-300 rounded-lg overflow-hidden">
                     <button onClick={() => setViewMode('grid')} aria-label="عرض شبكي" aria-pressed={viewMode === 'grid'}
                       className={`p-2 transition-colors ${viewMode==='grid' ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
                       <Grid size={16} />

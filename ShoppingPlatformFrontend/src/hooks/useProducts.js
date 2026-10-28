@@ -103,6 +103,16 @@ export const useProductSearch = (term) => {
  * @param {string} term   - نص البحث (يبدأ من 2 حرف)
  * @param {Object} params - { pageNumber?, pageSize? }
  */
+export const useSearchSuggestions = (term, scope) => {
+  return useQuery({
+    queryKey: [...productKeys.all, 'suggestions', term, scope],
+    queryFn: () => productService.suggestions(term, { scope }),
+    enabled: !!term && term.length >= 2,
+    staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
+  });
+};
+
 export const useUnifiedSearch = (term, params = {}) => {
   return useQuery({
     queryKey: productKeys.unifiedSearch(term, params),

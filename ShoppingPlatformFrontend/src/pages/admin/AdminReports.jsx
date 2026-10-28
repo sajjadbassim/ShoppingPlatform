@@ -8,6 +8,7 @@ import { Skeleton } from '../../components/common/Loading'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { formatDate } from '../../utils/dates'
 
 const AdminReports = () => {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' })
@@ -135,8 +136,8 @@ const AdminReports = () => {
               })}
             </div>
             <div className="mt-2 pt-4 border-t border-gray-100 flex justify-between text-sm text-gray-500">
-              <span>من: {salesData?.startDate ? new Date(salesData.startDate).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</span>
-              <span>إلى: {salesData?.endDate ? new Date(salesData.endDate).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</span>
+              <span>من: {salesData?.startDate ? formatDate(salesData.startDate) : '—'}</span>
+              <span>إلى: {salesData?.endDate ? formatDate(salesData.endDate) : '—'}</span>
             </div>
           </>
         )}

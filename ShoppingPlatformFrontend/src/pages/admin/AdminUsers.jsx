@@ -21,6 +21,7 @@ import {
   useDeleteUser,
   useCreateOpsUser,
 } from '../../hooks/useAdmin'
+import { formatDate } from '../../utils/dates'
 
 // ✅ API يرجع role بحروف كبيرة: CUSTOMER, VENDOR, ADMIN, OPS
 const ROLE_CONFIG = {
@@ -168,7 +169,7 @@ const AdminUsers = () => {
           </span>
         </td>
         <td className="px-4 py-4 text-gray-500 text-sm">
-          {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}
+          {user.createdAt ? formatDate(user.createdAt) : '—'}
         </td>
         <td className="px-4 py-4">
           <Dropdown
@@ -327,7 +328,7 @@ const AdminUsers = () => {
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">تاريخ الانضمام</p>
-                  <p className="font-medium text-sm">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—'}</p>
+                  <p className="font-medium text-sm">{selectedUser.createdAt ? formatDate(selectedUser.createdAt) : '—'}</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500">إجمالي الطلبات</p>

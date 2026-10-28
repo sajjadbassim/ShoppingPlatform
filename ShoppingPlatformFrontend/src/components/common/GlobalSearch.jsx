@@ -1,12 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, X, Package, Store, Tag, Clock, ArrowLeft } from 'lucide-react'
-import { useAdvancedFilter } from '../../hooks/useProducts'
-import { useVendorsPaged } from '../../hooks/useVendors'
-import { useCategories } from '../../hooks/useCategories'
-import { getPrimaryImage, getVendorLogo, IMG_SIZE } from '../../utils/imageHelper'
-import { SCOPE, isGroceryCategory, searchLink, useShopScope } from '../../utils/shopScope'
-import { formatPrice } from '../../utils/weight'
+import { useSearchSuggestions } from '../../hooks/useProducts'
+import { SCOPE, searchLink, useShopScope } from '../../utils/shopScope'
 import { useBackToClose } from '../../hooks/useBackToClose'
 
 const GlobalSearch = ({ isOpen, onClose }) => {
@@ -30,30 +26,9 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     return () => clearTimeout(t)
   }, [query])
 
-  // جلب النتائج
-  const { data: productsData, isLoading: productsLoading } = useAdvancedFilter({
-    searchTerm: term,
-    pageSize: 5,
-    isActive: true,
-    scope,
-  }, term.length >= 2)
-
-  const { data: vendorsData, isLoading: vendorsLoading } = useVendorsPaged({
-    searchTerm: term,
-    pageSize: 3,
-  }, { enabled: term.length >= 2 })
-
-  const { data: categoriesData } = useCategories()
-
-  const products = productsData?.items || productsData || []
-  const vendors = vendorsData?.items || vendorsData || []
-  const categories = (categoriesData || []).filter(c =>
-    isGroceryCategory(c) === grocery &&
-    (c.nameAr?.includes(query) || c.name?.toLowerCase().includes(query.toLowerCase()))
-  ).slice(0, 3)
-
-  const isLoading = productsLoading || vendorsLoading
-  const hasResults = products.length > 0 || vendors.length > 0 || categories.length > 0
+  // اقتراحات نصية من نقطة واحدة (منتجات + متاجر + فئات)
+  const { data: suggestions = [], isLoading } = useSearchSuggestions(term, scope)
+  const hasResults = suggestions.length > 0
 
   // تحميل البحث الأخير عند كل فتح (يُمسح عند تسجيل الخروج، والهيدر لا يُعاد تركيبه)
   useEffect(() => {
@@ -101,16 +76,16 @@ const GlobalSearch = ({ isOpen, onClose }) => {
     go(searchLink(searchQuery, scope))
   }
 
-  const handleProductClick = (product) => {
-    go(`/products/${product.id}`)
+  const SUGGESTION_META = {
+    product:  { label: 'منتج',  Icon: Package, color: 'text-primary',    badge: 'bg-primary/10 text-primary' },
+    store:    { label: 'متجر',  Icon: Store,   color: 'text-blue-500',   badge: 'bg-blue-50 text-blue-600' },
+    category: { label: 'فئة',   Icon: Tag,     color: 'text-green-500',  badge: 'bg-green-50 text-green-700' },
   }
 
-  const handleVendorClick = (vendor) => {
-    go(`/stores/${vendor.id}`)
-  }
-
-  const handleCategoryClick = (category) => {
-    go(`/products?category=${category.id}`)
+  const handleSuggestionClick = (s) => {
+    if (s.type === 'product') go(`/products/${s.id}`)
+    else if (s.type === 'store') go(`/stores/${s.id}`)
+    else go(`/products?category=${s.id}${grocery ? '&scope=grocery' : ''}`)
   }
 
   const clearRecentSearches = () => {
@@ -198,90 +173,33 @@ const GlobalSearch = ({ isOpen, onClose }) => {
             {/* Results */}
             {query.trim().length >= 2 && term.length >= 2 && !isLoading && (
               <>
-                {/* Products */}
-                {products.length > 0 && (
-                  <div className="p-4 border-b border-gray-100">
-                    <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <Package size={18} className="text-primary" />
-                      المنتجات
-                    </h3>
-                    <div className="space-y-2">
-                      {products.map(product => (
-                        <button
-                          key={product.id}
-                          onClick={() => handleProductClick(product)}
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-right"
-                        >
-                          <div className="w-12 h-12 product-media rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-                            {getPrimaryImage(product, IMG_SIZE.THUMB) ? (
-                              <img src={getPrimaryImage(product, IMG_SIZE.THUMB)} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <Package size={20} className="text-gray-400" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{product.nameAr || product.name}</p>
-                            <p className="text-sm text-primary font-bold">{formatPrice(product.price, product.weightStepKg)}</p>
-                          </div>
-                          <ArrowLeft size={16} className="text-gray-400" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {/* صف «بحث عن …» */}
+                <button
+                  onClick={() => handleSearch(term)}
+                  className="w-full flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors text-right"
+                >
+                  <Search size={18} className="text-gray-400" />
+                  <span className="flex-1 min-w-0 truncate text-gray-700">بحث عن «{term}»</span>
+                  <ArrowLeft size={16} className="text-gray-400" />
+                </button>
 
-                {/* Vendors */}
-                {vendors.length > 0 && (
-                  <div className="p-4 border-b border-gray-100">
-                    <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <Store size={18} className="text-blue-500" />
-                      المتاجر
-                    </h3>
-                    <div className="space-y-2">
-                      {vendors.map(vendor => (
-                        <button
-                          key={vendor.id}
-                          onClick={() => handleVendorClick(vendor)}
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-right"
-                        >
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                            {getVendorLogo(vendor, IMG_SIZE.THUMB) ? (
-                              <img src={getVendorLogo(vendor, IMG_SIZE.THUMB)} alt="" className="w-full h-full object-cover rounded-lg" />
-                            ) : (
-                              <Store size={20} className="text-blue-500" />
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{vendor.nameAr || vendor.name}</p>
-                            <p className="text-sm text-gray-500">{vendor.productsCount || 0} منتج</p>
-                          </div>
-                          <ArrowLeft size={16} className="text-gray-400" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Categories */}
-                {categories.length > 0 && (
-                  <div className="p-4">
-                    <h3 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                      <Tag size={18} className="text-green-500" />
-                      الفئات
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map(category => (
-                        <button
-                          key={category.id}
-                          onClick={() => handleCategoryClick(category)}
-                          className="px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors"
-                        >
-                          {category.nameAr || category.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                {suggestions.map(s => {
+                  const meta = SUGGESTION_META[s.type] || SUGGESTION_META.product
+                  return (
+                    <button
+                      key={`${s.type}-${s.id}`}
+                      onClick={() => handleSuggestionClick(s)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-right"
+                    >
+                      <meta.Icon size={18} className={meta.color} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{s.text}</p>
+                        {s.subtitle && <p className="text-xs text-gray-500 truncate">{s.subtitle}</p>}
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${meta.badge}`}>{meta.label}</span>
+                    </button>
+                  )
+                })}
 
                 {/* No Results */}
                 {!hasResults && (

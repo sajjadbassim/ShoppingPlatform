@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiDelete } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo, getImageUrl } from '../../utils/imageHelper'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
@@ -227,7 +228,7 @@ const OrderRatingsTab = () => {
                   }
                 </td>
                 <td className="px-4 py-3 text-gray-400 text-xs">
-                  {new Date(r.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                  {formatDate(r.createdAt)}
                 </td>
               </tr>
             ))}
@@ -310,7 +311,7 @@ const ReportedReviewsTab = () => {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900 text-sm">{review.userName || 'مستخدم'}</p>
-                  <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+                  <p className="text-xs text-gray-400">{formatDate(review.createdAt)}</p>
                 </div>
                 <StarDisplay value={review.rating} />
                 <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -415,7 +416,7 @@ const ReportedReviewsTab = () => {
                   <p className="text-red-700 font-medium">{rep.reasonAr}</p>
                   {rep.details && <p className="text-gray-700 mt-0.5">{rep.details}</p>}
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {rep.reporterName || 'مستخدم'} • {new Date(rep.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                    {rep.reporterName || 'مستخدم'} • {formatDate(rep.createdAt)}
                   </p>
                 </div>
               ))}
@@ -511,7 +512,7 @@ const ProductReviewsTab = () => {
                       <p className="font-medium text-gray-900 text-sm truncate">{review.userFullName || 'مستخدم'}</p>
                       <div className="flex items-center gap-2">
                         <StarDisplay value={review.rating} size={12} />
-                        <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
+                        <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
                         {review.isVerifiedPurchase && (
                           <span className="text-xs bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full">شراء موثق</span>
                         )}

@@ -19,6 +19,7 @@ import InstagramLogo from '../../components/social/InstagramLogo'
 import FacebookLogo from '../../components/social/FacebookLogo'
 import TikTokFeedViewer from '../../components/tiktok/TikTokFeedViewer'
 import { ReelsGrid, ReelTile } from '../../components/tiktok/ReelsGrid'
+import { formatDate } from '../../utils/dates'
 
 const compact = (n) => n == null ? '—' : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n)
 const unwrap = (r) => r.data?.data ?? r.data
@@ -635,7 +636,7 @@ const AccountSheet = ({ platform, onClose, onReconnect }) => {
           </div>
 
           <div className="flex items-center justify-between text-xs text-gray-400">
-            <span>مربوط منذ {new Date(status.connectedAt).toLocaleDateString('ar-IQ-u-nu-latn')}</span>
+            <span>مربوط منذ {formatDate(status.connectedAt)}</span>
             <a href={cfg.privacyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-gray-600">
               سياسة خصوصية {cfg.name} <ExternalLink size={11} />
             </a>

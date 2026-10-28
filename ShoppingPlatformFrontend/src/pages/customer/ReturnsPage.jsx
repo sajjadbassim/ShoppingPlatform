@@ -14,6 +14,7 @@ import { API_ENDPOINTS } from '../../api/endpoints'
 import { useAuthStore } from '../../stores/authStore'
 import { useCustomerOrders } from '../../hooks/useOrders'
 import { useBackToClose } from '../../hooks/useBackToClose'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
@@ -34,6 +35,22 @@ const StatusBadge = ({ status }) => {
       <Icon size={11} />{s.label}
     </span>
   )
+}
+
+// مفتاح البند: المنتج + المتغير (كما يطابقه الخادم)
+const lineKey = (productId, variantId) => `${productId}|${variantId ?? ''}`
+
+// ما أُرجع سابقاً من هذا الطلب (غير المرفوض وغير رفض الباب) — يُخصم مما يمكن إرجاعه، كالخادم
+const returnedQuantities = (orderId, returns) => {
+  const out = {}
+  for (const ret of returns) {
+    if (ret.orderId !== orderId || ret.status?.toUpperCase() === 'REJECTED' || ret.isDoorRefusal) continue
+    for (const i of ret.items || []) {
+      const k = lineKey(i.productId, i.variantId)
+      out[k] = (out[k] ?? 0) + i.quantity
+    }
+  }
+  return out
 }
 
 // ===========================
@@ -76,6 +93,20 @@ const { data: orderDetails } = useQuery({
 })
 
 const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
+
+  // الإرجاعات السابقة لهذا الطلب: تعطّل البند المُرجَع كله وتحدّد أقصى كمية للمُرجَع جزئياً
+  const { data: myReturnsData } = useQuery({
+    queryKey: ['my-returns'],
+    queryFn: async () => {
+      const res = await apiGet(API_ENDPOINTS.RETURNS.MY)
+      return res.data.data || res.data
+    },
+    staleTime: 0,
+  })
+  const myReturns = Array.isArray(myReturnsData) ? myReturnsData : (myReturnsData?.items ?? [])
+  const returnedQty = useMemo(() => returnedQuantities(orderId, myReturns), [orderId, myReturns])
+  const alreadyReturned = (oi) => returnedQty[lineKey(oi.productId, oi.variantId)] ?? 0
+  const maxQty = (oi) => Math.max(0, (oi?.quantity ?? 1) - alreadyReturned(oi))
   const { mutateAsync: createReturn, isPending } = useMutation({
     mutationFn: async (formData) => {
       const r = await apiPostForm(API_ENDPOINTS.RETURNS.BASE, formData)
@@ -100,6 +131,10 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
     if (!orderId) { showError('يرجى اختيار الطلب'); return }
     if (!reason.trim()) { showError('يرجى إدخال سبب الإرجاع'); return }
     if (items.some(i => !i.orderItemId)) { showError('يرجى اختيار المنتجات'); return }
+    for (const i of items) {
+      const oi = orderItems.find(x => x.id === i.orderItemId)
+      if (oi && Number(i.quantity) > maxQty(oi)) { showError(`أقصى كمية يمكن إرجاعها من «${oi.productNameAr || oi.productName}» هي ${maxQty(oi)}`); return }
+    }
 
     try {
       const fd = new FormData()
@@ -151,7 +186,7 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
                 <option value="">اختر الطلب...</option>
                 {deliveredOrders.map(o => (
                   <option key={o.id} value={o.id}>
-                    {o.orderNumber} — {new Date(o.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                    {o.orderNumber} — {formatDate(o.createdAt)}
                   </option>
                 ))}
               </select>
@@ -199,13 +234,15 @@ const orderItems = orderDetails?.subOrders?.flatMap(s => s.items || []) || []
                     {orderItems.map(oi => (
                       // المنتج المختار في سطر آخر لا يُختار مرتين — تُعدَّل كميته في سطره
                       <option key={oi.id} value={oi.id}
-                        disabled={items.some((other, j) => j !== i && other.orderItemId === oi.id)}>
+                        disabled={maxQty(oi) === 0 || items.some((other, j) => j !== i && other.orderItemId === oi.id)}>
                         {oi.productNameAr || oi.productName}
                         {oi.variantSku ? ` (${oi.variantSku})` : ''}
+                        {maxQty(oi) === 0 ? ' — تم إرجاعه' : alreadyReturned(oi) > 0 ? ` (أُرجع ${alreadyReturned(oi)})` : ''}
                       </option>
                     ))}
                   </select>
                   <input type="number" min="1"
+                    max={item.orderItemId ? maxQty(orderItems.find(x => x.id === item.orderItemId)) || undefined : undefined}
                     value={item.quantity}
                     onChange={e => handleItemChange(i, 'quantity', e.target.value)}
                     className="w-16 h-9 px-2 border border-gray-300 rounded-lg text-sm text-center focus:ring-2 focus:ring-primary" />
@@ -276,7 +313,7 @@ const ReturnCard = ({ ret }) => {
         <div>
           <p className="font-medium text-gray-900">طلب إرجاع #{ret.returnNumber || ret.id?.slice(0,8)}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {new Date(ret.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+            {formatDate(ret.createdAt)}
           </p>
         </div>
         <StatusBadge status={ret.status} />
@@ -320,7 +357,7 @@ const ReturnCard = ({ ret }) => {
       {['APPROVED', 'COMPLETED'].includes(ret.status?.toUpperCase()) && ret.refundAmount > 0 && (
         <div className={`rounded-lg p-3 text-xs border ${ret.status?.toUpperCase() === 'COMPLETED' ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
           {ret.status?.toUpperCase() === 'COMPLETED'
-            ? <>تم ردّ <b>{ret.refundAmount.toLocaleString('en-US')} د.ع</b> إليك{ret.refundedAt && ` بتاريخ ${new Date(ret.refundedAt).toLocaleDateString('ar-IQ-u-nu-latn')}`}</>
+            ? <>تم ردّ <b>{ret.refundAmount.toLocaleString('en-US')} د.ع</b> إليك{ret.refundedAt && ` بتاريخ ${formatDate(ret.refundedAt)}`}</>
             : <>سيُردّ لك <b>{ret.refundAmount.toLocaleString('en-US')} د.ع</b>{ret.pickupStatus && ret.pickupStatus !== 'RECEIVED' ? ' بعد وصول القطع للمتجر' : ''}</>}
           {ret.pickupFeePayer === 'CUSTOMER' && ret.pickupFeeAmount > 0 && (
             <p className="mt-1 opacity-80">خُصمت منه أجرة استلام القطع {ret.pickupFeeAmount.toLocaleString('en-US')} د.ع</p>

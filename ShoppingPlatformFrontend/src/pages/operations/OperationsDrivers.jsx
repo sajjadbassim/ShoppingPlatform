@@ -26,6 +26,7 @@ import {
   useDriverStats,
 } from '../../hooks/useOrders'
 import { useSetDriverAccount, useDriverCash, useSettleDriverCash } from '../../hooks/useDriverApp'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers (خارج الـ Component)
@@ -674,7 +675,7 @@ const OperationsDrivers = () => {
                         {(order.total || 0).toLocaleString('en-US')} د.ع
                       </span>
                       <span className="text-gray-400">
-                        {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')} —{' '}
+                        {formatDate(order.createdAt)} —{' '}
                         {new Date(order.createdAt).toLocaleTimeString('ar-IQ-u-nu-latn', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>

@@ -13,6 +13,7 @@ import { useToast } from '../../components/common/Toast'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { useAuthStore } from '../../stores/authStore'
 import { getImageUrl } from '../../utils/imageHelper'
+import { formatDate } from '../../utils/dates'
 
 // ===========================
 // Helpers
@@ -188,7 +189,7 @@ const VendorReplyBox = ({ review, productId }) => {
       <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs font-semibold text-blue-700">
-            ردك{review.vendorReplyAt ? ` · ${new Date(review.vendorReplyAt).toLocaleDateString('ar-IQ-u-nu-latn')}` : ''}
+            ردك{review.vendorReplyAt ? ` · ${formatDate(review.vendorReplyAt)}` : ''}
           </p>
           <div className="flex gap-1">
             <button type="button" aria-label="تعديل الرد" onClick={() => { setText(review.vendorReply); setEditing(true) }}
@@ -282,7 +283,7 @@ const ProductReviewsRow = ({ product }) => {
                       </div>
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{review.userFullName || 'مستخدم'}</p>
-                        <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+                        <p className="text-xs text-gray-400">{formatDate(review.createdAt)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -382,7 +383,7 @@ const ReviewsFeed = ({ vendorId, unansweredOnly }) => {
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{review.productName}</p>
-                  <p className="text-xs text-gray-400">{review.customerName || 'زبون'} · {new Date(review.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+                  <p className="text-xs text-gray-400">{review.customerName || 'زبون'} · {formatDate(review.createdAt)}</p>
                 </div>
                 <StarDisplay value={review.rating} />
               </div>

@@ -18,6 +18,7 @@ import { apiGet, apiPut } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { getVendorLogo } from '../../utils/imageHelper'
 import OverdueConfirmationsAlert from '../../components/common/OverdueConfirmationsAlert'
+import { formatDate } from '../../utils/dates'
 
 const AdminDashboard = () => {
   const [dateRange, setDateRange] = useState('month')
@@ -186,7 +187,7 @@ const AdminDashboard = () => {
                 { label: 'الحد الأدنى',     value: store.minOrderAmount ? `${store.minOrderAmount.toLocaleString('en-US')} د.ع` : '—' },
                 { label: 'رسوم التوصيل',    value: store.deliveryFee     ? `${store.deliveryFee.toLocaleString('en-US')} د.ع`     : '—' },
                 { label: 'وقت التحضير',     value: store.estimatedPrepTime ? `${store.estimatedPrepTime} دقيقة`            : '—' },
-                { label: 'تاريخ التسجيل',   value: store.createdAt ? new Date(store.createdAt).toLocaleDateString('ar-IQ-u-nu-latn') : '—' },
+                { label: 'تاريخ التسجيل',   value: store.createdAt ? formatDate(store.createdAt) : '—' },
               ].map(({ label, value, dir }) => (
                 <div key={label} className="bg-gray-50 rounded-lg p-3">
                   <p className="text-xs text-gray-500 mb-1">{label}</p>

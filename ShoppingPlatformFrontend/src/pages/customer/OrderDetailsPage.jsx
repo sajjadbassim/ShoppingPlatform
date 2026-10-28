@@ -18,6 +18,7 @@ import { CustomerDeliveredIn } from '../../components/common/OrderTiming'
 import DeliverySlot from '../../components/common/DeliverySlot'
 import { formatQuantity, formatPrice } from '../../utils/weight'
 import { useBackToClose } from '../../hooks/useBackToClose'
+import { formatDate } from '../../utils/dates'
 
 
 // ===========================
@@ -545,7 +546,7 @@ const OrderDetailsPage = () => {
                         </p>
                         {step.date && step.completed && (
                           <p className="text-sm text-gray-500">
-                            {new Date(step.date).toLocaleDateString('ar-IQ-u-nu-latn')}
+                            {formatDate(step.date)}
                           </p>
                         )}
                       </div>

@@ -82,6 +82,15 @@ export const productService = {
    * @param {string} term   - نص البحث
    * @param {Object} params - { pageNumber?, pageSize? }
    */
+  /**
+   * اقتراحات البحث أثناء الكتابة: منتجات ومتاجر وفئات في طلب واحد
+   * @returns {Promise<Array<{type:'product'|'store'|'category', id, text, subtitle}>>}
+   */
+  suggestions: async (term, { limit = 8, scope } = {}) => {
+    const response = await apiGet(API_ENDPOINTS.PRODUCTS.SUGGESTIONS, { term, limit, scope });
+    return response.data.data || [];
+  },
+
   unifiedSearch: async (term, params = {}) => {
     const response = await apiGet(API_ENDPOINTS.PRODUCTS.UNIFIED_SEARCH, {
       term,

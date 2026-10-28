@@ -11,6 +11,7 @@ import { useToast } from '../../components/common/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiGet, apiPut, apiPost } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
+import { tierWithIcon } from '../../utils/loyaltyTier'
 
 // ===========================
 // Hooks
@@ -150,9 +151,9 @@ const SettingsTab = () => {
         <h3 className="font-semibold text-gray-800 mb-4">حدود المستويات</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { key: 'silverThreshold',   multiplierKey: 'silverMultiplier',   label: '🥈 فضي',     color: 'border-gray-300' },
-            { key: 'goldThreshold',     multiplierKey: 'goldMultiplier',     label: '🥇 ذهبي',    color: 'border-yellow-300' },
-            { key: 'platinumThreshold', multiplierKey: 'platinumMultiplier', label: '💎 بلاتيني', color: 'border-purple-300' },
+            { key: 'silverThreshold',   multiplierKey: 'silverMultiplier',   label: tierWithIcon('silver'), color: 'border-gray-300' },
+            { key: 'goldThreshold',     multiplierKey: 'goldMultiplier',     label: tierWithIcon('gold'), color: 'border-yellow-300' },
+            { key: 'platinumThreshold', multiplierKey: 'platinumMultiplier', label: tierWithIcon('platinum'), color: 'border-purple-300' },
           ].map(tier => (
             <div key={tier.key} className={`border-2 ${tier.color} rounded-xl p-4 space-y-3`}>
               <p className="font-medium text-gray-800">{tier.label}</p>
@@ -338,9 +339,7 @@ const AdjustPointsTab = () => {
                   userLoyalty.tier === 'Silver'   ? 'bg-gray-100 text-gray-700' :
                   'bg-amber-100 text-amber-700'
                 }`}>
-                  {userLoyalty.tier === 'Platinum' ? '💎 بلاتيني' :
-                   userLoyalty.tier === 'Gold'     ? '🥇 ذهبي' :
-                   userLoyalty.tier === 'Silver'   ? '🥈 فضي' : '🥉 برونزي'}
+                  {tierWithIcon(userLoyalty.tier)}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">

@@ -38,6 +38,7 @@ export const API_ENDPOINTS = {
     BY_VENDOR: (vendorId) => `/api/Products/vendor/${vendorId}`,
     BY_CATEGORY: (categoryId) => `/api/Products/category/${categoryId}`,
     SEARCH: '/api/Products/search',
+    SUGGESTIONS: '/api/Products/suggestions',               // اقتراحات نصية خفيفة (منتج/متجر/فئة)
     UNIFIED_SEARCH: '/api/Products/unified-search',         // ✅ جديد
     FILTER: '/api/Products/filter',
     ADVANCED_FILTER: '/api/Products/advanced-filter',       // ✅ جديد

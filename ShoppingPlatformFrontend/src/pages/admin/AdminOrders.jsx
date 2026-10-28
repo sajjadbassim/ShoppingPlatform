@@ -14,6 +14,7 @@ import { apiGet } from '../../api/axios'
 import { API_ENDPOINTS } from '../../api/endpoints'
 import { DurationChip } from '../../components/common/OrderTiming'
 import { useOrderTimings } from '../../hooks/useOrderTiming'
+import { formatDate } from '../../utils/dates'
 
 const STATUS_OPTIONS = [
   { value: '',                      label: 'الكل'           },
@@ -77,7 +78,7 @@ const OrderDetailModal = ({ orderId, onClose }) => {
             {/* Status + Summary */}
             <div className="flex items-center justify-between">
               <span className={`text-sm px-3 py-1 rounded-full font-medium ${s.color}`}>{s.label}</span>
-              <p className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}</p>
+              <p className="text-xs text-gray-400">{formatDate(order.createdAt)}</p>
             </div>
 
             {/* Customer Info */}
@@ -282,7 +283,7 @@ const AdminOrders = () => {
                       {order.paymentMethod === 'COD' ? 'عند الاستلام' : order.paymentMethod || '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">
-                      {new Date(order.createdAt).toLocaleDateString('ar-IQ-u-nu-latn')}
+                      {formatDate(order.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status} />
