@@ -64,7 +64,9 @@ export default function OrderScreen() {
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="رجوع">
           <Ionicons name="arrow-forward" size={24} color={colors.text} />
         </Pressable>
-        <AppText weight="extraBold" style={{ fontSize: 18, flex: 1, writingDirection: 'ltr', textAlign: 'right' }}>{order?.orderNumber ?? 'الطلب'}</AppText>
+        <AppText weight="extraBold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18, flex: 1, writingDirection: 'ltr', textAlign: 'right' }}>{order?.orderNumber ?? 'الطلب'}</AppText>
+        {order?.status === 'DELIVERED' && <Chip label={`سُلّم ${formatClock(order.deliveredAt)}`} tone="ok" />}
+        {order?.status === 'DELIVERY_FAILED' && <Chip label="تعذّر التسليم" tone="bad" />}
       </View>
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={refreshAll} />}>
         {!order ? (
@@ -124,8 +126,8 @@ export default function OrderScreen() {
                 <AppText>{order.deliveryFee > 0 ? money(order.deliveryFee) : 'مجاني'}</AppText>
               </View>
               <View style={[styles.row, styles.total]}>
-                <AppText weight="bold">المطلوب تحصيله</AppText>
-                <AppText weight="extraBold" style={{ fontSize: 18 }}>{order.amountToCollect > 0 ? money(order.amountToCollect) : 'مدفوع مسبقاً'}</AppText>
+                <AppText weight="bold" style={{ flexShrink: 1 }}>{finished && order.amountToCollect <= 0 ? 'التحصيل' : 'المطلوب تحصيله'}</AppText>
+                <AppText weight="extraBold" style={{ fontSize: order.amountToCollect > 0 ? 18 : 15 }}>{order.amountToCollect > 0 ? money(order.amountToCollect) : 'مدفوع مسبقاً'}</AppText>
               </View>
               <Chip label={order.amountToCollect > 0 ? 'دفع عند الاستلام' : 'مدفوع'} tone={order.amountToCollect > 0 ? 'primary' : 'ok'} />
             </Card>
@@ -155,8 +157,6 @@ export default function OrderScreen() {
                 <ActionButton title="تعذّر التسليم" icon="close-circle-outline" tone="bad" onPress={() => setFailing({ order })} />
               </Card>
             )}
-            {order.status === 'DELIVERED' && <Chip label={`سُلّم ${formatClock(order.deliveredAt)}`} tone="ok" />}
-            {order.status === 'DELIVERY_FAILED' && <Chip label="تعذّر التسليم" tone="bad" />}
           </>
         )}
       </ScrollView>

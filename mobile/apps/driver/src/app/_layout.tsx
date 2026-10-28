@@ -1,3 +1,4 @@
+import '../lib/palette';
 import { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +8,7 @@ import { colors, useAppFonts, useTheme } from '@wasit/ui';
 import { queryClient } from '../api/queryClient';
 import { DialogHost } from '../components/DialogHost';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { ThemeFade } from '../components/ThemeFade';
 import { ToastHost } from '../components/ToastHost';
 import { usePushNotifications } from '../lib/pushNotifications';
 import { loadSavedTheme, useAccountTheme } from '../lib/theme';
@@ -69,12 +71,14 @@ export default function RootLayout() {
           <Stack.Protected guard={signedIn}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="order/[id]" />
+            <Stack.Screen name="notifications" />
             <Stack.Screen name="location-permission" options={{ presentation: 'modal' }} />
           </Stack.Protected>
         </Stack>
         <OfflineBanner />
         <ToastHost />
         <DialogHost />
+        <ThemeFade />
       </QueryClientProvider>
     </ThemeProvider>
   );

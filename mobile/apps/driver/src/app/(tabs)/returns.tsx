@@ -1,6 +1,6 @@
 import { Linking, RefreshControl, View } from 'react-native';
 import { mapsUrl, newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
-import { AppText, createStyles, useTheme } from '@wasit/ui';
+import { AppText, brand, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDriverActions, useDriverReturns, useRefreshDriver } from '../../api/useDriver';
 import { ActionButton, Card, Chip, Empty, PhoneRow, Screen } from '../../components/kit';
 import { confirmDialog } from '../../lib/dialog';
@@ -25,7 +25,7 @@ function CustomerPickup({ trips }: { trips: ReturnTrip[] }) {
   const vendors = [...new Set(trips.map((t) => t.vendorName))].join('، ');
 
   return (
-    <Card tone="warn">
+    <Card tone="warn" accent={colors.warning}>
       <View style={styles.row}>
         <AppText weight="bold">خذ القطع من الزبون</AppText>
         <Chip label={first.returnNumber ?? 'مرتجع'} tone="warn" />
@@ -85,11 +85,9 @@ function CustomerPickup({ trips }: { trips: ReturnTrip[] }) {
 // قطع معه: يسلّمها للمتجر والمتجر يؤكد الاستلام
 function VendorDelivery({ trip }: { trip: ReturnTrip }) {
   return (
-    <Card>
-      <View style={styles.row}>
-        <AppText weight="bold" numberOfLines={1} style={{ flex: 1 }}>{trip.vendorName}</AppText>
-        <PhoneRow phone={trip.vendorPhone} />
-      </View>
+    <Card accent={colors.primary}>
+      <AppText weight="bold">{trip.vendorName}</AppText>
+      <PhoneRow phone={trip.vendorPhone} />
       {!!trip.vendorAddress && <AppText muted style={{ fontSize: 13 }}>{trip.vendorAddress}</AppText>}
       <AppText muted style={{ fontSize: 12 }}>{trip.reasonAr} · {trip.subOrderNumber}</AppText>
       <Items trips={[trip]} />
@@ -120,5 +118,5 @@ export default function ReturnsScreen() {
 const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   items: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  item: { backgroundColor: '#F3F4F6', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
+  item: { backgroundColor: brand.surfaceMuted, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
 }));

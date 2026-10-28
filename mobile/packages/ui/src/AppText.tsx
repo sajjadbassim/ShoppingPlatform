@@ -16,16 +16,23 @@ export const setMaxFontScale = (value: number | undefined) => {
   maxFontScale = value;
 };
 
+// معامل تصغير/تكبير كل نصوص التطبيق (الافتراضي 1 = بلا تغيير). يستدعيه تطبيق يريد خطاً أصغر (مثل المندوب)
+let textScale = 1;
+export const setTextScale = (value: number) => {
+  textScale = value;
+};
+
 // خط Tajawal يُختار بالاسم لا بـfontWeight (لا يدعم الخط الوزن عبر الخاصية على أندرويد)
 export function AppText({ weight = 'regular', muted, style, ...rest }: Props) {
   useTheme();
   const flat = StyleSheet.flatten(style) ?? {};
-  const lineHeight = safeLineHeight(flat.fontSize, flat.lineHeight);
+  const scaled = textScale === 1 ? undefined : Math.round((flat.fontSize ?? 16) * textScale * 2) / 2;
+  const lineHeight = safeLineHeight(scaled ?? flat.fontSize, flat.lineHeight != null && scaled ? Math.round(flat.lineHeight * textScale) : flat.lineHeight);
   return (
     <Text
       maxFontSizeMultiplier={maxFontScale}
       {...rest}
-      style={[styles.base, { fontFamily: fonts[weight] }, muted && styles.muted, style, lineHeight != null && { lineHeight }]}
+      style={[styles.base, { fontFamily: fonts[weight] }, muted && styles.muted, style, scaled != null && { fontSize: scaled }, lineHeight != null && { lineHeight }]}
     />
   );
 }

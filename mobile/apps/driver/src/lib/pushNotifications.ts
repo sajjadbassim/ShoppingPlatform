@@ -71,7 +71,7 @@ export function usePushNotifications() {
     });
     // طلب جديد أو إلغاؤه: نحدّث القوائم فوراً بدل انتظار الدورة التالية
     const receivedSub = Notifications.addNotificationReceivedListener(() => {
-      for (const key of ['driver-me', 'driver-orders', 'driver-returns'])
+      for (const key of ['driver-me', 'driver-orders', 'driver-returns', 'notifications', 'notifications-unread'])
         queryClient.invalidateQueries({ queryKey: [key] });
     });
     const last = Notifications.getLastNotificationResponse();

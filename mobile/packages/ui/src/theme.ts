@@ -47,15 +47,21 @@ const WHITE = '#FFFFFF';
 export const colors: Palette = { ...lightColors };
 export const brand: Brand = { ...lightBrand };
 
+// لوحة داكنة صريحة يحددها التطبيق (المندوب)؛ ما لم يحدده يُشتق من الفاتح بالجدول المشترك كما في الويب
+const customDarkColors: Partial<Palette> = {};
+const customDarkBrand: Partial<Brand> = {};
+
 const applyPalette = (mode: ThemeMode) => {
   const dark = mode === 'dark';
   for (const key of Object.keys(lightColors) as (keyof Palette)[]) {
-    colors[key] = dark ? (key === 'white' ? WHITE : darkHex(lightColors[key])) : lightColors[key];
+    const custom = customDarkColors[key];
+    colors[key] = dark ? (custom ?? (key === 'white' ? WHITE : darkHex(lightColors[key]))) : lightColors[key];
   }
   for (const key of Object.keys(lightBrand) as (keyof Brand)[]) {
     const value = lightBrand[key];
+    const custom = customDarkBrand[key];
     // التدرجات (مصفوفات) وألوان الهوية الصريحة (عروض، سوبرماركت) تبقى كما هي
-    (brand as Record<string, unknown>)[key] = dark && typeof value === 'string' ? darkHex(value) : value;
+    (brand as Record<string, unknown>)[key] = dark ? (custom ?? (typeof value === 'string' ? darkHex(value) : value)) : value;
   }
 };
 
@@ -65,9 +71,11 @@ const listeners = new Set<() => void>();
 
 // تطبيق له هوية لونية مختلفة (البائع): يستبدل قيم الوضع الفاتح قبل رسم أي شاشة.
 // الجدول الداكن مبني على لوحة الويب، فالتطبيق الذي يغيّر لوحته يبقى فاتحاً فقط
-export function configurePalette(next: { colors?: Partial<Palette>; brand?: Partial<Brand> }) {
+export function configurePalette(next: { colors?: Partial<Palette>; brand?: Partial<Brand>; dark?: { colors?: Partial<Palette>; brand?: Partial<Brand> } }) {
   Object.assign(lightColors, next.colors);
   Object.assign(lightBrand, next.brand);
+  Object.assign(customDarkColors, next.dark?.colors);
+  Object.assign(customDarkBrand, next.dark?.brand);
   applyPalette(mode);
   listeners.forEach((l) => l());
 }
