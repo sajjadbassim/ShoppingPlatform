@@ -51,6 +51,11 @@ export default function OrderScreen() {
   const finished = order && (order.status === 'DELIVERED' || order.status === 'DELIVERY_FAILED');
   const pending = order ? pendingPickups(order) : [];
   // قيمة المنتجات قبل الخصومات (القطع المرفوضة تبقى ظاهرة بعلامتها)
+  // الخصم (كوبون أو نقاط أو غيرهما) موزّع على المتاجر؛ يُعرض للمندوب رقماً واحداً كي يفهم لماذا المطلوب أقل من مجموع المنتجات والتوصيل
+  const discount = order ? order.stores.reduce((sum, st) => sum + (st.couponShare || 0) + (st.pointsShare || 0), 0) : 0;
+  // بعد التسليم يصير المطلوب صفراً على الخادم؛ فيُعرض المبلغ الذي حصّله المندوب فعلاً بدل «مدفوع مسبقاً»
+  const collected = order?.status === 'DELIVERED' ? order.cashCollectedAmount ?? 0 : 0;
+  const shownTotal = collected > 0 ? collected : order?.amountToCollect ?? 0;
   const productsTotal = order ? order.stores.reduce((sum, st) => sum + st.items.reduce((a, i) => a + i.unitPrice * i.quantity, 0), 0) : 0;
 
   const doPickUp = (subOrderId: string) =>
@@ -115,11 +120,20 @@ export default function OrderScreen() {
                 <AppText muted>أجرة التوصيل</AppText>
                 <AppText>{order.deliveryFee > 0 ? money(order.deliveryFee) : 'مجاني'}</AppText>
               </View>
+              {discount > 0 && (
+                <View style={styles.row}>
+                  <View style={styles.discountLabel}>
+                    <Ionicons name="pricetag-outline" size={14} color={colors.success} />
+                    <AppText muted>خصم</AppText>
+                  </View>
+                  <AppText weight="medium" style={{ color: colors.success }}>{'‎'}−{money(discount)}</AppText>
+                </View>
+              )}
               <View style={[styles.row, styles.total]}>
-                <AppText weight="bold" style={{ flexShrink: 1 }}>{finished && order.amountToCollect <= 0 ? 'التحصيل' : 'المطلوب تحصيله'}</AppText>
-                <AppText weight="extraBold" style={{ fontSize: order.amountToCollect > 0 ? 18 : 15 }}>{order.amountToCollect > 0 ? money(order.amountToCollect) : 'مدفوع مسبقاً'}</AppText>
+                <AppText weight="bold" style={{ flexShrink: 1 }}>{collected > 0 ? 'المبلغ المحصَّل' : finished && order.amountToCollect <= 0 ? 'التحصيل' : 'المطلوب تحصيله'}</AppText>
+                <AppText weight="extraBold" style={{ fontSize: shownTotal > 0 ? 18 : 15 }}>{shownTotal > 0 ? money(shownTotal) : 'مدفوع مسبقاً'}</AppText>
               </View>
-              <Chip label={order.amountToCollect > 0 ? 'دفع عند الاستلام' : 'مدفوع'} tone={order.amountToCollect > 0 ? 'primary' : 'ok'} />
+              <Chip label={collected > 0 ? 'حُصّل نقداً' : order.amountToCollect > 0 ? 'دفع عند الاستلام' : 'مدفوع'} tone={collected > 0 || order.amountToCollect <= 0 ? 'ok' : 'primary'} />
             </Card>
 
             {!finished && pending.length > 0 && (
@@ -206,6 +220,7 @@ const styles = createStyles(() => ({
   stop: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', paddingTop: 6 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, borderTopWidth: 1, borderTopColor: colors.border },
   thumb: { width: 44, height: 44, borderRadius: 10, backgroundColor: brand.surfaceMuted },
+  discountLabel: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   total: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 8 },
   dot: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
 }));

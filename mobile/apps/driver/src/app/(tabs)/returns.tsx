@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
 import { AppText, brand, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDriverActions, useDriverReturns, useRefreshDriver } from '../../api/useDriver';
-import { ActionButton, Card, Chip, Empty, openNavigation, PhoneRow, Screen } from '../../components/kit';
+import { ActionButton, Card, Chip, ChipFilter, Empty, openNavigation, PhoneRow, Screen } from '../../components/kit';
+import { inPeriod, PERIODS, type Period } from '../../lib/period';
 import { confirmDialog } from '../../lib/dialog';
 import { toast } from '../../lib/toast';
 
@@ -100,15 +102,28 @@ export default function ReturnsScreen() {
   useTheme();
   const returns = useDriverReturns();
   const refreshAll = useRefreshDriver();
-  const { pickups, deliveries } = splitReturnTrips(newestFirst(returns.data ?? [], (t) => t.createdAt));
-  const empty = pickups.length === 0 && deliveries.length === 0;
+  const [kind, setKind] = useState<'pickup' | 'vendor' | 'all'>('all');
+  const [period, setPeriod] = useState<Period>('all');
+  const split = splitReturnTrips(newestFirst(returns.data ?? [], (t) => t.createdAt));
+  const total = split.pickups.length + split.deliveries.length;
+  const pickups = kind === 'vendor' ? [] : split.pickups.filter((g) => inPeriod(g[0].createdAt, period));
+  const deliveries = kind === 'pickup' ? [] : split.deliveries.filter((t) => inPeriod(t.createdAt, period));
+  const shown = pickups.length + deliveries.length;
 
   return (
     <Screen title="المرتجعات" refreshControl={<RefreshControl refreshing={returns.isRefetching} onRefresh={refreshAll} />}>
       <AppText muted style={{ fontSize: 13, lineHeight: 22 }}>
         خذ القطع من الزبون ثم أرجعها لمتاجرها حين تتفرغ. المتجر يؤكد الاستلام.
       </AppText>
-      {empty && !returns.isLoading && <Empty icon="return-down-back-outline" text="لا توجد مرتجعات بعهدتك" />}
+      <ChipFilter options={PERIODS} value={period} onChange={setPeriod} />
+      <ChipFilter
+        options={[{ value: 'pickup', label: `من الزبون · ${split.pickups.length}` }, { value: 'vendor', label: `للمتاجر · ${split.deliveries.length}` }, { value: 'all', label: 'الكل' }] as const}
+        value={kind}
+        onChange={setKind}
+      />
+      {shown === 0 && !returns.isLoading && (
+        <Empty icon={total === 0 ? 'return-down-back-outline' : 'funnel-outline'} text={total === 0 ? 'لا توجد مرتجعات بعهدتك' : 'لا مرتجعات تطابق هذا الفلتر'} />
+      )}
       {pickups.map((group) => <CustomerPickup key={group[0].returnId ?? group[0].id} trips={group} />)}
       {deliveries.map((t) => <VendorDelivery key={t.id} trip={t} />)}
     </Screen>

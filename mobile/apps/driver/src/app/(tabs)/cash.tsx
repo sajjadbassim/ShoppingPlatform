@@ -6,6 +6,7 @@ import { formatClock, formatDate, newestFirst } from '@wasit/shared';
 import { AppText, colors, createStyles, radius, useTheme } from '@wasit/ui';
 import { useDriverCash, useDriverOrders, useRefreshDriver } from '../../api/useDriver';
 import { Card, ChipFilter, Empty, money, Screen } from '../../components/kit';
+import { FadeIn, FloatingOrb, Shimmer, useCountUp } from '../../components/live';
 import { dayKey, inPeriod, PERIODS, type Period } from '../../lib/period';
 
 type Entry = { orderId: string; orderNumber: string; amount: number; collectedAt: string };
@@ -18,7 +19,8 @@ const dayLabel = (iso: string) => {
   return formatDate(iso);
 };
 
-function Stat({ icon, label, value, unit }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: string; unit?: string }) {
+function Stat({ icon, label, value, unit }: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; value: number; unit?: string }) {
+  const shown = useCountUp(value);
   return (
     <View style={styles.stat}>
       <View style={styles.statIcon}>
@@ -27,7 +29,7 @@ function Stat({ icon, label, value, unit }: { icon: React.ComponentProps<typeof 
       <View style={{ flex: 1 }}>
         <AppText style={styles.heroMuted}>{label}</AppText>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-          <AppText weight="extraBold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 16, color: colors.white, flexShrink: 1 }}>{value}</AppText>
+          <AppText weight="extraBold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 16, color: colors.white, flexShrink: 1 }}>{shown.toLocaleString('en-US')}</AppText>
           {!!unit && <AppText style={styles.heroMuted}>{unit}</AppText>}
         </View>
       </View>
@@ -41,6 +43,8 @@ export default function CashScreen() {
   // تفاصيل الزبون والمنطقة من سجل الطلبات المنتهية (يحتفظ بها الخادم 7 أيام)
   const history = useDriverOrders(true);
   const refreshAll = useRefreshDriver();
+  const owed = useCountUp(Math.round(cash.data?.total ?? 0));
+  const [heroWidth, setHeroWidth] = useState(360);
   const [period, setPeriod] = useState<Period>('all');
 
   const detail = new Map((history.data ?? []).map((o) => [o.orderId, o]));
@@ -58,17 +62,22 @@ export default function CashScreen() {
 
   return (
     <Screen title="النقد" refreshControl={<RefreshControl refreshing={cash.isRefetching} onRefresh={refreshAll} />}>
-      <View style={styles.hero}>
+      <FadeIn>
+      <View style={styles.hero} onLayout={(e) => setHeroWidth(e.nativeEvent.layout.width)}>
+        <FloatingOrb size={150} style={{ top: -50, end: -40 }} />
+        <FloatingOrb size={90} style={{ bottom: -30, start: -20 }} delay={1200} />
+        <Shimmer width={heroWidth} />
         <AppText style={styles.heroMuted}>المستحق عليك للعمليات</AppText>
-        <AppText weight="extraBold" style={{ color: colors.white, fontSize: 30 }}>{money(cash.data?.total)}</AppText>
+        <AppText weight="extraBold" style={{ color: colors.white, fontSize: 30 }}>{owed.toLocaleString('en-US')} د.ع</AppText>
         {allItems.length > 0 && (
           <View style={styles.stats}>
-            <Stat icon="cash-outline" label={period === 'all' ? 'كل الفترات' : `مجموع ${PERIODS.find((p) => p.value === period)!.label}`} value={Math.round(total).toLocaleString('en-US')} unit="د.ع" />
+            <Stat icon="cash-outline" label={period === 'all' ? 'كل الفترات' : `مجموع ${PERIODS.find((p) => p.value === period)!.label}`} value={Math.round(total)} unit="د.ع" />
             <View style={styles.sep} />
-            <Stat icon="receipt-outline" label="عدد الطلبات" value={String(items.length)} unit="طلب" />
+            <Stat icon="receipt-outline" label="عدد الطلبات" value={items.length} unit="طلب" />
           </View>
         )}
       </View>
+      </FadeIn>
 
       <ChipFilter options={PERIODS} value={period} onChange={setPeriod} />
 
@@ -115,7 +124,7 @@ export default function CashScreen() {
 }
 
 const styles = createStyles(() => ({
-  hero: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: 16, gap: 4, alignItems: 'center' },
+  hero: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: 16, gap: 4, alignItems: 'center', overflow: 'hidden' },
   heroMuted: { color: 'rgba(255,255,255,0.88)', fontSize: 12 },
   stats: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: radius.lg, paddingVertical: 10, paddingHorizontal: 6, marginTop: 8, alignSelf: 'stretch' },
   stat: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6 },
