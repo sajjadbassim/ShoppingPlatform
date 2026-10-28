@@ -257,8 +257,15 @@
 
 **الملفات:** `Controllers/DriverAppController.cs` (`MyReturns([FromQuery] bool history)`)، `Services/DriverAppService/DriverAppService.cs` (`GetMyReturnTripsAsync(userId, history, ct)`)، `Services/ReturnTripService/ReturnTripService.cs` (`GetClosedForDriverAsync(driverId, since, ct)` في الواجهة والتنفيذ). لا مهاجرة لقاعدة البيانات.
 
-**اختبار:** `DriverHistory_ListsReceivedTripsWithinWindowOnly_AndOpenListExcludesThem` (المنتهي يظهر في السجل ويغيب من المفتوح، سجل سائق آخر فارغ، والسقف يُحترم). اختبارات المرتجعات والمندوب 44 ناجحاً.
+**اختبار:** `DriverHistory_ListsAllReceivedTrips_AndOpenListExcludesThem` (المنتهي يظهر في السجل ويغيب من المفتوح، سجل سائق آخر فارغ، والسقف يُحترم). اختبارات المرتجعات والمندوب 44 ناجحاً.
 
-**للنشر:** نُشر على الخادم التجريبي بـ`wasit-deploy` (الكوميت `02acb44`) وجُرّب من تطبيق المندوب. قبل النشر (للخوادم الأخرى) يتجاهل الخادم `history` ويعيد المفتوح، لذا يرشّح التطبيق السجل بحالة `RECEIVED` فقط فلا يعرض خطأً.
+**للنشر:** نُشر على الخادم التجريبي بـ`wasit-deploy` (الكوميت الأول `02acb44` بحد 7 أيام، ثم `7a880b6` بلا حد زمني وبسقف 200) وجُرّب من تطبيق المندوب. قبل النشر (للخوادم الأخرى) يتجاهل الخادم `history` ويعيد المفتوح، لذا يرشّح التطبيق السجل بحالة `RECEIVED` فقط فلا يعرض خطأً.
 
 **للويب لاحقاً:** لا يلزم الويب تغيير. إن أردت سجلاً في واجهة مشابهة، استدعِ النقطة نفسها بالمعامل. مرتجعات المتجر لها نقطتها (`GetForVendorAsync(vendorId, openOnly)`) ولم تتغير.
+
+**ملاحظات للويب والتكامل:**
+- الحقول التي يعتمد عليها التطبيق في `ReturnTripDto`: `status` (`AT_CUSTOMER` أو `WITH_DRIVER` أو `RECEIVED`)، `createdAt`، `pickedUpAt` (أخذ القطع)، `receivedAt` (تأكيد المتجر)، `returnId` و`returnNumber` (فارغان لرحلات تعذّر التسليم)، `reason` و`reasonAr`، `customerName/Phone/Address` وإحداثيات الزبون، `vendorName/Phone/Address`، و`items`.
+- ترتيب الرد داخل الخادم: الأحدث إنشاءً (مع `WITH_DRIVER` أولاً). التطبيق يعيد ترتيب السجل بـ`receivedAt` تنازلياً. إن لزم ترتيب محدد في الويب فرتّب بنفسك.
+- معرّف شاشة التفاصيل في التطبيق: `returnId` وإن كان فارغاً فرقم الرحلة `id`. رحلات مرتجع واحد لعدة متاجر تُجمع تحت `returnId` واحد.
+- لا نقطة جديدة لتفاصيل مرتجع واحد: التطبيق يبحث في قائمتي المفتوح والسجل. إن احتاج الويب نقطة بالمعرّف فهي تعديل باك جديد بإذن مستقل.
+
