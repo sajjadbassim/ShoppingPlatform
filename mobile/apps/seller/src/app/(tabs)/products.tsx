@@ -180,11 +180,12 @@ export default function ProductsScreen() {
         <Card tone="warn">
           <AppText weight="bold" style={{ fontSize: 14 }}>{selected.length ? `${selected.length} محدد` : 'اضغط المنتجات لتحديدها'}</AppText>
           {selected.length > 0 && (
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              <ActionButton title="إظهار" tone="soft" compact onPress={() => bulkVisibility(true)} />
-              <ActionButton title="إخفاء" tone="soft" compact onPress={() => bulkVisibility(false)} />
-              <ActionButton title="الأسعار" tone="soft" compact onPress={() => setBulkPrice(true)} />
-              <ActionButton title="حذف" tone="bad" compact onPress={() => confirmDelete(selectedProducts)} />
+            // شبكة 2×2 بأيقونات: أربعة أزرار في صف واحد تكسر كلماتها في المنتصف على الشاشات الضيقة
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 }}>
+              <View style={{ width: '48.5%', flexDirection: 'row' }}><ActionButton title="إظهار" icon="eye-outline" tone="soft" compact onPress={() => bulkVisibility(true)} /></View>
+              <View style={{ width: '48.5%', flexDirection: 'row' }}><ActionButton title="إخفاء" icon="eye-off-outline" tone="soft" compact onPress={() => bulkVisibility(false)} /></View>
+              <View style={{ width: '48.5%', flexDirection: 'row' }}><ActionButton title="الأسعار" icon="pricetag-outline" tone="soft" compact onPress={() => setBulkPrice(true)} /></View>
+              <View style={{ width: '48.5%', flexDirection: 'row' }}><ActionButton title="حذف" icon="trash-outline" tone="bad" compact onPress={() => confirmDelete(selectedProducts)} /></View>
             </View>
           )}
           <Pressable onPress={() => setSelected(shown.map((p) => p.id))}><AppText weight="bold" style={{ color: colors.primaryHover, fontSize: 13 }}>تحديد الكل ({shown.length})</AppText></Pressable>
