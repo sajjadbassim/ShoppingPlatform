@@ -6,8 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatClock, getImageUrl, ORDER_STATUS_LABELS, updateVendorProfile } from '@wasit/shared';
 import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
 import { Image } from 'expo-image';
-import { useDashboard, useProfile, useReturnTrips } from '../../api/useVendor';
-import { Card, Chip, IconTile, ListRow, money, Screen, SectionTitle } from '../../components/kit';
+import { useDashboard, useOrderCounts, useProfile, useReturnTrips } from '../../api/useVendor';
+import { Card, Chip, IconTile, money, Screen, SectionTitle } from '../../components/kit';
 import { toast } from '../../lib/toast';
 import { palette } from '../../lib/palette';
 import { goOrders } from '../../lib/nav';
@@ -21,6 +21,7 @@ export default function HomeScreen() {
   const dash = useDashboard();
   const profile = useProfile();
   const trips = useReturnTrips();
+  const counts = useOrderCounts();
   const d = dash.data;
   const p = profile.data;
   const showNumbers = can('home');
@@ -35,6 +36,9 @@ export default function HomeScreen() {
     onError: (e) => toast.error((e as { message?: string }).message || 'تعذّر التحديث'),
   });
 
+  // «قيد التنفيذ» ليست حالة واحدة: نفتح أول مرحلة فيها طلبات (وإلا أولها)
+  const byStatus = counts.data?.byStatus ?? {};
+  const activeStatus = ['CONFIRMED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY'].find((s) => (byStatus[s] ?? 0) > 0) ?? 'CONFIRMED';
   const pending = d?.pendingOrders ?? 0;
   const lowStock = (d?.lowStockProducts ?? 0) + (d?.outOfStockProducts ?? 0);
   const returnsIncoming = (trips.data ?? []).length;
@@ -68,13 +72,20 @@ export default function HomeScreen() {
         {showNumbers ? (
           <View style={{ gap: 2 }}>
             <AppText style={{ color: palette.cream, fontSize: 13 }}>مبيعات اليوم</AppText>
-            <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 36, lineHeight: 48 }}>{money(d?.revenueToday)}</AppText>
+            <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 30, lineHeight: 40 }}>{money(d?.revenueToday)}</AppText>
             <AppText style={{ color: palette.cream, fontSize: 13 }}>آخر 7 أيام: {money(d?.revenueThisWeek)} · هذا الشهر: {money(d?.revenueThisMonth)}</AppText>
           </View>
         ) : (
           <AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 18 }}>صباح الخير</AppText>
         )}
       </LinearGradient>
+
+      {/* اختصارات سريعة تحت بطاقة المبيعات */}
+      <View style={styles.quick}>
+        {can('products') && <QuickAction icon="add-circle-outline" label="إضافة منتج" onPress={() => router.push({ pathname: '/product/[id]', params: { id: 'new' } })} />}
+        {can('marketing') && <QuickAction icon="pricetag-outline" tone="bad" label="كوبون جديد" onPress={() => router.push('/promotions')} />}
+        {can('reviews') && <QuickAction icon="star-outline" tone="warn" label="التقييمات" onPress={() => router.push('/reviews')} />}
+      </View>
 
       <SectionTitle>تحتاج قرارك الآن</SectionTitle>
       {can('orders') && (
@@ -106,8 +117,8 @@ export default function HomeScreen() {
         <>
           <SectionTitle>أرقام المتجر</SectionTitle>
           <View style={styles.grid}>
-            <Stat label="قيد التنفيذ" value={d?.activeOrders ?? 0} />
-            <Stat label="مكتملة" value={d?.completedOrders ?? 0} tone="ok" />
+            <Stat label="قيد التنفيذ" value={d?.activeOrders ?? 0} onPress={can('orders') ? () => goOrders('orders', activeStatus) : undefined} />
+            <Stat label="مكتملة" value={d?.completedOrders ?? 0} tone="ok" onPress={can('orders') ? () => goOrders('orders', 'DELIVERED') : undefined} />
             <Stat label="مخزون ينفد" value={lowStock} tone={lowStock > 0 ? 'warn' : undefined} onPress={can('products') ? () => router.push('/products') : undefined} />
             <Stat label="تقييمات بلا رد" value={d?.pendingReviews ?? 0} tone={(d?.pendingReviews ?? 0) > 0 ? 'warn' : undefined} onPress={can('reviews') ? () => router.push('/reviews') : undefined} />
           </View>
@@ -155,13 +166,6 @@ export default function HomeScreen() {
           </Card>
         </>
       )}
-
-      <SectionTitle>اختصارات</SectionTitle>
-      <Card pad={4}>
-        {can('products') && <ListRow icon="add-circle-outline" title="إضافة منتج" onPress={() => router.push({ pathname: '/product/[id]', params: { id: 'new' } })} />}
-        {can('marketing') && <ListRow icon="pricetag-outline" tone="bad" title="كوبون جديد" onPress={() => router.push('/promotions')} />}
-        {can('reviews') && <ListRow icon="star-outline" tone="warn" title="التقييمات" onPress={() => router.push('/reviews')} last />}
-      </Card>
     </Screen>
   );
 }
@@ -172,19 +176,35 @@ function Stat({ label, value, tone, onPress }: { label: string; value: number; t
   return (
     <View style={{ width: '48.5%' }}>
       <Card onPress={onPress}>
-        <AppText muted style={{ fontSize: 12.5 }}>{label}</AppText>
-        <AppText weight="extraBold" style={{ fontSize: 26, color, lineHeight: 36 }}>{value}</AppText>
+        <View style={styles.rowC}>
+          <AppText muted style={{ fontSize: 12.5, flex: 1 }}>{label}</AppText>
+          {onPress && <Ionicons name="chevron-back" size={15} color={colors.placeholder} />}
+        </View>
+        <AppText weight="extraBold" style={{ fontSize: 24, color, lineHeight: 32 }}>{value}</AppText>
       </Card>
     </View>
   );
 }
 
+// زر اختصار: أيقونة فوق الاسم، ثلاثة بعرض متساوٍ في صف واحد
+function QuickAction({ icon, label, tone, onPress }: { icon: React.ComponentProps<typeof IconTile>['icon']; label: string; tone?: React.ComponentProps<typeof IconTile>['tone']; onPress: () => void }) {
+  useTheme();
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [styles.quickBtn, pressed && { opacity: 0.8 }]}>
+      <IconTile icon={icon} tone={tone} size={40} />
+      <AppText weight="bold" style={{ fontSize: 12.5 }} numberOfLines={1}>{label}</AppText>
+    </Pressable>
+  );
+}
+
 const styles = createStyles(() => ({
-  hero: { borderRadius: 24, padding: 18, gap: 14, overflow: 'hidden' },
+  quick: { flexDirection: 'row', gap: 8 },
+  quickBtn: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#7A4A12', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  hero: { borderRadius: 20, padding: 16, gap: 10, overflow: 'hidden' },
   circle: { position: 'absolute', left: -50, top: -60, width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(255,255,255,0.09)' },
   switchWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 99, paddingStart: 12, paddingEnd: 4 },
   rowC: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  recent: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
-  thumb: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F8ECDA', overflow: 'hidden' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
+  recent: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
+  thumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: '#F8ECDA', overflow: 'hidden' },
 }));

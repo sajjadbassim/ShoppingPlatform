@@ -129,7 +129,7 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
 }
 
 const styles = createStyles(() => ({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
   chart: { alignItems: 'flex-end', gap: 8, minHeight: 170, paddingTop: 8 },
   barCol: { alignItems: 'center', gap: 4, width: 26 },
   bar: { width: 18, borderRadius: 6 },

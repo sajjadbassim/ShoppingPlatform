@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Linking, Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useScrollToTop } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText, brand, colors, createStyles, radius, useTheme } from '@wasit/ui';
 import { palette } from '../lib/palette';
@@ -31,9 +31,15 @@ interface ScreenProps {
 
 export function Screen({ title, subtitle, back, right, children, footer, refreshing, onRefresh, scroll = true, tabs, overlay }: ScreenProps) {
   useTheme();
+  // الشاشات بلا شريط تبويب أو شريط سفلي: المحتوى يمتد تحت شريط التنقل في النظام، فنرفع نهايته بقدر الحافة السفلية
+  const insets = useSafeAreaInsets();
+  // الضغط على التبويب وهو مفتوح يعيد الصفحة إلى أعلاها (لا أثر له خارج التبويبات)
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  useScrollToTop(scrollRef as Parameters<typeof useScrollToTop>[0]);
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={[styles.content, tabs && { paddingBottom: 110 }, !!footer && { paddingBottom: 24 }]}
+      ref={scrollRef}
+      contentContainerStyle={[styles.content, tabs ? { paddingBottom: 110 } : footer ? { paddingBottom: 24 } : { paddingBottom: 24 + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
       refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
     >
@@ -53,8 +59,8 @@ export function Screen({ title, subtitle, back, right, children, footer, refresh
             </Pressable>
           )}
           <View style={{ flex: 1 }}>
-            <AppText weight="extraBold" style={{ fontSize: 22 }} numberOfLines={1}>{title}</AppText>
-            {!!subtitle && <AppText muted style={{ fontSize: 13 }} numberOfLines={1}>{subtitle}</AppText>}
+            <AppText weight="extraBold" style={{ fontSize: 20 }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{title}</AppText>
+            {!!subtitle && <AppText muted style={{ fontSize: 12.5 }} numberOfLines={1}>{subtitle}</AppText>}
           </View>
           {right}
         </View>
@@ -66,7 +72,7 @@ export function Screen({ title, subtitle, back, right, children, footer, refresh
   );
 }
 
-export function Card({ children, tone, onPress, pad = 14 }: { children: ReactNode; tone?: 'warn' | 'ok' | 'bad'; onPress?: () => void; pad?: number }) {
+export function Card({ children, tone, onPress, pad = 12 }: { children: ReactNode; tone?: 'warn' | 'ok' | 'bad'; onPress?: () => void; pad?: number }) {
   useTheme();
   const border = tone === 'warn' ? palette.amber : tone === 'ok' ? colors.success : tone === 'bad' ? colors.error : 'transparent';
   const style = [styles.card, { padding: pad, borderColor: border }];
@@ -112,7 +118,7 @@ export function Chip({ label, tone = 'primary' }: { label: string; tone?: Tone }
 }
 
 // مربع أيقونة ملوّن (نقاط الدخول في القوائم والبطاقات)
-export function IconTile({ icon, tone = 'primary', size = 42 }: { icon: IconName; tone?: Tone; size?: number }) {
+export function IconTile({ icon, tone = 'primary', size = 36 }: { icon: IconName; tone?: Tone; size?: number }) {
   useTheme();
   const [bg, fg] = toneColors(tone);
   return (
@@ -150,7 +156,7 @@ export function ActionButton({ title, onPress, icon, disabled, loading, tone = '
         (pressed || disabled || loading) && { opacity: 0.6 },
       ]}
     >
-      {!!icon && <Ionicons name={icon} size={18} color={fg} />}
+      {!!icon && <Ionicons name={icon} size={17} color={fg} />}
       <AppText weight="extraBold" style={{ color: fg, fontSize: compact ? 14 : 16 }}>{loading ? '...' : title}</AppText>
     </Pressable>
   );
@@ -214,7 +220,7 @@ export function ListRow({ icon, tone, title, subtitle, badge, onPress, last }: {
   useTheme();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, !last && { borderBottomWidth: 1, borderBottomColor: brand.surfaceMuted }, pressed && { opacity: 0.7 }]} accessibilityRole="button">
-      <IconTile icon={icon} tone={tone} size={38} />
+      <IconTile icon={icon} tone={tone} size={34} />
       <View style={{ flex: 1 }}>
         <AppText weight="bold" style={{ fontSize: 15 }}>{title}</AppText>
         {!!subtitle && <AppText muted style={{ fontSize: 12.5 }}>{subtitle}</AppText>}
@@ -250,16 +256,16 @@ const styles = createStyles(() => ({
   glow: { position: 'absolute', top: 0, left: 0, right: 0, height: 260 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 },
   backBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  content: { padding: 16, paddingTop: 4, gap: 12 },
+  content: { padding: 14, paddingTop: 2, gap: 10 },
   footer: { backgroundColor: colors.surface, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 10 },
-  card: { backgroundColor: colors.surface, borderRadius: 22, borderWidth: 1.5, gap: 10, shadowColor: '#7A4A12', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
+  card: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, gap: 8, shadowColor: '#7A4A12', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
   chip: { alignSelf: 'flex-start', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3 },
-  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, minHeight: 52, paddingHorizontal: 18, flex: 1 },
+  btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minHeight: 48, paddingHorizontal: 16, flex: 1 },
   segWrap: { flexDirection: 'row', backgroundColor: '#F3E6D2', borderRadius: 18, padding: 4 },
   seg: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: 14 },
   segOn: { backgroundColor: colors.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   pillCount: { minWidth: 20, paddingHorizontal: 6, borderRadius: radius.full, alignItems: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 54 },
   empty: { alignItems: 'center', gap: 12, paddingVertical: 44, paddingHorizontal: 20 },
 }));

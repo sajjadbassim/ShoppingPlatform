@@ -34,7 +34,7 @@ export default function EarningsScreen() {
           <LinearGradient colors={s.balance >= 0 ? [palette.burntDeep, palette.burnt, palette.amber] : ['#8B2D27', palette.bad]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
             <View style={styles.circle} />
             <AppText style={{ color: palette.cream, fontSize: 13.5 }}>{s.balance >= 0 ? 'الرصيد المستحق للمتجر' : 'على المتجر للمنصة'}</AppText>
-            <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 38, lineHeight: 50 }}>{money(Math.abs(s.balance))}</AppText>
+            <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 30, lineHeight: 40 }}>{money(Math.abs(s.balance))}</AppText>
             {s.lastPayoutAt && <AppText style={{ color: palette.cream, fontSize: 12.5 }}>آخر دفعة: {formatDateTime(s.lastPayoutAt)}</AppText>}
           </LinearGradient>
 
@@ -93,8 +93,8 @@ function LedgerRow({ e, first }: { e: LedgerEntry; first: boolean }) {
 }
 
 const styles = createStyles(() => ({
-  hero: { borderRadius: 24, padding: 18, gap: 2, overflow: 'hidden' },
+  hero: { borderRadius: 20, padding: 16, gap: 2, overflow: 'hidden' },
   circle: { position: 'absolute', left: -50, top: -60, width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(255,255,255,0.09)' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
 }));

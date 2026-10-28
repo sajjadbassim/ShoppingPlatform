@@ -1,9 +1,11 @@
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { goOrders } from '../../lib/nav';
 import { getImageUrl, logout } from '@wasit/shared';
-import { AppText, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDashboard, useProfile, useReturnTrips } from '../../api/useVendor';
 import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle } from '../../components/kit';
 import { confirmDialog } from '../../lib/dialog';
@@ -17,6 +19,8 @@ export default function MoreScreen() {
   const dash = useDashboard();
   const trips = useReturnTrips();
   const p = profile.data;
+  // إن تعذّر رسم الشعار (رابط مكسور أو صيغة غير مدعومة مثل SVG) نعرض الحرف الأول بدل مربع فارغ
+  const [logoFailed, setLogoFailed] = useState(false);
   const unanswered = dash.data?.pendingReviews ?? 0;
   const tripsCount = (trips.data ?? []).length;
 
@@ -32,22 +36,23 @@ export default function MoreScreen() {
   ].filter(Boolean) as { icon: 'stats-chart-outline'; tone: 'ok'; title: string; subtitle: string; badge?: { label: string; tone?: 'primary' }; to: '/reports' }[];
 
   const store = [
-    can('settings') && { icon: 'storefront-outline' as const, title: 'معلومات المتجر', subtitle: 'الاسم والوصف والشعار والحد الأدنى للطلب', to: '/settings' as const },
     can('settings') && { icon: 'time-outline' as const, title: 'الأوقات والإشعارات', subtitle: 'استقبال الطلبات وأوقات العمل والتنبيهات', to: '/settings/hours' as const },
     !isStaff && { icon: 'people-outline' as const, title: 'الموظفون', subtitle: 'حسابات وصلاحيات فريقك (للمالك فقط)', to: '/staff' as const },
     { icon: 'pulse-outline' as const, title: 'سجل النشاط', subtitle: 'ما فعله كل شخص في متجرك ومتى', to: '/activity' as const },
-  ].filter(Boolean) as { icon: 'storefront-outline'; title: string; subtitle: string; to: '/settings' }[];
+  ].filter(Boolean) as { icon: 'time-outline'; title: string; subtitle: string; to: '/settings/hours' }[];
 
   return (
     <Screen title="المزيد" tabs>
-      <Card>
+      {/* الضغط على بطاقة المتجر يفتح معلومات المتجر (الاسم والوصف والشعار والحد الأدنى للطلب) */}
+      <Card onPress={can('settings') ? () => router.push('/settings') : undefined}>
         <View style={styles.row}>
-          <View style={styles.logo}>{p?.logoUrl ? <Image source={{ uri: getImageUrl(p.logoUrl, 200) ?? undefined }} style={{ flex: 1 }} contentFit="cover" /> : <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 22 }}>{(p?.nameAr || 'م').slice(0, 1)}</AppText>}</View>
+          <View style={styles.logo}>{p?.logoUrl && !logoFailed ? <Image source={{ uri: getImageUrl(p.logoUrl, 200) ?? undefined }} style={{ width: '100%', height: '100%' }} contentFit="cover" onError={() => setLogoFailed(true)} /> : <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 22 }}>{(p?.nameAr || 'م').slice(0, 1)}</AppText>}</View>
           <View style={{ flex: 1 }}>
             <AppText weight="extraBold" style={{ fontSize: 17 }} numberOfLines={1}>{p?.nameAr || 'متجري'}</AppText>
             <AppText muted style={{ fontSize: 12.5 }}>{isStaff ? 'موظف' : 'صاحب المتجر'} · {session?.fullName}</AppText>
           </View>
           {p && <Chip label={p.isActive ? 'نشط' : 'معطّل'} tone={p.isActive ? 'ok' : 'bad'} />}
+          {can('settings') && <Ionicons name="chevron-back" size={18} color={colors.placeholder} />}
         </View>
       </Card>
 

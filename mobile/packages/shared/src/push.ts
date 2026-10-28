@@ -2,7 +2,7 @@ import { api } from './api';
 import { API_ENDPOINTS } from './endpoints';
 
 // ربط رمز FCM لهذا الجهاز بالحساب الحالي (الخادم ينقله إن كان مربوطاً بحساب آخر)
-export const registerDevice = async (token: string, platform: 'android' | 'ios', app: 'customer' | 'driver'): Promise<void> => {
+export const registerDevice = async (token: string, platform: 'android' | 'ios', app: 'customer' | 'driver' | 'seller'): Promise<void> => {
   await api.post(API_ENDPOINTS.PUSH.DEVICE, { token, platform, app });
 };
 
