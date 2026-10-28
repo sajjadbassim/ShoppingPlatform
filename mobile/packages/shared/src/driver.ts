@@ -90,6 +90,7 @@ export interface ReturnTrip {
   reasonAr: string;
   status: string; // AT_CUSTOMER = لم يأخذ القطع من الزبون بعد
   createdAt: string;
+  receivedAt?: string | null; // وقت تأكيد المتجر (في السجل فقط)
   returnId?: string | null;
   returnNumber?: string | null;
   customerName?: string | null;
@@ -126,7 +127,11 @@ export const setWorkStatus = async (workStatus: WorkStatus): Promise<DriverProfi
 export const fetchDriverOrders = async (history = false): Promise<DriverOrder[]> =>
   (await api.get(D.ORDERS, { params: { history } })).data.data ?? [];
 export const fetchDriverCash = async (): Promise<DriverCash> => (await api.get(D.MY_CASH)).data.data;
-export const fetchDriverReturns = async (): Promise<ReturnTrip[]> => (await api.get(D.MY_RETURNS)).data.data ?? [];
+// المفتوح، أو سجل ما استلمه المتجر (7 أيام). الخادم القديم يتجاهل history فيُرشَّح السجل هنا بالحالة
+export const fetchDriverReturns = async (history = false): Promise<ReturnTrip[]> => {
+  const rows: ReturnTrip[] = (await api.get(D.MY_RETURNS, { params: { history } })).data.data ?? [];
+  return history ? rows.filter((t) => t.status === 'RECEIVED') : rows;
+};
 
 export const pickUpStop = async (subOrderId: string): Promise<void> => {
   await api.post(D.PICKED_UP(subOrderId));

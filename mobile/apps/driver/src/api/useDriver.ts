@@ -34,9 +34,14 @@ export const useDriverOrders = (history = false) => {
   });
 };
 
-export const useDriverReturns = () => {
+export const useDriverReturns = (history = false) => {
   const signedIn = useSessionStore((s) => s.signedIn);
-  return useQuery({ queryKey: ['driver-returns'], queryFn: fetchDriverReturns, enabled: signedIn, refetchInterval: POLL_MS });
+  return useQuery({
+    queryKey: ['driver-returns', history],
+    queryFn: () => fetchDriverReturns(history),
+    enabled: signedIn,
+    refetchInterval: history ? false : POLL_MS,
+  });
 };
 
 export const useDriverCash = () => {

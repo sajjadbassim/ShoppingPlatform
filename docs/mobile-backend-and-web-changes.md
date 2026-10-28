@@ -247,3 +247,18 @@
 **السبب:** `useNotificationsRealtime` كان يضيف الإشعار إلى الجرس فقط، ولا يبطل استعلامات React Query (لوحة العمليات `useOpsNotifications` تفعل ذلك).
 
 **الإصلاح (ويب فقط، ملف واحد: `src/hooks/useNotificationsRealtime.js`):** عند `OrderStatusChanged` يُبطَل `orderKeys.all` (التفاصيل والتتبع والقوائم) فتُعاد جلبها في الحال، وكذلك بعد إعادة اتصال SignalR لأن أحداثاً قد تكون فاتت أثناء الانقطاع. لا تغيير في الباك. اختبارات الوحدة 44 ناجحة و`vite build` ناجح؛ لم تُجرَّب الواجهة يدوياً بعد.
+
+## سجل مرتجعات المندوب `GET /api/driver/returns?history=true` (2026-10-29، نُفِّذ بإذن المستخدم)
+**المشكلة:** `GET /api/driver/returns` يعيد الرحلات المفتوحة فقط (`AT_CUSTOMER` و`WITH_DRIVER`)، فبعد أن يؤكد المتجر الاستلام (`RECEIVED`) يختفي المرتجع من تطبيق المندوب كلياً ولا يجد ما أنهاه في أي فلتر. بخلاف الطلبات التي لها سجل 7 أيام (`/api/driver/orders?history=true`).
+
+**التعديل (باك فقط، متوافق مع القديم):** معامل اختياري `history` (افتراضي `false` فيبقى السلوك كما هو).
+- `history=false`: المفتوح كما كان.
+- `history=true`: رحلات هذا المندوب بحالة `RECEIVED` و`ReceivedAt` خلال آخر 7 أيام (`HistoryDays` نفسه المستعمل للطلبات)، الأحدث إنشاءً أولاً. الشكل `ReturnTripDto` نفسه، وفيه `Status = RECEIVED` و`ReceivedAt` و`PickedUpAt`.
+
+**الملفات:** `Controllers/DriverAppController.cs` (`MyReturns([FromQuery] bool history)`)، `Services/DriverAppService/DriverAppService.cs` (`GetMyReturnTripsAsync(userId, history, ct)`)، `Services/ReturnTripService/ReturnTripService.cs` (`GetClosedForDriverAsync(driverId, since, ct)` في الواجهة والتنفيذ). لا مهاجرة لقاعدة البيانات.
+
+**اختبار:** `DriverHistory_ListsReceivedTripsWithinWindowOnly_AndOpenListExcludesThem` (المفتوح لا يظهر في السجل، المنتهي يظهر فيه ويغيب من المفتوح، سجل سائق آخر فارغ، خارج النافذة فارغ). اختبارات المرتجعات والمندوب 44 ناجحاً.
+
+**للنشر:** يحتاج نشر الباك على الخادم. قبل النشر يتجاهل الخادم `history` ويعيد المفتوح، لذا يرشّح التطبيق السجل بحالة `RECEIVED` فقط فلا يعرض خطأً.
+
+**للويب لاحقاً:** لا يلزم الويب تغيير. إن أردت سجلاً في واجهة مشابهة، استدعِ النقطة نفسها بالمعامل. مرتجعات المتجر لها نقطتها (`GetForVendorAsync(vendorId, openOnly)`) ولم تتغير.

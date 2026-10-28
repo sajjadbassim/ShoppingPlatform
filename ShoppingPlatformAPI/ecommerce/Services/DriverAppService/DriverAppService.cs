@@ -31,7 +31,7 @@ namespace ecommerce.Services.DriverAppService
         Task<List<DriverCashCustodyDto>> GetCashCustodyAsync(CancellationToken ct = default);
         Task<OrderRefusalFeeDto> GetRefusalFeeAsync(Guid orderId, CancellationToken ct = default);
         Task<OrderRefusalFeeDto> SetRefusalFeeOverrideAsync(Guid orderId, string? payer, string? reason, Guid userId, CancellationToken ct = default);
-        Task<List<ReturnTripDto>> GetMyReturnTripsAsync(Guid userId, CancellationToken ct = default);
+        Task<List<ReturnTripDto>> GetMyReturnTripsAsync(Guid userId, bool history = false, CancellationToken ct = default);
         Task CollectCustomerReturnAsync(Guid userId, Guid returnId, CancellationToken ct = default);
         Task FailCustomerReturnPickupAsync(Guid userId, Guid returnId, string? note, CancellationToken ct = default);
         Task<(int Orders, decimal Amount)> SettleCashAsync(Guid driverId, Guid opsUserId, decimal? expectedAmount = null, CancellationToken ct = default);
@@ -651,10 +651,13 @@ namespace ecommerce.Services.DriverAppService
             => await GetCashAsync((await GetDriverAsync(userId, ct)).Id, ct);
 
         // البضاعة المرتجعة التي معه: محطة لكل متجر (المتجر يؤكد الاستلام)
-        public async Task<List<ReturnTripDto>> GetMyReturnTripsAsync(Guid userId, CancellationToken ct = default)
+        public async Task<List<ReturnTripDto>> GetMyReturnTripsAsync(Guid userId, bool history = false, CancellationToken ct = default)
         {
             var driver = await GetDriverAsync(userId, ct);
-            return _returnTrips == null ? new() : await _returnTrips.GetOpenForDriverAsync(driver.Id, ct);
+            if (_returnTrips == null) return new();
+            return history
+                ? await _returnTrips.GetClosedForDriverAsync(driver.Id, DateTime.UtcNow.AddDays(-HistoryDays), ct)
+                : await _returnTrips.GetOpenForDriverAsync(driver.Id, ct);
         }
 
         // مرتجع بعد الاستلام: أخذ القطع من الزبون، أو تعذّر أخذها

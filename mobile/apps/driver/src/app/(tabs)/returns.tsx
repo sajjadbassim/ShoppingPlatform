@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
-import { newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
+import { formatDateTime, newestFirst, splitReturnTrips, type ReturnTrip } from '@wasit/shared';
 import { AppText, brand, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDriverActions, useDriverReturns, useRefreshDriver } from '../../api/useDriver';
 import { ActionButton, Card, Chip, ChipFilter, Empty, openNavigation, PhoneRow, Screen } from '../../components/kit';
@@ -98,17 +98,35 @@ function VendorDelivery({ trip }: { trip: ReturnTrip }) {
   );
 }
 
+// مرتجع أنهاه المتجر: يبقى في السجل 7 أيام
+function ClosedTrip({ trip }: { trip: ReturnTrip }) {
+  return (
+    <Card accent={colors.success}>
+      <View style={styles.row}>
+        <AppText weight="bold">{trip.vendorName}</AppText>
+        <Chip label="استلمها المتجر" tone="ok" />
+      </View>
+      <AppText muted style={{ fontSize: 12 }}>{trip.returnNumber ?? trip.subOrderNumber} · {trip.reasonAr}</AppText>
+      <Items trips={[trip]} />
+      {!!trip.receivedAt && <AppText muted style={{ fontSize: 12 }}>{formatDateTime(trip.receivedAt)}</AppText>}
+    </Card>
+  );
+}
+
 export default function ReturnsScreen() {
   useTheme();
   const returns = useDriverReturns();
+  const closed = useDriverReturns(true);
   const refreshAll = useRefreshDriver();
-  const [kind, setKind] = useState<'pickup' | 'vendor' | 'all'>('all');
+  const [kind, setKind] = useState<'pickup' | 'vendor' | 'history' | 'all'>('all');
   const [period, setPeriod] = useState<Period>('all');
   const split = splitReturnTrips(newestFirst(returns.data ?? [], (t) => t.createdAt));
+  const history = newestFirst(closed.data ?? [], (t) => t.receivedAt ?? t.createdAt).filter((t) => inPeriod(t.receivedAt ?? t.createdAt, period));
   const total = split.pickups.length + split.deliveries.length;
-  const pickups = kind === 'vendor' ? [] : split.pickups.filter((g) => inPeriod(g[0].createdAt, period));
-  const deliveries = kind === 'pickup' ? [] : split.deliveries.filter((t) => inPeriod(t.createdAt, period));
-  const shown = pickups.length + deliveries.length;
+  const showHistory = kind === 'history';
+  const pickups = kind === 'vendor' || showHistory ? [] : split.pickups.filter((g) => inPeriod(g[0].createdAt, period));
+  const deliveries = kind === 'pickup' || showHistory ? [] : split.deliveries.filter((t) => inPeriod(t.createdAt, period));
+  const shown = pickups.length + deliveries.length + (showHistory ? history.length : 0);
 
   return (
     <Screen title="المرتجعات" refreshControl={<RefreshControl refreshing={returns.isRefetching} onRefresh={refreshAll} />}>
@@ -117,15 +135,19 @@ export default function ReturnsScreen() {
       </AppText>
       <ChipFilter options={PERIODS} value={period} onChange={setPeriod} />
       <ChipFilter
-        options={[{ value: 'pickup', label: `من الزبون · ${split.pickups.length}` }, { value: 'vendor', label: `للمتاجر · ${split.deliveries.length}` }, { value: 'all', label: 'الكل' }] as const}
+        options={[{ value: 'pickup', label: `من الزبون · ${split.pickups.length}` }, { value: 'vendor', label: `للمتاجر · ${split.deliveries.length}` }, { value: 'history', label: 'السجل' }, { value: 'all', label: 'الكل' }] as const}
         value={kind}
         onChange={setKind}
       />
       {shown === 0 && !returns.isLoading && (
-        <Empty icon={total === 0 ? 'return-down-back-outline' : 'funnel-outline'} text={total === 0 ? 'لا توجد مرتجعات بعهدتك' : 'لا مرتجعات تطابق هذا الفلتر'} />
+        <Empty
+          icon={showHistory || total > 0 ? 'funnel-outline' : 'return-down-back-outline'}
+          text={showHistory ? 'لا مرتجعات منتهية في هذه الفترة' : total === 0 ? 'لا توجد مرتجعات بعهدتك' : 'لا مرتجعات تطابق هذا الفلتر'}
+        />
       )}
       {pickups.map((group) => <CustomerPickup key={group[0].returnId ?? group[0].id} trips={group} />)}
       {deliveries.map((t) => <VendorDelivery key={t.id} trip={t} />)}
+      {showHistory && history.map((t) => <ClosedTrip key={t.id} trip={t} />)}
     </Screen>
   );
 }
