@@ -34,7 +34,7 @@ module.exports = {
           isAndroidForegroundServiceEnabled: true,
         },
       ],
-      ['expo-notifications', { color: '#4F46E5', defaultChannel: 'orders' }],
+      ['expo-notifications', { color: '#4F46E5', defaultChannel: 'default' }],
     ],
     experiments: { typedRoutes: true },
     extra: { appEnv: isDev ? 'dev' : 'prod' },

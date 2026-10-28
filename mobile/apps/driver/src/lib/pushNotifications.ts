@@ -8,7 +8,8 @@ import { router } from 'expo-router';
 import { onBeforeLogout, registerDevice, removeDevice, useSessionStore } from '@wasit/shared';
 
 const TOKEN_KEY = 'driver-fcm-device-token';
-const CHANNEL_ID = 'orders';
+// يجب أن يطابق قناة الباك (FcmSender.AndroidChannelId = "default")، وإلا تذهب الرسائل إلى قناة Firebase الاحتياطية
+const CHANNEL_ID = 'default';
 
 // والتطبيق مفتوح يظهر الإشعار كشريط نظام أيضاً: المندوب قد يكون بعيداً عن الشاشة
 Notifications.setNotificationHandler({
