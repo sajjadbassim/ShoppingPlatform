@@ -29,6 +29,7 @@ import { useCategories } from '../../api/useVendor';
 import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle } from '../../components/kit';
 import { Sheet } from '../../components/Sheet';
 import { confirmDialog } from '../../lib/dialog';
+import { chooseSource, openCamera, type ImageSource } from '../../lib/imagePick';
 import { toast } from '../../lib/toast';
 import { useVendorId } from '../../lib/vendor';
 
@@ -73,16 +74,20 @@ export default function ProductFormScreen() {
   const weightStep = Number(form.WeightStep) || 0;
   const category = useMemo(() => (categories.data ?? []).find((c) => c.id === form.CategoryId), [categories.data, form.CategoryId]);
 
-  const pickImages = async () => {
+  const pickImages = async (source: ImageSource) => {
     const room = MAX_PRODUCT_IMAGES - imageCount;
     if (room <= 0) return toast.error(`الحد الأقصى ${MAX_PRODUCT_IMAGES} صور للمنتج`);
-    let res: ImagePicker.ImagePickerResult;
-    try {
-      res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.7 });
-    } catch {
-      return toast.error('تعذّر فتح معرض الصور');
+    let res: ImagePicker.ImagePickerResult | null;
+    if (source === 'camera') {
+      res = await openCamera({ mediaTypes: ['images'], quality: 0.7 });
+    } else {
+      try {
+        res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.7 });
+      } catch {
+        return toast.error('تعذّر فتح معرض الصور');
+      }
     }
-    if (res.canceled) return;
+    if (!res || res.canceled) return;
     setNewImages((prev) => [
       ...prev,
       ...res.assets.slice(0, room).map((a, i) => ({ key: `${a.uri}-${i}`, uri: a.uri, name: a.fileName ?? `product-${Date.now()}-${i}.jpg`, type: a.mimeType ?? 'image/jpeg' })),
@@ -199,7 +204,7 @@ export default function ProductFormScreen() {
             </View>
           ))}
           {imageCount < MAX_PRODUCT_IMAGES && (
-            <Pressable onPress={pickImages} style={[styles.img, styles.add, !!errors.images && { borderColor: colors.error }]} accessibilityRole="button" accessibilityLabel="إضافة صور">
+            <Pressable onPress={() => chooseSource('إضافة صور المنتج', pickImages)} style={[styles.img, styles.add, !!errors.images && { borderColor: colors.error }]} accessibilityRole="button" accessibilityLabel="إضافة صور">
               <Ionicons name="image-outline" size={24} color={colors.primary} />
               <AppText weight="medium" style={{ fontSize: 12 }}>{imageCount === 0 ? 'أضف صور المنتج' : 'إضافة'}</AppText>
             </Pressable>

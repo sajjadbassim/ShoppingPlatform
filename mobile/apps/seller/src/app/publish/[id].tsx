@@ -14,6 +14,7 @@ import {
 import { AppText, brand, colors, Input, useTheme } from '@wasit/ui';
 import { ActionButton, Card, Chip, Screen, Segmented, SectionTitle, ToggleRow } from '../../components/kit';
 import { confirmDialog } from '../../lib/dialog';
+import { chooseSource, openCamera, type ImageSource } from '../../lib/imagePick';
 import { toast } from '../../lib/toast';
 
 const PLATFORMS: { key: PublishPlatform; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
@@ -103,16 +104,22 @@ export default function PublishScreen() {
   const toggleMedia = (url: string) =>
     setSelected((l) => (l.includes(url) ? l.filter((x) => x !== url) : l.length >= PUBLISH_LIMITS.maxMedia ? l : [...l, url]));
 
-  const pickMedia = async () => {
+  const pickMedia = () => chooseSource('إضافة صورة أو فيديو', pickMediaFrom);
+
+  const pickMediaFrom = async (source: ImageSource) => {
     const room = PUBLISH_LIMITS.maxMedia - selected.length;
     if (room <= 0) return toast.error(`الحد الأقصى ${PUBLISH_LIMITS.maxMedia} عناصر`);
-    let res: ImagePicker.ImagePickerResult;
-    try {
-      res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.85 });
-    } catch {
-      return toast.error('تعذّر فتح المعرض');
+    let res: ImagePicker.ImagePickerResult | null;
+    if (source === 'camera') {
+      res = await openCamera({ mediaTypes: ['images', 'videos'], quality: 0.85 });
+    } else {
+      try {
+        res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], allowsMultipleSelection: true, selectionLimit: room, quality: 0.85 });
+      } catch {
+        return toast.error('تعذّر فتح المعرض');
+      }
     }
-    if (res.canceled) return;
+    if (!res || res.canceled) return;
     for (const a of res.assets.slice(0, room)) {
       const video = a.type === 'video' || /\.(mp4|mov)$/i.test(a.fileName ?? a.uri);
       const sizeMb = (a.fileSize ?? 0) / 1048576;
@@ -301,9 +308,9 @@ export default function PublishScreen() {
       <SectionTitle>الصور والفيديو</SectionTitle>
       <Card>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          <Pressable onPress={pickMedia} style={tile({ dashed: true })} accessibilityLabel="من المعرض">
+          <Pressable onPress={pickMedia} style={tile({ dashed: true })} accessibilityLabel="إضافة صورة أو فيديو">
             <Ionicons name="add" size={24} color={colors.textMuted} />
-            <AppText muted style={{ fontSize: 11, textAlign: 'center' }}>من المعرض</AppText>
+            <AppText muted style={{ fontSize: 11, textAlign: 'center' }}>إضافة</AppText>
           </Pressable>
           {library.map((it) => {
             const order = selected.indexOf(it.url);

@@ -79,6 +79,12 @@ registerDarkHex({
   '#7A4A12': dark.warnText,
   '#8A5A00': dark.warnText,
   '#FEE2E2': dark.badSoft,
+  // رماديات الويب المستعملة في النوافذ (تميل للأزرق) ← درجات بنية دافئة
+  '#F3F4F6': dark.tint,
+  '#EEF2FF': dark.cream,
+  '#374151': '#E4D6C6',
+  '#4B5563': '#C9B8A6',
+  '#DC2626': '#FF8A80',
 });
 
 configurePalette({

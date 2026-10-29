@@ -8,21 +8,33 @@ import { getImageUrl, updateVendorProfile, type PickedImage } from '@wasit/share
 import { AppText, colors, createStyles, Input, useTheme , tc } from '@wasit/ui';
 import { useProfile } from '../../api/useVendor';
 import { ActionButton, Card, money, Screen } from '../../components/kit';
+import { chooseSource, openCamera, type ImageSource } from '../../lib/imagePick';
 import { toast } from '../../lib/toast';
 import { useVendorId } from '../../lib/vendor';
 
-const pick = async (aspect: [number, number]): Promise<PickedImage | null> => {
-  let res: ImagePicker.ImagePickerResult;
-  try {
-    res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
-  } catch {
-    toast.error('تعذّر فتح معرض الصور');
-    return null;
+const pickFrom = async (source: ImageSource, aspect: [number, number]): Promise<PickedImage | null> => {
+  let res: ImagePicker.ImagePickerResult | null;
+  if (source === 'camera') {
+    res = await openCamera({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
+  } else {
+    try {
+      res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect, quality: 0.8 });
+    } catch {
+      toast.error('تعذّر فتح معرض الصور');
+      return null;
+    }
   }
-  if (res.canceled) return null;
+  if (!res || res.canceled) return null;
   const a = res.assets[0];
   return { uri: a.uri, name: a.fileName ?? `store-${Date.now()}.jpg`, type: a.mimeType ?? 'image/jpeg' };
 };
+
+// يسأل: كاميرا أم معرض؟ ثم يسلّم الصورة المختارة
+const pick = (title: string, aspect: [number, number], onPicked: (img: PickedImage) => void) =>
+  chooseSource(title, async (source) => {
+    const img = await pickFrom(source, aspect);
+    if (img) onPicked(img);
+  });
 
 // معلومات المتجر: الاسم والوصف والهاتف والعنوان والحد الأدنى ووقت التحضير، والشعار والغلاف
 export default function StoreSettingsScreen() {
@@ -78,15 +90,15 @@ export default function StoreSettingsScreen() {
       footer={<ActionButton title="حفظ" icon="save-outline" onPress={save} loading={saving} disabled={!v} />}
     >
       <Card pad={0}>
-        <Pressable onPress={async () => setCover((await pick([16, 9])) ?? cover)} style={styles.cover} accessibilityLabel="تغيير صورة الغلاف">
+        <Pressable onPress={() => pick('صورة الغلاف', [16, 9], setCover)} style={styles.cover} accessibilityLabel="تغيير صورة الغلاف">
           {coverUri ? <Image source={{ uri: coverUri }} style={{ flex: 1 }} contentFit="cover" /> : <AppText muted style={{ textAlign: 'center', marginTop: 34 }}>لا توجد صورة غلاف</AppText>}
           <View style={styles.coverBtn}><Ionicons name="camera-outline" size={14} color="#FFFFFF" /><AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 12, lineHeight: 20 }}>تغيير الغلاف</AppText></View>
         </Pressable>
         <View style={styles.logoRow}>
-          <Pressable onPress={async () => setLogo((await pick([1, 1])) ?? logo)} style={styles.logo} accessibilityLabel="تغيير الشعار">
+          <Pressable onPress={() => pick('شعار المتجر', [1, 1], setLogo)} style={styles.logo} accessibilityLabel="تغيير الشعار">
             {logoUri ? <Image source={{ uri: logoUri }} style={{ flex: 1 }} contentFit="cover" /> : <Ionicons name="storefront-outline" size={28} color={colors.primary} style={{ margin: 'auto' }} />}
           </Pressable>
-          <AppText weight="bold" style={{ color: colors.primaryHover, lineHeight: 24, flex: 1 }} onPress={async () => setLogo((await pick([1, 1])) ?? logo)}>تغيير الشعار</AppText>
+          <AppText weight="bold" style={{ color: colors.primaryHover, lineHeight: 24, flex: 1 }} onPress={() => pick('شعار المتجر', [1, 1], setLogo)}>تغيير الشعار</AppText>
         </View>
       </Card>
 
