@@ -157,14 +157,6 @@ export default function ProductsScreen() {
       tabs
       refreshing={products.isRefetching}
       onRefresh={() => products.refetch()}
-      overlay={
-        !selecting ? (
-          <Pressable onPress={() => router.push({ pathname: '/product/[id]', params: { id: 'new' } })} style={styles.fab} accessibilityRole="button" accessibilityLabel="منتج جديد">
-            <Ionicons name="add" size={22} color="#FFFFFF" />
-            <AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 15 }}>منتج جديد</AppText>
-          </Pressable>
-        ) : undefined
-      }
     >
       <View style={styles.search}>
         <Ionicons name="search" size={18} color={colors.placeholder} />
@@ -287,5 +279,4 @@ const styles = createStyles(() => ({
   stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8ECDA', borderRadius: 12, paddingHorizontal: 12, minHeight: 38 },
   stockInput: { width: 60, minHeight: 38, textAlign: 'center', borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, fontFamily: fonts.bold, fontSize: 15, color: colors.text, paddingVertical: 4 },
   step: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F8ECDA', alignItems: 'center', justifyContent: 'center' },
-  fab: { position: 'absolute', bottom: 16, left: 16, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryHover, borderRadius: 99, paddingHorizontal: 20, minHeight: 54, shadowColor: '#B5500F', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
 }));

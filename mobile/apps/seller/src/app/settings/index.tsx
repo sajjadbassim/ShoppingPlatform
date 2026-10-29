@@ -97,7 +97,7 @@ export default function StoreSettingsScreen() {
         <Input label="الهاتف" value={form.Phone} onChangeText={(t) => set({ Phone: t })} placeholder="+964..." keyboardType="phone-pad" ltr />
         <Input label="عنوان المتجر" value={form.Address} onChangeText={(t) => set({ Address: t })} placeholder="عنوان المتجر" />
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <View style={{ flex: 1 }}><Input label="الحد الأدنى للطلب (د.ع)" value={form.MinOrderAmount} onChangeText={(t) => set({ MinOrderAmount: t })} placeholder="0 د.ع" keyboardType="number-pad" ltr /></View>
+          <View style={{ flex: 1 }}><Input label="أقل طلب (د.ع)" value={form.MinOrderAmount} onChangeText={(t) => set({ MinOrderAmount: t })} placeholder="0 د.ع" keyboardType="number-pad" ltr /></View>
           <View style={{ flex: 1 }}><Input label="وقت التحضير (دقيقة)" value={form.EstimatedPrepTime} onChangeText={(t) => set({ EstimatedPrepTime: t })} placeholder="30" keyboardType="number-pad" ltr /></View>
         </View>
         <View style={styles.info}>

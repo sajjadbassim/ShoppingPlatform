@@ -39,7 +39,7 @@ export function Screen({ title, subtitle, back, right, children, footer, refresh
   const body = scroll ? (
     <ScrollView
       ref={scrollRef}
-      contentContainerStyle={[styles.content, tabs ? { paddingBottom: 110 } : footer ? { paddingBottom: 24 } : { paddingBottom: 24 + insets.bottom }]}
+      contentContainerStyle={[styles.content, tabs ? { paddingBottom: 140 + insets.bottom } : footer ? { paddingBottom: 24 } : { paddingBottom: 24 + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
       refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} /> : undefined}
     >
