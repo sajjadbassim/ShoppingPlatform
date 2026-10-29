@@ -5,16 +5,16 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { cancelSocialPost, formatDateTime, getImageUrl, retrySocialPost, TIKTOK_PRIVACY_LABELS, type SocialPost } from '@wasit/shared';
 import { AppText, brand, colors, useTheme } from '@wasit/ui';
-import { ActionButton, Card, Chip, Empty, FilterPills, Screen } from '../components/kit';
-import { SwipeReveal } from '../components/SwipeReveal';
-import { confirmDialog } from '../lib/dialog';
-import { isVideo, PLATFORM_ICON, PLATFORM_LABEL, POST_STATUS, postKey, useRefreshPosts, useSocialPosts } from '../lib/socialPosts';
-import { toast } from '../lib/toast';
+import { ActionButton, Card, Chip, Empty, FilterPills } from '../kit';
+import { SwipeReveal } from '../SwipeReveal';
+import { confirmDialog } from '../../lib/dialog';
+import { isVideo, PLATFORM_ICON, PLATFORM_LABEL, POST_STATUS, postKey, useRefreshPosts, useSocialPosts } from '../../lib/socialPosts';
+import { toast } from '../../lib/toast';
 
 type Filter = 'all' | 'SCHEDULED' | 'PUBLISHED' | 'FAILED';
 
 // سجل المنشورات على إنستغرام وتيك توك: النقر على البطاقة يفتح تفاصيل المنشور، والمجدولة تُلغى والفاشلة تُعاد
-export default function SocialPostsScreen() {
+export function PostsTab() {
   useTheme();
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export default function SocialPostsScreen() {
   };
 
   return (
-    <Screen title="سجل المنشورات" subtitle="اضغط على منشور لرؤية تفاصيله" back refreshing={q.isRefetching} onRefresh={refresh}>
+    <>
       <FilterPills<Filter>
         value={filter}
         onChange={setFilter}
@@ -101,6 +101,6 @@ export default function SocialPostsScreen() {
           </SwipeReveal>
         );
       })}
-    </Screen>
+    </>
   );
 }

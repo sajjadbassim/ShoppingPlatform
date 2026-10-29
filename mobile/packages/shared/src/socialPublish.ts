@@ -178,3 +178,51 @@ export const publishedPlatformsByProduct = (posts: SocialPost[]): Record<string,
   }
   return map;
 };
+
+// ===== منشورات الحسابات المربوطة (ما نُشر سابقاً على المنصات، المزامَن إلى المتجر) =====
+export type FeedPlatform = 'instagram' | 'tiktok' | 'facebook';
+
+export interface FeedItem {
+  id: string;
+  platform: FeedPlatform;
+  mediaType: 'video' | 'image' | 'carousel' | string;
+  title?: string | null;
+  coverImageUrl?: string | null;
+  shareUrl?: string | null;
+  durationSeconds?: number | null;
+  viewCount?: number | null;
+  likeCount?: number | null;
+  commentsCount?: number | null;
+  publishedAt?: string | null;
+  isHidden: boolean;
+  // منشور نُشر بخصوصية خاصة على تيك توك: للقراءة فقط
+  platformOnly?: boolean;
+  privacyLevel?: string | null;
+  product?: { id: string; name?: string | null; nameAr?: string | null; price: number; primaryImageUrl?: string | null; isAvailable: boolean } | null;
+}
+
+const FEED_URLS: Record<FeedPlatform, { list: string; item: (id: string) => string }> = {
+  instagram: { list: API_ENDPOINTS.INSTAGRAM.MEDIA, item: API_ENDPOINTS.INSTAGRAM.MEDIA_ITEM },
+  tiktok: { list: API_ENDPOINTS.TIKTOK.VIDEOS, item: API_ENDPOINTS.TIKTOK.VIDEO },
+  facebook: { list: API_ENDPOINTS.FACEBOOK.MEDIA, item: API_ENDPOINTS.FACEBOOK.MEDIA_ITEM },
+};
+
+// عناصر تيك توك لا تحمل المنصة ولا النوع، فنضيفهما ليعمل العرض المشترك
+const normalizeFeed = (platform: FeedPlatform, raw: Partial<FeedItem>): FeedItem =>
+  ({ ...raw, platform, mediaType: platform === 'tiktok' ? 'video' : raw.mediaType ?? 'image', isHidden: !!raw.isHidden }) as FeedItem;
+
+export const fetchFeedItems = async (platform: FeedPlatform): Promise<FeedItem[]> =>
+  (unwrap<Partial<FeedItem>[]>(await api.get(FEED_URLS[platform].list)) ?? []).map((r) => normalizeFeed(platform, r));
+
+// الحقول غير المرسلة لا تتغير. removeProduct=true يفك ربط المنتج
+export const updateFeedItem = async (platform: FeedPlatform, id: string, patch: { isHidden?: boolean; productId?: string; removeProduct?: boolean }): Promise<FeedItem> =>
+  normalizeFeed(platform, unwrap(await api.patch(FEED_URLS[platform].item(id), patch)));
+
+export const FEED_FILTERS = ['all', 'visible', 'hidden', 'linked'] as const;
+export type FeedFilter = (typeof FEED_FILTERS)[number];
+
+export const filterFeed = (items: FeedItem[], platform: FeedPlatform | 'all', filter: FeedFilter): FeedItem[] =>
+  items.filter((i) => (platform === 'all' || i.platform === platform) && (filter === 'visible' ? !i.isHidden : filter === 'hidden' ? i.isHidden : filter === 'linked' ? !!i.product : true));
+
+export const sortFeedNewestFirst = (items: FeedItem[]): FeedItem[] =>
+  [...items].sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());

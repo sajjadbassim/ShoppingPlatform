@@ -222,7 +222,7 @@ export default function PublishScreen() {
         title="نتيجة النشر"
         subtitle={o?.productName}
         back
-        footer={<><ActionButton title="سجل المنشورات" tone="ghost" onPress={() => router.replace('/social-posts')} /><ActionButton title="تم" onPress={() => router.back()} /></>}
+        footer={<><ActionButton title="سجل المنشورات" tone="ghost" onPress={() => router.replace({ pathname: '/social', params: { tab: 'posts' } })} /><ActionButton title="تم" onPress={() => router.back()} /></>}
       >
         {entries.length > 1 && (
           <Card tone={ok === entries.length ? 'ok' : ok === 0 ? 'bad' : 'warn'}>
@@ -288,7 +288,7 @@ export default function PublishScreen() {
                   {on && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
                 </View>
               ) : s.hint === 'غير مربوط' || s.hint.startsWith('انتهت') || s.hint.startsWith('أعد') ? (
-                <ActionButton title={s.hint === 'غير مربوط' ? 'ربط' : 'إعادة الربط'} tone="soft" compact onPress={() => router.push('/social')} />
+                <ActionButton title={s.hint === 'غير مربوط' ? 'ربط' : 'إعادة الربط'} tone="soft" compact onPress={() => router.push({ pathname: '/social', params: { tab: 'accounts' } })} />
               ) : (
                 <Chip label="غير متاح" tone="muted" />
               )}
