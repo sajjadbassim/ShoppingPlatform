@@ -9,7 +9,7 @@ import { confirmDialog } from '../lib/dialog';
 import { toast } from '../lib/toast';
 
 // ربط حسابات التواصل: موافقة المنصة تتم في المتصفح، ثم تعيد المنصة المتصفح إلى رابط التطبيق (wasit-seller://social?platform&code&state)
-// فيكمل التطبيق الربط بنفسه بـ JWT، بلا مرور على صفحة الويب. النشر على الحسابات من لوحة الويب حالياً
+// فيكمل التطبيق الربط بنفسه بـ JWT، بلا مرور على صفحة الويب. النشر من شاشة publish/[id] وسجله من social-posts
 export default function SocialScreen() {
   useTheme();
   const queryClient = useQueryClient();
@@ -74,7 +74,7 @@ export default function SocialScreen() {
       )}
       {SOCIAL_PLATFORMS.map((p) => <PlatformCard key={p.key} platform={p.key} label={p.label} />)}
       <Card>
-        <AppText muted style={{ fontSize: 13, lineHeight: 22 }}>نشر المنتجات على هذه الحسابات وجدولتها غير متاح في التطبيق بعد، ويتم من لوحة التاجر على الويب.</AppText>
+        <AppText muted style={{ fontSize: 13, lineHeight: 22 }}>لنشر منتج على هذه الحسابات أو جدولته: من قائمة المنتجات اضغط على ⋮ ثم «نشر على التواصل». وتجد المنشورات المجدولة في «سجل المنشورات» من تبويب المزيد.</AppText>
       </Card>
     </Screen>
   );

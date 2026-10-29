@@ -28,6 +28,7 @@ export default function MoreScreen() {
     can('reviews') && { icon: 'star-outline' as const, tone: 'warn' as const, title: 'التقييمات', subtitle: 'الرد على آراء الزبائن', badge: unanswered > 0 ? { label: `${unanswered} بلا رد` } : undefined, to: '/reviews' as const },
     can('marketing') && { icon: 'pricetag-outline' as const, tone: 'bad' as const, title: 'العروض والكوبونات', subtitle: 'خصومات على منتجاتك وكوبونات لزبائنك', to: '/promotions' as const },
     can('social') && { icon: 'link-outline' as const, tone: 'primary' as const, title: 'ربط الحسابات والنشر', subtitle: 'إنستغرام وفيسبوك وتيك توك', to: '/social' as const },
+    can('social') && { icon: 'calendar-outline' as const, tone: 'primary' as const, title: 'سجل المنشورات', subtitle: 'المنشورات المنشورة والمجدولة على حساباتك', to: '/social-posts' as const },
   ].filter(Boolean) as { icon: 'star-outline'; tone: 'warn'; title: string; subtitle: string; badge?: { label: string }; to: '/reviews' }[];
 
   const ops = [

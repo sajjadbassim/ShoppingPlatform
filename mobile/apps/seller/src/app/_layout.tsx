@@ -61,6 +61,9 @@ export default function RootLayout() {
             <Stack.Screen name="promotions" />
             <Stack.Screen name="reports" />
             <Stack.Screen name="social" />
+            <Stack.Screen name="social-posts" />
+            <Stack.Screen name="social-post/[id]" />
+            <Stack.Screen name="publish/[id]" />
             <Stack.Screen name="staff" />
             <Stack.Screen name="activity" />
             <Stack.Screen name="settings/index" />

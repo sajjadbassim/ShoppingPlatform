@@ -31,7 +31,7 @@ import { BulkPriceSheet } from '../../components/BulkPriceSheet';
 import { actionSheet, confirmDialog } from '../../lib/dialog';
 import { toast } from '../../lib/toast';
 import { palette } from '../../lib/palette';
-import { useVendorId } from '../../lib/vendor';
+import { useVendorId, useVendorSession } from '../../lib/vendor';
 
 const PAGE = 20;
 
@@ -39,6 +39,7 @@ export default function ProductsScreen() {
   useTheme();
   const queryClient = useQueryClient();
   const vendorId = useVendorId();
+  const { can } = useVendorSession();
   const products = useProducts();
   const sales = useProductSales();
   const [filter, setFilter] = useState<VendorProductFilter>('all');
@@ -135,6 +136,7 @@ export default function ProductsScreen() {
               if (copy?.id) router.push({ pathname: '/product/[id]', params: { id: copy.id } });
             }, 'أُنشئت نسخة مخفية بمخزون صفر، عدّلها ثم أظهرها'),
         },
+        ...(can('social') ? [{ label: 'نشر على التواصل', icon: 'share-social-outline' as const, onPress: () => router.push({ pathname: '/publish/[id]', params: { id: p.id } }) }] : []),
         { label: 'حذف', icon: 'trash-outline', destructive: true, onPress: () => confirmDelete([p]) },
       ],
     });
