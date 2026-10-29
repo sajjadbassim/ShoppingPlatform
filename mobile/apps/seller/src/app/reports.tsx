@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { ScrollView, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { getImageUrl, type SalesPeriod } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { useDashboard, useSales } from '../api/useVendor';
 import { Card, Chip, Empty, FilterPills, money, Screen, SectionTitle } from '../components/kit';
 import { palette } from '../lib/palette';
@@ -88,7 +88,7 @@ export default function ReportsScreen() {
           <SectionTitle>الأكثر مبيعاً</SectionTitle>
           <Card pad={4}>
             {d!.topProducts.map((t, i) => (
-              <View key={t.productId} style={[styles.top, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+              <View key={t.productId} style={[styles.top, i > 0 && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
                 <View style={styles.rank}><AppText weight="extraBold" style={{ color: colors.primaryHover, fontSize: 13 }}>{i + 1}</AppText></View>
                 <View style={styles.thumb}>{t.imageUrl ? <Image source={{ uri: getImageUrl(t.imageUrl, 200) ?? undefined }} style={{ flex: 1 }} contentFit="cover" /> : null}</View>
                 <View style={{ flex: 1 }}>
@@ -134,7 +134,7 @@ const styles = createStyles(() => ({
   barCol: { alignItems: 'center', gap: 4, width: 26 },
   bar: { width: 18, borderRadius: 6 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
-  rank: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#FEF3E2', alignItems: 'center', justifyContent: 'center' },
-  thumb: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F8ECDA', overflow: 'hidden' },
+  rank: { width: 28, height: 28, borderRadius: 14, backgroundColor: tc('#FEF3E2'), alignItems: 'center', justifyContent: 'center' },
+  thumb: { width: 44, height: 44, borderRadius: 12, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
   date: { minHeight: 48, borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 12, fontFamily: fonts.regular, fontSize: 15, color: colors.text, writingDirection: 'ltr' },
 }));

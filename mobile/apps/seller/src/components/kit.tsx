@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useScrollToTop } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { AppText, brand, colors, createStyles, radius, useTheme } from '@wasit/ui';
+import { AppText, brand, colors, createStyles, radius, useTheme , tc } from '@wasit/ui';
 import { palette } from '../lib/palette';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -101,9 +101,9 @@ type Tone = 'primary' | 'ok' | 'warn' | 'bad' | 'muted';
 const toneColors = (t: Tone) =>
   ({
     primary: [colors.primaryLight, colors.primaryHover],
-    ok: [palette.okSoft, '#2D6B4B'],
+    ok: [palette.okSoft, palette.okText],
     warn: [palette.warnSoft, palette.warnText],
-    bad: [palette.badSoft, '#A8322C'],
+    bad: [palette.badSoft, palette.badText],
     muted: [brand.surfaceMuted, colors.textMuted],
   })[t];
 
@@ -141,7 +141,7 @@ interface BtnProps {
 export function ActionButton({ title, onPress, icon, disabled, loading, tone = 'primary', compact }: BtnProps) {
   useTheme();
   const solid = tone === 'primary' || tone === 'ok';
-  const fg = solid ? '#FFFFFF' : tone === 'bad' ? '#A8322C' : tone === 'soft' ? colors.primaryHover : colors.text;
+  const fg = solid ? '#FFFFFF' : tone === 'bad' ? palette.badText : tone === 'soft' ? colors.primaryHover : colors.text;
   const bg = tone === 'primary' ? colors.primaryHover : tone === 'ok' ? '#2D6B4B' : tone === 'soft' ? colors.primaryLight : tone === 'bad' ? palette.badSoft : colors.surface;
   return (
     <Pressable
@@ -188,7 +188,7 @@ export function FilterPills<T extends string>({ value, onChange, options }: { va
       {options.map((o) => {
         const on = o.key === value;
         return (
-          <Pressable key={o.key} onPress={() => onChange(o.key)} style={[styles.pill, on && { backgroundColor: colors.text, borderColor: colors.text }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+          <Pressable key={o.key} onPress={() => onChange(o.key)} style={[styles.pill, on && { backgroundColor: palette.chipOn, borderColor: palette.chipOn }]} accessibilityRole="button" accessibilityState={{ selected: on }}>
             <AppText weight="bold" numberOfLines={1} style={{ fontSize: 13, lineHeight: 22, color: on ? '#FFFFFF' : colors.text }}>{o.label}</AppText>
             {o.count != null && (
               <View style={[styles.pillCount, on ? { backgroundColor: 'rgba(255,255,255,0.22)' } : o.alert ? { backgroundColor: palette.warnSoft } : { backgroundColor: brand.surfaceMuted }]}>
@@ -258,10 +258,10 @@ const styles = createStyles(() => ({
   backBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   content: { padding: 14, paddingTop: 2, gap: 10 },
   footer: { backgroundColor: colors.surface, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, borderTopWidth: 1, borderTopColor: colors.border, flexDirection: 'row', gap: 10 },
-  card: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, gap: 8, shadowColor: '#7A4A12', shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
+  card: { backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1.5, gap: 8, shadowColor: tc('#7A4A12'), shadowOpacity: 0.07, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 },
   chip: { alignSelf: 'flex-start', borderRadius: radius.full, paddingHorizontal: 10, paddingVertical: 3 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minHeight: 48, paddingHorizontal: 16, flex: 1 },
-  segWrap: { flexDirection: 'row', backgroundColor: '#F3E6D2', borderRadius: 18, padding: 4 },
+  segWrap: { flexDirection: 'row', backgroundColor: tc('#F3E6D2'), borderRadius: 18, padding: 4 },
   seg: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: 14 },
   segOn: { backgroundColor: colors.surface, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: 14, borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },

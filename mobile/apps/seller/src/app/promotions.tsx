@@ -14,7 +14,7 @@ import {
   type DiscountType,
   type Promotion,
 } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, Input, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, Input, useTheme , tc } from '@wasit/ui';
 import { useCoupons, useDeleteMarketing, useProducts, usePromotions } from '../api/useVendor';
 import { ActionButton, Card, Chip, Empty, ltr, money, Screen, Segmented } from '../components/kit';
 import { Sheet } from '../components/Sheet';
@@ -318,7 +318,7 @@ function PromotionSheet({ promotion, onClose }: { promotion: Promotion | 'new' |
 
 const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  code: { backgroundColor: '#FEF3E2', borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#F4AE52', paddingHorizontal: 12, paddingVertical: 4 },
+  code: { backgroundColor: tc('#FEF3E2'), borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#F4AE52', paddingHorizontal: 12, paddingVertical: 4 },
   search: { minHeight: 46, borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 12, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
   pick: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border },
 }));

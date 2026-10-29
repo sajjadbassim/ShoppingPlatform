@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { palette } from '../../lib/palette';
 import { Pressable, Switch, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
@@ -22,7 +23,7 @@ import {
   type ProductForm,
   type ProductFormErrors,
 } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, Input, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, Input, useTheme , tc } from '@wasit/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useCategories } from '../../api/useVendor';
 import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle } from '../../components/kit';
@@ -170,7 +171,7 @@ export default function ProductFormScreen() {
     >
       {justCreatedParam === '1' && (
         <Card tone="ok">
-          <AppText weight="extraBold" style={{ fontSize: 15, color: '#2D6B4B' }}>تمت إضافة المنتج وهو الآن في متجرك</AppText>
+          <AppText weight="extraBold" style={{ fontSize: 15, color: palette.okText }}>تمت إضافة المنتج وهو الآن في متجرك</AppText>
           <AppText muted style={{ fontSize: 13, lineHeight: 21 }}>إن كان له مقاسات أو ألوان فأضفها من «إدارة المتغيرات» بالأسفل.</AppText>
         </Card>
       )}
@@ -193,7 +194,7 @@ export default function ProductFormScreen() {
             <View key={img.key} style={[styles.img, oldImages.length === 0 && i === 0 && { borderColor: colors.primary, borderWidth: 2 }]}>
               <Image source={{ uri: img.uri }} style={{ flex: 1 }} contentFit="cover" />
               {oldImages.length === 0 && i === 0 && <View style={styles.badge}><AppText weight="bold" style={{ fontSize: 10.5, color: '#FFFFFF' }}>الرئيسية</AppText></View>}
-              {editing && <View style={[styles.badge, { start: undefined, end: 4, backgroundColor: '#3B82F6' }]}><AppText weight="bold" style={{ fontSize: 10.5, color: '#FFFFFF' }}>جديدة</AppText></View>}
+              {editing && <View style={[styles.badge, { start: undefined, end: 4, backgroundColor: tc('#3B82F6') }]}><AppText weight="bold" style={{ fontSize: 10.5, color: '#FFFFFF' }}>جديدة</AppText></View>}
               <Pressable onPress={() => setNewImages((p) => p.filter((x) => x.key !== img.key))} style={styles.imgBtnTop} accessibilityLabel="إزالة"><Ionicons name="close" size={14} color={colors.text} /></Pressable>
             </View>
           ))}
@@ -311,8 +312,8 @@ function ToggleLine({ title, desc, value, onChange }: { title: string; desc: str
 
 const styles = createStyles(() => ({
   images: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  img: { width: '31%', aspectRatio: 1, borderRadius: 16, backgroundColor: '#F8ECDA', overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  add: { borderStyle: 'dashed', borderColor: '#D9B98A', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  img: { width: '31%', aspectRatio: 1, borderRadius: 16, backgroundColor: tc('#F8ECDA'), overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  add: { borderStyle: 'dashed', borderColor: tc('#D9B98A'), backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', gap: 2 },
   badge: { position: 'absolute', bottom: 4, start: 4, backgroundColor: colors.primaryHover, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
   imgBtnTop: { position: 'absolute', top: 4, end: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
   imgBtnBottom: { position: 'absolute', bottom: 4, start: 4, width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
@@ -320,7 +321,7 @@ const styles = createStyles(() => ({
   opt: { borderWidth: 1.5, borderColor: colors.border, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8 },
   optOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start' },
-  step: { width: 52, height: 52, borderRadius: 16, backgroundColor: '#F8ECDA', alignItems: 'center', justifyContent: 'center' },
+  step: { width: 52, height: 52, borderRadius: 16, backgroundColor: tc('#F8ECDA'), alignItems: 'center', justifyContent: 'center' },
   stock: { width: 96, height: 52, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, textAlign: 'center', fontFamily: fonts.extraBold, fontSize: 20, color: colors.text },
   catRow: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 12 },
 }));

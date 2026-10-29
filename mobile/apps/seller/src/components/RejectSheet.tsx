@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { REJECT_REASONS, type VendorOrder } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { ActionButton } from './kit';
 import { Sheet } from './Sheet';
 
@@ -48,7 +48,7 @@ export function RejectSheet({ order, busy, onClose, onSubmit }: { order: Pick<Ve
 const styles = createStyles(() => ({
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1.5, borderColor: colors.border },
   optionOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#CDB89B', alignItems: 'center', justifyContent: 'center' },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: tc('#CDB89B'), alignItems: 'center', justifyContent: 'center' },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   input: { minHeight: 80, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, padding: 12, fontFamily: fonts.regular, fontSize: 15, color: colors.text, textAlignVertical: 'top' },
 }));

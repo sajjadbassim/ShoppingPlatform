@@ -24,7 +24,7 @@ import {
   type VendorProductFilter,
   type VendorProductSort,
 } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { useProductSales, useProducts } from '../../api/useVendor';
 import { ActionButton, Card, Chip, Empty, FilterPills, ltr, money, Screen } from '../../components/kit';
 import { BulkPriceSheet } from '../../components/BulkPriceSheet';
@@ -277,8 +277,8 @@ const styles = createStyles(() => ({
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text, paddingVertical: 8 },
   iconBtn: { width: 44, height: 44, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
   rowC: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  thumb: { width: 60, height: 60, borderRadius: 16, backgroundColor: '#F8ECDA', overflow: 'hidden' },
-  stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8ECDA', borderRadius: 12, paddingHorizontal: 12, minHeight: 38 },
+  thumb: { width: 60, height: 60, borderRadius: 16, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
+  stockBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tc('#F8ECDA'), borderRadius: 12, paddingHorizontal: 12, minHeight: 38 },
   stockInput: { width: 60, minHeight: 38, textAlign: 'center', borderWidth: 1.5, borderColor: colors.primary, borderRadius: 12, fontFamily: fonts.bold, fontSize: 15, color: colors.text, paddingVertical: 4 },
-  step: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#F8ECDA', alignItems: 'center', justifyContent: 'center' },
+  step: { width: 38, height: 38, borderRadius: 12, backgroundColor: tc('#F8ECDA'), alignItems: 'center', justifyContent: 'center' },
 }));

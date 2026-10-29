@@ -3,7 +3,7 @@ import { Linking, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ORDER_STATUS_LABELS, type VendorOrder, type VendorReturnTrip } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { useOrderActions, useOrderCounts, useOrders, useRefreshOrders, useReturnTrips } from '../../api/useVendor';
 import { ActionButton, Card, Chip, Empty, FilterPills, ltr, Screen, Segmented } from '../../components/kit';
 import { OrderCard } from '../../components/OrderCard';
@@ -172,5 +172,5 @@ function ReturnTrips({ trips, loading, onReceive, busyId }: { trips: VendorRetur
 const styles = createStyles(() => ({
   search: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14 },
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text, paddingVertical: 8 },
-  itemChip: { backgroundColor: '#F8ECDA', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
+  itemChip: { backgroundColor: tc('#F8ECDA'), borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
 }));

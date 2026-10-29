@@ -7,13 +7,14 @@ import { goOrders } from '../../lib/nav';
 import { getImageUrl, logout } from '@wasit/shared';
 import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
 import { useDashboard, useProfile, useReturnTrips } from '../../api/useVendor';
-import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle } from '../../components/kit';
+import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle, ToggleRow } from '../../components/kit';
+import { changeTheme } from '../../lib/theme';
 import { confirmDialog } from '../../lib/dialog';
 import { useVendorSession } from '../../lib/vendor';
 
 // «المزيد»: كل ما عدا التبويبات الأربعة، في ثلاث مجموعات
 export default function MoreScreen() {
-  useTheme();
+  const theme = useTheme();
   const { session, isStaff, can } = useVendorSession();
   const profile = useProfile();
   const dash = useDashboard();
@@ -70,6 +71,8 @@ export default function MoreScreen() {
       )}
       <SectionTitle>المتجر والفريق</SectionTitle>
       <Card pad={4}>{store.map((m, i) => <ListRow key={m.to} icon={m.icon} tone="muted" title={m.title} subtitle={m.subtitle} onPress={() => router.push(m.to)} last={i === store.length - 1} />)}</Card>
+
+      <Card><ToggleRow title="الوضع الداكن" desc="يريح العين في الإضاءة المنخفضة" value={theme === 'dark'} onChange={(v) => changeTheme(v ? 'dark' : 'light')} /></Card>
 
       <View style={{ flexDirection: 'row' }}>
         <ActionButton title="تسجيل الخروج" icon="log-out-outline" tone="bad" onPress={() => confirmDialog({ title: 'تسجيل الخروج؟', message: 'ستحتاج لإدخال رقمك وكلمة المرور مجدداً.', confirmText: 'خروج', tone: 'danger', onConfirm: () => logout() })} />

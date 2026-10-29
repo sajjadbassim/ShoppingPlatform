@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { getImageUrl, updateVendorProfile, type PickedImage } from '@wasit/shared';
-import { AppText, colors, createStyles, Input, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, Input, useTheme , tc } from '@wasit/ui';
 import { useProfile } from '../../api/useVendor';
 import { ActionButton, Card, money, Screen } from '../../components/kit';
 import { toast } from '../../lib/toast';
@@ -110,9 +110,9 @@ export default function StoreSettingsScreen() {
 }
 
 const styles = createStyles(() => ({
-  cover: { height: 130, backgroundColor: '#F8ECDA', borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
+  cover: { height: 130, backgroundColor: tc('#F8ECDA'), borderTopLeftRadius: 22, borderTopRightRadius: 22, overflow: 'hidden' },
   coverBtn: { position: 'absolute', bottom: 8, start: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(42,26,14,0.7)', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingBottom: 14, marginTop: -28 },
-  logo: { width: 66, height: 66, borderRadius: 20, backgroundColor: '#FEF3E2', borderWidth: 3, borderColor: '#FFFFFF', overflow: 'hidden' },
-  info: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#F8ECDA', borderRadius: 14, padding: 12 },
+  logo: { width: 66, height: 66, borderRadius: 20, backgroundColor: tc('#FEF3E2'), borderWidth: 3, borderColor: '#FFFFFF', overflow: 'hidden' },
+  info: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: tc('#F8ECDA'), borderRadius: 14, padding: 12 },
 }));

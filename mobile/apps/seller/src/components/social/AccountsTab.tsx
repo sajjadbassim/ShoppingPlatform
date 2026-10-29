@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { completeSocialConnect, disconnectSocial, fetchFacebookPages, fetchSocialConnectUrl, fetchSocialStatus, formatDateTime, selectFacebookPage, SOCIAL_PLATFORMS, socialAccountName, syncSocial, type FacebookPageOption, type SocialPlatform } from '@wasit/shared';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText, colors, useTheme } from '@wasit/ui';
-import { palette } from '../../lib/palette';
 import { ActionButton, Card, Chip, IconTile } from '../kit';
+import { MiniButton } from './MiniButton';
 import { confirmDialog } from '../../lib/dialog';
 import { toast } from '../../lib/toast';
 
@@ -155,22 +155,5 @@ function PlatformCard({ platform, label }: { platform: SocialPlatform; label: st
         )}
       </View>
     </Card>
-  );
-}
-
-// أزرار الحسابات: ارتفاع وخط وعرض موحّدة (تتقاسم الصف بالتساوي) وسطر واحد دائماً
-function MiniButton({ title, icon, tone, onPress, loading }: { title: string; icon: React.ComponentProps<typeof Ionicons>['name']; tone: 'solid' | 'soft' | 'bad'; onPress: () => void; loading?: boolean }) {
-  const fg = tone === 'solid' ? '#FFFFFF' : tone === 'bad' ? '#A8322C' : colors.primaryHover;
-  const bg = tone === 'solid' ? colors.primaryHover : tone === 'bad' ? palette.badSoft : colors.primaryLight;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={loading}
-      onPress={onPress}
-      style={({ pressed }) => ({ flex: 1, height: 40, borderRadius: 12, backgroundColor: bg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: pressed || loading ? 0.6 : 1 })}
-    >
-      <Ionicons name={icon} size={16} color={fg} />
-      <AppText weight="bold" numberOfLines={1} style={{ color: fg, fontSize: 13.5 }}>{loading ? '...' : title}</AppText>
-    </Pressable>
   );
 }

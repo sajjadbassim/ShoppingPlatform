@@ -4,17 +4,20 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { commissionLabel, formatDateTime, type LedgerEntry } from '@wasit/shared';
-import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme , tc, createThemed } from '@wasit/ui';
 import { useEarnings } from '../../api/useVendor';
 import { ActionButton, Card, Empty, FilterPills, IconTile, ltr, money, Screen, SectionTitle } from '../../components/kit';
 import { FadeIn } from '../../components/live';
 import { palette } from '../../lib/palette';
 
-const TONE: Record<string, string> = { SALE: '#2D6B4B', RETURN_COMMISSION: '#2D6B4B', PAYOUT: colors.primaryHover, ADJUSTMENT: palette.warnText };
 // الخادم يعيد حتى 500 حركة دفعة واحدة؛ نعرض منها صفحات من 30 حتى لا تثقل الشاشة
 const PAGE = 30;
-const GREEN = '#2D6B4B';
-const RED = '#A8322C';
+// ألوان تتبع الوضع (تُحسب لكل وضع بدل ثابت عند الاستيراد)
+const T = createThemed(() => ({
+  green: palette.okText,
+  red: palette.badText,
+  tone: { SALE: palette.okText, RETURN_COMMISSION: palette.okText, PAYOUT: colors.primaryHover, ADJUSTMENT: palette.warnText } as Record<string, string>,
+}));
 
 type Period = 'today' | 'week' | 'month' | 'all';
 type Kind = 'all' | 'sales' | 'commission' | 'payout' | 'other';
@@ -140,21 +143,21 @@ export default function EarningsScreen() {
           <SectionTitle>كيف تكوّن رصيدك</SectionTitle>
           <FadeIn delay={90}>
             <Card>
-              <FormulaRow icon="trending-up" label="المبيعات" value={s.sales} sign="+" color={GREEN} />
-              <FormulaRow icon="ellipse-outline" label="عمولة المنصة" value={s.commission} sign="−" color={RED} />
-              <FormulaRow icon="remove-circle-outline" label="خصومات ومرتجعات" value={s.deductions} sign="−" color={RED} />
-              <FormulaRow icon="cash-outline" label="دفعات مُحوَّلة" value={s.payouts} sign="−" color={RED} />
+              <FormulaRow icon="trending-up" label="المبيعات" value={s.sales} sign="+" color={T.green} />
+              <FormulaRow icon="ellipse-outline" label="عمولة المنصة" value={s.commission} sign="−" color={T.red} />
+              <FormulaRow icon="remove-circle-outline" label="خصومات ومرتجعات" value={s.deductions} sign="−" color={T.red} />
+              <FormulaRow icon="cash-outline" label="دفعات مُحوَّلة" value={s.payouts} sign="−" color={T.red} />
               <View style={styles.divider} />
               <View style={styles.formula}>
                 <AppText weight="extraBold" style={{ fontSize: 15, flex: 1 }}>الرصيد المستحق</AppText>
-                <AppText weight="extraBold" style={{ fontSize: 17, color: s.balance >= 0 ? GREEN : RED }}>{s.balance < 0 ? '−' : ''}{money(Math.abs(s.balance))}</AppText>
+                <AppText weight="extraBold" style={{ fontSize: 17, color: s.balance >= 0 ? T.green : T.red }}>{s.balance < 0 ? '−' : ''}{money(Math.abs(s.balance))}</AppText>
               </View>
               {s.sales > 0 && (
                 <View style={{ gap: 6, marginTop: 4 }}>
                   <View style={styles.shareBar}>
-                    <View style={{ width: `${keptShare}%`, backgroundColor: GREEN }} />
-                    <View style={{ width: `${commissionShare}%`, backgroundColor: RED }} />
-                    <View style={{ flex: 1, backgroundColor: '#E8D9C2' }} />
+                    <View style={{ width: `${keptShare}%`, backgroundColor: T.green }} />
+                    <View style={{ width: `${commissionShare}%`, backgroundColor: T.red }} />
+                    <View style={{ flex: 1, backgroundColor: tc('#E8D9C2') }} />
                   </View>
                   <AppText muted style={{ fontSize: 12 }}>
                     الأخضر: ما بقي لك ({Math.round(keptShare)}٪ من المبيعات) · الأحمر: عمولة المنصة ({commissionShare.toFixed(1)}٪) · الباقي: خصومات ودفعات
@@ -189,7 +192,7 @@ export default function EarningsScreen() {
                     return (
                       <View key={c.key} style={styles.barCol}>
                         <View style={{ height: 72, justifyContent: 'flex-end', width: '100%' }}>
-                          <View style={{ height: h, borderRadius: 5, backgroundColor: c.net === 0 ? '#EADCC6' : c.net > 0 ? GREEN : RED }} />
+                          <View style={{ height: h, borderRadius: 5, backgroundColor: c.net === 0 ? tc('#EADCC6') : c.net > 0 ? T.green : T.red }} />
                         </View>
                         <AppText muted style={{ fontSize: 10.5 }}>{chartDays === 7 ? DAY_LETTER[c.day.getDay()] : c.day.getDate()}</AppText>
                       </View>
@@ -212,7 +215,7 @@ export default function EarningsScreen() {
                 <View key={key} style={{ gap: 6 }}>
                   <View style={styles.dayHead}>
                     <AppText weight="bold" muted style={{ fontSize: 12.5, flex: 1 }}>{dayLabel(key)} · {total.count} حركة</AppText>
-                    <AppText weight="bold" style={{ fontSize: 12.5, color: dayNet >= 0 ? GREEN : RED }}>{signed(dayNet)}</AppText>
+                    <AppText weight="bold" style={{ fontSize: 12.5, color: dayNet >= 0 ? T.green : T.red }}>{signed(dayNet)}</AppText>
                   </View>
                   <Card pad={4}>
                     {list.map((e, i) => (
@@ -256,10 +259,10 @@ function Tile({ icon, tone, label, value }: { icon: React.ComponentProps<typeof 
 function LedgerRow({ e, first, open, onToggle, related }: { e: LedgerEntry; first: boolean; open: boolean; onToggle: () => void; related?: LedgerEntry[] }) {
   useTheme();
   const positive = e.amount >= 0;
-  const color = TONE[e.type] ?? (positive ? GREEN : colors.errorDark);
+  const color = T.tone[e.type] ?? (positive ? T.green : colors.errorDark);
   const orderNet = related?.reduce((t, x) => t + x.amount, 0);
   return (
-    <View style={!first && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }}>
+    <View style={!first && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }}>
       <Pressable onPress={onToggle} style={styles.row} accessibilityRole="button" accessibilityState={{ expanded: open }}>
         <View style={{ flex: 1, gap: 1 }}>
           <AppText weight="bold" style={{ fontSize: 14.5 }}>{e.typeAr}</AppText>
@@ -302,9 +305,9 @@ const styles = createStyles(() => ({
   circle: { position: 'absolute', left: -50, top: -60, width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(255,255,255,0.09)' },
   formula: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
   divider: { height: 1, backgroundColor: '#F1E3CC', marginVertical: 2 },
-  shareBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: '#E8D9C2' },
+  shareBar: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: tc('#E8D9C2') },
   tiles: { flexDirection: 'row', gap: 8 },
-  tile: { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#7A4A12', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  tile: { flex: 1, alignItems: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: tc('#7A4A12'), shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
   barCol: { flex: 1, alignItems: 'center', gap: 4 },
   dayHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4, marginTop: 4 },

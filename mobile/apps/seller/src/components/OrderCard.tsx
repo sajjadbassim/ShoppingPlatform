@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { Image } from 'expo-image';
 import { formatClock, formatDecisionCountdown, getImageUrl, itemTitle, nextOrderStep, orderPieces, orderTotal, ORDER_STATUS_LABELS, secondsLeft, type VendorOrder } from '@wasit/shared';
-import { AppText, createStyles, useTheme } from '@wasit/ui';
+import { AppText, createStyles, useTheme , tc } from '@wasit/ui';
 import { ActionButton, Card, Chip, ltr, money } from './kit';
 import { palette } from '../lib/palette';
 
@@ -103,7 +103,7 @@ export function OrderCard({ order, busy, onAccept, onReject, onAdvance }: Props)
           <ActionButton title={next.label} tone={next.step === 'ready' ? 'ok' : 'primary'} onPress={() => onAdvance(next.step)} loading={busy} compact />
         </View>
       )}
-      {order.status === 'READY' && <AppText weight="bold" style={{ color: '#2D6B4B', textAlign: 'center', fontSize: 13 }}>جاهز، بانتظار وصول السائق</AppText>}
+      {order.status === 'READY' && <AppText weight="bold" style={{ color: palette.okText, textAlign: 'center', fontSize: 13 }}>جاهز، بانتظار وصول السائق</AppText>}
     </Card>
   );
 }
@@ -111,5 +111,5 @@ export function OrderCard({ order, busy, onAccept, onReject, onAdvance }: Props)
 const styles = createStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   thumbs: { flexDirection: 'row' },
-  thumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: '#F8ECDA', overflow: 'hidden', marginEnd: -10, borderWidth: 2, borderColor: '#FFFFFF' },
+  thumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: tc('#F8ECDA'), overflow: 'hidden', marginEnd: -10, borderWidth: 2, borderColor: '#FFFFFF' },
 }));

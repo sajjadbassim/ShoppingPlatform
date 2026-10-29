@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { bulkPriceFields, type BulkPriceMode, type VendorProduct } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { ActionButton, Segmented } from './kit';
 import { Sheet } from './Sheet';
 
@@ -76,5 +76,5 @@ export function BulkPriceSheet({ products, visible, busy, onClose, onApply }: { 
 
 const styles = createStyles(() => ({
   input: { minHeight: 52, borderWidth: 1.5, borderColor: colors.border, borderRadius: 16, paddingHorizontal: 14, fontFamily: fonts.bold, fontSize: 18, color: colors.text, writingDirection: 'ltr' },
-  preview: { backgroundColor: '#F8ECDA', borderRadius: 16, padding: 12, gap: 4 },
+  preview: { backgroundColor: tc('#F8ECDA'), borderRadius: 16, padding: 12, gap: 4 },
 }));

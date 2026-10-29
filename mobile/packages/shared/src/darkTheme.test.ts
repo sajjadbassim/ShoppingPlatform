@@ -25,3 +25,13 @@ describe('darkHex', () => {
     expect(darkHex('#10B981')).toBe('#10B981');
   });
 });
+
+import { registerDarkHex } from './darkTheme';
+
+describe('registerDarkHex', () => {
+  it('الألوان المسجّلة تتقدّم على جدول الويب وبلا حساسية لحالة الأحرف', () => {
+    registerDarkHex({ '#f8ecda': '#2b2118' });
+    expect(darkHex('#F8ECDA')).toBe('#2B2118');
+    expect(darkHex('#f8ecda80')).toBe('#2B211880');
+  });
+});

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { palette } from '../../lib/palette';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -318,7 +319,7 @@ export default function PublishScreen() {
                   </View>
                 </Pressable>
                 {uploaded && (
-                  <Pressable onPress={() => removeExtra(it.url)} accessibilityLabel="إزالة" style={{ position: 'absolute', top: -6, start: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' }}>
+                  <Pressable onPress={() => removeExtra(it.url)} accessibilityLabel="إزالة" style={{ position: 'absolute', top: -6, start: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: palette.chipOn, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name="close" size={14} color="#FFFFFF" />
                   </Pressable>
                 )}
@@ -362,7 +363,7 @@ export default function PublishScreen() {
                 {tkOptions.data.privacyOptions.map((p) => {
                   const on = tt.privacy === p;
                   return (
-                    <Pressable key={p} onPress={() => setTt((s) => ({ ...s, privacy: p }))} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99, borderWidth: 1.5, borderColor: on ? colors.text : colors.border, backgroundColor: on ? colors.text : 'transparent' }}>
+                    <Pressable key={p} onPress={() => setTt((s) => ({ ...s, privacy: p }))} style={{ paddingHorizontal: 14, paddingVertical: 9, borderRadius: 99, borderWidth: 1.5, borderColor: on ? palette.chipOn : colors.border, backgroundColor: on ? palette.chipOn : 'transparent' }}>
                       <AppText weight="bold" style={{ fontSize: 13, color: on ? '#FFFFFF' : colors.text }}>{TIKTOK_PRIVACY_LABELS[p] ?? p}</AppText>
                     </Pressable>
                   );

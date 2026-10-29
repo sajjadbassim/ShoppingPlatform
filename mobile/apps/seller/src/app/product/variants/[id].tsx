@@ -19,7 +19,7 @@ import {
   type ProductAttribute,
   type VendorVariant,
 } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, Input, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, Input, useTheme , tc } from '@wasit/ui';
 import { ActionButton, Card, Chip, Empty, ltr, money, Screen, SectionTitle, ToggleRow } from '../../../components/kit';
 import { Sheet } from '../../../components/Sheet';
 import { confirmDialog } from '../../../lib/dialog';
@@ -102,7 +102,7 @@ export default function VariantsScreen() {
       ) : (
         <Card pad={4}>
           {list.map((v, i) => (
-            <Pressable key={v.id} onPress={() => setEditing(v)} style={[styles.variant, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+            <Pressable key={v.id} onPress={() => setEditing(v)} style={[styles.variant, i > 0 && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText weight="bold" style={{ fontSize: 14.5 }}>{variantLabel(v) || 'متغير'}</AppText>
                 <AppText muted style={{ fontSize: 12.5 }}>{v.sku ? `${ltr(v.sku)} · ` : ''}{money(v.finalPrice)}{v.priceAdjustment ? ` (${v.priceAdjustment > 0 ? '+' : ''}${Math.round(v.priceAdjustment).toLocaleString('en-US')})` : ''}</AppText>
@@ -271,6 +271,6 @@ function VariantSheet({ variant, attributes, productId, onClose, onDone }: { var
 
 const styles = createStyles(() => ({
   variant: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
-  valueChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F8ECDA', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7 },
+  valueChip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tc('#F8ECDA'), borderRadius: 99, paddingHorizontal: 12, paddingVertical: 7 },
   valueInput: { flex: 1, minHeight: 46, borderWidth: 1.5, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 12, fontFamily: fonts.regular, fontSize: 15, color: colors.text },
 }));

@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme , tc } from '@wasit/ui';
 import { dismissToast, subscribeToasts, type ToastItem, type ToastType } from '../lib/toast';
 
 const TYPES: Record<ToastType, { bg: string; icon: keyof typeof Ionicons.glyphMap }> = {
   success: { bg: colors.success, icon: 'checkmark-circle-outline' },
   error: { bg: colors.error, icon: 'alert-circle-outline' },
   warning: { bg: colors.warning, icon: 'warning-outline' },
-  info: { bg: '#3B82F6', icon: 'information-circle-outline' },
+  info: { bg: tc('#3B82F6'), icon: 'information-circle-outline' },
 };
 
 // ارتفاع الشريط السفلي (التبويبات أو شريط الإضافة للسلة) كي لا يغطيه الإشعار

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { palette } from '../lib/palette';
 import { Pressable, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDateTime, type ActivityLog } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, useTheme , tc } from '@wasit/ui';
 import { useActivity } from '../api/useVendor';
 import { ActionButton, Card, Empty, FilterPills, Screen, ToggleRow } from '../components/kit';
 
@@ -80,9 +81,9 @@ function LogRow({ log, first }: { log: ActivityLog; first: boolean }) {
   const failed = log.action === 'auth.login_failed';
   const expandable = !!log.details?.length || !!log.ip || !!log.device;
   return (
-    <View style={[styles.log, !first && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+    <View style={[styles.log, !first && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
       <Pressable onPress={() => expandable && setOpen((o) => !o)} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
-        <View style={[styles.dot, failed && { backgroundColor: colors.error }, log.kind === 'AUTH' && !failed && { backgroundColor: '#3B82F6' }]} />
+        <View style={[styles.dot, failed && { backgroundColor: colors.error }, log.kind === 'AUTH' && !failed && { backgroundColor: tc('#3B82F6') }]} />
         <View style={{ flex: 1, gap: 2 }}>
           <AppText weight="medium" style={{ fontSize: 14, lineHeight: 22, color: failed ? colors.errorDark : colors.text }}>{log.summary}</AppText>
           <AppText muted style={{ fontSize: 12 }}>{[log.actorName, formatDateTime(log.at)].filter(Boolean).join(' · ')}</AppText>
@@ -98,7 +99,7 @@ function LogRow({ log, first }: { log: ActivityLog; first: boolean }) {
                 <AppText key={j} style={{ fontSize: 12.5 }}>
                   <AppText muted style={{ fontSize: 12.5 }}>{FIELD_AR[c.p] ?? c.p}: </AppText>
                   {e.state === 'Modified' && <AppText style={{ fontSize: 12.5, color: colors.errorDark, textDecorationLine: 'line-through' }}>{c.o ?? '—'} </AppText>}
-                  <AppText weight="bold" style={{ fontSize: 12.5, color: '#2D6B4B' }}>{e.state === 'Modified' ? '← ' : ''}{c.n ?? '—'}</AppText>
+                  <AppText weight="bold" style={{ fontSize: 12.5, color: palette.okText }}>{e.state === 'Modified' ? '← ' : ''}{c.n ?? '—'}</AppText>
                 </AppText>
               ))}
             </View>
@@ -115,5 +116,5 @@ const styles = createStyles(() => ({
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, color: colors.text, paddingVertical: 8 },
   log: { padding: 12, gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#D4621A', marginTop: 7 },
-  change: { backgroundColor: '#F8ECDA', borderRadius: 12, padding: 10, gap: 3 },
+  change: { backgroundColor: tc('#F8ECDA'), borderRadius: 12, padding: 10, gap: 3 },
 }));

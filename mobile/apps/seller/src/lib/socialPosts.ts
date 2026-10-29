@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSocialPosts, type PublishPlatform, type SocialPost } from '@wasit/shared';
+import { fetchSocialPosts, formatClock, type PublishPlatform, type SocialPost } from '@wasit/shared';
 import type { Ionicons } from '@expo/vector-icons';
 
 export const PLATFORM_LABEL: Record<PublishPlatform, string> = { instagram: 'إنستغرام', tiktok: 'تيك توك' };
@@ -29,3 +29,7 @@ export const useRefreshPosts = () => {
 };
 
 export const isVideo = (u?: string | null) => /\.(mp4|mov)(\?|$)/i.test(u || '');
+
+// «29 تشرين الأول · 3:47 ص» بسطر واحد (التاريخ الكامل في شاشة التفاصيل)
+export const shortWhen = (iso?: string | null): string =>
+  iso ? `${new Date(iso).toLocaleDateString('ar-IQ-u-nu-latn', { timeZone: 'Asia/Baghdad', day: 'numeric', month: 'long' })} · ${formatClock(iso)}` : '';

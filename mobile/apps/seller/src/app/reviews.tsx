@@ -3,7 +3,7 @@ import { TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useQueryClient } from '@tanstack/react-query';
 import { deleteReviewReply, formatDate, getImageUrl, replyToReview, type VendorReview } from '@wasit/shared';
-import { AppText, colors, createStyles, fonts, StarRating, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, fonts, StarRating, useTheme , tc } from '@wasit/ui';
 import { useReviewSummary, useReviews } from '../api/useVendor';
 import { ActionButton, Card, Chip, Empty, Screen, Segmented } from '../components/kit';
 import { confirmDialog } from '../lib/dialog';
@@ -133,10 +133,10 @@ function ReviewCard({ review: r }: { review: VendorReview }) {
 }
 
 const styles = createStyles(() => ({
-  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: '#F3E6D2' },
+  track: { flex: 1, height: 7, borderRadius: 4, backgroundColor: tc('#F3E6D2') },
   fill: { height: 7, borderRadius: 4, backgroundColor: palette.amber },
-  thumb: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F8ECDA', overflow: 'hidden' },
-  photo: { width: 62, height: 62, borderRadius: 12, backgroundColor: '#F8ECDA', overflow: 'hidden' },
-  reply: { backgroundColor: '#FEF3E2', borderRadius: 14, padding: 12, gap: 4 },
+  thumb: { width: 44, height: 44, borderRadius: 12, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
+  photo: { width: 62, height: 62, borderRadius: 12, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
+  reply: { backgroundColor: tc('#FEF3E2'), borderRadius: 14, padding: 12, gap: 4 },
   input: { minHeight: 72, borderWidth: 1.5, borderColor: colors.border, borderStyle: 'dashed', borderRadius: 14, padding: 12, fontFamily: fonts.regular, fontSize: 14.5, color: colors.text, textAlignVertical: 'top' },
 }));

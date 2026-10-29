@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { formatClock, getImageUrl, ORDER_STATUS_LABELS, updateVendorProfile } from '@wasit/shared';
-import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme , tc } from '@wasit/ui';
 import { Image } from 'expo-image';
 import { useDashboard, useOrderCounts, useProfile, useReturnTrips, useSales } from '../../api/useVendor';
 import { Card, Chip, IconTile, ListRow, money, Screen, SectionTitle } from '../../components/kit';
@@ -169,7 +169,7 @@ export default function HomeScreen() {
           <SectionTitle action={{ label: 'كل الطلبات', onPress: () => goOrders('orders', 'all') }}>آخر الطلبات</SectionTitle>
           <Card pad={4}>
             {d!.recentOrders.map((o, i) => (
-              <Pressable key={o.subOrderId} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.subOrderId } })} style={[styles.recent, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+              <Pressable key={o.subOrderId} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.subOrderId } })} style={[styles.recent, i > 0 && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
                 <View style={styles.avatar}><AppText weight="extraBold" style={{ color: palette.burnt, fontSize: 15 }}>{(o.customerName || '؟').trim().slice(0, 1)}</AppText></View>
                 <View style={{ flex: 1 }}>
                   <AppText weight="bold" style={{ fontSize: 14.5 }} numberOfLines={1}>{o.customerName}</AppText>
@@ -190,7 +190,7 @@ export default function HomeScreen() {
           <SectionTitle>الأكثر مبيعاً</SectionTitle>
           <Card pad={4}>
             {d!.topProducts.map((t, i) => (
-              <View key={t.productId} style={[styles.recent, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+              <View key={t.productId} style={[styles.recent, i > 0 && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
                 <View style={[styles.rank, i === 0 && { backgroundColor: palette.burnt }]}>
                   <AppText weight="bold" style={{ fontSize: 12, color: i === 0 ? '#FFFFFF' : colors.textMuted }}>{i + 1}</AppText>
                 </View>
@@ -260,17 +260,17 @@ function QuickAction({ icon, label, tone, onPress }: { icon: React.ComponentProp
 const styles = createStyles(() => ({
   delta: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 3 },
   quick: { flexDirection: 'row', gap: 8 },
-  quickBtn: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#7A4A12', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  quickBtn: { flex: 1, alignItems: 'center', gap: 6, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: tc('#7A4A12'), shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   hero: { borderRadius: 20, padding: 16, gap: 10, overflow: 'hidden' },
   circle: { position: 'absolute', left: -50, top: -60, width: 190, height: 190, borderRadius: 95, backgroundColor: 'rgba(255,255,255,0.09)' },
   switchWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 99, paddingStart: 12, paddingEnd: 4 },
   rowC: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8 },
-  pipe: { width: '32%', alignItems: 'center', gap: 2, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: '#7A4A12', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
+  pipe: { width: '32%', alignItems: 'center', gap: 2, paddingVertical: 10, paddingHorizontal: 4, borderRadius: 16, backgroundColor: colors.surface, shadowColor: tc('#7A4A12'), shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
   recent: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#FBE6D0', alignItems: 'center', justifyContent: 'center' },
-  rank: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#F8ECDA', alignItems: 'center', justifyContent: 'center' },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: '#F8ECDA', overflow: 'hidden' },
+  rank: { width: 22, height: 22, borderRadius: 11, backgroundColor: tc('#F8ECDA'), alignItems: 'center', justifyContent: 'center' },
+  barTrack: { height: 6, borderRadius: 3, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
   barFill: { height: 6, borderRadius: 3, backgroundColor: palette.burnt },
-  thumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: '#F8ECDA', overflow: 'hidden' },
+  thumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
 }));

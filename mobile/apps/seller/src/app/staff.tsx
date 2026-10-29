@@ -3,7 +3,7 @@ import { Pressable, Switch, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { formatDateTime, removeStaff, saveStaff, toggleStaff, validateStaff, VENDOR_PERMISSIONS, type StaffMember } from '@wasit/shared';
-import { AppText, colors, createStyles, Input, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, Input, useTheme , tc } from '@wasit/ui';
 import { useStaff } from '../api/useVendor';
 import { ActionButton, Card, Chip, Empty, ltr, Screen } from '../components/kit';
 import { Sheet } from '../components/Sheet';
@@ -60,7 +60,7 @@ export default function StaffScreen() {
           return (
             <Card key={s.id}>
               <View style={styles.row}>
-                <View style={[styles.avatar, !s.isActive && { backgroundColor: '#E5E7EB' }]}><AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 18 }}>{(s.fullName || '؟').slice(0, 1)}</AppText></View>
+                <View style={[styles.avatar, !s.isActive && { backgroundColor: tc('#E5E7EB') }]}><AppText weight="extraBold" style={{ color: '#FFFFFF', fontSize: 18 }}>{(s.fullName || '؟').slice(0, 1)}</AppText></View>
                 <View style={{ flex: 1 }}>
                   <AppText weight="extraBold" style={{ fontSize: 15.5 }}>{s.fullName}{self ? ' (أنت)' : ''}</AppText>
                   <AppText muted style={{ fontSize: 12.5 }}>{ltr(s.phone ?? '')}{s.email ? ` · ${s.email}` : ''}</AppText>

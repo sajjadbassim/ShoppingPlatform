@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme , tc } from '@wasit/ui';
 import { ToastHost } from './ToastHost';
 
 // نافذة من الأسفل (رفض طلب، نموذج كوبون، فلاتر...). تُغلق بالضغط على الخلفية ما لم تكن مشغولة
@@ -34,6 +34,6 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer, bus
 const styles = createStyles(() => ({
   backdrop: { flex: 1, backgroundColor: 'rgba(42,26,14,0.5)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 18, paddingTop: 10, maxHeight: '88%' },
-  grab: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: '#E8D9C2', marginBottom: 12 },
+  grab: { alignSelf: 'center', width: 44, height: 5, borderRadius: 3, backgroundColor: tc('#E8D9C2'), marginBottom: 12 },
   footer: { flexDirection: 'row', gap: 10, paddingTop: 12 },
 }));

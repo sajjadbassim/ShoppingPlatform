@@ -18,7 +18,7 @@ import {
   type VendorOrderItem,
   type VendorProduct,
 } from '@wasit/shared';
-import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
+import { AppText, colors, createStyles, useTheme , tc } from '@wasit/ui';
 import { useOrder, useOrderActions, useProducts } from '../../api/useVendor';
 import { ActionButton, callPhone, Card, Chip, ltr, money, Screen, SectionTitle, whatsappUrl } from '../../components/kit';
 import { Countdown, statusTone } from '../../components/OrderCard';
@@ -162,7 +162,7 @@ export default function OrderScreen() {
           const gone = it.quantity === 0;
           const options = pool.filter((p) => p.id !== it.productId && p.stockQuantity >= m);
           return (
-            <View key={it.id} style={[styles.item, i > 0 && { borderTopWidth: 1, borderTopColor: '#F8ECDA' }]}>
+            <View key={it.id} style={[styles.item, i > 0 && { borderTopWidth: 1, borderTopColor: tc('#F8ECDA') }]}>
               <View style={styles.itemRow}>
                 <View style={styles.thumb}>{it.productImageUrl ? <Image source={{ uri: getImageUrl(it.productImageUrl, 200) ?? undefined }} style={{ flex: 1 }} contentFit="cover" /> : null}</View>
                 <View style={{ flex: 1, gap: 2 }}>
@@ -286,9 +286,9 @@ function ItemNotes({ it, items }: { it: VendorOrderItem; items: VendorOrderItem[
 const styles = createStyles(() => ({
   item: { padding: 12, gap: 10 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  thumb: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#F8ECDA', overflow: 'hidden' },
+  thumb: { width: 52, height: 52, borderRadius: 14, backgroundColor: tc('#F8ECDA'), overflow: 'hidden' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#F8ECDA', alignItems: 'center', justifyContent: 'center' },
+  stepBtn: { width: 34, height: 34, borderRadius: 11, backgroundColor: tc('#F8ECDA'), alignItems: 'center', justifyContent: 'center' },
   opt: { borderRadius: 99, borderWidth: 1.5, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 6 },
   optOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
 }));

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { palette } from '../../lib/palette';
 import { Linking, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -62,8 +63,8 @@ export default function SocialPostDetail() {
         </View>
         {!!p.error && p.status !== 'PUBLISHED' && (
           <View style={{ backgroundColor: '#FEE2E2', borderRadius: 12, padding: 10 }}>
-            <AppText weight="bold" style={{ fontSize: 13, color: '#A8322C' }}>{failed ? 'سبب الفشل' : 'ملاحظة'}</AppText>
-            <AppText style={{ fontSize: 13.5, lineHeight: 22, color: '#A8322C' }} selectable>{p.error}</AppText>
+            <AppText weight="bold" style={{ fontSize: 13, color: palette.badText }}>{failed ? 'سبب الفشل' : 'ملاحظة'}</AppText>
+            <AppText style={{ fontSize: 13.5, lineHeight: 22, color: palette.badText }} selectable>{p.error}</AppText>
           </View>
         )}
       </Card>
