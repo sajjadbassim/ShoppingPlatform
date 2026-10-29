@@ -1,5 +1,6 @@
 import {
   canReceiveOrders,
+  findOrderByCode,
   newestFirst,
   displayWorkStatus,
   mapsUrl,
@@ -48,5 +49,18 @@ describe('driver helpers', () => {
   it('الأحدث أولاً وغير المؤرَّخ في آخر القائمة', () => {
     const rows = [{ d: '2026-10-21T10:00:00Z' }, { d: null }, { d: '2026-10-24T08:00:00Z' }, { d: '2026-10-22T09:00:00Z' }];
     expect(newestFirst(rows, (r) => r.d).map((r) => r.d)).toEqual(['2026-10-24T08:00:00Z', '2026-10-22T09:00:00Z', '2026-10-21T10:00:00Z', null]);
+  });
+});
+
+describe('findOrderByCode', () => {
+  const rows = [{ orderId: 'id-1', orderNumber: 'ORD-1001' }, { orderId: 'id-2', orderNumber: 'ORD-1002' }];
+  it('يطابق رقم الطلب دون حساسية للحالة والفراغات والرموز', () => {
+    expect(findOrderByCode(rows, ' ord1002 ')?.orderId).toBe('id-2');
+    expect(findOrderByCode(rows, 'ORD-1001')?.orderId).toBe('id-1');
+  });
+  it('يقبل معرّف الطلب ويرجع undefined عند عدم الوجود أو الفراغ', () => {
+    expect(findOrderByCode(rows, 'id-2')?.orderNumber).toBe('ORD-1002');
+    expect(findOrderByCode(rows, 'ORD-9999')).toBeUndefined();
+    expect(findOrderByCode(rows, '  ')).toBeUndefined();
   });
 });

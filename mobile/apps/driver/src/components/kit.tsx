@@ -29,13 +29,28 @@ export function NotificationBell() {
   );
 }
 
+// أيقونة الحساب في الترويسة: «حسابي» خرج من الشريط السفلي ليتّسع لزر مسح الباركود
+export function AccountButton() {
+  useTheme();
+  return (
+    <Pressable onPress={() => router.navigate('/account')} hitSlop={8} accessibilityRole="button" accessibilityLabel="حسابي" style={styles.bell}>
+      <Ionicons name="person-outline" size={21} color={colors.text} />
+    </Pressable>
+  );
+}
+
 export function Screen({ title, children, refreshControl, right }: { title: string; children: ReactNode; refreshControl?: React.ReactElement<RefreshControlProps>; right?: ReactNode }) {
   useTheme();
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.header}>
         <AppText weight="extraBold" style={{ fontSize: 21, flex: 1 }}>{title}</AppText>
-        {right ?? <NotificationBell />}
+        {right ?? (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <NotificationBell />
+            {title !== 'حسابي' && <AccountButton />}
+          </View>
+        )}
       </View>
       <ScrollView contentContainerStyle={styles.content} refreshControl={refreshControl}>
         {children}

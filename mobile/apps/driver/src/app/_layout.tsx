@@ -73,6 +73,7 @@ export default function RootLayout() {
             <Stack.Screen name="order/[id]" />
             <Stack.Screen name="return/[id]" />
             <Stack.Screen name="notifications" />
+            <Stack.Screen name="scan" />
             <Stack.Screen name="location-permission" options={{ presentation: 'modal' }} />
           </Stack.Protected>
         </Stack>

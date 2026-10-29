@@ -34,6 +34,7 @@ module.exports = {
           isAndroidForegroundServiceEnabled: true,
         },
       ],
+      ['expo-camera', { cameraPermission: 'نستخدم الكاميرا لمسح باركود الطلب.', recordAudioAndroid: false }],
       ['expo-notifications', { color: '#4F46E5', defaultChannel: 'default' }],
     ],
     experiments: { typedRoutes: true },

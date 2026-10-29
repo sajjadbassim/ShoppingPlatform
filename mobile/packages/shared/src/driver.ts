@@ -220,3 +220,11 @@ export const splitReturnTrips = (trips: ReturnTrip[]) => {
 // القوائم تُعرض من الأحدث إلى الأقدم (الخادم لا يضمن ترتيباً)
 export const newestFirst = <T>(items: readonly T[], dateOf: (item: T) => string | null | undefined): T[] =>
   [...items].sort((a, b) => (Date.parse(dateOf(b) ?? '') || 0) - (Date.parse(dateOf(a) ?? '') || 0));
+
+// باركود الطلب = رقم الطلب. يُطابَق دون حساسية لحالة الأحرف والمسافات والرموز، ويقبل معرّف الطلب أيضاً
+const codeKey = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '');
+export const findOrderByCode = <T extends { orderId: string; orderNumber: string }>(orders: readonly T[], code: string): T | undefined => {
+  const key = codeKey(code);
+  if (!key) return undefined;
+  return orders.find((o) => codeKey(o.orderNumber) === key) ?? orders.find((o) => codeKey(o.orderId) === key);
+};

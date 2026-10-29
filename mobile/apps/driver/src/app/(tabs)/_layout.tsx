@@ -1,7 +1,7 @@
 import { Pressable, View } from 'react-native';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText, brand, colors, fonts, useTheme } from '@wasit/ui';
 import { useDriverProfile } from '../../api/useDriver';
 
@@ -15,18 +15,91 @@ const ICONS: Record<string, { off: IconName; on: IconName }> = {
   account: { off: 'person-outline', on: 'person' },
 };
 
-// شريط عائم بكبسولة: التبويب النشط يعرض أيقونته واسمه بلون البرتقالي، وغيره أيقونة فقط
+// تبويبات تُفتح من مكان آخر ولا تظهر في الشريط
+const HIDDEN_TABS = ['account'];
+
+// زر مسح الباركود: دائرة برتقالية بجانب كبسولة التبويبات وبارتفاعها (في بداية الشريط)، تفتح الكاميرا لقراءة رقم الطلب
+function ScanButton() {
+  useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="مسح باركود الطلب"
+      onPress={() => router.push('/scan')}
+      style={({ pressed }) => ({
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: colors.primary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 12,
+        shadowColor: colors.primary,
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 6 },
+        transform: [{ scale: pressed ? 0.94 : 1 }],
+      })}
+    >
+      <MaterialCommunityIcons name="qrcode-scan" size={26} color="#FFFFFF" />
+    </Pressable>
+  );
+}
+
+// شريط عائم بكبسولة: التبويب النشط يعرض أيقونته واسمه بلون البرتقالي، وغيره أيقونة فقط.
 function FloatingTabBar({ state, descriptors, navigateToTab }: BottomTabBarProps) {
   useTheme();
   const insets = useSafeAreaInsets();
-  return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', start: 16, end: 16, bottom: insets.bottom + 10 }}>
-      <View
+  // «حسابي» يُفتح من الترويسة ولا يظهر في الشريط (HIDDEN_TABS) ليتّسع الشريط لزر المسح
+  const visible = state.routes.map((route, index) => ({ route, index })).filter(({ route }) => !HIDDEN_TABS.includes(route.name));
+
+  const anyFocused = visible.some((v) => v.index === state.index);
+
+  const renderTab = ({ route, index: i }: (typeof visible)[number]) => {
+    const focused = state.index === i;
+    const { options } = descriptors[route.key];
+    const icon = ICONS[route.name] ?? ICONS.index;
+    const badge = options.tabBarBadge;
+    return (
+      <Pressable
+        key={route.key}
+        accessibilityRole="button"
+        accessibilityState={{ selected: focused }}
+        accessibilityLabel={options.title}
+        onPress={() => !focused && navigateToTab(route.key)}
         style={{
+          ...(focused ? { flex: 1 } : anyFocused ? { width: 46 } : { flex: 1 }),
+          height: 46,
+          borderRadius: 23,
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
-          padding: 7,
+          justifyContent: 'center',
+          gap: 4,
+          backgroundColor: focused ? colors.primaryLight : brand.surfaceMuted,
+        }}
+      >
+        <Ionicons name={focused ? icon.on : icon.off} size={focused ? 18 : 20} color={focused ? colors.primary : colors.textMuted} />
+        {focused && (
+          <AppText weight="bold" numberOfLines={1} style={{ fontSize: 12, color: colors.primary }}>{options.title}</AppText>
+        )}
+        {!!badge && (
+          <View style={{ position: 'absolute', top: 3, end: focused ? 6 : 8, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+            <AppText weight="bold" style={{ fontSize: 10.5, lineHeight: 15, color: '#FFFFFF', fontFamily: fonts.bold }}>{String(badge)}</AppText>
+          </View>
+        )}
+      </Pressable>
+    );
+  };
+
+  return (
+    <View pointerEvents="box-none" style={{ position: 'absolute', start: 16, end: 16, bottom: insets.bottom + 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <ScanButton />
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          padding: 6,
           borderRadius: 32,
           backgroundColor: colors.surface,
           borderWidth: 1,
@@ -38,41 +111,7 @@ function FloatingTabBar({ state, descriptors, navigateToTab }: BottomTabBarProps
           shadowOffset: { width: 0, height: 6 },
         }}
       >
-        {state.routes.map((route, i) => {
-          const focused = state.index === i;
-          const { options } = descriptors[route.key];
-          const icon = ICONS[route.name] ?? ICONS.index;
-          const badge = options.tabBarBadge;
-          return (
-            <Pressable
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: focused }}
-              accessibilityLabel={options.title}
-              onPress={() => !focused && navigateToTab(route.key)}
-              style={{
-                flex: focused ? 2.4 : 1,
-                height: 46,
-                borderRadius: 23,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                backgroundColor: focused ? colors.primaryLight : brand.surfaceMuted,
-              }}
-            >
-              <Ionicons name={focused ? icon.on : icon.off} size={20} color={focused ? colors.primary : colors.textMuted} />
-              {focused && (
-                <AppText weight="bold" numberOfLines={1} style={{ fontSize: 13, color: colors.primary }}>{options.title}</AppText>
-              )}
-              {!!badge && (
-                <View style={{ position: 'absolute', top: 3, end: focused ? 6 : 8, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-                  <AppText weight="bold" style={{ fontSize: 10.5, lineHeight: 15, color: '#FFFFFF', fontFamily: fonts.bold }}>{String(badge)}</AppText>
-                </View>
-              )}
-            </Pressable>
-          );
-        })}
+        <View style={{ flex: 1, flexDirection: 'row', gap: 4 }}>{visible.map(renderTab)}</View>
       </View>
     </View>
   );
