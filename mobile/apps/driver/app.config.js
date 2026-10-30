@@ -14,12 +14,13 @@ module.exports = {
     version: '0.1.0',
     orientation: 'portrait',
     scheme: 'wasit-driver',
+    icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     ios: {
       bundleIdentifier: 'com.wasit.driver' + suffix,
       infoPlist: { UIBackgroundModes: ['location'] },
     },
-    android: { package: 'com.wasit.driver' + suffix, ...(googleServicesFile ? { googleServicesFile } : {}) },
+    android: { package: 'com.wasit.driver' + suffix, adaptiveIcon: { foregroundImage: './assets/adaptive-icon.png', backgroundColor: '#F26A21' }, ...(googleServicesFile ? { googleServicesFile } : {}) },
     web: { bundler: 'metro', output: 'single' },
     plugins: [
       'expo-router',

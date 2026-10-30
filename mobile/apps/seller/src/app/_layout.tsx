@@ -8,6 +8,7 @@ import { colors, setMaxFontScale, useAppFonts, useTheme } from '@wasit/ui';
 import { queryClient } from '../api/queryClient';
 import { DialogHost } from '../components/DialogHost';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { ThemeFade } from '../components/ThemeFade';
 import { ToastHost } from '../components/ToastHost';
 import { usePushNotifications } from '../lib/pushNotifications';
 import { loadSavedTheme, useAccountTheme } from '../lib/theme';
@@ -65,6 +66,7 @@ export default function RootLayout() {
             <Stack.Screen name="order/[id]" />
             <Stack.Screen name="product/[id]" />
             <Stack.Screen name="product/variants/[id]" />
+            <Stack.Screen name="edit-image" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="reviews" />
             <Stack.Screen name="promotions" />
             <Stack.Screen name="reports" />
@@ -80,6 +82,7 @@ export default function RootLayout() {
         <OfflineBanner />
         <ToastHost />
         <DialogHost />
+        <ThemeFade />
       </QueryClientProvider>
     </ThemeProvider>
   );

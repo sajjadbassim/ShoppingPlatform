@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,9 @@ import { useVendorSession } from '../../lib/vendor';
 // «المزيد»: كل ما عدا التبويبات الأربعة، في ثلاث مجموعات
 export default function MoreScreen() {
   const theme = useTheme();
+  // المفتاح يتحرك فوراً، وإعادة رسم التطبيق بالمظهر الجديد (الثقيلة) تُؤجَّل لما بعد حركته
+  const [dark, setDark] = useState(theme === 'dark');
+  useEffect(() => setDark(theme === 'dark'), [theme]);
   const { session, isStaff, can } = useVendorSession();
   const profile = useProfile();
   const dash = useDashboard();
@@ -72,7 +75,7 @@ export default function MoreScreen() {
       <SectionTitle>المتجر والفريق</SectionTitle>
       <Card pad={4}>{store.map((m, i) => <ListRow key={m.to} icon={m.icon} tone="muted" title={m.title} subtitle={m.subtitle} onPress={() => router.push(m.to)} last={i === store.length - 1} />)}</Card>
 
-      <Card><ToggleRow title="الوضع الداكن" desc="يريح العين في الإضاءة المنخفضة" value={theme === 'dark'} onChange={(v) => changeTheme(v ? 'dark' : 'light')} /></Card>
+      <Card><ToggleRow title="الوضع الداكن" desc="يريح العين في الإضاءة المنخفضة" value={dark} onChange={(v) => { setDark(v); setTimeout(() => changeTheme(v ? 'dark' : 'light'), 120); }} /></Card>
 
       <View style={{ flexDirection: 'row' }}>
         <ActionButton title="تسجيل الخروج" icon="log-out-outline" tone="bad" onPress={() => confirmDialog({ title: 'تسجيل الخروج؟', message: 'ستحتاج لإدخال رقمك وكلمة المرور مجدداً.', confirmText: 'خروج', tone: 'danger', onConfirm: () => logout() })} />

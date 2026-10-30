@@ -29,6 +29,7 @@ import { useCategories } from '../../api/useVendor';
 import { ActionButton, Card, Chip, ListRow, Screen, SectionTitle } from '../../components/kit';
 import { Sheet } from '../../components/Sheet';
 import { confirmDialog } from '../../lib/dialog';
+import { editImage } from '../../lib/imageEditor';
 import { chooseSource, openCamera, type ImageSource } from '../../lib/imagePick';
 import { toast } from '../../lib/toast';
 import { useVendorId } from '../../lib/vendor';
@@ -88,6 +89,11 @@ export default function ProductFormScreen() {
       }
     }
     if (!res || res.canceled) return;
+    // صورة الكاميرا تمرّ على شاشة التعديل (قص وتحسين) ويمكن تخطّيها
+    if (source === 'camera' && res.assets[0]) {
+      const edited = await editImage(res.assets[0].uri);
+      if (edited) res.assets[0] = { ...res.assets[0], uri: edited, fileName: `product-${Date.now()}.jpg`, mimeType: 'image/jpeg' };
+    }
     setNewImages((prev) => [
       ...prev,
       ...res.assets.slice(0, room).map((a, i) => ({ key: `${a.uri}-${i}`, uri: a.uri, name: a.fileName ?? `product-${Date.now()}-${i}.jpg`, type: a.mimeType ?? 'image/jpeg' })),
@@ -200,6 +206,7 @@ export default function ProductFormScreen() {
               <Image source={{ uri: img.uri }} style={{ flex: 1 }} contentFit="cover" />
               {oldImages.length === 0 && i === 0 && <View style={styles.badge}><AppText weight="bold" style={{ fontSize: 10.5, color: '#FFFFFF' }}>الرئيسية</AppText></View>}
               {editing && <View style={[styles.badge, { start: undefined, end: 4, backgroundColor: tc('#3B82F6') }]}><AppText weight="bold" style={{ fontSize: 10.5, color: '#FFFFFF' }}>جديدة</AppText></View>}
+              <Pressable onPress={async () => { const edited = await editImage(img.uri); if (edited) setNewImages((p) => p.map((x) => (x.key === img.key ? { ...x, uri: edited, type: 'image/jpeg' } : x))); }} style={styles.imgBtnBottom} accessibilityLabel="تعديل الصورة"><Ionicons name="create-outline" size={14} color={colors.text} /></Pressable>
               <Pressable onPress={() => setNewImages((p) => p.filter((x) => x.key !== img.key))} style={styles.imgBtnTop} accessibilityLabel="إزالة"><Ionicons name="close" size={14} color={colors.text} /></Pressable>
             </View>
           ))}
