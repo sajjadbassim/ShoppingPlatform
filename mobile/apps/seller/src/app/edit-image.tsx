@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, I18nManager, PanResponder, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { Canvas, ColorMatrix, ImageFormat, Rect as SkRect, Shadow, Image as SkImage, Skia, useImage } from '@shopify/react-native-skia';
+import { Canvas, ColorMatrix, ImageFormat, Rect as SkRect, Image as SkImage, Skia, useImage } from '@shopify/react-native-skia';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { removeProductImageBackground } from '@wasit/shared';
@@ -28,18 +28,9 @@ const MAX_SIDE = 2048;
 const MARGIN = 8;
 const MIN_FRAME = 72;
 const MAX_ZOOM = 6;
-// ألوان الخلفية بعد الإزالة (null = شفاف). تُرسم كما هي في الوضعين لأنها لون الصورة نفسها
-const BACKGROUNDS: { label: string; color: string | null }[] = [
-  { label: 'أبيض', color: '#FFFFFF' },
-  { label: 'رمادي', color: '#EFEFEF' },
-  { label: 'بيج', color: '#F4ECE1' },
-  { label: 'أسود', color: '#151515' },
-  { label: 'شفاف', color: null },
-];
+// بعد الإزالة تُوضع خلفية بيضاء تلقائياً بلا ظل (بقرار المستخدم: بلا خيارات)
+const WHITE = '#FFFFFF';
 const saveOpts = (alpha?: boolean) => (alpha ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 });
-// ظل ناعم تحت المنتج بنسبة من ارتفاع الصورة، فيبدو نفسه في المعاينة والصورة المحفوظة
-const shadowFor = (h: number) => ({ dy: h * 0.02, blur: h * 0.025 });
-const SHADOW_COLOR = 'rgba(0,0,0,0.28)';
 const RATIOS: { key: string; label: string; value: number | null }[] = [
   { key: 'free', label: 'حر', value: null },
   { key: 'orig', label: 'الأصلي', value: null },
@@ -137,8 +128,6 @@ export default function EditImageScreen() {
   const cvRef = useRef<CropView | null>(null);
   const done = useRef(false);
   const vendorId = useVendorId();
-  const [bg, setBg] = useState<string | null>('#FFFFFF');
-  const [shadow, setShadow] = useState(true);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
 
   const current = stack[stack.length - 1];
@@ -363,20 +352,14 @@ export default function EditImageScreen() {
       const surface = Skia.Surface.MakeOffscreen(current.w, current.h);
       if (!surface) throw new Error('surface');
       const canvas = surface.getCanvas();
-      // بعد الإزالة: لون الخلفية المختار ثم المنتج بظله (الشفاف يبقى PNG)
-      const transparent = !!current.alpha && !bg;
-      if (current.alpha && bg) canvas.drawColor(Skia.Color(bg));
+      // بعد الإزالة: خلفية بيضاء ثم المنتج، فيُحفظ JPEG عادياً
+      if (current.alpha) canvas.drawColor(Skia.Color(WHITE));
       const paint = Skia.Paint();
       paint.setColorFilter(Skia.ColorFilter.MakeMatrix(toMatrix(adjust)));
-      if (current.alpha && shadow) {
-        const sh = shadowFor(current.h);
-        paint.setImageFilter(Skia.ImageFilter.MakeDropShadow(0, sh.dy, sh.blur, sh.blur, Skia.Color(SHADOW_COLOR), null));
-      }
       canvas.drawImage(image, 0, 0, paint);
       surface.flush();
-      const mime = transparent ? 'png' : 'jpeg';
-      const b64 = surface.makeImageSnapshot().encodeToBase64(transparent ? ImageFormat.PNG : ImageFormat.JPEG, 92);
-      const r = await (await ImageManipulator.manipulate(`data:image/${mime};base64,${b64}`).renderAsync()).saveAsync(saveOpts(transparent));
+      const b64 = surface.makeImageSnapshot().encodeToBase64(ImageFormat.JPEG, 92);
+      const r = await (await ImageManipulator.manipulate(`data:image/jpeg;base64,${b64}`).renderAsync()).saveAsync(saveOpts(false));
       close(r.uri);
     } catch {
       toast.error('تعذّر حفظ التعديلات');
@@ -425,10 +408,9 @@ export default function EditImageScreen() {
       <View style={styles.preview} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {image && drawRect ? (
           <Canvas style={{ width: box.w, height: box.h }}>
-            {current?.alpha && bg && !showOriginal && <SkRect x={drawRect.x} y={drawRect.y} width={drawRect.w} height={drawRect.h} color={bg} />}
+            {current?.alpha && !showOriginal && <SkRect x={drawRect.x} y={drawRect.y} width={drawRect.w} height={drawRect.h} color={WHITE} />}
             <SkImage image={image} x={drawRect.x} y={drawRect.y} width={drawRect.w} height={drawRect.h} fit="fill">
               <ColorMatrix matrix={matrix} />
-              {current?.alpha && shadow && !showOriginal && <Shadow dx={0} dy={shadowFor(drawRect.h).dy} blur={shadowFor(drawRect.h).blur} color={SHADOW_COLOR} />}
             </SkImage>
           </Canvas>
         ) : null}
@@ -512,31 +494,17 @@ export default function EditImageScreen() {
           </>
         ) : tab === 'background' ? (
           current?.alpha ? (
-            <>
-              <View style={styles.chips}>
-                {BACKGROUNDS.map((b) => {
-                  const on = bg === b.color;
-                  return (
-                    <Pressable key={b.label} onPress={() => setBg(b.color)} style={[styles.chip, on && { borderColor: colors.primary, borderWidth: 2 }]}>
-                      <View style={[styles.swatch, b.color ? { backgroundColor: b.color } : styles.swatchClear]} />
-                      <AppText weight="bold" style={{ fontSize: 13 }}>{b.label}</AppText>
-                    </Pressable>
-                  );
-                })}
-                <Pressable onPress={() => setShadow((v) => !v)} style={[styles.chip, shadow && styles.chipOn]}>
-                  <Ionicons name="sunny-outline" size={17} color={shadow ? '#FFFFFF' : colors.text} />
-                  <AppText weight="bold" style={{ fontSize: 13, color: shadow ? '#FFFFFF' : colors.text }}>ظل</AppText>
-                </Pressable>
-              </View>
-              <AppText muted style={{ fontSize: 12, textAlign: 'center' }}>للرجوع للخلفية الأصلية اضغط «تراجع» أعلى الشاشة</AppText>
-            </>
+            <View style={styles.doneRow}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+              <AppText weight="medium" style={{ fontSize: 13.5, flex: 1 }}>أُزيلت الخلفية ووُضعت خلفية بيضاء. للرجوع للأصلية اضغط «تراجع» أعلى الشاشة.</AppText>
+            </View>
           ) : (
             <>
               <Pressable onPress={removeBackground} disabled={busy || !vendorId} style={[styles.auto, { opacity: busy || !vendorId ? 0.5 : 1 }]}>
                 <Ionicons name="color-wand" size={18} color="#FFFFFF" />
                 <AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 14 }}>إزالة الخلفية</AppText>
               </Pressable>
-              <AppText muted style={{ fontSize: 12, textAlign: 'center' }}>تُرسل الصورة للخادم وتعود بلا خلفية خلال ثوانٍ، ثم تختار لون الخلفية والظل. تحتاج اتصالاً بالإنترنت.</AppText>
+              <AppText muted style={{ fontSize: 12, textAlign: 'center' }}>تُرسل الصورة للخادم وتعود بلا خلفية خلال ثوانٍ، بخلفية بيضاء. تحتاج اتصالاً بالإنترنت.</AppText>
             </>
           )
         ) : (
@@ -589,8 +557,7 @@ const styles = createStyles(() => ({
   hint: { color: '#FFFFFF', fontSize: 11.5, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden' },
   gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.35)' },
   gridH: { position: 'absolute', start: 0, end: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.35)' },
-  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: colors.border },
-  swatchClear: { backgroundColor: 'transparent', borderStyle: 'dashed' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: colors.primary },
   adjRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   track: { height: 4, borderRadius: 2, backgroundColor: colors.border, justifyContent: 'center' },
