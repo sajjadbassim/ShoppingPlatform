@@ -9,12 +9,16 @@ WorkingDirectory=/opt/wasit-bgremove
 Environment=U2NET_HOME=/opt/wasit-bgremove/models
 Environment=BG_CONCURRENCY=3
 Environment=BG_MODELS=isnet-general-use
+# خيط واحد لكل صورة × 3 صور متزامنة = 3 أنوية، بلا تزاحم مع حد CPUQuota
+Environment=OMP_NUM_THREADS=1
+# حد أعلى يحمي الذاكرة من صور ضخمة (المحرر يرسل حتى 2048 أصلاً، فصور التطبيق تبقى بحجمها)
+Environment=BG_HARD_MAX_SIDE=2048
 ExecStart=/opt/wasit-bgremove/venv/bin/uvicorn app:app --host 127.0.0.1 --port 7010 --workers 1
 Restart=always
 RestartSec=3
-# لا تتجاوز 3 أنوية من 6 ولا 3GB، حتى يبقى الـAPI وقاعدة البيانات سريعين
+# لا تتجاوز 3 أنوية من 6 ولا 5GB، حتى يبقى الـAPI وقاعدة البيانات سريعين (3GB لم تكفِ: OOM في اختبار 30 متزامناً)
 CPUQuota=300%
-MemoryMax=3G
+MemoryMax=5G
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

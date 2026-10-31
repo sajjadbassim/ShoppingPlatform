@@ -11,6 +11,7 @@ from rembg import new_session, remove
 MAX_BYTES = int(os.getenv("BG_MAX_BYTES", str(12 * 1024 * 1024)))
 CONCURRENCY = int(os.getenv("BG_CONCURRENCY", "3"))
 MODELS = os.getenv("BG_MODELS", "isnet-general-use").split(",")
+HARD_MAX_SIDE = int(os.getenv("BG_HARD_MAX_SIDE", "2048"))
 
 sessions = {m: new_session(m) for m in MODELS}
 gate = asyncio.Semaphore(CONCURRENCY)
@@ -20,9 +21,10 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
 def run(data: bytes, model: str, max_side: int) -> bytes:
     img = ImageOps.exif_transpose(Image.open(io.BytesIO(data))).convert("RGB")
-    # max_side=0 (الافتراضي) = الصورة بحجمها كما وصلت، بلا تصغير
-    if max_side and max(img.size) > max_side:
-        img.thumbnail((max_side, max_side), Image.LANCZOS)
+    # max_side=0 (الافتراضي) = الصورة بحجمها كما وصلت، إلا ما تجاوز الحد الأعلى للحماية من نفاد الذاكرة
+    limit = min(max_side, HARD_MAX_SIDE) if max_side else HARD_MAX_SIDE
+    if limit and max(img.size) > limit:
+        img.thumbnail((limit, limit), Image.LANCZOS)
     out = remove(img, session=sessions[model])
     buf = io.BytesIO()
     out.save(buf, "PNG")
