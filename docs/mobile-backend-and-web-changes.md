@@ -274,3 +274,12 @@
 - **التغيير:** نُقل `tiktokP9EGx98mkwSinng0ZBnPzIjVcCwV612Q.txt` إلى `ShoppingPlatformFrontend/public/` ليدخل في كل بناء للويب ويُخدَّم من جذر الموقع (`https://84-46-251-145.sslip.io/tiktok….txt`).
 - **السبب:** تيك توك يطلب ملف تحقق النطاق قبل السماح بالنشر. كان الملف على الخادم نسخةً يدوية في `/var/www/wasit-web` فقط، وأي نشر جديد للويب كان قد يمسحه.
 - **ملاحظة:** ملف `tiktokPbSDYWMLhCQmUUqp2fEQY3HyG1pzQM9X.txt` (رمز آخر غير المُتحقَّق منه) بقي في جذر المشروع ولم يُنقل ولا أثر له على الخادم.
+
+
+## إزالة خلفية صور المنتج (باك + خدمة على السيرفر، 2026-10-31، بإذن المستخدم)
+- **نقطة جديدة:** `POST /api/vendors/{vendorId}/image-tools/remove-background` (multipart، الحقل `file`، JPEG/PNG/WebP حتى 12MB). تعيد PNG شفافاً مباشرة (ليس JSON)، مع ترويستي `X-Queue-Ms` و`X-Process-Ms` للقياس. لا تُخزَّن الصورة على الخادم.
+- **الحماية:** سياسة `OpsOrAdminOrVendor` و`VendorRouteAccessFilter` (ملكية المتجر)، والموظف يحتاج صلاحية `products` (`["ProductImageTools"] = Products` في `StaffPermissions`). حد طلبات جديد `image-tools`: 20 في الدقيقة لكل مستخدم.
+- **الملفات:** `Controllers/ProductImageToolsController.cs`، `Services/ImageToolsService/{IBackgroundRemovalService,BackgroundRemovalService}.cs`، `AddBackgroundRemoval` في `ServiceCollectionExtensions` (عميل HTTP بمهلة 90 ثانية، العنوان من `BackgroundRemoval:BaseUrl` وافتراضياً `http://127.0.0.1:7010`)، وسياسة الحد في `Program.cs`. الأخطاء رسائل عربية عبر `BusinessRuleException` (400) حين تكون الخدمة متوقفة أو الصورة غير صالحة.
+- **الخدمة الداخلية:** `ShoppingPlatformAPI/bgremove/` (`app.py` بـ FastAPI وrembg ونموذج isnet-general-use، `wasit-bgremove.service`، `install.sh`، `loadtest.sh`). تستمع على `127.0.0.1:7010` فقط، طابور بحد 3 صور متزامنة، وsystemd يحدها بـ 3 أنوية و3GB. الصورة تُعالج بحجمها كما وصلت (`max_side=0`)، ويمكن تجربة التصغير بـ `max_side=1024` للمقارنة.
+- **للويب:** النقطة متاحة للويب أيضاً بنفس الشكل إن أُضيف محرر صور هناك. `dotnet build` نظيف و595 اختباراً تنجح.
+- **التثبيت على السيرفر:** لم يُنفَّذ بعد. بعد الرفع إلى `main`: `wasit-deploy` ثم `bash /opt/wasit/ShoppingPlatformAPI/bgremove/install.sh`، ثم `bash /opt/wasit/ShoppingPlatformAPI/bgremove/loadtest.sh 30` للقياس.

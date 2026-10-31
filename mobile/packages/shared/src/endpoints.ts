@@ -147,6 +147,7 @@ export const API_ENDPOINTS = {
     BY_PHONE: (phone: Id) => `/api/Vendors/phone/${phone}`,
     MY_REQUEST: '/api/Vendors/my-request',
     LOGO: (id: Id) => `/api/Vendors/${id}/logo`,
+    REMOVE_BACKGROUND: (id: Id) => `/api/vendors/${id}/image-tools/remove-background`,
     PAGED: '/api/Vendors/paged',
   },
 

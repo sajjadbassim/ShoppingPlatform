@@ -515,6 +515,21 @@ export const buildProductFormData = (form: ProductForm, opts: { editing: boolean
 export const saveProduct = async (id: string | null, fd: FormData): Promise<VendorProduct> =>
   unwrap(id ? await api.put(API_ENDPOINTS.PRODUCTS.BY_ID(id), fd, MULTIPART) : await api.post(API_ENDPOINTS.PRODUCTS.BASE, fd, MULTIPART));
 
+// إزالة خلفية صورة منتج على الخادم: PNG شفاف (بايتات) مع زمن الانتظار والمعالجة للقياس.
+// الانتظار قد يطول وقت الازدحام (طابور الخادم)، فالمهلة أطول من المعتاد
+export interface RemovedBackground {
+  png: ArrayBuffer;
+  queueMs: number | null;
+  processMs: number | null;
+}
+export const removeProductImageBackground = async (vendorId: string, image: PickedImage): Promise<RemovedBackground> => {
+  const fd = new FormData();
+  fd.append('file', image as unknown as Blob);
+  const res = await api.post(API_ENDPOINTS.VENDORS.REMOVE_BACKGROUND(vendorId), fd, { ...MULTIPART, responseType: 'arraybuffer', timeout: 120000 });
+  const ms = (h: unknown) => (h != null && Number.isFinite(Number(h)) ? Number(h) : null);
+  return { png: res.data as ArrayBuffer, queueMs: ms(res.headers['x-queue-ms']), processMs: ms(res.headers['x-process-ms']) };
+};
+
 export const deleteProductImage = async (imageId: string): Promise<void> => {
   await api.delete(API_ENDPOINTS.PRODUCTS.DELETE_IMAGE(imageId));
 };

@@ -2,15 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, I18nManager, PanResponder, Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { Canvas, ColorMatrix, ImageFormat, Image as SkImage, Skia, useImage } from '@shopify/react-native-skia';
+import { Canvas, ColorMatrix, ImageFormat, Rect as SkRect, Shadow, Image as SkImage, Skia, useImage } from '@shopify/react-native-skia';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { removeProductImageBackground } from '@wasit/shared';
 import { AppText, colors, createStyles, useTheme } from '@wasit/ui';
 import { finishEdit } from '../lib/imageEditor';
 import { toast } from '../lib/toast';
+import { useVendorId } from '../lib/vendor';
 
-type Step = { uri: string; w: number; h: number };
-type Tab = 'crop' | 'enhance';
+// alpha = الصورة بلا خلفية (PNG شفاف من الخادم): تُحفظ PNG في كل خطوة بعدها كي لا تضيع الشفافية
+type Step = { uri: string; w: number; h: number; alpha?: boolean };
+type Tab = 'crop' | 'enhance' | 'background';
 type Adjust = { brightness: number; contrast: number; saturation: number };
 type Rect = { x: number; y: number; w: number; h: number };
 // إطار القص ثابت على الشاشة، والصورة تُسحب وتُكبَّر تحته (s = بكسل الشاشة لكل بكسل صورة، cx/cy = مركز الصورة)
@@ -25,6 +28,18 @@ const MAX_SIDE = 2048;
 const MARGIN = 8;
 const MIN_FRAME = 72;
 const MAX_ZOOM = 6;
+// ألوان الخلفية بعد الإزالة (null = شفاف). تُرسم كما هي في الوضعين لأنها لون الصورة نفسها
+const BACKGROUNDS: { label: string; color: string | null }[] = [
+  { label: 'أبيض', color: '#FFFFFF' },
+  { label: 'رمادي', color: '#EFEFEF' },
+  { label: 'بيج', color: '#F4ECE1' },
+  { label: 'أسود', color: '#151515' },
+  { label: 'شفاف', color: null },
+];
+const saveOpts = (alpha?: boolean) => (alpha ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 });
+// ظل ناعم تحت المنتج بنسبة من ارتفاع الصورة، فيبدو نفسه في المعاينة والصورة المحفوظة
+const shadowFor = (h: number) => ({ dy: h * 0.02, blur: h * 0.025 });
+const SHADOW_COLOR = 'rgba(0,0,0,0.28)';
 const RATIOS: { key: string; label: string; value: number | null }[] = [
   { key: 'free', label: 'حر', value: null },
   { key: 'orig', label: 'الأصلي', value: null },
@@ -121,6 +136,10 @@ export default function EditImageScreen() {
   const [cv, setCv] = useState<CropView | null>(null);
   const cvRef = useRef<CropView | null>(null);
   const done = useRef(false);
+  const vendorId = useVendorId();
+  const [bg, setBg] = useState<string | null>('#FFFFFF');
+  const [shadow, setShadow] = useState(true);
+  const [busyLabel, setBusyLabel] = useState<string | null>(null);
 
   const current = stack[stack.length - 1];
   const image = useImage(current?.uri);
@@ -270,8 +289,8 @@ export default function EditImageScreen() {
     if (!current || busy) return;
     setBusy(true);
     try {
-      const r = await (await ImageManipulator.manipulate(current.uri).rotate(90).renderAsync()).saveAsync({ format: SaveFormat.JPEG, compress: 0.92 });
-      push({ uri: r.uri, w: r.width, h: r.height });
+      const r = await (await ImageManipulator.manipulate(current.uri).rotate(90).renderAsync()).saveAsync(saveOpts(current.alpha));
+      push({ uri: r.uri, w: r.width, h: r.height, alpha: current.alpha });
     } catch {
       toast.error('تعذّر تدوير الصورة');
     } finally {
@@ -292,12 +311,37 @@ export default function EditImageScreen() {
     if (width >= current.w - 1 && height >= current.h - 1) return toast.success('لا تغيير على القص');
     setBusy(true);
     try {
-      const out = await (await ImageManipulator.manipulate(current.uri).crop({ originX, originY, width, height }).renderAsync()).saveAsync({ format: SaveFormat.JPEG, compress: 0.92 });
-      push({ uri: out.uri, w: out.width, h: out.height });
+      const out = await (await ImageManipulator.manipulate(current.uri).crop({ originX, originY, width, height }).renderAsync()).saveAsync(saveOpts(current.alpha));
+      push({ uri: out.uri, w: out.width, h: out.height, alpha: current.alpha });
     } catch {
       toast.error('تعذّر قص الصورة');
     } finally {
       setBusy(false);
+    }
+  };
+
+  // إزالة الخلفية على الخادم (الصورة بحجمها كما هي). الناتج PNG شفاف يصير خطوة جديدة قابلة للتراجع
+  const removeBackground = async () => {
+    if (!current || busy || !vendorId) return;
+    setBusy(true);
+    setBusyLabel('جاري إزالة الخلفية…');
+    const started = Date.now();
+    try {
+      const res = await removeProductImageBackground(vendorId, { uri: current.uri, name: current.alpha ? 'product.png' : 'product.jpg', type: current.alpha ? 'image/png' : 'image/jpeg' });
+      const img = Skia.Image.MakeImageFromEncoded(Skia.Data.fromBytes(new Uint8Array(res.png)));
+      if (!img) throw new Error('decode');
+      const out = await (await ImageManipulator.manipulate(`data:image/png;base64,${img.encodeToBase64(ImageFormat.PNG)}`).renderAsync()).saveAsync({ format: SaveFormat.PNG });
+      push({ uri: out.uri, w: out.width, h: out.height, alpha: true });
+      const sec = (ms: number) => (ms / 1000).toFixed(1);
+      const detail = res.processMs != null ? ` (المعالجة ${sec(res.processMs)} ث${res.queueMs ? `، الانتظار ${sec(res.queueMs)} ث` : ''})` : '';
+      toast.success(`تمت الإزالة في ${sec(Date.now() - started)} ث${detail}`);
+    } catch (e) {
+      const err = e as { status?: number; response?: { status?: number } };
+      const status = err.status ?? err.response?.status;
+      toast.error(status === 429 ? 'محاولات كثيرة، انتظر دقيقة ثم أعد المحاولة' : status === 403 ? 'لا تملك صلاحية المنتجات' : status ? 'تعذّرت إزالة الخلفية الآن، حاول بعد قليل' : 'تحقق من الاتصال بالإنترنت ثم أعد المحاولة');
+    } finally {
+      setBusy(false);
+      setBusyLabel(null);
     }
   };
 
@@ -313,17 +357,26 @@ export default function EditImageScreen() {
 
   const save = async () => {
     if (!current || !image || busy) return;
-    if (isNeutral(adjust)) return close(stack.length > 1 ? current.uri : null);
+    if (isNeutral(adjust) && !current.alpha) return close(stack.length > 1 ? current.uri : null);
     setBusy(true);
     try {
       const surface = Skia.Surface.MakeOffscreen(current.w, current.h);
       if (!surface) throw new Error('surface');
+      const canvas = surface.getCanvas();
+      // بعد الإزالة: لون الخلفية المختار ثم المنتج بظله (الشفاف يبقى PNG)
+      const transparent = !!current.alpha && !bg;
+      if (current.alpha && bg) canvas.drawColor(Skia.Color(bg));
       const paint = Skia.Paint();
       paint.setColorFilter(Skia.ColorFilter.MakeMatrix(toMatrix(adjust)));
-      surface.getCanvas().drawImage(image, 0, 0, paint);
+      if (current.alpha && shadow) {
+        const sh = shadowFor(current.h);
+        paint.setImageFilter(Skia.ImageFilter.MakeDropShadow(0, sh.dy, sh.blur, sh.blur, Skia.Color(SHADOW_COLOR), null));
+      }
+      canvas.drawImage(image, 0, 0, paint);
       surface.flush();
-      const b64 = surface.makeImageSnapshot().encodeToBase64(ImageFormat.JPEG, 92);
-      const r = await (await ImageManipulator.manipulate(`data:image/jpeg;base64,${b64}`).renderAsync()).saveAsync({ format: SaveFormat.JPEG, compress: 0.92 });
+      const mime = transparent ? 'png' : 'jpeg';
+      const b64 = surface.makeImageSnapshot().encodeToBase64(transparent ? ImageFormat.PNG : ImageFormat.JPEG, 92);
+      const r = await (await ImageManipulator.manipulate(`data:image/${mime};base64,${b64}`).renderAsync()).saveAsync(saveOpts(transparent));
       close(r.uri);
     } catch {
       toast.error('تعذّر حفظ التعديلات');
@@ -372,8 +425,10 @@ export default function EditImageScreen() {
       <View style={styles.preview} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
         {image && drawRect ? (
           <Canvas style={{ width: box.w, height: box.h }}>
+            {current?.alpha && bg && !showOriginal && <SkRect x={drawRect.x} y={drawRect.y} width={drawRect.w} height={drawRect.h} color={bg} />}
             <SkImage image={image} x={drawRect.x} y={drawRect.y} width={drawRect.w} height={drawRect.h} fit="fill">
               <ColorMatrix matrix={matrix} />
+              {current?.alpha && shadow && !showOriginal && <Shadow dx={0} dy={shadowFor(drawRect.h).dy} blur={shadowFor(drawRect.h).blur} color={SHADOW_COLOR} />}
             </SkImage>
           </Canvas>
         ) : null}
@@ -416,6 +471,7 @@ export default function EditImageScreen() {
         {busy && (
           <View style={styles.busy} pointerEvents="none">
             <ActivityIndicator color="#FFFFFF" />
+            {busyLabel && <AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 14 }}>{busyLabel}</AppText>}
           </View>
         )}
         {!cv && (
@@ -427,7 +483,7 @@ export default function EditImageScreen() {
       </View>
 
       <View style={styles.tabs}>
-        {([['crop', 'crop-outline', 'قص وتدوير'], ['enhance', 'sparkles-outline', 'تحسين']] as const).map(([k, icon, label]) => (
+        {([['crop', 'crop-outline', 'قص'], ['enhance', 'sparkles-outline', 'تحسين'], ['background', 'color-wand-outline', 'الخلفية']] as const).map(([k, icon, label]) => (
           <Pressable key={k} onPress={() => setTab(k)} style={[styles.tab, tab === k && styles.tabOn]}>
             <Ionicons name={icon} size={18} color={tab === k ? colors.primary : colors.textMuted} />
             <AppText weight="bold" style={{ fontSize: 13, color: tab === k ? colors.primary : colors.textMuted }}>{label}</AppText>
@@ -454,6 +510,35 @@ export default function EditImageScreen() {
               <AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 14 }}>تطبيق القص</AppText>
             </Pressable>
           </>
+        ) : tab === 'background' ? (
+          current?.alpha ? (
+            <>
+              <View style={styles.chips}>
+                {BACKGROUNDS.map((b) => {
+                  const on = bg === b.color;
+                  return (
+                    <Pressable key={b.label} onPress={() => setBg(b.color)} style={[styles.chip, on && { borderColor: colors.primary, borderWidth: 2 }]}>
+                      <View style={[styles.swatch, b.color ? { backgroundColor: b.color } : styles.swatchClear]} />
+                      <AppText weight="bold" style={{ fontSize: 13 }}>{b.label}</AppText>
+                    </Pressable>
+                  );
+                })}
+                <Pressable onPress={() => setShadow((v) => !v)} style={[styles.chip, shadow && styles.chipOn]}>
+                  <Ionicons name="sunny-outline" size={17} color={shadow ? '#FFFFFF' : colors.text} />
+                  <AppText weight="bold" style={{ fontSize: 13, color: shadow ? '#FFFFFF' : colors.text }}>ظل</AppText>
+                </Pressable>
+              </View>
+              <AppText muted style={{ fontSize: 12, textAlign: 'center' }}>للرجوع للخلفية الأصلية اضغط «تراجع» أعلى الشاشة</AppText>
+            </>
+          ) : (
+            <>
+              <Pressable onPress={removeBackground} disabled={busy || !vendorId} style={[styles.auto, { opacity: busy || !vendorId ? 0.5 : 1 }]}>
+                <Ionicons name="color-wand" size={18} color="#FFFFFF" />
+                <AppText weight="bold" style={{ color: '#FFFFFF', fontSize: 14 }}>إزالة الخلفية</AppText>
+              </Pressable>
+              <AppText muted style={{ fontSize: 12, textAlign: 'center' }}>تُرسل الصورة للخادم وتعود بلا خلفية خلال ثوانٍ، ثم تختار لون الخلفية والظل. تحتاج اتصالاً بالإنترنت.</AppText>
+            </>
+          )
         ) : (
           <>
             <Pressable onPress={() => setAdjust(AUTO)} style={styles.auto}>
@@ -490,7 +575,7 @@ const styles = createStyles(() => ({
   screen: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 16, paddingVertical: 12 },
   preview: { flex: 1, overflow: 'hidden', backgroundColor: colors.background },
-  busy: { ...({ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 } as const), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
+  busy: { ...({ position: 'absolute', top: 0, bottom: 0, start: 0, end: 0 } as const), alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.35)' },
   compare: { position: 'absolute', bottom: 10, start: 10, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.55)' },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 10 },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, borderRadius: 21, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
@@ -504,6 +589,8 @@ const styles = createStyles(() => ({
   hint: { color: '#FFFFFF', fontSize: 11.5, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, overflow: 'hidden' },
   gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(255,255,255,0.35)' },
   gridH: { position: 'absolute', start: 0, end: 0, height: 1, backgroundColor: 'rgba(255,255,255,0.35)' },
+  swatch: { width: 18, height: 18, borderRadius: 9, borderWidth: 1, borderColor: colors.border },
+  swatchClear: { backgroundColor: 'transparent', borderStyle: 'dashed' },
   knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF', borderWidth: 3, borderColor: colors.primary },
   adjRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   track: { height: 4, borderRadius: 2, backgroundColor: colors.border, justifyContent: 'center' },

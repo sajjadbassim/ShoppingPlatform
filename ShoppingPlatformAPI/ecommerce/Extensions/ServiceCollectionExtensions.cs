@@ -201,6 +201,19 @@ namespace ecommerce.Extensions
         }
 
         // ربط متاجر التجار بتيك توك — المفاتيح من القسم "TikTok" (السر في user-secrets / متغيرات البيئة).
+        // إزالة خلفية صور المنتجات: خدمة rembg داخلية على نفس الخادم (BackgroundRemoval:BaseUrl). الانتظار في طابورها قد يطول وقت الازدحام
+        public static IServiceCollection AddBackgroundRemoval(this IServiceCollection services, IConfiguration config)
+        {
+            var baseUrl = config["BackgroundRemoval:BaseUrl"] ?? "http://127.0.0.1:7010";
+            services.AddHttpClient(ecommerce.Services.ImageToolsService.BackgroundRemovalService.HttpClientName, c =>
+            {
+                c.BaseAddress = new Uri(baseUrl);
+                c.Timeout = TimeSpan.FromSeconds(90);
+            });
+            services.AddScoped<ecommerce.Services.ImageToolsService.IBackgroundRemovalService, ecommerce.Services.ImageToolsService.BackgroundRemovalService>();
+            return services;
+        }
+
         // يُستدعى بعد AddAppDataProtection (تشفير التوكنات)
         // رمز التحقق عبر واتساب (Wevlix) — بلا مفتاح يُطبع الرمز في السجل (التطوير)
         public static IServiceCollection AddOtpSender(this IServiceCollection services, IConfiguration config)

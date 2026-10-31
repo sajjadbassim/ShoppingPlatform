@@ -1,0 +1,25 @@
+[Unit]
+Description=Wasit background removal (rembg, internal only)
+After=network.target
+
+[Service]
+User=wasit-bg
+Group=wasit-bg
+WorkingDirectory=/opt/wasit-bgremove
+Environment=U2NET_HOME=/opt/wasit-bgremove/models
+Environment=BG_CONCURRENCY=3
+Environment=BG_MODELS=isnet-general-use
+ExecStart=/opt/wasit-bgremove/venv/bin/uvicorn app:app --host 127.0.0.1 --port 7010 --workers 1
+Restart=always
+RestartSec=3
+# لا تتجاوز 3 أنوية من 6 ولا 3GB، حتى يبقى الـAPI وقاعدة البيانات سريعين
+CPUQuota=300%
+MemoryMax=3G
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/wasit-bgremove
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

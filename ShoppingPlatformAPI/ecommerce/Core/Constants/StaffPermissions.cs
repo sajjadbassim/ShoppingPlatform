@@ -106,6 +106,7 @@ namespace ecommerce.Core.Constants
             ["Invoice"] = Orders,
             ["Products"] = Products,
             ["ProductVariants"] = Products,
+            ["ProductImageTools"] = Products,
             ["VendorMarketing"] = Marketing,
             ["Reviews.Reply"] = Reviews,
             ["Reviews.DeleteReply"] = Reviews,

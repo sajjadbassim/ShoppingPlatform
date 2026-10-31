@@ -286,6 +286,15 @@ builder.Services.AddRateLimiter(options =>
             Window = TimeSpan.FromMinutes(5),
             QueueLimit = 0,
         }));
+    // أدوات صور المنتج (إزالة الخلفية): لكل مستخدم، حتى لا يحجز تاجر واحد طابور الخادم
+    options.AddPolicy("image-tools", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
     // تحديث محتوى حسابات التواصل (طلب عام يتصل بتيك توك وإنستغرام): يكفي لفتح المتاجر والريلز بشكل طبيعي
     options.AddPolicy("social-refresh", http => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
         http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -321,6 +330,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddAppPersistence(builder.Configuration);
 builder.Services.AddAppServices();
 builder.Services.AddOtpSender(builder.Configuration);
+builder.Services.AddBackgroundRemoval(builder.Configuration);
 builder.Services.AddAppDataProtection(builder.Configuration, builder.Environment);
 builder.Services.AddTikTokIntegration(builder.Configuration);
 builder.Services.AddInstagramIntegration(builder.Configuration);
